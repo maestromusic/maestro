@@ -16,10 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import string
+
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db
+from .. import database as db, strutils
 from ..core import elements, levels, nodes, tags
 from . import tagwidgets, widgets
 
@@ -46,7 +48,6 @@ def warning(title,text,parent=None):
 
 
 class WaitingDialog(QtGui.QDialog):
-    
     def __init__(self, title, text, cancelButton=True):
         from . import mainwindow
         super().__init__(mainwindow.mainWindow)
@@ -63,7 +64,8 @@ class WaitingDialog(QtGui.QDialog):
     
     def setText(self, text):
         self.label.setText(text)
-    
+
+
 class FancyPopup(QtGui.QFrame):
     """Fancy popup that looks like a tooltip. It is shown beneath its parent component (usually the button
     that opens the popup).
@@ -198,6 +200,7 @@ class MergeDialog(QtGui.QDialog):
         """
         
         super().__init__(parent)
+        self.setMinimumSize(400, 250)
         self.setWindowTitle(self.tr("Merge elements"))
         self.model = model
         self.wrappers = wrappers
@@ -207,130 +210,159 @@ class MergeDialog(QtGui.QDialog):
         cTypes = set(elem.type for elem in self.elements if elem.isContainer())
         containerType = next(iter(cTypes)) if len(cTypes) == 1 else None
         
-        # Layout:
-        # <tagType>  | "of new container:" | <lineEdit>
-        # "Type of new container:"         | <containerType>
-        # <checkbox> "Remove common prefx" | <lineEdit>
-        # <checkbox "assign common tags and flags"
-        # <checkbox> "auto-adjust positions" (only if relevant)
-        # <DialogButtonBox>
+        titleHint = ''
+        prefix = ''
+        if len(self.elements) > 1:
+            allTitles = []
+            for element in self.elements:
+                if tags.TITLE in element.tags:
+                    allTitles.extend(element.tags[tags.TITLE])
+            # We require that the common title is separated from the rest by whitespace or punctuation
+            # Otherwise elements that happen to start with the same letter would give a common prefix.
+            prefix = strutils.commonPrefix(allTitles, separated=True)
+            if len(prefix) > 0: 
+                titleHint = prefix.strip(string.punctuation + string.whitespace)
+        elif len(self.elements) == 1:
+            titleHint = ' - '.join(self.elements[0].tags[tags.TITLE])
+        
         layout = QtGui.QGridLayout()
+        self.setLayout(layout)
         
-        self.tagChooser = tagwidgets.TagTypeBox(defaultTag=tags.TITLE, editable=False)
-        self.tagChooser.tagChanged.connect(self.updateHints)
-        layout.addWidget(self.tagChooser, 0, 0)
-        label = QtGui.QLabel(self.tr('of new container:'))
-        layout.addWidget(label, 0, 1)
-        self.valueEdit = QtGui.QLineEdit()
-        layout.addWidget(self.valueEdit, 0, 2)
+        row = 0
+        titleLineLayout = QtGui.QHBoxLayout()
+        layout.addLayout(titleLineLayout, row, 0, 1, 2)
+        titleLineLayout.addWidget(QtGui.QLabel(self.tr('Title of new container:')))
+        self.titleEdit = QtGui.QLineEdit(titleHint)
+        titleLineLayout.addWidget(self.titleEdit)
         
+        row += 1
         label = QtGui.QLabel(self.tr('Container type:'))
-        layout.addWidget(label, layout.rowCount(), 0, 1, 2)
+        layout.addWidget(label, row, 0)
         self.parentTypeBox = widgets.ContainerTypeBox(containerType or elements.TYPE_COLLECTION)
-        layout.addWidget(self.parentTypeBox, layout.rowCount() - 1, 2)
+        layout.addWidget(self.parentTypeBox, row, 1)
         
-        self.changeTypeBox = QtGui.QCheckBox(self.tr("Change types to:"))
-        self.changeTypeBox.setChecked(False)
-        if any(elem.isContainer() for elem in self.elements):
-            layout.addWidget(self.changeTypeBox, layout.rowCount(), 0, 1, 2)
+        row += 1
+        label = QtGui.QLabel(self.tr("Options"))
+        label.setStyleSheet("QLabel { font-weight: bold }")
+        label.setContentsMargins(0, 10, 0, 0)
+        layout.addWidget(label, row, 0, 1, 2)
+        
+        row += 1
+        self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags and flags"))
+        self.commonTagsBox.setChecked(True)
+        layout.addWidget(self.commonTagsBox, row, 0, 1, 2)
+        
+        if isinstance(self.parentNode, nodes.Wrapper):
+            row += 1
+            self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
+            self.positionCheckBox.setChecked(True)
+            layout.addWidget(self.positionCheckBox, row, 0, 1, 2)
+        
+        if any(element.isContainer() for element in self.elements):
+            row += 1
+            self.changeTypeBox = QtGui.QCheckBox(self.tr("Change content container types to:"))
+            self.changeTypeBox.setChecked(False)
+            layout.addWidget(self.changeTypeBox, row, 0)
             self.childrenTypeBox = widgets.ContainerTypeBox(elements.TYPE_CONTAINER)
-            layout.addWidget(self.childrenTypeBox, layout.rowCount() - 1, 2)
+            layout.addWidget(self.childrenTypeBox, row, 1)
             self.childrenTypeBox.setEnabled(False)
             self.changeTypeBox.toggled.connect(self.childrenTypeBox.setEnabled)
         
-        self.removePrefixBox = QtGui.QCheckBox()
-        self.removePrefixBox.setChecked(True)
-        layout.addWidget(self.removePrefixBox, layout.rowCount(), 0, 1, 2)
-        self.removeEdit = QtGui.QLineEdit()
-        layout.addWidget(self.removeEdit, layout.rowCount() - 1, 2)
-        self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
+        if len(prefix) > 0:
+            row += 1
+            self.removePrefixBox = QtGui.QCheckBox(self.tr("Remove common title prefix:"))
+            self.removePrefixBox.setChecked(True)
+            layout.addWidget(self.removePrefixBox, row, 0)
+            self.removeEdit = QtGui.QLineEdit(prefix)
+            layout.addWidget(self.removeEdit, row, 1)
+            self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
         
-        self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags and flags"))
-        self.commonTagsBox.setChecked(True)
-        layout.addWidget(self.commonTagsBox, layout.rowCount(), 0, 1, 3)
-        
-        if isinstance(self.parentNode, nodes.Wrapper):
-            self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
-            self.positionCheckBox.setChecked(True)
-            layout.addWidget(self.positionCheckBox, layout.rowCount(), 0, 1, 3)
+        if len(self.elements) > 1 and any(strutils.numberFromPrefix(title[len(prefix):])[0] is not None 
+                                          for title in allTitles):
+            row += 1
+            if len(prefix) > 0:
+                text = self.tr("Remove numbers after common title prefix")
+            else: text = self.tr("Remove numbers from title start")
+            self.removeNumbersBox = QtGui.QCheckBox(text)
+            self.removeNumbersBox.setChecked(True)
+            layout.addWidget(self.removeNumbersBox, row, 0)
             
+        row += 1
+        layout.setRowStretch(row, 1)
+        
+        row += 1
         buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
         buttons.accepted.connect(self.performMerge)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons, layout.rowCount(), 0, 1, 3)
-        self.updateHints(tags.TITLE)
-        self.setLayout(layout)
-        
-    def updateHints(self, tag):
-        """Update the hints for new tag value and remove prefix after a tag type is selected.
-        
-        The prefix hint is the longest common prefix of all children that have a tag of type *tag*.
-        The value hint is the prefix with punctuation and whitespaces stripped.
-        """
-        from .. import strutils
-        import string
-        self.removePrefixBox.setText(self.tr("Remove prefixes from children's {}:").format(tag))
-        noHint = all(tag not in element.tags for element in self.elements)
-        self.removeEdit.setDisabled(noHint)
-        if noHint:
-            self.valueEdit.setText("")
-            self.removeEdit.setText("")
-        else:
-            hintRemove = strutils.commonPrefix(str(element.tags[tag][0])
-                            for element in self.elements if tag in element.tags)
-            self.removeEdit.setText(hintRemove)
-            hintValue = hintRemove.strip(string.punctuation + string.whitespace)
-            self.valueEdit.setText(hintValue)
+        layout.addWidget(buttons, row, 0, 1, 2)
     
     def performMerge(self):
-        """The actual merge operation.
-        """
-        self.level.stack.beginMacro(self.tr("merge"))
-        if self.level is levels.real:
-            db.transaction()
+        """The actual merge operation."""
+        self.level.stack.beginMacro(self.tr("Merge elements"), transaction=self.level is levels.real)
+        containerTitle = self.titleEdit.text().strip()
+        containerType = self.parentTypeBox.currentType()
+        
+        # Container tags & flags
         if self.commonTagsBox.isChecked():
             containerTags = tags.findCommonTags(self.elements)
             containerFlags = list(set.intersection(*(set(el.flags) for el in self.elements)))
         else:
             containerTags = tags.Storage()
             containerFlags = []
-        mergeTag = self.tagChooser.getTag()
-        containerTags[mergeTag] = [ self.valueEdit.text() ]
-        contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
-        container = self.level.createContainer(tags=containerTags,
-                                               flags=containerFlags,
-                                               contents=contents,
-                                               type=self.parentTypeBox.currentType())
-        if self.removePrefixBox.isChecked():
-            childChanges = {}
-            prefix = self.removeEdit.text()
-            for elem in self.elements:
-                if mergeTag not in elem.tags:
+            
+        if len(containerTitle) > 0:
+            containerTags[tags.TITLE] = [containerTitle]
+            if containerType == elements.TYPE_ALBUM and tags.ALBUM not in containerTags:
+                containerTags[tags.ALBUM] = [containerTitle]
+                
+        # Before creating anything, change tags of children (might raise filesystem errors)
+        removePrefixes = hasattr(self, 'removePrefixBox') and self.removePrefixBox.isChecked()
+        removeNumbers = hasattr(self, 'removeNumbersBox') and self.removeNumbersBox.isChecked()
+        if removePrefixes or removeNumbers:
+            tagChanges = {}
+            prefix = self.removeEdit.text() if removePrefixes else ''
+            for element in self.elements:
+                if tags.TITLE not in element.tags:
                     continue
-                replacements = [(val, val[len(prefix):]) for val in elem.tags[mergeTag]
-                                                         if val.startswith(prefix)
-                                                         and val != prefix]
-                removals = [val for val in elem.tags[mergeTag] if val == prefix]
-                if len(replacements) > 0 or len(removals) > 0:
-                    childChanges[elem] = tags.SingleTagDifference(mergeTag,
-                                                                  removals=removals,
-                                                                  replacements=replacements)
-            if len(childChanges) > 0:
+                removals, replacements = [], []
+                for value in element.tags[tags.TITLE]:
+                    if value == prefix:
+                        removals.append(value)
+                    elif value.startswith(prefix):
+                        newValue = value[len(prefix):]
+                        if removeNumbers:
+                            number = strutils.numberFromPrefix(newValue)[1]
+                            if len(number) > 0:
+                                newValue = newValue[len(number):]
+                        if len(newValue) == 0:
+                            removals.append(value)
+                        elif value != newValue:
+                            replacements.append((value, newValue))
+                tagChanges[element] = tags.SingleTagDifference(tags.TITLE,
+                                                               removals=removals,
+                                                               replacements=replacements)
+    
+            if len(tagChanges) > 0:
                 from ..filebackends import TagWriteError
                 try:
-                    self.level.changeTags(childChanges)
+                    self.level.changeTags(tagChanges)
                 except TagWriteError as e:
                     e.displayMessage()
                     self.level.stack.abortMacro()
-                    if self.level is levels.real:
-                        db.commit()
                     self.reject()
                     return
-        if self.changeTypeBox.isChecked():
+                
+        if hasattr(self, 'changeTypeBox') and self.changeTypeBox.isChecked():
             newType = self.childrenTypeBox.currentType()
             self.level.setTypes({elem: newType for elem in self.elements
                                                if elem.isContainer
                                                and elem.type != newType})
+            
+        contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
+        container = self.level.createContainer(tags = containerTags,
+                                               flags = containerFlags,
+                                               contents = contents,
+                                               type = containerType)
                     
         if isinstance(self.parentNode, nodes.Wrapper):
             parent = self.parentNode.element
@@ -338,7 +370,7 @@ class MergeDialog(QtGui.QDialog):
             insertIndex = parent.contents.positions.index(insertPosition)
             if self.positionCheckBox.isChecked():
                 self.level.removeContentsAuto(parent, [wrapper.position for wrapper in self.wrappers])
-                self.level.insertContentsAuto(parent, insertIndex, [ container ])
+                self.level.insertContentsAuto(parent, insertIndex, [container])
             else:
                 self.level.removeContents(parent, [wrapper.position for wrapper in self.wrappers])
                 self.level.insertContents(parent, [(insertPosition, container)] )
@@ -355,8 +387,6 @@ class MergeDialog(QtGui.QDialog):
                 self.model.removeElements(self.parentNode, rows)
             #else: Nothing to do: Merge has been performed in the level and the model does not allow a merge
                 
-        if self.level is levels.real:
-            db.commit()
         self.level.stack.endMacro()
         self.accept()
         

@@ -518,38 +518,36 @@ class TagEditorWidget(QtGui.QWidget):
 
         if len(selectedRecords) > 0:
             if len(selectedRecords) > 1 and all(r.tag.type == tags.TYPE_VARCHAR for r in selectedRecords):
-                commonPrefix = strutils.commonPrefix(record.value for record in selectedRecords)
+                commonPrefix = strutils.commonPrefix([record.value for record in selectedRecords])
                 
                 if len(commonPrefix) > 0:
                     action = fancyMenu.addAction(self.tr("Edit common start..."))
                     action.triggered.connect(self._editCommonStart)
                     
-                    if commonPrefix[-1].upper() == "I":
-                        # Bugfix: If up to four pieces using roman numbers are selected, the commonPrefix
-                        # will contain an 'I'. Consequently the 'I' is missing in the rest and
-                        # numberFromPrefix won't find a number in the first piece.
-                        prefixLength = len(commonPrefix) - 1
-                    else: prefixLength = len(commonPrefix)
-                    rests = [str(record.value)[prefixLength:] for record in selectedRecords]
-                    if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
-                        newValues = []
-                        for record, rest in zip(selectedRecords, rests):
-                            number, prefix = strutils.numberFromPrefix(rest)
-                            if number is not None:
-                                newValues.append(record.value[prefixLength+len(prefix):])
-                            else: newValues.append(record.value[prefixLength:])
-                        if all(record.tag.isValid(value)
-                               for record, value in zip(selectedRecords, newValues)):
-                            action = fancyMenu.addAction(self.tr("Remove common start (including numbers)"))
-                            action.triggered.connect(functools.partial(self._editMany,
-                                                                       selectedRecords, newValues))
-                    else:
-                        newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
-                        if all(record.tag.isValid(value)
-                               for record, value in zip(selectedRecords, newValues)):
-                            action = fancyMenu.addAction(self.tr("Remove common start"))
-                            action.triggered.connect(functools.partial(self._editMany,
-                                                                       selectedRecords, newValues))
+                    commonPrefix = strutils.commonPrefix([record.value for record in selectedRecords],
+                                                         separated=True)
+                    if len(commonPrefix) > 0:
+                        rests = [record.value[len(commonPrefix):] for record in selectedRecords]
+                        if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
+                            newValues = []
+                            for record, rest in zip(selectedRecords, rests):
+                                number, prefix = strutils.numberFromPrefix(rest)
+                                if number is not None:
+                                    newValues.append(record.value[len(commonPrefix)+len(prefix):])
+                                else: newValues.append(record.value[len(commonPrefix):])
+                            if all(record.tag.isValid(value)
+                                   for record, value in zip(selectedRecords, newValues)):
+                                action = fancyMenu.addAction(
+                                                        self.tr("Remove common start (including numbers)"))
+                                action.triggered.connect(functools.partial(self._editMany,
+                                                                           selectedRecords, newValues))
+                        else:
+                            newValues = [record.value[len(commonPrefix):] for record in selectedRecords]
+                            if all(record.tag.isValid(value)
+                                   for record, value in zip(selectedRecords, newValues)):
+                                action = fancyMenu.addAction(self.tr("Remove common start"))
+                                action.triggered.connect(functools.partial(self._editMany,
+                                                                           selectedRecords, newValues))
                 else:
                     action = fancyMenu.addAction(self.tr("Add common start..."))
                     action.triggered.connect(self._editCommonStart)

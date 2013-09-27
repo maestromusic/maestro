@@ -19,12 +19,12 @@
 """This module just contains several useful string functions."""
 
 from PyQt4 import QtCore
+translate = QtCore.QCoreApplication.translate
 
-import re
+import re, string
 
 from . import constants
 
-translate = QtCore.QCoreApplication.translate
 
 def replace(text,dict):
     """Replace multiple pairs at a single blow. To be exact: The keys of *dict* are replaced by the
@@ -71,18 +71,29 @@ def formatLength(lengthInSeconds):
                                int(hours/24)) + ' ' + timeString
 
 
-def commonPrefix(strings):
-    """Given a list of string or something that can be converted to one, return the longest common prefix."""
+def commonPrefix(strings, separated=False):
+    """Given a list of string or something that can be converted to one, return the longest common prefix.
+    If *separated* is True, shorten the prefix so that it ends with whitespace/punctuation (exception: do
+    not shorten prefix, if all strings are equal). Note: In particular this fixes the problem that the common
+    prefix of ["Part I.", "Part II.", "Part III."] includes a part of the numbers and that the numbers
+    cannot be recognized without it.
+    """
     strings = list(strings)
     if len(strings) == 0:
         return ''
     i = 0
     try:
         while i < len(strings[0]) and all(strings[0][i] == string[i] for string in strings[1:]):
-            i = i + 1
+            i += 1
     except IndexError:
         pass
-    return strings[0][:i]
+    prefix = strings[0][:i]
+    if not separated or all(len(prefix) == len(string) for string in strings):
+        return prefix
+    else:
+        while i > 0 and prefix[i-1] not in string.whitespace + string.punctuation:
+            i -= 1
+        return prefix[:i]
 
         
 def numberFromPrefix(string):
@@ -132,8 +143,8 @@ def numberFromPrefix(string):
     if indexWhereNumberEnds < i:
         return (number,string[:i])
     else: return (None,'')
-    
 
+    
 def rstripSeparator(string):
     """Return a copy of *string* where whitespace at the end is removed. If after removing whitespace the
     string contains one of the separators from ``constants.SEPARATORS`` at its end, remove it together with
