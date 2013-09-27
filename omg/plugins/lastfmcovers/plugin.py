@@ -59,8 +59,13 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
     
     def fetch(self,elements):
         for element in elements:
-            if tags.get('artist') not in element.tags or tags.ALBUM not in element.tags:
-                self.error.emit(self.tr("Cannot fetch a cover for an element without artist or album."))
+            if tags.get('artist') not in element.tags:
+                self.error.emit(self.tr("Cannot fetch a cover for an element without artist tag."))
+                self.finished.emit(element)
+            elif (tags.ALBUM not in element.tags 
+                    # for containers allow to use the title
+                    and (not element.isContainer() or tags.TITLE not in element.tags)):
+                self.error.emit(self.tr("Cannot fetch a cover for an element without album tag."))
                 self.finished.emit(element)
             else:
                 for url in self._getLastFmURLs(element):
@@ -79,7 +84,8 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
         """Based on *element*'s artist-tags and album-tags, return a list of URLs where album information
         including cover URLs may be found.""" 
         urls = []
-        for artist,album in itertools.product(element.tags[tags.get('artist')],element.tags[tags.ALBUM]):
+        tag = tags.ALBUM if tags.ALBUM in element.tags else tags.TITLE
+        for artist,album in itertools.product(element.tags[tags.get('artist')], element.tags[tag]):
             url = QtCore.QUrl('http://ws.audioscrobbler.com/2.0/')
             url.addQueryItem('method','album.getinfo')
             url.addQueryItem('artist',artist)
