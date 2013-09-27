@@ -188,9 +188,10 @@ class MergeDialog(QtGui.QDialog):
       3. the selected elements are inserted into the new container
       4. the new container is inserted into the parent (at the position of the first child removed)
     The dialog allows to set a single tag for the new container (usually the title). Optionally,
-      - a common prefix of the selected tag can be removed from the children
+      - a common prefix of the selected tag can be removed from the children,
+      - numbers behind the prefix can be removed
       - the container can be assigned the common tags of all children
-      - positions of subsequent elements can be lowered accordinlgy.
+      - positions of subsequent elements can be lowered accordingly.
     """ 
     
     def __init__(self, model, wrappers, parent=None):
@@ -280,10 +281,7 @@ class MergeDialog(QtGui.QDialog):
         if len(self.elements) > 1 and any(strutils.numberFromPrefix(title[len(prefix):])[0] is not None 
                                           for title in allTitles):
             row += 1
-            if len(prefix) > 0:
-                text = self.tr("Remove numbers after common title prefix")
-            else: text = self.tr("Remove numbers from title start")
-            self.removeNumbersBox = QtGui.QCheckBox(text)
+            self.removeNumbersBox = QtGui.QCheckBox(self.tr("Remove numbers from title start"))
             self.removeNumbersBox.setChecked(True)
             layout.addWidget(self.removeNumbersBox, row, 0)
             
@@ -326,18 +324,17 @@ class MergeDialog(QtGui.QDialog):
                     continue
                 removals, replacements = [], []
                 for value in element.tags[tags.TITLE]:
-                    if value == prefix:
-                        removals.append(value)
-                    elif value.startswith(prefix):
+                    if removePrefixes and value.startswith(prefix):
                         newValue = value[len(prefix):]
-                        if removeNumbers:
-                            number = strutils.numberFromPrefix(newValue)[1]
-                            if len(number) > 0:
-                                newValue = newValue[len(number):]
-                        if len(newValue) == 0:
-                            removals.append(value)
-                        elif value != newValue:
-                            replacements.append((value, newValue))
+                    else: newValue = value
+                    if removeNumbers:
+                        number = strutils.numberFromPrefix(newValue)[1]
+                        if len(number) > 0:
+                            newValue = newValue[len(number):]
+                    if len(newValue) == 0:
+                        removals.append(value)
+                    elif value != newValue:
+                        replacements.append((value, newValue))
                 tagChanges[element] = tags.SingleTagDifference(tags.TITLE,
                                                                removals=removals,
                                                                replacements=replacements)
