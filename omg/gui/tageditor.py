@@ -561,8 +561,10 @@ class TagEditorWidget(QtGui.QWidget):
                             action.triggered.connect(functools.partial(self._editMany,
                                                                        selectedRecords, newValues))
             for separator in self.model.getPossibleSeparators(selectedRecords):
-                # getPossibleSeparators returns nothing if a date record is selected
-                action = fancyMenu.addAction(self.tr("Separate at '{}'").format(separator))
+                # Note: getPossibleSeparators returns nothing if a date record is selected
+                # & are used to specify mnemonics
+                action = fancyMenu.addAction(self.tr("Separate at '{}'")
+                                             .format(separator.replace('&', '&&')))
                 action.triggered.connect(functools.partial(self._splitMany, selectedRecords, separator))
 
         fancyMenu.setEnabled(len(fancyMenu.actions()) > 0)
