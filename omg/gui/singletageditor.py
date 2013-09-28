@@ -73,13 +73,29 @@ class SingleTagEditor(QtGui.QWidget):
         self.expandLine.doubleClicked.connect(self.uncommonList.selectAll)
         self.layout().addWidget(self.uncommonList, 1)
         
-        pos = 0
+        # Big CD collections will often have hundreds of records. In most cases only few of them will be
+        # common and the rest will not be visible until its ExpandLine is expanded.
+        # By creating widgets only for expanded uncommon records, tageditor load time is significantly
+        # reduced.
+        self._uncommonLoaded = False
         for record in model.getRecords(tag):
-            self._insertRecord(pos, record)
-            pos = pos + 1
+            if record.isCommon():
+                self._insertRecord(-1, record)
     
-        self._updateUncommonDisplay()
+        self._updateListVisibility()
 
+    def _loadUncommonRecords(self):
+        """Load all uncommon records.
+        Big CD collections will often have hundreds of records. In most cases only few of them will be
+        common and the rest will not be visible until its ExpandLine is expanded. By creating widgets only
+        for expanded uncommon records, tageditor load time is significantly reduced.
+        """
+        assert not self._uncommonLoaded
+        for record in self.model.getRecords(self.tag):
+            if not record.isCommon():
+                self._insertRecord(-1, record)
+        self._uncommonLoaded = True
+        
     def setTag(self, tag):
         """Set the tag this SingleTagEditor feels responsible for. This does not change the appearance of
         the editor or the value in the editor but simply the set of recordAdded-, recordRemoved,...-signals
@@ -99,9 +115,11 @@ class SingleTagEditor(QtGui.QWidget):
     def _insertRecord(self, pos, record):
         """Helper method: Insert *record* at position *pos*."""
         recordEditor = RecordEditor(self.model, record)
-        pos = self._computePosition(record.isCommon(), pos)
-        (self.commonList if record.isCommon() else self.uncommonList).insertWidget(pos, recordEditor)
-        self._updateUncommonDisplay()
+        theList = self.commonList if record.isCommon() else self.uncommonList
+        if pos >= 0:
+            self._computePosition(record.isCommon(), pos)
+        else: pos = len(theList)
+        theList.insertWidget(pos, recordEditor)
     
     def _removeRecord(self, record, exact=False):
         """Helper method: Remove *record*. Compare with "is" if *exact* is True, otherwise with "=="."""
@@ -109,46 +127,63 @@ class SingleTagEditor(QtGui.QWidget):
         for widget in widgetList:
             if widget.getRecord() == record and (not exact or widget.getRecord() is record):
                 widgetList.removeWidget(widget)
-                self._updateUncommonDisplay()
                 return
         else: raise ValueError("Record '{}' was not found.".format(record))
         
     def _handleRecordInserted(self, pos, record):
         """React to recordInserted-signals from the model."""
         if record.tag == self.tag:
+            if not self._uncommonLoaded and not record.isCommon():
+                self._loadUncommonRecords()
             self._insertRecord(pos, record)
+            self._updateListVisibility()
             
     def _handleRecordRemoved(self, record):
         """React to recordRemoved-signals from the model."""
         if record.tag == self.tag:
+            if not self._uncommonLoaded and not record.isCommon():
+                self._loadUncommonRecords()
             self._removeRecord(record)
+            self._updateListVisibility()
 
     def _handleRecordChanged(self, tag, oldRecord, newRecord):
         """React to recordChanged-signals from the model."""
         if tag == self.tag and oldRecord.isCommon() != newRecord.isCommon():
+            if not self._uncommonLoaded:
+                self._loadUncommonRecords()
             # Change the list in which the record is displayed
             # BUGFIX: When level events are handled, it may happen that the model contains two equal records
             # for a short moment (change a,b to b,c. After one step you have b,b).
             # We must remove the correct one.
             self._removeRecord(oldRecord, exact=True)
             self._insertRecord(self.model.getRecords(self.tag).index(newRecord), newRecord)
+            self._updateListVisibility()
 
-    def _updateUncommonDisplay(self):
-        """Update the expand line and list of uncommon records. Check whether they should be visible."""
+    def _updateListVisibility(self):
+        """Update the expand line and check whether the lists should be visible."""
         self.commonList.setVisible(len(self.commonList) > 0)
-        uncommonCount = len(self.uncommonList)
+        if self._uncommonLoaded:
+            uncommonCount = len(self.uncommonList)
+        else:
+            uncommonCount = sum(0 if record.isCommon() else 1 for record in self.model.getRecords(self.tag))
+            if 0 < uncommonCount <= self.EXPAND_LINE_LIMIT: # no expandline necessary
+                self._loadUncommonRecords()
+            
         expandLineNecessary = uncommonCount > self.EXPAND_LINE_LIMIT
         self.expandLine.setVisible(expandLineNecessary)
         self.uncommonList.setVisible(uncommonCount > 0 and (self.expanded or not expandLineNecessary))
         self.uncommonList.setContentsMargins(20 if expandLineNecessary else 0, 0, 0, 0)
         self.expandLine.setText("<i>"+self.tr("{} different").format(uncommonCount)+"</i>")
-                
+            
     def setExpanded(self, expanded):
         """Set whether the uncommon records in this list should be visible (expanded) or not (collapsed)."""
-        if expanded == self.expanded:
-            return
-        self.expanded = expanded
-        self._updateUncommonDisplay()
+        if expanded != self.expanded:
+            if not self._uncommonLoaded:
+                self.expandLine.setText(self.tr("<i>Loading...</i>"))
+                QtGui.QApplication.processEvents()
+                self._loadUncommonRecords()
+            self.expanded = expanded
+            self._updateListVisibility()
                 
     def contextMenuEvent(self, contextMenuEvent):
         # Figure out on what record editor the event did happen
