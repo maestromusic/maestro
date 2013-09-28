@@ -34,8 +34,7 @@ class EditorTreeView(treeview.DraggingTreeView):
 
     actionConfig = treeview.TreeActionConfiguration()
     sect = translate("EditorTreeView", "elements")
-    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction, recursive=False)
-    actionConfig.addActionDefinition(((sect, 'editTagsR'),), treeactions.EditTagsAction, recursive=True)
+    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
     actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'change type'),), treeactions.ChangeElementTypeAction)

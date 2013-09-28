@@ -113,13 +113,15 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
     
 class TagEditorDialog(QtGui.QDialog):
     """The tageditor as dialog. It uses its own level and commits the level when the dialog is accepted."""
-    def __init__(self, includeContents=True, parent=None):
+    def __init__(self, includeContents=None, parent=None):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600, 450) #TODO: make this cleverer
         self.stack = application.stack.createSubstack(modalDialog=True)
         self.level = None
-        
+        if includeContents is None:
+            includeContents = config.storage.gui.tag_editor_include_contents
+            
         self.setLayout(QtGui.QVBoxLayout())
         self.tagedit = TagEditorWidget(includeContents=includeContents,
                                        stack=self.stack,
@@ -187,6 +189,7 @@ class TagEditorDialog(QtGui.QDialog):
             self.level.stack = application.stack
             self.level.commit()
             super().accept()
+            config.storage.gui.tag_editor_include_contents = self.tagedit.includeContentsButton.isChecked()
         except filebackends.TagWriteError as e:
             e.displayMessage()
             self.level.stack = self.stack

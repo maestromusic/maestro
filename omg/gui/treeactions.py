@@ -57,11 +57,9 @@ class EditTagsAction(TreeAction):
     """Action to edit tags; exists both in a recursive and non-recursive variant, depending on the argument
     to the constructor."""
     
-    def __init__(self, parent, recursive):
+    def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr('Edit tags (recursively)') if recursive
-                         else self.tr('Edit tags'))
-        self.recursive = recursive
+        self.setText(self.tr("Edit tags"))
     
     def initialize(self, selection):
         self.setEnabled(selection.hasWrappers())
@@ -71,7 +69,7 @@ class EditTagsAction(TreeAction):
         *recursive* is True). This is called by the edit tags actions in the contextmenu.
         """
         from ..gui import tageditor
-        dialog = tageditor.TagEditorDialog(includeContents=self.recursive, parent=self.parent())
+        dialog = tageditor.TagEditorDialog(parent=self.parent())
         dialog.useElementsFromSelection(self.parent().selection)
         dialog.exec_()
 
