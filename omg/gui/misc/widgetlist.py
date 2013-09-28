@@ -268,6 +268,31 @@ class SelectionManager(QtCore.QObject):
                         self.selected[listIndex][widgetIndex] = True
                         self.anchor = (listIndex,widgetIndex)
                         widgetList.selectionChanged(widgetIndex)
+                        
+        if event.type() == QtCore.QEvent.KeyPress:
+            if event.key() in (Qt.Key_Up, Qt.Key_Down):
+                widgetList = object.parent()
+                listIndex = self.widgetLists.index(widgetList)
+                widgetIndex = widgetList.index(object)
+                if event.key() == Qt.Key_Up:
+                    if widgetIndex > 0:
+                        widgetList[widgetIndex-1].setFocus(Qt.OtherFocusReason)
+                    else:
+                        for wl in reversed(self.widgetLists[:listIndex]):
+                            for w in reversed(wl):
+                                if w.isVisible():
+                                    w.setFocus(Qt.OtherFocusReason)
+                                    return True
+                elif event.key() == Qt.Key_Down:
+                    if widgetIndex+1 < len(widgetList):
+                        widgetList[widgetIndex+1].setFocus(Qt.OtherFocusReason)
+                    else:
+                        for wl in self.widgetLists[listIndex+1:]:
+                            for w in wl:
+                                if w.isVisible():
+                                    w.setFocus(Qt.OtherFocusReason)
+                                    return True
+             
         return False # Don't stop the event
         
     def _handleWidgetInserted(self,widgetList,index):

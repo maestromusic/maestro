@@ -185,6 +185,7 @@ class RecordEditor(QtGui.QWidget):
         self.valueEditor = tagwidgets.TagValueEditor(record.tag, hideEditor=True)
         self.valueEditor.valueChanged.connect(self._handleValueChanged)
         self.layout().addWidget(self.valueEditor)
+        self.setFocusProxy(self.valueEditor)
         
         self.expandLine = ExpandLine()
         self.layout().addWidget(self.expandLine)

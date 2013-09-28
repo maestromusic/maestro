@@ -444,6 +444,7 @@ class TagValueEditor(QtGui.QWidget):
             else:
                 self.editor = editor
                 self.editor.editingFinished.connect(self._handleValueChanged)
+                
             self.setFocusProxy(self.editor)
             self.layout().addWidget(self.editor)
     
