@@ -921,14 +921,17 @@ class TagDifference:
         difference object. If *withoutPrivateTags* is True, ignore changes to private tags."""
         if self.removals is not None:
             for tag, value in self.removals:
-                if not (withoutPrivateTags and tag.private):
-                    element.tags[tag].remove(value)
+                if tag in element.tags and not (withoutPrivateTags and tag.private):
+                    if value in element.tags[tag]:
+                        element.tags[tag].remove(value)
         
         if self.replacements is not None:
             for tag, value, newValue in self.replacements:
                 if not (withoutPrivateTags and tag.private):
-                    index = element.tags[tag].index(value)
-                    element.tags[tag][index] = newValue
+                    if tag in element.tags and value in element.tags[tag]: 
+                        index = element.tags[tag].index(value)
+                        element.tags[tag][index] = newValue
+                    else: element.tags.add(tag, newValue)
         
         if self.additions is not None:
             for tag, value in self.additions:
@@ -940,14 +943,16 @@ class TagDifference:
         is True, ignore changes to private tags."""
         if self.additions is not None:
             for tag, value in self.additions:
-                if not (withoutPrivateTags and tag.private):
+                if tag in element.tags and not (withoutPrivateTags and tag.private):
                     element.tags[tag].remove(value)
         
         if self.replacements is not None:
             for tag, value, newValue in self.replacements:
                 if not (withoutPrivateTags and tag.private):
-                    index = element.tags[tag].index(newValue)
-                    element.tags[tag][index] = value
+                    if tag in element.tags and newValue in element.tags[tag]:
+                        index = element.tags[tag].index(newValue)
+                        element.tags[tag][index] = value
+                    else: element.tags.add(tag, value)
         
         if self.removals is not None:
             for tag, value in self.removals:
