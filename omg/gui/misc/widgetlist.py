@@ -21,7 +21,7 @@ from PyQt4.QtCore import Qt
 
 
 class WidgetList(QtGui.QWidget):
-    """A WidgetList sort of a list-view for widgets: It is a widget containing a list of child-widgets,
+    """A WidgetList is sort of a list-view for widgets: It is a widget containing a list of child-widgets,
     which are either laid out horizontically or vertically. Using a SelectionManager a WidgetList can have
     a selection and will highlight selected children.
     """
@@ -230,11 +230,27 @@ class SelectionManager(QtCore.QObject):
                 listIndex = self.widgetLists.index(widgetList)
                 widgetIndex = widgetList.index(object)
                 if Qt.ShiftModifier & event.modifiers() and self.anchor is not None:
-                    if self.anchor[0] == listIndex:
-                        for i in range(min(widgetIndex,self.anchor[1]),max(widgetIndex,self.anchor[1])+1):
-                            if not self.selected[listIndex][i]:
-                                self.selected[listIndex][i] = True
-                                widgetList.selectionChanged(i)
+                    self.clear()
+                    if listIndex == self.anchor[0]: # same lists
+                        for i in range(min(widgetIndex, self.anchor[1]),
+                                       max(widgetIndex, self.anchor[1])+1):
+                            self.selected[listIndex][i] = True
+                            widgetList.selectionChanged(i)
+                    else: # different lists
+                        first = min((listIndex, widgetIndex), tuple(self.anchor))
+                        last = max((listIndex, widgetIndex), tuple(self.anchor))
+                        for li in range(first[0], last[0]+1):
+                            # Determine which widgets should be selected in widgetLists[li]
+                            widgetList = self.widgetLists[li]
+                            if li == first[0]:
+                                r = range(first[1], len(widgetList))
+                            elif li == last[0]:
+                                r = range(0, last[1]+1)
+                            else: r = range(0, len(widgetList))
+                            for wi in r:
+                                self.selected[li][wi] = True
+                                widgetList.selectionChanged(wi)
+                              
                 elif Qt.ControlModifier & event.modifiers():
                     self.selected[listIndex][widgetIndex] = not self.selected[listIndex][widgetIndex]
                     self.anchor = (listIndex,widgetIndex)
