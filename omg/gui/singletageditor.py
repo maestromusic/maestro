@@ -70,6 +70,7 @@ class SingleTagEditor(QtGui.QWidget):
         self.layout().addWidget(self.expandLine)
         
         self.uncommonList = widgetlist.WidgetList(QtGui.QBoxLayout.TopToBottom)
+        self.expandLine.doubleClicked.connect(self.uncommonList.selectAll)
         self.layout().addWidget(self.uncommonList, 1)
         
         pos = 0
@@ -287,11 +288,26 @@ class ExpandLine(QtGui.QLabel):
     # _after_ changing its state due to the click.
     triggered = QtCore.pyqtSignal(bool)
     
+    doubleClicked = QtCore.pyqtSignal()
+    
     def __init__(self, text=''):
         super().__init__(text)
-        self.setIndent(20)
+        self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.setContentsMargins(20, 5, 5, 5)
+        self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding, QtGui.QSizePolicy.MinimumExpanding)
         self._expanded = False
         self._expanderVisible = True
+        # Use a timer to avoid flickering (unexpand and expand again) on double click events.
+        self._timer = QtCore.QTimer()
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.toggleExpanded)
+        # A higher interval leads to lags on single clicks.
+        # Also flickering on very slow double clicks is not that bad.
+        self._timer.setInterval(min(QtGui.QApplication.doubleClickInterval(), 150))
+    
+    def isExpanded(self):
+        """Return whether the line is in expanded state."""
+        return self._expanded
     
     def setExpanded(self, expanded):
         """Set whether this line is expanded. When the expand-state is changed by this method, emit the
@@ -300,6 +316,10 @@ class ExpandLine(QtGui.QLabel):
             self._expanded = expanded
             self.update()
             self.triggered.emit(expanded)
+            
+    def toggleExpanded(self):
+        """Change expanded state to its opposite."""
+        self.setExpanded(not self._expanded)
             
     def setExpanderVisible(self, expanderVisible):
         """Set whether the expand-icon is visible (and reacts to mouse clicks)."""
@@ -313,7 +333,7 @@ class ExpandLine(QtGui.QLabel):
         if self._expanderVisible:
             option = QtGui.QStyleOption()
             option.initFrom(self)
-            option.rect = QtCore.QRect(0, 0, self.indent(), self.height())
+            option.rect = QtCore.QRect(0, 5, 20, 20)
             # State_Children is necessary to draw an arrow at all, State_Open draws the expanded arro
             option.state |= QtGui.QStyle.State_Children
             if self._expanded:
@@ -322,7 +342,24 @@ class ExpandLine(QtGui.QLabel):
         event.accept()
     
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and self._expanderVisible and event.pos().y() < self.indent():
-            self.setExpanded(not self._expanded)
+        if event.button() == Qt.LeftButton and self._expanderVisible:
+            self._timer.start()
             event.accept()
-        else: event.ignore() # let parent widget handle it (otherwise it is not possible to select records)
+        else: event.ignore()
+    
+    # whoever handles mousePressEvents must handle the rest, too:
+    # http://blog.qt.digia.com/blog/2006/05/27/mouse-event-propagation/
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self._expanderVisible:
+            event.accept()
+        else: event.ignore()
+        
+    mouseMoveEvent = mouseReleaseEvent
+    
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton and self._expanderVisible:
+            self._timer.stop()
+            self.setExpanded(True)
+            self.doubleClicked.emit()
+            event.accept()
+        else: event.ignore()

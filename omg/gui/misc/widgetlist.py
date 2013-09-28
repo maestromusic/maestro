@@ -141,6 +141,13 @@ class WidgetList(QtGui.QWidget):
         the selection manager."""
         child = self.children[index]
         self.update(child.x(),child.y(),child.width(),child.height())
+        
+    def selectAll(self):
+        """Clear the selection and select all widgets in this list."""
+        if self.selectionManager is not None:
+            self.selectionManager.clear()
+            for widget in self:
+                self.selectionManager.setSelected(self, widget, True)
 
 
 class SelectionManager(QtCore.QObject):
