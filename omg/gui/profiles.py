@@ -98,11 +98,11 @@ class ProfileDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr("Profile Configuration: {}").format(category.title))
         self.resize(500,300)
         layout = QtGui.QVBoxLayout(self)
-        layout.addWidget(ProfileConfigurationWidget(category, profile))
+        layout.addWidget(ProfileConfigurationWidget(self, category, profile))
         
         
 class ProfileConfigurationWidget(QtGui.QWidget):
-    def __init__(self, category, profile=None):
+    def __init__(self, dialog, category, profile=None):
         super().__init__()
         self.category = category
         self.category.profileAdded.connect(self._handleProfileAdded)

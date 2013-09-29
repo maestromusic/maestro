@@ -25,114 +25,13 @@ from ... import application, constants, utils
 from ...core import tags
 from .. import dialogs, delegates, profiles as profilesgui
 
-
-class DelegatesPanel(profilesgui.ProfileConfigurationWidget):
-    """This widget is used in the preferences dialog."""
-    def __init__(self,parent):
-        super().__init__(delegates.profiles.category)
-
-
-class DelegatesPanelOld(QtGui.QWidget):
-    """Panel widget for the delegates panel in the preferences dialog. The user can choose a delegate
-    configuration and then edit its properties. With *startConfig* you can specify which configuration is
-    shown at the beginning."""
-    def __init__(self,dialog,profile=None):
-        super().__init__()
-        self.setLayout(QtGui.QVBoxLayout())
-        
-        topLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(topLayout)
-        topLayout.addWidget(QtGui.QLabel(self.tr("Choose a configuration: ")))
-        
-        self.delegateBox = QtGui.QComboBox()
-        self.delegateBox.setSizeAdjustPolicy(QtGui.QComboBox.AdjustToContents)
-        self._populateDelegateBox()
-        if startConfig is not None:
-            for i in range(self.delegateBox.count()):
-                if self.delegateBox.itemData(i) == startConfig:
-                    self.delegateBox.setCurrentIndex(i)
-                    break
-        self.delegateBox.currentIndexChanged.connect(self._handleCurrentConfigChanged)
-        topLayout.addWidget(self.delegateBox)
-        
-        manageConfigurationsButton = QtGui.QPushButton(self.tr("Manage configurations..."))
-        manageConfigurationsButton.clicked.connect(self._handleManageConfigsButton)
-        topLayout.addWidget(manageConfigurationsButton)
-        
-        topLayout.addStretch(1)
-        
-        self.stackedWidget = QtGui.QStackedWidget()
-        self.layout().addWidget(self.stackedWidget)
-        
-        bottomLayout = QtGui.QHBoxLayout()
-        resetButton = QtGui.QPushButton(self.tr("Reset this configuration"))
-        resetButton.clicked.connect(self._handleResetButton)
-        bottomLayout.addWidget(resetButton)
-        bottomLayout.addStretch()
-        closeButton = QtGui.QPushButton(self.tr("Close"))
-        closeButton.clicked.connect(dialog.close)
-        bottomLayout.addWidget(closeButton)
-        self.layout().addLayout(bottomLayout)
-        
-        if startConfig is None:
-            self.showConfig(configuration.getConfiguration(self.delegateBox.itemText(0)))
-        else: self.showConfig(startConfig)
-        configuration.dispatcher.changes.connect(self._handleDispatcher)
-        
-    def _populateDelegateBox(self):
-        """Fill the delegate configuration combo box with a list of all configurations.""" 
-        self.delegateBox.clear()
-        for config in configuration.getConfigurations():
-            self.delegateBox.addItem(config.title,config)
-        
-    def _handleCurrentConfigChanged(self,i):
-        """Handle delegateBox.currentIndexChanged."""
-        self.showConfig(self.delegateBox.itemData(i))
-        
-    def _handleDispatcher(self,event):
-        """Handle the delegate configuration dispatcher: Update the delegate box."""
-        if event.type != constants.CHANGED:
-            # Only events of type ADDED or DELETED change the entry list
-            self.delegateBox.currentIndexChanged.disconnect(self._handleCurrentConfigChanged)
-            self._populateDelegateBox()
-            if self._currentConfig is not None:
-                for i in range(self.delegateBox.count()):
-                    if self.delegateBox.itemData(i) == self._currentConfig:
-                        self.delegateBox.setCurrentIndex(i)
-                        break
-            self.delegateBox.currentIndexChanged.connect(self._handleCurrentConfigChanged)
-        else:
-            # Update the title
-            for i in range(self.delegateBox.count()):
-                if self.delegateBox.itemData(i) == event.config:
-                    self.delegateBox.setItemText(i,event.config.title)
-                    break
-    
-    def showConfig(self,config):
-        """Choose and display the given delegate configuration."""
-        if config not in self.panels:
-            panel = DelegateOptionsPanel(self,config)
-            self.stackedWidget.addWidget(panel)
-            self.panels[config] = panel
-        self.stackedWidget.setCurrentWidget(self.panels[config])
-        self._currentConfig = config
-            
-    def _handleResetButton(self):
-        """Reset the current configuration."""
-        self._currentConfig.resetToDefaults()
-        
-    def _handleManageConfigsButton(self):
-        """Open a dialog to add/rename/delete configurations."""
-        dialog = ManageConfigurationsDialog(self)
-        dialog.exec_()
-        
         
 class DelegateOptionsPanel(QtGui.QScrollArea):
     """This panel allows the user to edit a single delegate configuration. It consists of three parts:
     Two DataPiecesEditors to edit the datapieces displayed in the left and those displayed in the right
     column and a list of widgets (checkboxes, comboboxes etc.) to edit the configuration's options.
     """
-    def __init__(self,profile):
+    def __init__(self, profile):
         super().__init__()
         self.profile = profile
         self.setMinimumSize(600,500) #TODO: make this cleverer

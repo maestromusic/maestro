@@ -50,10 +50,10 @@ class Panel:
         - *callable*: A callable that will produce the widget that should be displayed on this panel.
           Often this is simply the widget's class.
           Alternatively, a tuple can be passed. It must consist of either a callable or a module name (e.g.
-          "gui.preferences.tagmanager"), the name of a callable that is found in the module. In both cases
-          this mandatory components can be followed by an arbitrary number of arguments that will be passed
-          into the callable. In the second case, the module will only be imported when the panel is actually
-          shown.
+          "gui.preferences.tagmanager") and the name of a callable that is found in the module. In both cases
+          this mandatory components can be followed by an arbitrary number of arguments.
+          The callable will be invoked with the PreferencesDialog-instance and the arguments from the tuple.
+          In the second case, the module will only be imported when the panel is actually shown.
         - *icon*: Icon that will be displayed in the preferences' menu.
         
     \ """
@@ -64,12 +64,11 @@ class Panel:
         self._callable = callable
         self.subPanels = utils.OrderedDict()
         
-    def createWidget(self):
-        """Create a configuration widget for this panel using the 'callable' argument of the constructor."""
-        if not isinstance(self._callable, tuple):
-            return self._callable()
-        
-        if isinstance(self._callable[0], str):
+    def createWidget(self, dialog):
+        """Create a configuration widget for this panel using the 'callable' argument of the constructor.
+        *dialog* is the PreferencesDialog that will contain the panel.
+        """
+        if isinstance(self._callable, tuple) and isinstance(self._callable[0], str):
             import importlib
             try:
                 module = importlib.import_module('.'+self._callable[0], 'omg')
@@ -77,14 +76,14 @@ class Panel:
             except ImportError:
                 logger.error("Cannot import module '{}'".format(self._callable[0]))
                 self._callable = QtGui.QWidget
-                return self._callable
             except AttributeError:
                 logger.error("Module '{}' has no attribute '{}'"
                              .format(self._callable[0], self._callable[1]))
                 self._callable = QtGui.QWidget
-                return self._callable
                 
-        return self._callable[0](*self._callable[1:])
+        if not isinstance(self._callable, tuple):
+            return self._callable(dialog)
+        else: return self._callable[0](dialog, *self._callable[1:])
         
         
 class PreferencesDialog(QtGui.QDialog):
@@ -162,7 +161,7 @@ class PreferencesDialog(QtGui.QDialog):
         """Show the panel with the given path, constructing it, if it is shown for the first time."""
         if key not in self.panelWidgets:
             panel = self.getPanel(key)
-            innerWidget = panel.createWidget()
+            innerWidget = panel.createWidget(self)
             widget = QtGui.QWidget()
             widget.setLayout(QtGui.QVBoxLayout())
             label = QtGui.QLabel(panel.title)
