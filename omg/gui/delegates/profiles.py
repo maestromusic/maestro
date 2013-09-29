@@ -37,9 +37,12 @@ class DelegateProfileCategory(profiles.TypedProfileCategory):
                 return profile
         return restrictToType.default()
     
-category = DelegateProfileCategory("delegates",
-                                   translate("Delegates","Item display"),
-                                   config.storageObject.gui.delegates)
+category = DelegateProfileCategory(name = "delegates",
+                                   title = translate("Delegates","Item display"),
+                                   storageOption = config.storageObject.gui.delegates,
+                                   iconPath = ':omg/icons/preferences/delegates_small.png',
+                                   pixmapPath = ':omg/icons/preferences/delegates.png')
+                                   
 profiles.manager.addCategory(category)
 
 

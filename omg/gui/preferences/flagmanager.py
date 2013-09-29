@@ -31,7 +31,7 @@ translate = QtCore.QCoreApplication.translate
 
 class FlagManager(QtGui.QWidget):
     """The FlagManager allows to add, edit and delete flagtypes."""
-    def __init__(self, dialog, parent=None):
+    def __init__(self, buttonBar, parent=None):
         super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
         
@@ -52,28 +52,17 @@ class FlagManager(QtGui.QWidget):
         self.tableWidget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tableWidget.customContextMenuRequested.connect(self._handleCustomContextMenuRequested)
         self.layout().addWidget(self.tableWidget)
-        
-        buttonBarLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(buttonBarLayout)
-        
+                
         addButton = QtGui.QPushButton(utils.getIcon("add.png"),self.tr("Add flag"))
         addButton.clicked.connect(self._handleAddButton)
-        buttonBarLayout.addWidget(addButton)
+        buttonBar.addWidget(addButton)
         
         self.undoButton = QtGui.QPushButton(self.tr("Undo"))
         self.undoButton.clicked.connect(application.stack.undo)
-        buttonBarLayout.addWidget(self.undoButton)
+        buttonBar.addWidget(self.undoButton)
         self.redoButton = QtGui.QPushButton(self.tr("Redo"))
         self.redoButton.clicked.connect(application.stack.redo)
-        buttonBarLayout.addWidget(self.redoButton)
-        
-        buttonBarLayout.addStretch(1)
-        
-        style = QtGui.QApplication.style()
-        closeButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCloseButton),
-                                        self.tr("Close"))
-        closeButton.clicked.connect(dialog.accept)
-        buttonBarLayout.addWidget(closeButton)
+        buttonBar.addWidget(self.redoButton)
         
         self._loadFlags()
         self._checkUndoRedoButtons()

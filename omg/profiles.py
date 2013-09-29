@@ -103,7 +103,7 @@ class ProfileCategory(QtCore.QObject):
           into this option.
         - profileClass: Python class used for profiles in this category.
         - defaultProfileName: default name for new profiles (defaults to the category title).
-        - infoText: Information text that is displayed in profile configuration dialogs.
+        - description: Informative text that is displayed in profile configuration dialogs.
           
     """
     profileAdded = QtCore.pyqtSignal(Profile)
@@ -116,10 +116,12 @@ class ProfileCategory(QtCore.QObject):
     profileClass = Profile
     
     def __init__(self, name, title, storageOption, profileClass=None, defaultProfileName=None,
-                 infoText='', saveImmediately=True):
+                 description='', iconPath='', pixmapPath='', saveImmediately=True):
         super().__init__()
         self.name = name
         self.title = title
+        self.iconPath = iconPath
+        self.pixmapPath = pixmapPath
         assert isinstance(storageOption,config.Option)
         
         self.storageOption = storageOption
@@ -134,7 +136,7 @@ class ProfileCategory(QtCore.QObject):
             self.defaultProfileName = defaultProfileName
         else: self.defaultProfileName = title
         
-        self.infoText = infoText
+        self.description = description
         self.saveImmediately = saveImmediately
     
     def get(self, name):
@@ -163,7 +165,7 @@ class ProfileCategory(QtCore.QObject):
     def deleteProfile(self,profile):
         """Delete a profile so that it disappears from the storage file at application end."""
         assert not profile.builtIn
-        # TODO: comment this lines
+        # TODO: comment these lines
         for data in self.storageOption.getValue():
             if data[0] == profile.name:
                 data[2] = profile.save()

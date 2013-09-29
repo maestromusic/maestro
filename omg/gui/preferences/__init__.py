@@ -57,16 +57,18 @@ class Panel:
         - *icon*: Icon that will be displayed in the preferences' menu.
         
     \ """
-    def __init__(self, path, title, callable, icon=None):
+    def __init__(self, path, title, callable, iconPath=None, pixmapPath=None, description=''):
         self.path = path
         self.title = title
-        self.icon = icon
         self._callable = callable
+        self.iconPath = iconPath
+        self.pixmapPath = pixmapPath or ':omg/icons/preferences/preferences.png'
+        self.description = description
         self.subPanels = utils.OrderedDict()
         
-    def createWidget(self, dialog):
+    def createWidget(self, buttonBar):
         """Create a configuration widget for this panel using the 'callable' argument of the constructor.
-        *dialog* is the PreferencesDialog that will contain the panel.
+        *buttonBar* is the button bar of the panel and may be used to add buttons.
         """
         if isinstance(self._callable, tuple) and isinstance(self._callable[0], str):
             import importlib
@@ -75,15 +77,17 @@ class Panel:
                 self._callable = (getattr(module, self._callable[1]), ) + self._callable[2:]
             except ImportError:
                 logger.error("Cannot import module '{}'".format(self._callable[0]))
-                self._callable = QtGui.QWidget
+                self._callable = None
             except AttributeError:
                 logger.error("Module '{}' has no attribute '{}'"
                              .format(self._callable[0], self._callable[1]))
-                self._callable = QtGui.QWidget
+                self._callable = None
                 
-        if not isinstance(self._callable, tuple):
-            return self._callable(dialog)
-        else: return self._callable[0](dialog, *self._callable[1:])
+        if self._callable is None:
+            return QtGui.QWidget()  
+        elif not isinstance(self._callable, tuple):
+            return self._callable(buttonBar)
+        else: return self._callable[0](buttonBar, *self._callable[1:])
         
         
 class PreferencesDialog(QtGui.QDialog):
@@ -98,7 +102,7 @@ class PreferencesDialog(QtGui.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Preferences - OMG"))
-        self.setWindowIcon(utils.getIcon(':/omg/options.png'))
+        self.setWindowIcon(utils.getIcon('preferences/preferences_small.png'))
         self.finished.connect(self._handleFinished)
 
         # Restore geometry
@@ -114,19 +118,21 @@ class PreferencesDialog(QtGui.QDialog):
         self.panelWidgets = {}
         
         self.setLayout(QtGui.QVBoxLayout())
+        self.layout().setContentsMargins(0,0,0,0)
         
         splitter = QtGui.QSplitter(Qt.Horizontal)
+        splitter.setContentsMargins(0,0,0,0)
         self.layout().addWidget(splitter, 1)
         
         self.treeWidget = QtGui.QTreeWidget()
         self.treeWidget.header().setVisible(False)
-        self.treeWidget.itemClicked.connect(self._handleItemClicked)
+        self.treeWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
         splitter.addWidget(self.treeWidget)
         
         self.stackedWidget = QtGui.QStackedWidget()
         splitter.addWidget(self.stackedWidget)
         
-        splitter.setSizes([150, 650])
+        splitter.setSizes([180, 620])
         
         self.fillTreeWidget()
         self.showPanel("main")
@@ -138,45 +144,33 @@ class PreferencesDialog(QtGui.QDialog):
         for path, panel in panels.items():
             item = QtGui.QTreeWidgetItem([panel.title])
             item.setData(0, Qt.UserRole, path)
-            if panel.icon is not None:
-                item.setIcon(0, panel.icon)
+            if panel.iconPath is not None:
+                item.setIcon(0, QtGui.QIcon(panel.iconPath))
             self.treeWidget.addTopLevelItem(item)
             if len(panel.subPanels) > 0:
                 self._addSubPanels(panel, item)
-        
+
     def _addSubPanels(self, panel, item):
         """Add the subpanels of *panel* to the treeview. *item* is the QTreeWidgetItem for *panel*."""
         for p, subPanel in panel.subPanels.items():
             newPath = '{}/{}'.format(panel.path, p)
             newItem = QtGui.QTreeWidgetItem([subPanel.title])
             newItem.setData(0, Qt.UserRole, newPath)
-            if subPanel.icon is not None:
-                newItem.setIcon(0, subPanel.icon)
+            if subPanel.iconPath is not None:
+                newItem.setIcon(0, QtGui.QIcon(subPanel.iconPath))
             item.addChild(newItem)
             if len(subPanel.subPanels) > 0:
                 self._addSubPanels(subPanel, newItem)
             item.setExpanded(True)
         
-    def showPanel(self, key):
+    def showPanel(self, path):
         """Show the panel with the given path, constructing it, if it is shown for the first time."""
-        if key not in self.panelWidgets:
-            panel = self.getPanel(key)
-            innerWidget = panel.createWidget(self)
-            widget = QtGui.QWidget()
-            widget.setLayout(QtGui.QVBoxLayout())
-            label = QtGui.QLabel(panel.title)
-            font = label.font()
-            font.setPointSize(16)
-            font.setBold(True)
-            label.setFont(font)
-            widget.layout().addWidget(label, 0)
-            widget.layout().addWidget(innerWidget, 1)
-            #frame = QtGui.QFrame()
-            #frame.setFrameShape(QtGui.QFrame.HLine)
-            #widget.layout().addWidget(frame)
-            self.panelWidgets[key] = widget
+        if path not in self.panelWidgets:
+            panel = self.getPanel(path)
+            widget = PanelWidget(self, panel)
+            self.panelWidgets[path] = widget
             self.stackedWidget.addWidget(widget)
-        self.stackedWidget.setCurrentWidget(self.panelWidgets[key])
+        self.stackedWidget.setCurrentWidget(self.panelWidgets[path])
             
     def getPanel(self, path):
         """Return the Panel-instance (not the actual widget!) with the given *path*.""" 
@@ -188,10 +182,12 @@ class PreferencesDialog(QtGui.QDialog):
             i += 1
         return currentPanels[keys[-1]]
         
-    def _handleItemClicked(self, item, column):
+    def _handleSelectionChanged(self):
         """Handle clicks on a panel in the treeview."""
-        key = item.data(0, Qt.UserRole)
-        self.showPanel(key)
+        items = self.treeWidget.selectedItems()
+        if len(items) > 0:
+            path = items[0].data(0, Qt.UserRole)
+            self.showPanel(path)
         
     def _handleFinished(self):
         """Handle the close button."""
@@ -200,6 +196,66 @@ class PreferencesDialog(QtGui.QDialog):
         config.binary["preferences_geometry"] = bytearray(self.saveGeometry())
 
 
+class PanelWidget(QtGui.QWidget):
+    """PanelWidgets are used for the right part of the preferences dialog. They contain a title section,
+    a configuration widget and a button bar. The configuration widget is created using the createWidget
+    method of *panel*.
+    """
+    def __init__(self, dialog, panel):
+        super().__init__(dialog)
+        
+        self.setLayout(QtGui.QVBoxLayout())
+        self.layout().setContentsMargins(0,0,0,0)
+        
+        frame = QtGui.QFrame()
+        frame.setFrameStyle(QtGui.QFrame.StyledPanel | QtGui.QFrame.Sunken)
+        frame.setLayout(QtGui.QVBoxLayout())
+        frame.layout().setContentsMargins(0,0,0,0)
+        self.layout().addWidget(frame)
+        
+        # Create title widget
+        self.titleWidget = QtGui.QWidget()
+        self.titleWidget.setObjectName("titleWidget")
+        self.titleWidget.setStyleSheet(
+                                "#titleWidget { background-color: white; border-bottom: 1px solid grey; }")
+        
+        titleLayout = QtGui.QHBoxLayout()
+        titleLayout.setSpacing(20)
+        self.titleWidget.setLayout(titleLayout)
+        self.titleLabel = QtGui.QLabel()
+        self.titleLabel.setText("<b>{}</b><br/>{}".format(panel.title, panel.description))
+        self.titleLabel.setWordWrap(True)
+        self.titleLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        titleLayout.addWidget(self.titleLabel, 1)
+        self.pixmapLabel = QtGui.QLabel()
+        self.pixmapLabel.setPixmap(QtGui.QPixmap(panel.pixmapPath))
+        self.pixmapLabel.setContentsMargins(20, 0, 20, 0)
+        titleLayout.addWidget(self.pixmapLabel)
+        frame.layout().addWidget(self.titleWidget)
+        
+        self.buttonBar = QtGui.QHBoxLayout()
+        
+        # Create configuration widget
+        innerWidget = panel.createWidget(self.buttonBar)
+        scrollArea = QtGui.QScrollArea()
+        scrollArea.setWidgetResizable(True)
+        scrollArea.setFrameStyle(QtGui.QFrame.NoFrame)
+        scrollArea.setWidget(innerWidget)
+        frame.layout().addWidget(scrollArea, 1)
+        
+        # Add button bar
+        style = QtGui.QApplication.style()
+        self.layout().addLayout(self.buttonBar)
+        self.buttonBar.setContentsMargins(0, 0, style.pixelMetric(QtGui.QStyle.PM_LayoutRightMargin), 
+                                          style.pixelMetric(QtGui.QStyle.PM_LayoutBottomMargin))
+        if all(self.buttonBar.stretch(i) == 0 for i in range(self.buttonBar.count())):
+            self.buttonBar.addStretch(1)
+        closeButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCloseButton),
+                                        self.tr("Close"))
+        closeButton.clicked.connect(dialog.accept)
+        self.buttonBar.addWidget(closeButton)
+        
+    
 def _getParentPanel(path):
     """Return the parent panel of the one identified by *path*. This method even works when no panel is
     registered for *path* (the parent must be registered, of course)."""
@@ -218,15 +274,17 @@ def _getParentPanel(path):
     return parent, keys[-1]
     
     
-def addPanel(path, title, theClass, icon=None):
-    """Add a panel to the preferences dialog. The arguments are passed to the constructor of Panel."""
-    insertPanel(path, -1, title, theClass, icon)
+def addPanel(path, *args, **kwargs):
+    """Add a panel to the preferences dialog. *path* specifies the position in the panel tree.
+    All other arguments are passed to the constructor of Panel."""
+    insertPanel(path, -1, *args, **kwargs)
 
 
-def insertPanel(path, position, title, theClass, icon=None):
-    """Insert a panel into the preferences dialog. It will  inserted at the given position into its parent
-    in the treeview. If *position* is -1 it will be in inserted at the end. The other arguments are passed
-    to the constructor of Panel."""
+def insertPanel(path, position, *args, **kwargs):
+    """Insert a panel into the preferences dialog. *path* specifies the position in the panel tree.
+    *position* is the position among the panels with the same parent in the tree. If *position* is -1 it
+    will be in inserted at the end. The other arguments are passed to the constructor of Panel.
+    """
     parent, key = _getParentPanel(path)
     if parent is not None:
         currentPanels = parent.subPanels
@@ -236,7 +294,7 @@ def insertPanel(path, position, title, theClass, icon=None):
         raise ValueError("Panel '{}' does already exist".format('/'.join(keys)))
     if position == -1:
         position = len(currentPanels)
-    currentPanels.insert(position, key, Panel(path, title, theClass, icon))
+    currentPanels.insert(position, key, Panel(path, *args, **kwargs))
     if PreferencesDialog._dialog is not None:
         PreferencesDialog._dialog.fillTreeWidget()
 
@@ -256,31 +314,40 @@ def removePanel(path):
 
 
 # Add core panels
-addPanel("main", translate("PreferencesPanel", "Main"), QtGui.QWidget)
-addPanel("main/tagmanager", translate("PreferencesPanel", "Tag Manager"),
-            ('gui.preferences.tagmanager', 'TagManager'), utils.getIcon('tag_blue.png'))
-addPanel("main/flagmanager", translate("PreferencesPanel", "Flag Manager"),
-            ('gui.preferences.flagmanager', 'FlagManager'), utils.getIcon('flag_blue.png'))
-addPanel("main/delegates", translate("PreferencesPanel", "Element display"),
-            ('gui.preferences.delegates', 'DelegatesPanel'))
-addPanel("main/filesystem", translate("PreferencesPanel", "File system"),
-            ('filesystem.preferences', 'FilesystemSettings'), utils.getIcon('folder.svg'))
+addPanel("main", translate("Preferences", "Main"), None)
+addPanel("main/tagmanager", translate("Preferences", "Tag Manager"),
+            ('gui.preferences.tagmanager', 'TagManager'),
+            iconPath = ':omg/icons/tag_blue.png')
+addPanel("main/flagmanager", translate("Preferences", "Flag Manager"),
+            ('gui.preferences.flagmanager', 'FlagManager'),
+            iconPath = ':omg/icons/flag_blue.png')
+addPanel("main/filesystem", translate("Preferences", "File system"),
+            ('filesystem.preferences', 'FilesystemSettings'),
+            iconPath = ':omg/icons/folder.svg')
 
 # Profile panels                   
 def _addProfileCategory(category):
     classTuple = ('gui.profiles', 'ProfileConfigurationWidget', category)
-    addPanel("profiles/" + category.name, category.title, classTuple)
+    addPanel(path = "profiles/" + category.name,
+             title = category.title,
+             callable = classTuple,
+             description = category.description,
+             iconPath = category.iconPath,
+             pixmapPath = category.pixmapPath)
     
 def _removeProfileCategory(category):
     removePanel("profiles/" + category.name)
     
-addPanel("profiles", translate("PreferencesPanel", "Profiles"), QtGui.QWidget,
-         utils.getIcon('preferences_small.png'))
+addPanel("profiles", translate("Preferences", "Profiles"), None,
+         iconPath = ':omg/icons/preferences/profiles_small.png',
+         pixmapPath = ':omg/icons/preferences/profiles.png')
 profiles.manager.categoryAdded.connect(_addProfileCategory)
 profiles.manager.categoryRemoved.connect(_removeProfileCategory)
 for category in profiles.manager.categories:
     _addProfileCategory(category)
 
 
-addPanel("plugins", translate("PreferencesPanel", "Plugins"), ('plugins.dialog', 'PluginDialog'),
-         utils.getIcon('plugin.png'))
+addPanel("plugins", translate("Preferences", "Plugins"), ('gui.preferences.plugins', 'PluginPanel'),
+         iconPath = ':omg/icons/preferences/plugin.png',
+         description = translate("Preferences", "Enable or disable plugins.<br />"
+                                 "<b>Warning:</b> Changes will be performed immediately!"))

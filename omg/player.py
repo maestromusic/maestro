@@ -39,12 +39,14 @@ RANDOM_WORKS = FLAG_RANDOM_WORKS
 _runningBackends = {}
 
 profileCategory = profiles.TypedProfileCategory(
-    'playback',
-    translate('PlayerBackend','Playback'),
-    config.storageObject.player.profiles,
-    infoText=translate('PlayerBackend',
-                       "OMG can control more than one audio backend. To easily switch between them, "
-                       "their configuration is stored in profiles."),
+    name = 'playback',
+    title = translate('PlayerBackend','Playback'),
+    storageOption = config.storageObject.player.profiles,
+    description = translate("PlayerBackend",
+                            "OMG can control more than one audio backend. To easily switch between them, "
+                            "their configuration is stored in profiles."),
+    iconPath = ':omg/icons/preferences/audiobackends_small.png',
+    pixmapPath = ':omg/icons/preferences/audiobackends.png',
     saveImmediately=False)
 profiles.manager.addCategory(profileCategory)
 

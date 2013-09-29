@@ -102,7 +102,7 @@ class ProfileDialog(QtGui.QDialog):
         
         
 class ProfileConfigurationWidget(QtGui.QWidget):
-    def __init__(self, dialog, category, profile=None):
+    def __init__(self, buttonBar, category, profile=None):
         super().__init__()
         self.category = category
         self.category.profileAdded.connect(self._handleProfileAdded)
@@ -110,14 +110,9 @@ class ProfileConfigurationWidget(QtGui.QWidget):
         
         layout = QtGui.QVBoxLayout(self)
         
-        if len(category.infoText) > 0:
-            label = QtGui.QLabel(category.infoText)
-            label.setWordWrap(True)
-            layout.addWidget(label)
-        
         self.stackedWidget = QtGui.QStackedWidget()
         self.stackedWidget.addWidget(NoProfileYetWidget(self))
-        self.stackedWidget.addWidget(ChooseAndConfigureProfileWidget(self, profile))
+        self.stackedWidget.addWidget(ChooseAndConfigureProfileWidget(self, buttonBar, profile))
         if len(category.profiles()) > 0:
             self.stackedWidget.setCurrentIndex(1)
         layout.addWidget(self.stackedWidget)
@@ -154,18 +149,7 @@ class NoProfileYetWidget(QtGui.QWidget):
         self.createButton.clicked.connect(functools.partial(CreateProfileDialog.execute, self.category))
         self.createButton.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
         layout.addWidget(self.createButton)
-           
-        layout.addStretch(1)
-        frame = QtGui.QFrame()
-        frame.setFrameShape(QtGui.QFrame.HLine)
-        layout.addWidget(frame)
-        
-        buttonLayout = QtGui.QHBoxLayout()
-        layout.addLayout(buttonLayout)
-        buttonLayout.addStretch()
-        closeButton = QtGui.QPushButton(self.tr("Close"))
-        closeButton.clicked.connect(lambda: self.window().close())
-        buttonLayout.addWidget(closeButton)
+        layout.addStretch()
         
 
 class ChooseAndConfigureProfileWidget(QtGui.QWidget):
@@ -173,7 +157,7 @@ class ChooseAndConfigureProfileWidget(QtGui.QWidget):
     least one profile."""
     profileChosen = QtCore.pyqtSignal(profiles.Profile)
     
-    def __init__(self, parent, profile=None):
+    def __init__(self, parent, buttonBar, profile=None):
         super().__init__(parent)
         self.category = parent.category
         self.category.profileAdded.connect(self.setProfile)
@@ -209,22 +193,12 @@ class ChooseAndConfigureProfileWidget(QtGui.QWidget):
         layout.addWidget(self.titleLabel)
         
         self._profileWidgetPosition = layout.count()
-           
-        layout.addStretch(1)
-        frame = QtGui.QFrame()
-        frame.setFrameShape(QtGui.QFrame.HLine)
-        layout.addWidget(frame)
         
-        buttonLayout = QtGui.QHBoxLayout()
-        layout.addLayout(buttonLayout)
-        buttonLayout.addStretch()
         if not self.category.saveImmediately:
+            buttonBar.addStretch(1)
             self.saveButton = QtGui.QPushButton(self.tr("Save"))
             self.saveButton.clicked.connect(self._handleSaveButton)
-            buttonLayout.addWidget(self.saveButton)
-        closeButton = QtGui.QPushButton(self.tr("Close"))
-        closeButton.clicked.connect(self._handleCloseButton)
-        buttonLayout.addWidget(closeButton)
+            buttonBar.addWidget(self.saveButton)
                 
         self.profile = None
         self.profileWidget = None # Will be created in setProfile

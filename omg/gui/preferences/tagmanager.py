@@ -32,7 +32,7 @@ CUSTOM_MIME = 'application/x-omgtagtype'
 class TagManager(QtGui.QWidget):
     """The TagManager allows to add, edit and remove tagtypes (like artist, composer,...). To make things
     easy it only allows changing tagtypes which do not appear in any internal element."""
-    def __init__(self,dialog,parent=None):
+    def __init__(self,buttonBar,parent=None):
         super().__init__(parent)
         self.setLayout(QtGui.QVBoxLayout())
         
@@ -43,28 +43,19 @@ class TagManager(QtGui.QWidget):
         self.layout().addWidget(descriptionLabel)
         
         self.layout().addWidget(TagManagerTableWidget())
-        
-        buttonBarLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(buttonBarLayout)
-        
+                
         addButton = QtGui.QPushButton(utils.getIcon("add.png"),self.tr("Add tag"))
         addButton.clicked.connect(self._handleAddButton)
-        buttonBarLayout.addWidget(addButton)
+        buttonBar.addWidget(addButton)
         
         self.undoButton = QtGui.QPushButton(self.tr("Undo"))
         self.undoButton.clicked.connect(application.stack.undo)
-        buttonBarLayout.addWidget(self.undoButton)
+        buttonBar.addWidget(self.undoButton)
         self.redoButton = QtGui.QPushButton(self.tr("Redo"))
         self.redoButton.clicked.connect(application.stack.redo)
-        buttonBarLayout.addWidget(self.redoButton)
-        
-        buttonBarLayout.addStretch(1)
+        buttonBar.addWidget(self.redoButton)
         
         style = QtGui.QApplication.style()
-        closeButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCloseButton),
-                                        self.tr("Close"))
-        closeButton.clicked.connect(dialog.accept)
-        buttonBarLayout.addWidget(closeButton)
         
         self._checkUndoRedoButtons()
         application.stack.indexChanged.connect(self._checkUndoRedoButtons)
@@ -87,7 +78,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         super().__init__()
         
         self.columns = [
-                ("sort",   self.tr("Order")),
+                ("sort",   self.tr("#")),
                 ("icon",   self.tr("Icon")),
                 ("name",   self.tr("Name")),
                 ("type",   self.tr("Type")),
