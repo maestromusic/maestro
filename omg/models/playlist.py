@@ -343,7 +343,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         marker = Wrapper(wrappers[0].element)
         super().insert(parent, position, [marker])
         self._dontGlueAway = [parent, marker]
-        self.removeWrappers(wrappers, updateBackend='never')
+        self.removeWrappers(wrappers, updateBackend='never', updateCurrentlyPlaying=False)
         position = parent.index(marker)
         super().removeMany([(parent, position, position)])
         self._dontGlueAway = None
@@ -367,12 +367,12 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             ranges.append((parent, index, index))
         self.removeMany(ranges, updateBackend)
         
-    def removeMany(self, ranges, updateBackend='always'):
+    def removeMany(self, ranges, updateBackend='always', updateCurrentlyPlaying=True):
         """See WrapperTreeModel.removeMany."""
         if len(ranges) == 0:
             return
         self.stack.beginMacro(self.tr('Remove from playlist'))
-        command = PlaylistRemoveCommand(self, ranges, updateBackend)
+        command = PlaylistRemoveCommand(self, ranges, updateBackend, updateCurrentlyPlaying)
         self.stack.push(command)
         
         # Process gaps in reversed order to keep indexes below the same parent intact
@@ -552,12 +552,13 @@ class PlaylistInsertCommand(wrappertreemodel.InsertCommand):
         
 class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
     """Subclass of RemoveCommand that additionally changes the backend."""
-    def __init__(self, model, ranges, updateBackend, removeEmptyParents=True):
+    def __init__(self, model, ranges, updateBackend, updateCurrentlyPlaying=True, removeEmptyParents=True):
         assert all(range[2] >= range[1] for range in ranges)
         super().__init__(model, ranges, removeEmptyParents)
         if not updateBackend in ('always', 'never', 'onundoredo'):
             raise ValueError("Invalid value for 'updateBackend' argument: {}".format(updateBackend))
         self._updateBackend = updateBackend
+        self._updateCurrentlyPlaying = updateCurrentlyPlaying
         self._playlistEntries = None
         
     def redo(self):
@@ -571,7 +572,8 @@ class PlaylistRemoveCommand(wrappertreemodel.RemoveCommand):
             elif self._updateBackend == 'onundoredo':
                 self._updateBackend = 'always' # from now on
             self.model._remove(parent, start, end)
-        self.model._updateCurrentlyPlayingNodes()
+        if self._updateCurrentlyPlaying:
+            self.model._updateCurrentlyPlayingNodes()
             
     def undo(self):
         for parent, pos, wrappers in self.insertions:
