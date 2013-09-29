@@ -19,69 +19,71 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, logging, config
+from ... import utils, logging, config, profiles
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
+# Toplevel panels. Map path to Panel instance
 panels = utils.OrderedDict()
 
 
-def show(startPanel=None, **params):
-    """Open the preferences dialog. To start with a specific panel provide its path as *startPanel*. In this
-    case all further keyword arguments will be submitted to the constructor of the start panel.
-    """
+def show(startPanel=None):
+    """Open the preferences dialog. To start with a specific panel provide its path as *startPanel*."""
     from .. import mainwindow
     dialog = PreferencesDialog(mainwindow.mainWindow)
     if startPanel is not None:
-        dialog.showPanel(startPanel, **params)
+        dialog.showPanel(startPanel)
     dialog.exec_()
     
     
 class Panel:
     """A panel inside the preferences dialog, i.e. the part on the right of the panel treeview and below of
-    the title label. Panels are identified by a path (e.g. "main/tagmanager") and store a class that will be
-    instantiated when the panel is shown.
+    the title label. Panels are identified by a path (e.g. "main/tagmanager") and store a callable which is
+    used to produce the Panel's configuration widget.
     
     Constructor parameters are
     
         - *path*: A unique identifier for the panel which additionally specifies the parent node in the tree
             of panels.
         - *title*: The title of the panel
-        - *theClass*: Either a class or a tuple consisting of a module name
-            (e.g. "gui.preferences.tagmanager") and a class name that can be found in the module.
-            The module will only be imported when the panel is actully shown.
+        - *callable*: A callable that will produce the widget that should be displayed on this panel.
+          Often this is simply the widget's class.
+          Alternatively, a tuple can be passed. It must consist of either a callable or a module name (e.g.
+          "gui.preferences.tagmanager") and the name of a callable that is found in the module. In both cases
+          this mandatory components can be followed by an arbitrary number of arguments.
+          The callable will be invoked with the PreferencesDialog-instance and the arguments from the tuple.
+          In the second case, the module will only be imported when the panel is actually shown.
         - *icon*: Icon that will be displayed in the preferences' menu.
         
     \ """
-    def __init__(self, path, title, theClass, icon=None):
+    def __init__(self, path, title, callable, icon=None):
         self.path = path
         self.title = title
         self.icon = icon
-        if isinstance(theClass, type):
-            self._theClass = theClass
-        else:
-            self._importInfo = theClass
-            self._theClass = None
+        self._callable = callable
         self.subPanels = utils.OrderedDict()
         
-    def getClass(self):
-        """Return the class of this panel. If import information were submitted to the constructor's
-        *theClass* argument instead of a type, this will import the module and find the class when called
-        for the first time.
+    def createWidget(self, dialog):
+        """Create a configuration widget for this panel using the 'callable' argument of the constructor.
+        *dialog* is the PreferencesDialog that will contain the panel.
         """
-        if self._theClass is None:
+        if isinstance(self._callable, tuple) and isinstance(self._callable[0], str):
             import importlib
             try:
-                module = importlib.import_module('.'+self._importInfo[0], 'omg')
-                self._theClass = getattr(module, self._importInfo[1])
+                module = importlib.import_module('.'+self._callable[0], 'omg')
+                self._callable = (getattr(module, self._callable[1]), ) + self._callable[2:]
             except ImportError:
-                logger.error("Cannot import module '{}'".format(self._importInfo[0]))
-                self._theClass = QtGui.QWidget
+                logger.error("Cannot import module '{}'".format(self._callable[0]))
+                self._callable = QtGui.QWidget
             except AttributeError:
-                logger.error("Module '{}' has no attribute '{}'".format(*self._importInfo))
-                self._theClass = QtGui.QWidget 
-        return self._theClass
+                logger.error("Module '{}' has no attribute '{}'"
+                             .format(self._callable[0], self._callable[1]))
+                self._callable = QtGui.QWidget
+                
+        if not isinstance(self._callable, tuple):
+            return self._callable(dialog)
+        else: return self._callable[0](dialog, *self._callable[1:])
         
         
 class PreferencesDialog(QtGui.QDialog):
@@ -155,12 +157,11 @@ class PreferencesDialog(QtGui.QDialog):
                 self._addSubPanels(subPanel, newItem)
             item.setExpanded(True)
         
-    def showPanel(self, key, **params):
-        """Show the panel with the given path, constructing it, if it is shown for the first time.
-        In that case additional key-word parameters will be submitted to the constructor."""
+    def showPanel(self, key):
+        """Show the panel with the given path, constructing it, if it is shown for the first time."""
         if key not in self.panelWidgets:
             panel = self.getPanel(key)
-            innerWidget = panel.getClass()(self, **params)
+            innerWidget = panel.createWidget(self)
             widget = QtGui.QWidget()
             widget.setLayout(QtGui.QVBoxLayout())
             label = QtGui.QLabel(panel.title)
@@ -254,10 +255,6 @@ def removePanel(path):
         PreferencesDialog._dialog.fillTreeWidget()
 
 
-# Toplevel panels. Map path to Panel instance
-panels = utils.OrderedDict()
-
-
 # Add core panels
 addPanel("main", translate("PreferencesPanel", "Main"), QtGui.QWidget)
 addPanel("main/tagmanager", translate("PreferencesPanel", "Tag Manager"),
@@ -268,6 +265,22 @@ addPanel("main/delegates", translate("PreferencesPanel", "Element display"),
             ('gui.preferences.delegates', 'DelegatesPanel'))
 addPanel("main/filesystem", translate("PreferencesPanel", "File system"),
             ('filesystem.preferences', 'FilesystemSettings'), utils.getIcon('folder.svg'))
-                   
+
+# Profile panels                   
+def _addProfileCategory(category):
+    classTuple = ('gui.profiles', 'ProfileConfigurationWidget', category)
+    addPanel("profiles/" + category.name, category.title, classTuple)
+    
+def _removeProfileCategory(category):
+    removePanel("profiles/" + category.name)
+    
+addPanel("profiles", translate("PreferencesPanel", "Profiles"), QtGui.QWidget,
+         utils.getIcon('preferences_small.png'))
+profiles.manager.categoryAdded.connect(_addProfileCategory)
+profiles.manager.categoryRemoved.connect(_removeProfileCategory)
+for category in profiles.manager.categories:
+    _addProfileCategory(category)
+
+
 addPanel("plugins", translate("PreferencesPanel", "Plugins"), ('plugins.dialog', 'PluginDialog'),
          utils.getIcon('plugin.png'))
