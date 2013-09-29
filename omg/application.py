@@ -146,6 +146,15 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     logging.init()
     global logger
     logger = logging.getLogger("omg")
+    
+    # install a global exception handler so that exceptions are passed to the logging module
+    def exceptionHandler(type, value, tb):
+        import traceback
+        logger.error("Uncaught exception: {}\n{}"
+                     .format(str(value), "\n".join(traceback.format_tb(tb))))
+        sys.__excepthook__(type, value, tb)
+    sys.excepthook = exceptionHandler
+    
     logger.debug("START")
 
     if exitPoint == 'config':
