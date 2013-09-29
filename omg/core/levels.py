@@ -215,6 +215,7 @@ class Level(application.ChangeEventDispatcher):
         # These are necessary to solve ticket #138
         self.lastInsertId = None      # last element into which something has been inserted
         self.lastInsertPositions = [] # positions of that element that have been inserted
+        self.commitHooks = []
     
     def emit(self, event):
         super().emit(event)
@@ -547,57 +548,10 @@ class Level(application.ChangeEventDispatcher):
             elements = self.elements.values()
         if len(elements) == 0:
             return
-        self.stack.beginMacro(self.tr("Commit"), transaction=self.parent is real)
+        self.stack.beginMacro(self.tr("Commit"), transaction=(self.parent is real))
       
         if self.parent is real:
-            # First load all missing files
-            for element in elements:
-                if element.isFile() and element.id not in real:
-                    real.collect(element.id if element.isInDb() else element.url)
-            
-            # 1. Collect data
-            # 2. Write file tags (do this first because it is most likely to fail). Private tags must
-            #    be excluded first, because files have not yet been added to the database. Tags must be
-            #    changed before adding files to the db, because files on real might contain external tags.
-            # 3. Add elements to database
-            # 4. Change remaining tags (i.e. container tags and private tags)
-            # 5. change other stuff (same as if self.parent is not real)
-            
-            # 1. Collect data
-            addToDbElements = [] # Have to be added to the db (this does overlap oldElements below)
-            fileTagChanges = {}
-            remainingTagChanges = {}
-            for element in elements:
-                if element.isFile():
-                    inParent = self.parent[element.id]
-                    if element.isInDb():
-                        newTags = element.tags.copy()
-                    else:
-                        addToDbElements.append(inParent)
-                        if element.tags.containsPrivateTags():
-                            newTags = element.tags.withoutPrivateTags()
-                            remainingTagChanges[inParent] = tags.TagDifference(
-                                                    additions=list(element.tags.privateTags().getTuples()))
-                        else: newTags = element.tags.copy()
-                    if inParent.tags != newTags:
-                        fileTagChanges[inParent] = tags.TagStorageDifference(inParent.tags, newTags)
-                else: # containers
-                    if element.isInDb():
-                        inParent = self.parent[element.id]
-                        remainingTagChanges[inParent] = tags.TagStorageDifference(inParent.tags,
-                                                                                  element.tags.copy())
-                    else:
-                        addToDbElements.append(element.copy(level=self.parent))
-                        # we do not have to change tags of new containers
-                        
-            # 2.-4.
-            try:
-                real.changeTags(fileTagChanges)
-            except (filebackends.TagWriteError, OSError) as e:
-                self.stack.abortMacro()
-                raise e
-            real.addToDb(addToDbElements)
-            real.changeTags(remainingTagChanges)
+            real._commitHelper(elements)
         else:
             self.parent.addElements([element.copy(level=self.parent)
                                      for element in elements if element.id not in self.parent])
@@ -641,7 +595,8 @@ class Level(application.ChangeEventDispatcher):
         except RenameFilesError as e:
             self.stack.abortMacro()
             raise e
-        
+        for hook in self.parent.commitHooks:
+            hook(self, [self.parent[element.id] for element in elements])
         self.stack.endMacro()
     
     # ====================================================================================

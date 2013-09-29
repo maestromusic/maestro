@@ -233,12 +233,67 @@ class RealLevel(levels.Level):
             level.elements[id] = elem
             result.append(elem)
         return result
-            
+    
+    def _commitHelper(self, elements):
+        """Helper function called by Level.commit() if the parent level is real."""
+        
+        # First load all missing files so that everything is avaliable on real
+        for element in elements:
+            if element.isFile() and element.id not in self:
+                self.collect(element.id if element.isInDb() else element.url)
+        
+        # AGENDA:
+        # 1. Collect data
+        # 2. Write file tags (do this first because it is most likely to fail). Private tags must
+        #    be excluded first, because files have not yet been added to the database. Tags must be
+        #    changed before adding files to the db, because files on real might contain external
+        #    tags.
+        # 3. Add elements to database
+        # 4. Change remaining tags (i.e. container tags and private tags)
+        
+        # 1. Collect data
+        addToDbElements = [] # Have to be added to the db (this does overlap oldElements below)
+        fileTagChanges = {}
+        remainingTagChanges = {}
+        for file in filter(lambda e: e.isFile(), elements):
+            inReal = self[file.id]
+            if file.isInDb():
+                newTags = file.tags.copy()
+            else:
+                addToDbElements.append(inReal)
+                if file.tags.containsPrivateTags():
+                    newTags = file.tags.withoutPrivateTags()
+                    remainingTagChanges[inReal] = tags.TagDifference(
+                                            additions=list(file.tags.privateTags().getTuples()))
+                else:
+                    newTags = file.tags.copy()
+            if inReal.tags != newTags:
+                fileTagChanges[inReal] = tags.TagStorageDifference(inReal.tags, newTags)
+        for container in filter(lambda e: e.isContainer(), elements):
+            if container.isInDb():
+                inReal = self[element.id]
+                remainingTagChanges[inReal] = tags.TagStorageDifference(inReal.tags,
+                                                                        container.tags.copy())
+            else:
+                addToDbElements.append(container.copy(level=self))
+                # we do not have to change tags of new containers
+                    
+        # 2.-4.
+        try:
+            self.changeTags(fileTagChanges)
+        except (filebackends.TagWriteError, OSError) as e:
+            self.stack.abortMacro()
+            raise e
+        self.addToDb(addToDbElements)
+        self.changeTags(remainingTagChanges)
+    
+    
     # =============================================================
     # Overridden from Level: these methods modify DB and filesystem
     # =============================================================
     def commit(self, elements=None):
         raise RuntimeError("Cannot commit real level.")
+    
     
     def addElements(self, elements):
         if not all(element.isContainer() for element in elements):
