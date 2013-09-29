@@ -73,7 +73,7 @@ class Logger:
         """Log a critical error message."""
         self.log("CRITICAL",message)
 
-    def exception(self,message):
+    def exception(self, message):
         """Log an exception message. Information about the exception will be fetched using :mod:`traceback`.
         """
         if not configured:
@@ -108,8 +108,7 @@ def getLogger(name=None):
     logger = Logger(name)
     loggers.add(logger)
     return logger
-
-
+    
 def init():
     """Initialize logging according to the config variable ``config.storage.main.logging``. Of course, you
     must initialize the config module first.
