@@ -21,6 +21,13 @@ from omg.core import tags
 
 
 class AudioCDURL(filebackends.BackendURL):
+    """URLs for tracks on Audio CDs.
+    
+    The scheme is the following: audiocd://<discid>.<tracknr>/<destinedPath>
+    
+    where <destinedPath> is the path within the music directory to which the file, once ripped,
+    will be moved.
+    """
     
     CAN_RENAME = True
     IMPLEMENTATIONS = []

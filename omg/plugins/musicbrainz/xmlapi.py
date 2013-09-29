@@ -239,21 +239,33 @@ class MBTreeItem:
                 if tag not in self.tags or val not in self.tags[tag]:
                     self.tags.add(tag, val)
 
-    def makeElements(self, level):
+    def makeElements(self, level, includeParentTags=True):
+        elTags = self.makeOMGTags(mbplugin.tagMap, includeParentTags)
         if not isinstance(self, Recording):
-            contentList = elements.ContentList()
+            contents = elements.ContentList()
             for pos, child in self.children.items():
-                element = child.makeElements(level)            
-                contentList.insert(pos, element.id)
-            element = level.createContainer(tags=self.tags.asOMGTags(mbplugin.tagMap),
-                                            contents=contentList)
+                elem = child.makeElements(level)            
+                contents.insert(pos, elem.id)
+            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType)
         else:
-            element = level.collect(self.backendUrl)
-            diff = tags.TagStorageDifference(None, self.tags.asOMGTags(mbplugin.tagMap))
-            level.changeTags({element: diff})
-        element.mbItem = self
-        self.element = element
-        return element
+            elem = level.collect(self.backendUrl)
+            diff = tags.TagStorageDifference(None, elTags)
+            level.changeTags({elem: diff})
+        elem.mbItem = self
+        self.element = elem
+        return elem
+    
+    def makeOMGTags(self, mapping, includeParents=True):
+        omgTags = self.tags.asOMGTags(mapping)
+        if includeParents:
+            element = self
+            while element.parent is not None:
+                element = element.parent
+                parentTags = element.tags.asOMGTags(mapping)
+                for tag, values in parentTags.items():
+                    if tag is not tags.TITLE:
+                        omgTags.addUnique(tag, *values)
+        return omgTags
         
     def collectAliasEntities(self):
         entities = set()
@@ -285,6 +297,8 @@ class Release(MBTreeItem):
     """A release is the top-level container structure in MusicBrainz that we care about.
     """
     
+    containerType = elements.TYPE_ALBUM
+    
     def mediumForDiscid(self, discid):
         """Return the position of the medium in this release with given *discid*, if such exists.
         """
@@ -295,6 +309,8 @@ class Release(MBTreeItem):
 
 class Medium(MBTreeItem):
     """A medium inside a release. Usually has one or more discids associated to it."""
+    
+    containerType = elements.TYPE_CONTAINER
     
     def __init__(self, pos, release, discids, title=None):
         """Create the medium with associated *discids* as position *pos* in *release*.
@@ -440,6 +456,8 @@ class Recording(MBTreeItem):
         
 
 class Work(MBTreeItem):
+    
+    containerType = elements.TYPE_WORK
     
     def __init__(self, workid):
         super().__init__(workid)

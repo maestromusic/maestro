@@ -64,10 +64,9 @@ class ImportAudioCDAction(treeactions.TreeAction):
         else:
             release = releases[0]
         from . import ripper
-        from .plugin import fileReplacer
-        rip = ripper.RipThread(discid.get_default_device(), theDiscid)
-        rip.trackFinished.connect(fileReplacer.replaceFile)
-        rip.start()
+        ripper = ripper.Ripper(device, theDiscid)
+        if config.options.audiocd.earlyrip: 
+            ripper.start()
         progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
         progress.open()        
         stack = self.level().stack.createSubstack(modalDialog=True)
@@ -84,6 +83,8 @@ class ImportAudioCDAction(treeactions.TreeAction):
         if dialog.exec_():
             model = self.parent().model()
             model.insertElements(model.root, len(model.root.contents), [dialog.container])
+            if not config.options.audiocd.earlyrip:
+                ripper.start()
         stack.close()
         
 class ReleaseSelectionDialog(QtGui.QDialog):
@@ -255,7 +256,7 @@ class NewTagsWidget(QtGui.QTableWidget):
         self.setHorizontalHeaderLabels(self.columns)
         self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.setRowCount(len(newtags))
-        self.tagMapping = {}
+        self.tagMapping = mbplugin.tagMap
         from omg.gui.tagwidgets import TagTypeBox
         for row, tag in enumerate(newtags):
             self.tagMapping[tag.name] = tag
@@ -321,6 +322,10 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
         self.newTagWidget.tagConfigChanged.connect(self.updateTags)
         
+        self.includeParentTagsBox = QtGui.QCheckBox(self.tr("Include tags of parent containers"))
+        self.includeParentTagsBox.setChecked(True)
+        self.includeParentTagsBox.stateChanged.connect(self.updateTags)
+        
         btbx = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btbx.accepted.connect(self.finalize)
         btbx.rejected.connect(self.reject)
@@ -331,6 +336,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         lay.addWidget(self.aliasWidget, 1)
         lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
         lay.addWidget(self.newTagWidget, 1)
+        lay.addWidget(self.includeParentTagsBox, 1)
         lay.addWidget(btbx, 1)
         self.setLayout(lay)
         self.resize(mainwindow.mainWindow.width()*0.8, mainwindow.mainWindow.height()*0.8)
@@ -347,8 +353,9 @@ class ImportAudioCDDialog(QtGui.QDialog):
     def updateTags(self):
         changes = {}
         for item in self.release.walk():
-            t = item.tags.asOMGTags(self.newTagWidget.tagMapping)
-            if t != item.element.tags:
-                changes[item.element] = tags.TagStorageDifference(item.element.tags, t)
+            elemTags = item.makeOMGTags(self.newTagWidget.tagMapping,
+                                 self.includeParentTagsBox.isChecked())
+            if elemTags != item.element.tags:
+                changes[item.element] = tags.TagStorageDifference(item.element.tags, elemTags)
         if len(changes):
             self.level.changeTags(changes)
