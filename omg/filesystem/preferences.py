@@ -23,7 +23,7 @@ from .. import filesystem, config
 
 class FilesystemSettings(QtGui.QWidget):
     
-    def __init__(self, dialog, parent=None):
+    def __init__(self, buttonBar, parent=None):
         super().__init__(parent)
         
         layout = QtGui.QVBoxLayout()

@@ -33,6 +33,8 @@ from ..models import browser as browsermodel
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
+defaultBrowser = None
+
 
 class Browser(dockwidget.DockWidget):
     """Browser to search the music collection. The browser contains a searchbox, a button to open the
@@ -157,6 +159,9 @@ class Browser(dockwidget.DockWidget):
 
         self.createViews(layersForViews)
         self.load()
+        
+        global defaultBrowser
+        defaultBrowser = self
 
     def saveState(self):
         state = {
@@ -241,9 +246,13 @@ class Browser(dockwidget.DockWidget):
             for view in self.views:
                 view.resetToTable(self.table)
 
-    def search(self):
-        """Search for the value in the search-box. If it is empty, display all values."""
+    def search(self, searchString=None):
+        """Search for the value in the searchbox. If it is empty, display all values. If *searchString*
+        is given, write it into the searchbox and search for it.
+        """
         #TODO: restoreExpanded if new criteria are narrower than the old ones?
+        if searchString is not None:
+            self.searchBox.setText(searchString)
         self.searchCriterion = self.searchBox.criterion
         self.load()
         
@@ -331,14 +340,15 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
     actionConfig.addActionDefinition(((sect, 'rename'),), treeactions.RenameAction)
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
-                                     text=translate("BrowserTreeView", "delete from OMG"))
+                                     text=translate("BrowserTreeView", "Delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'elementType'),), treeactions.ChangeElementTypeAction)
     actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
     
-    def __init__(self, parent, layers, delegateProfile):
-        super().__init__(levels.real, parent)
+    def __init__(self, browser, layers, delegateProfile):
+        super().__init__(levels.real)
+        self.browser = browser
         self.setModel(browsermodel.BrowserModel(self, layers))
         self.header().sectionResized.connect(self.model().layoutChanged)
         
@@ -355,6 +365,11 @@ class BrowserTreeView(treeview.TreeView):
         # The expander will decide which nodes to load/expand after the view is reset. Because each loading
         # might perform a search, Expanders work asynchronously.
         self.expander = None
+        
+    def focusInEvent(self, event):
+        global defaultBrowser
+        defaultBrowser = self.browser
+        super().focusInEvent(event)
         
     def resetToTable(self, table):
         """Reset the view and its model so that it displays elements from *table*."""
