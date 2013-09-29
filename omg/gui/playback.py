@@ -100,7 +100,7 @@ class PlaybackWidget(dockwidget.DockWidget):
             text = "{} - {}".format(strutils.formatLength(value),
                                   strutils.formatLength(self.seekSlider.maximum()))
         else:
-            text = formatTime(value)
+            text = strutils.formatLength(value)
             self.seekSlider.setEnabled(False)
         self.seekLabel.setText(text)
         
