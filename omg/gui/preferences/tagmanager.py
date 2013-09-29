@@ -58,7 +58,7 @@ class TagManager(QtGui.QWidget):
         self.showInBrowserButton.clicked.connect(self._handleShowInBrowserButton)
         buttonLayout.addWidget(self.showInBrowserButton)
         self.deleteButton = QtGui.QPushButton(utils.getIcon("delete.png"), '')
-        self.deleteButton.setToolTip(self.tr("Delete"))
+        self.deleteButton.setToolTip(self.tr("Delete tag"))
         self.deleteButton.setEnabled(False)
         self.deleteButton.clicked.connect(self._handleDeleteButton)
         buttonLayout.addWidget(self.deleteButton)
@@ -89,6 +89,7 @@ class TagManager(QtGui.QWidget):
         self.deleteButton.setEnabled(len(rows) == 1)
     
     def _handleShowInBrowserButton(self):
+        """Load all elements containing the selected tag into the default browser."""
         from .. import browser
         rows = self.table.selectionModel().selectedRows()
         if len(rows) == 1 and browser.defaultBrowser is not None:

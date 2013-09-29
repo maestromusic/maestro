@@ -188,6 +188,14 @@ class UndoStack(QtCore.QObject):
         according to the stack's index."""
         return self._undoAction
     
+    def undoText(self):
+        """Return the text of the next action/macro that will be undone."""
+        return self._commands[self._index-1].text if self._index > 0 else ''
+    
+    def redoText(self):
+        """Return the text of the next action/macro that will be redone."""
+        return self._commands[self._index].text if self._index < len(self._commands) else ''
+
     def undo(self):
         """Undo the last command/macro."""
         if self._inUndoRedo or self.isComposing():
@@ -258,9 +266,8 @@ class UndoStack(QtCore.QObject):
         self.indexChanged.emit(self._index)
         self.canRedoChanged.emit(self.canRedo())
         self.canUndoChanged.emit(self.canUndo())
-        self.redoTextChanged.emit(self._commands[self._index].text if self._index < len(self._commands)
-                                                                   else '')
-        self.undoTextChanged.emit(self._commands[self._index-1].text if self._index > 0 else '')
+        self.redoTextChanged.emit(self.redoText())
+        self.undoTextChanged.emit(self.undoText())
     
     def shouldDelayEvents(self):
         """Return whether events should be delayed."""
