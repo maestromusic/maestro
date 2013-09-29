@@ -316,8 +316,12 @@ def removePanel(path):
 # Add core panels
 addPanel("main", translate("Preferences", "Main"), None)
 addPanel("main/tagmanager", translate("Preferences", "Tag Manager"),
-            ('gui.preferences.tagmanager', 'TagManager'),
-            iconPath = ':omg/icons/tag_blue.png')
+         callable = ('gui.preferences.tagmanager', 'TagManager'),
+         description = translate("Preferences", 
+                            "Note that you cannot change or remove tags that already appear in elements."
+                            "<br />Use drag&drop to change the order in which tags are usually displayed."),
+         iconPath = ':omg/icons/tag_blue.png'
+)
 addPanel("main/flagmanager", translate("Preferences", "Flag Manager"),
             ('gui.preferences.flagmanager', 'FlagManager'),
             iconPath = ':omg/icons/flag_blue.png')
