@@ -45,7 +45,7 @@ class Panel:
     Constructor parameters are
     
         - *path*: A unique identifier for the panel which additionally specifies the parent node in the tree
-            of panels.
+          of panels.
         - *title*: The title of the panel
         - *callable*: A callable that will produce the widget that should be displayed on this panel.
           Often this is simply the widget's class.
@@ -125,7 +125,9 @@ class PreferencesDialog(QtGui.QDialog):
         self.layout().addWidget(splitter, 1)
         
         self.treeWidget = QtGui.QTreeWidget()
-        self.treeWidget.header().setVisible(False)
+        self.treeWidget.header().hide()
+        self.treeWidget.header().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setStretchLastSection(False)
         self.treeWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
         splitter.addWidget(self.treeWidget)
         
@@ -207,21 +209,14 @@ class PanelWidget(QtGui.QWidget):
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
         
-        frame = QtGui.QFrame()
-        frame.setFrameStyle(QtGui.QFrame.StyledPanel | QtGui.QFrame.Sunken)
-        frame.setLayout(QtGui.QVBoxLayout())
-        frame.layout().setContentsMargins(0,0,0,0)
-        self.layout().addWidget(frame)
-        
         # Create title widget
-        self.titleWidget = QtGui.QWidget()
-        self.titleWidget.setObjectName("titleWidget")
-        self.titleWidget.setStyleSheet(
-                                "#titleWidget { background-color: white; border-bottom: 1px solid grey; }")
+        titleWidget = QtGui.QFrame()
+        titleWidget.setFrameStyle(QtGui.QFrame.StyledPanel | QtGui.QFrame.Raised)
+        titleWidget.setStyleSheet("QFrame { background-color: white; }")
+        self.layout().addWidget(titleWidget)
         
-        titleLayout = QtGui.QHBoxLayout()
+        titleLayout = QtGui.QHBoxLayout(titleWidget)
         titleLayout.setSpacing(20)
-        self.titleWidget.setLayout(titleLayout)
         self.titleLabel = QtGui.QLabel()
         self.titleLabel.setText("<b>{}</b><br/>{}".format(panel.title, panel.description))
         self.titleLabel.setWordWrap(True)
@@ -231,7 +226,6 @@ class PanelWidget(QtGui.QWidget):
         self.pixmapLabel.setPixmap(QtGui.QPixmap(panel.pixmapPath))
         self.pixmapLabel.setContentsMargins(20, 0, 20, 0)
         titleLayout.addWidget(self.pixmapLabel)
-        frame.layout().addWidget(self.titleWidget)
         
         self.buttonBar = QtGui.QHBoxLayout()
         
@@ -239,9 +233,8 @@ class PanelWidget(QtGui.QWidget):
         innerWidget = panel.createWidget(self.buttonBar)
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
-        scrollArea.setFrameStyle(QtGui.QFrame.NoFrame)
         scrollArea.setWidget(innerWidget)
-        frame.layout().addWidget(scrollArea, 1)
+        self.layout().addWidget(scrollArea, 1)
         
         # Add button bar
         style = QtGui.QApplication.style()
@@ -331,7 +324,7 @@ addPanel("main/filesystem", translate("Preferences", "File system"),
 
 # Profile panels                   
 def _addProfileCategory(category):
-    classTuple = ('gui.profiles', 'ProfileConfigurationWidget', category)
+    classTuple = ('gui.profiles', 'ProfileConfigurationPanel', category)
     addPanel(path = "profiles/" + category.name,
              title = category.title,
              callable = classTuple,

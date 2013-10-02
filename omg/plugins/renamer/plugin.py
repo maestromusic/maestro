@@ -212,3 +212,7 @@ class GrammarRenamer(profiles.Profile):
 
     def __eq__(self, other):
         return not self.__neq__(other)
+    
+    def __hash__(self):
+        return id(self)
+        

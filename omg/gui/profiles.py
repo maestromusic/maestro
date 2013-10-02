@@ -82,51 +82,284 @@ class CreateProfileDialog(QtGui.QDialog):
         dialog.exec_()
         return dialog.profile
         
-
-class ProfileDialog(QtGui.QDialog):
-    """A dialog that allows to configure all profiles of a given category. Depending on the number of
-    profiles in the category, it has two states:
-    
-        - if there is no profile it displays a form to add a profile (see NoProfileYetWidget),
-        - otherwise it contains a box to select a profile a form to configure it, and button to add new
-          profiles (ChooseAndConfigureProfileWidget)
-          
-    *profile* is the profile that is selected at the beginning.
-    """
-    def __init__(self, category, profile=None):
-        super().__init__()
-        self.setWindowTitle(self.tr("Profile Configuration: {}").format(category.title))
-        self.resize(500,300)
-        layout = QtGui.QVBoxLayout(self)
-        layout.addWidget(ProfileConfigurationWidget(self, category, profile))
         
-        
-class ProfileConfigurationWidget(QtGui.QWidget):
+class ProfileConfigurationPanel(QtGui.QWidget):
     def __init__(self, buttonBar, category, profile=None):
         super().__init__()
+        style = QtGui.QApplication.style()
+        
         self.category = category
         self.category.profileAdded.connect(self._handleProfileAdded)
+        self.category.profileRenamed.connect(self._handleProfileRenamed)
         self.category.profileRemoved.connect(self._handleProfileRemoved)
         
-        layout = QtGui.QVBoxLayout(self)
+        self.setLayout(QtGui.QHBoxLayout())
+        self.layout().setContentsMargins(0,0,0,0)
+        self.layout().setSpacing(0)
         
-        self.stackedWidget = QtGui.QStackedWidget()
-        self.stackedWidget.addWidget(NoProfileYetWidget(self))
-        self.stackedWidget.addWidget(ChooseAndConfigureProfileWidget(self, buttonBar, profile))
-        if len(category.profiles()) > 0:
-            self.stackedWidget.setCurrentIndex(1)
-        layout.addWidget(self.stackedWidget)
+        # Left column
+        leftLayout = QtGui.QVBoxLayout()
+        self.layout().addLayout(leftLayout)
         
+        toolBar = QtGui.QToolBar()
+        toolBar.setIconSize(QtCore.QSize(16, 16))
+        leftLayout.addWidget(toolBar)
+        
+        self.createButton = QtGui.QToolButton()
+        self.createButton.setIcon(utils.getIcon('add.png'))
+        self.createButton.setToolTip(self.tr("Create profile"))
+        self.createButton.clicked.connect(self._handleCreateButton)
+        toolBar.addWidget(self.createButton)
+        self.renameButton = QtGui.QToolButton()
+        self.renameButton.setIcon(utils.getIcon('pencil.png'))
+        self.renameButton.setToolTip(self.tr("Rename profile"))
+        self.renameButton.clicked.connect(self._handleRenameButton)
+        toolBar.addWidget(self.renameButton)
+        self.deleteButton = QtGui.QToolButton()
+        self.deleteButton.setIcon(utils.getIcon('delete.png'))
+        self.deleteButton.setToolTip(self.tr("Delete profile"))
+        self.deleteButton.clicked.connect(self._handleDeleteButton)
+        toolBar.addWidget(self.deleteButton)
+        
+        self.profileTree = ProfileTree(self.category)
+        self.profileTree.itemSelectionChanged.connect(self._handleSelectionChanged)
+        self.profileTree.setFrameStyle(QtGui.QFrame.NoFrame)
+        leftLayout.addWidget(self.profileTree, 1)
+    
+        # Line between left and right layout
+        frame = QtGui.QFrame()
+        frame.setFrameStyle(QtGui.QFrame.VLine)
+        palette = frame.palette()
+        # Draw frame in the color that is used for the Sunken | 
+        palette.setColor(QtGui.QPalette.WindowText, self.palette().color(QtGui.QPalette.Dark)) 
+        frame.setPalette(palette)
+        self.layout().addWidget(frame)
+        
+        # Right column
+        right = QtGui.QScrollArea()
+        right.setWidgetResizable(True)
+        right.setFrameStyle(QtGui.QFrame.NoFrame)
+        innerRight = QtGui.QWidget()
+        right.setWidget(innerRight)
+        rightLayout = QtGui.QVBoxLayout(innerRight)
+        self.layout().addWidget(right, 1)
+        
+        self.titleLabel = QtGui.QLabel()
+        self.titleLabel.setStyleSheet('QLabel {font-weight: bold}')
+        rightLayout.addWidget(self.titleLabel)
+        
+        self.stackedLayout = QtGui.QStackedLayout()
+        self.stackedLayout.setContentsMargins(0,0,0,0)
+        rightLayout.addLayout(self.stackedLayout, 1)
+        noProfileWidget = NoProfileYetWidget(self)
+        noProfileWidget.createButton.clicked.connect(self._handleCreateButton)
+        self.stackedLayout.addWidget(noProfileWidget)
+        
+        self.profileWidgets = {}
+        
+        if len(self.category.profiles()) > 0:
+            self.profileTree.selectProfile(self.category.profiles()[0])
+    
+    def showProfile(self, profile):
+        if profile is None:
+            self.titleLabel.setText('')
+            self.stackedLayout.setCurrentIndex(0)
+        else:
+            if profile not in self.profileWidgets:
+                widget = profile.configurationWidget()
+                if widget is None:
+                    widget = QtGui.QLabel(self.tr("There are no options for this profile."))
+                    widget.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+                widget.layout().setContentsMargins(0,0,0,0)
+                self.stackedLayout.addWidget(widget)
+                self.profileWidgets[profile] = widget
+            
+            self.titleLabel.setText(self.tr("Configure profile '{}'".format(profile.name)))
+            self.stackedLayout.setCurrentWidget(self.profileWidgets[profile])
+            self.profileTree.selectProfile(profile)
+            
+    def _handleSelectionChanged(self):
+        """Show the profile selected by the user. Enable/disable buttons according to the selection:
+        Built-in configurations must not be deleted."""
+        profile = self.profileTree.selectedProfile()
+        if profile is not None:
+            self.showProfile(profile)
+        self.renameButton.setEnabled(profile is not None and not profile.builtIn)
+        self.deleteButton.setEnabled(profile is not None and not profile.builtIn)
+            
     def _handleProfileAdded(self, profile):
         """Handle profileAdded-signal of the profile category."""
-        self.stackedWidget.setCurrentIndex(1)
+        if len(self.category.profiles()) == 1:
+            self.showProfile(profile)
+            
+    def _handleProfileRenamed(self, profile):
+        """Handle profileRenamed-signal of the profile category."""
+        if profile == self.profileTree.selectedProfile():
+            self.titleLabel.setText(self.tr("Configure profile '{}'".format(profile.name)))
         
     def _handleProfileRemoved(self, profile):
         """Handle profileRemoved-signal of the profile category."""
         if len(self.category.profiles()) == 0:
-            self.stackedWidget.setCurrentIndex(0)
-        
+            self.showProfile(None)
+        if profile in self.profileWidgets:
+            widget = self.profileWidgets[profile]
+            self.stackedLayout.removeWidget(widget)
+            widget.setParent(None)
+            del self.profileWidgets[profile]
             
+    def _handleCreateButton(self):
+        """Handle the add button (which is visible only if the category does not use profile types)."""
+        if not isinstance(self.category, profiles.TypedProfileCategory):
+            profile = self.category.addProfile(self.category.suggestProfileName())
+        else:
+            profile = CreateProfileDialog.execute(self.category, self)
+        if profile is not None:
+            self.profileTree.selectProfile(profile)
+                    
+    def _handleRenameButton(self):
+        """Ask the user for a new name of the current profile and change names."""
+        profile = self.profileTree.selectedProfile()
+        if profile is None:
+            return
+        text, ok = QtGui.QInputDialog.getText(self,
+                                              self.tr("Profile name"),
+                                              self.tr("Choose a new name:"),
+                                              text=profile.name)
+        if ok and len(text) > 0:
+            existingProfile = self.category.get(text)
+            if existingProfile == profile:
+                return # no change
+            elif existingProfile is not None:
+                dialogs.warning(self.tr("Invalid name"), self.tr("There is already a profile of this name."))
+            else:
+                self.category.renameProfile(profile, text)
+                
+    def _handleDeleteButton(self):
+        """Ask the user again and delete the current profile."""
+        profile = self.profileTree.selectedProfile()
+        if profile is not None and dialogs.question(
+                            self.tr("Delete profile"),
+                            self.tr("Should the profile '{}' really be deleted?").format(profile.name),
+                            parent=self):
+            self.category.deleteProfile(profile)
+        
+        
+class ProfileTree(QtGui.QTreeWidget):
+    """TreeWidget that displays all profiles of a given category. For non-typed categories, profiles will
+    be displayed as list. In typed categories a tree with types on first level and profiles on second
+    level is used.
+    """
+    def __init__(self, category):
+        super().__init__()
+        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.setItemsExpandable(False)
+        self.setRootIsDecorated(False)
+        self.header().hide()
+        self.header().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.header().setStretchLastSection(False)
+        
+        self.category = category
+        self.category.profileAdded.connect(self._handleProfileAdded)
+        self.category.profileRemoved.connect(self._handleProfileRemoved)
+        self.category.profileRenamed.connect(self._handleProfileRenamed)
+        if isinstance(self.category, profiles.TypedProfileCategory):
+            for type in self.category.types:
+                self._handleTypeAdded(type)
+        for profile in self.category.profiles():
+            self._handleProfileAdded(profile)
+            
+    # make the treewidget narrower
+    def minimumSizeHint(self):
+        return QtCore.QSize(150, 100)
+    
+    sizeHint = minimumSizeHint
+    
+    def selectedProfile(self):
+        items = self.selectedItems()
+        if len(items) > 0:
+            return items[0].data(0, Qt.UserRole)
+        else: return None
+    
+    def selectProfile(self, profile):
+        item, i = self._findProfileItem(profile)
+        if item is not None:
+            item.setSelected(True)
+                    
+    def _findToplevelItem(self, data):
+        for i in range(self.topLevelItemCount()):
+            item = self.topLevelItem(i)
+            if item.data(0, Qt.UserRole) == data:
+                return item, i
+        else: return None, None
+                    
+    def _findProfileItem(self, profile):
+        if not isinstance(self.category, profiles.TypedProfileCategory):
+            return self._findToplevelItem(profile)
+        else:
+            typeItem, i = self._findToplevelItem(profile.type)
+            if typeItem is not None:
+                for i in range(typeItem.childCount()):
+                    item = typeItem.child(i)
+                    if item.data(0, Qt.UserRole) == profile:
+                        return item, i
+            return None, None
+                    
+    def _handleTypeAdded(self, type):
+        text = self.tr("{}:").format(type.title)
+        if type != self.category.types[0]:
+            text = '\n' + text # create space between subtrees
+        typeItem = QtGui.QTreeWidgetItem([text])
+        font = typeItem.font(0)
+        font.setItalic(True)
+        typeItem.setFont(0, font)
+        typeItem.setData(0, Qt.UserRole, type)
+        typeItem.setFlags(Qt.ItemIsEnabled)
+        self.addTopLevelItem(typeItem)
+        typeItem.setExpanded(True)
+    
+    def _handleTypeRemove(self, type):
+        item, i = self._findToplevelItem(type)
+        if item is not None:
+            self.takeToplevelItem(i)
+        if i == 0:
+            # correct newlines in type widgets
+            if self.topLevelItemCount() > 0:
+                firstItem = self.topLevelItem(0)
+                text = firstItem.text(0)
+                if text.startswith('\n'):
+                    firstItem.setText(0, text[1:])
+    
+    def _handleProfileAdded(self, profile):
+        if not isinstance(self.category, profiles.TypedProfileCategory):
+            item = QtGui.QTreeWidgetItem([profile.name])
+            item.setData(0, Qt.UserRole, profile)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            self.addTopLevelItem(item)
+        else:
+            typeItem, i = self._findToplevelItem(profile.type)
+            if typeItem is not None:
+                item = QtGui.QTreeWidgetItem([profile.name])
+                item.setData(0, Qt.UserRole, profile)
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                typeItem.addChild(item)
+        
+    def _handleProfileRemoved(self, profile):
+        if not isinstance(self.category, profiles.TypedProfileCategory):
+            item, i = self._findToplevelItem(profile)
+            if item is not None:
+                self.takeTopLevelItem(i)
+        else:
+            item, i = self._findProfileItem(profile)
+            if item is not None:
+                item.parent().removeChild(item)
+                
+    def _handleProfileRenamed(self, profile):
+        """React to profileRenamed signals from the profile category."""
+        item, i = self._findProfileItem(profile)
+        if item is not None:
+            item.setText(0, profile.name)
+                
+        
 class NoProfileYetWidget(QtGui.QWidget):
     """This widget is displayed in a ProfileConfigurationWidget if the underlying profile category does
     not have a profile yet."""
@@ -134,187 +367,22 @@ class NoProfileYetWidget(QtGui.QWidget):
         super().__init__(parent)
         self.category = parent.category
         layout = QtGui.QVBoxLayout(self)
-        layout.setContentsMargins(0,0,0,0)
+        label = QtGui.QLabel()
+        label.setWordWrap(True)
+        layout.addWidget(label)
         
-        if isinstance(self.category, profiles.TypedProfileCategory):
-            if len(self.category.types) == 0:
-                label = QtGui.QLabel()
-                label.setWordWrap(True)
-                layout.addWidget(label)
-                label.setText(self.tr("There is no profile type. Probably you need to install a plugin"
-                                      " that adds support for '{}'.").format(self.category.name))
-                return
+        if isinstance(self.category, profiles.TypedProfileCategory) and len(self.category.types) == 0:
+            label.setText(self.tr("There is no profile type. Probably you need to install a plugin"
+                                  " that adds support for '{}'.").format(self.category.name))
+            return
         
-        self.createButton = QtGui.QPushButton(self.tr("Create profile"))
-        self.createButton.clicked.connect(functools.partial(CreateProfileDialog.execute, self.category))
-        self.createButton.setSizePolicy(QtGui.QSizePolicy.Fixed,QtGui.QSizePolicy.Fixed)
+        label.setText(self.tr("There is no profile yet."))
+        
+        self.createButton = QtGui.QPushButton(utils.getIcon('add.png'), self.tr("Create profile"))
+        self.createButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
         layout.addWidget(self.createButton)
         layout.addStretch()
         
-
-class ChooseAndConfigureProfileWidget(QtGui.QWidget):
-    """This widget is displayed in a ProfileConfigurationWidget if the underlying profile category has at
-    least one profile."""
-    profileChosen = QtCore.pyqtSignal(profiles.Profile)
-    
-    def __init__(self, parent, buttonBar, profile=None):
-        super().__init__(parent)
-        self.category = parent.category
-        self.category.profileAdded.connect(self.setProfile)
-        self.category.profileRenamed.connect(self._handleProfileRenamed)
-        
-        layout = QtGui.QVBoxLayout(self)
-        layout.setContentsMargins(0,0,0,0)
-        
-        topLayout = QtGui.QHBoxLayout()
-        layout.addLayout(topLayout)
-        topLayout.addWidget(QtGui.QLabel(self.tr("Choose profile: ")))
-        self.profileChooser = ProfileComboBox(self.category,
-                                              default=profile,
-                                              includeConfigure=False)
-        self.profileChooser.profileChosen.connect(self._handleProfileChooser)
-        topLayout.addWidget(self.profileChooser)
-        topLayout.addStretch()
-        
-        self.createButton = QtGui.QPushButton(utils.getIcon('add.png'), '')
-        self.createButton.clicked.connect(self._handleCreateButton)
-        topLayout.addWidget(self.createButton)
-        self.renameButton = QtGui.QPushButton(utils.getIcon('pencil.png'), '')
-        self.renameButton.clicked.connect(self._handleRenameButton)
-        topLayout.addWidget(self.renameButton)
-        self.deleteButton = QtGui.QPushButton(utils.getIcon('delete.png'), '')
-        self.deleteButton.clicked.connect(self._handleDeleteButton)
-        topLayout.addWidget(self.deleteButton)
-                
-        frame = QtGui.QFrame()
-        frame.setFrameShape(QtGui.QFrame.HLine)
-        layout.addWidget(frame)
-        self.titleLabel = QtGui.QLabel() # title will be set in setProfile
-        layout.addWidget(self.titleLabel)
-        
-        self._profileWidgetPosition = layout.count()
-        
-        if not self.category.saveImmediately:
-            buttonBar.addStretch(1)
-            self.saveButton = QtGui.QPushButton(self.tr("Save"))
-            self.saveButton.clicked.connect(self._handleSaveButton)
-            buttonBar.addWidget(self.saveButton)
-                
-        self.profile = None
-        self.profileWidget = None # Will be created in setProfile
-        self.setProfile(profile)
-        
-    def setProfile(self, profile):
-        """Set current profile."""
-        if profile is None:
-            return # widget is invisible
-        if profile != self.profile:
-            self.profile = profile
-            self.profileChooser.setCurrentProfile(profile)
-            self._updateTitleLabel()
-            self.renameButton.setEnabled(not profile.builtIn)
-            self.deleteButton.setEnabled(not profile.builtIn)
-            self._createProfileWidget()
-            
-    def _handleSaveButton(self):
-        if self.profileWidget is not None:
-            self.profileWidget.save()
-            
-    def _handleCloseButton(self):
-        if not self.category.saveImmediately and \
-                    self.profileWidget is not None and self.profileWidget.isModified():
-            if dialogs.question(self.tr("Save changes?"),
-                                self.tr("The profile has been modified. Save changes?"),
-                                parent=self):
-                self.profileWidget.save()
-        self.window().close()
-                
-    def _handleProfileChooser(self, profile):
-        if not self.category.saveImmediately and \
-                    self.profileWidget is not None and self.profileWidget.isModified():
-            if dialogs.question(self.tr("Save changes?"),
-                                self.tr("The profile has been modified. Save changes?"),
-                                parent=self):
-                self.profileWidget.save()
-        self.setProfile(profile)
-        
-    def _updateTitleLabel(self):
-        """Update the label below the profileChooser."""
-        if self.profile is not None and self.profile.type is not None:
-            text = self.tr("Type: {}".format(self.profile.type.title))
-            self.titleLabel.setText(text)
-            self.titleLabel.setVisible(True)
-        else: self.titleLabel.setVisible(False)
-        
-    def _createProfileWidget(self):
-        """Create a widget that allows to configure the current profile and insert it into the layout.
-        Remove any old profile widget first."""
-        if self.profileWidget is not None:
-            oldSize = self.profileWidget.sizeHint()
-            self.layout().removeWidget(self.profileWidget)
-            self.profileWidget.setParent(None)
-            self.profileWidget = None
-        else: oldSize = QtCore.QSize(0,0)
-        
-        if self.profile is not None:
-            self.profileWidget = self.profile.configurationWidget()
-            if hasattr(self.profileWidget, 'modified'):
-                self.saveButton.setEnabled(False)
-                self.profileWidget.modified.connect(self.saveButton.setEnabled)
-            if self.profileWidget is not None:
-                self.layout().insertWidget(self._profileWidgetPosition, self.profileWidget, stretch=1)
-                # sizeHint is not computed correctly until the event loop is entered.
-                QtCore.QTimer.singleShot(0, self._resize)
-                    
-    def _resize(self):
-        window = self.window()
-        window.resize(max(window.size().width(), window.sizeHint().width()),
-                      max(window.size().height(), window.sizeHint().height()))
-               
-    def _handleProfileRenamed(self, profile):
-        """React to profileRenamed signals from the profile category."""
-        if profile == self.profile:
-            self._updateTitleLabel()
-        
-    def _handleCreateButton(self):
-        """Handle the add button (which is visible only if the category does not use profile types)."""
-        if not isinstance(self.category, profiles.TypedProfileCategory):
-            profile = self.category.addProfile(self.category.suggestProfileName())
-            self.profileChooser.setCurrentProfile(profile)
-        else:
-            profile = CreateProfileDialog.execute(self.category, self)
-            if profile is not None:
-                self.profileChooser.setCurrentProfile(profile)
-                    
-    def _handleRenameButton(self):
-        """Ask the user for a new name of the current profile and change names."""
-        text, ok = QtGui.QInputDialog.getText(self,
-                                              self.tr("Profile name"),
-                                              self.tr("Choose a new name"),
-                                              text=self.profile.name)
-        if ok and len(text) > 0:
-            existingProfile = self.category.get(text)
-            if existingProfile == self.profile:
-                return # no change
-            elif existingProfile is not None:
-                dialogs.warning(self.tr("Invalid name"), self.tr("There is already a profile of this name."))
-            else:
-                self.category.renameProfile(self.profile, text)
-                
-    def _handleDeleteButton(self):
-        """Ask the user again and delete the current profile."""
-        if dialogs.question(self.tr("Delete profile"),
-                            self.tr("Should the profile '{}' really be deleted?").format(self.profile.name),
-                            parent=self):
-            if len(self.category.profiles()) > 1:
-                # Choose a different profile
-                index = self.category.profiles().index(self.profile)
-                newProfile = self.category.profiles()[index-1 if index > 0 else 1]
-            else: newProfile = None
-            profileToDelete = self.profile
-            self.setProfile(newProfile)
-            self.category.deleteProfile(profileToDelete)
-
 
 class ProfileComboBox(QtGui.QComboBox):
     """This class provides a combo box that lets the user choose a profile. Parameters are

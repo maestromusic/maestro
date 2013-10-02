@@ -204,9 +204,13 @@ class StandardGuesser(profiles.Profile):
         return GuessProfileConfigWidget(self)
 
 
-profileCategory = profiles.TypedProfileCategory('albumguesser',
-                                                translate('Albumguesser','Album guesser'),
-                                                config.storageObject.editor.albumguesser_profiles)
+profileCategory = profiles.TypedProfileCategory(
+    name = 'albumguesser',
+    title = translate('Albumguesser','Album guesser'),
+    description = translate("Albumguesser", "Configure how the editor tries to guess album structure "
+                            "when files are dropped into it."),
+    storageOption = config.storageObject.editor.albumguesser_profiles
+)
 
 profileCategory.addType(profiles.ProfileType('standard',
                                              translate('Albumguesser', 'standard guesser'),
@@ -229,10 +233,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
         super().__init__()
         self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding,QtGui.QSizePolicy.MinimumExpanding)
         mainLayout = QtGui.QVBoxLayout(self)
-        descriptionLabel = QtGui.QLabel(self.tr(
-"""Configuration of the "album guessing" profiles. These profiles determine how the editor tries to \
-guess the album structure of files which are dropped into the editor.
-
+        descriptionLabel = QtGui.QLabel(self.tr("""\
 Album guessing is done by means of a list of tags; all files whose tags coincide for this list will then be \
 considered an album. The "main" grouper tag determines the TITLE tag of the new album. If "directory mode" \
 is on, files will only be grouped together if they are in the same directory."""))
