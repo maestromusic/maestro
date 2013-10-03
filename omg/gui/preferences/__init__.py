@@ -66,7 +66,7 @@ class Panel:
         self.description = description
         self.subPanels = utils.OrderedDict()
         
-    def createWidget(self, buttonBar):
+    def createWidget(self, parent):
         """Create a configuration widget for this panel using the 'callable' argument of the constructor.
         *buttonBar* is the button bar of the panel and may be used to add buttons.
         """
@@ -86,8 +86,8 @@ class Panel:
         if self._callable is None:
             return QtGui.QWidget()  
         elif not isinstance(self._callable, tuple):
-            return self._callable(buttonBar)
-        else: return self._callable[0](buttonBar, *self._callable[1:])
+            return self._callable(parent)
+        else: return self._callable[0](parent, *self._callable[1:])
         
         
 class PreferencesDialog(QtGui.QDialog):
@@ -116,6 +116,7 @@ class PreferencesDialog(QtGui.QDialog):
         
         # map paths to the widget of a panel once it has been constructed
         self.panelWidgets = {}
+        self.currentPath = None
         
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
@@ -128,6 +129,7 @@ class PreferencesDialog(QtGui.QDialog):
         self.treeWidget.header().hide()
         self.treeWidget.header().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.treeWidget.header().setStretchLastSection(False)
+        self.treeWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
         self.treeWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
         splitter.addWidget(self.treeWidget)
         
@@ -164,9 +166,18 @@ class PreferencesDialog(QtGui.QDialog):
             if len(subPanel.subPanels) > 0:
                 self._addSubPanels(subPanel, newItem)
             item.setExpanded(True)
-        
+    
     def showPanel(self, path):
         """Show the panel with the given path, constructing it, if it is shown for the first time."""
+        print("SHOW PANEL", path, self.currentPath)
+        if path == self.currentPath:
+            return
+        if self.stackedWidget.currentWidget() is not None \
+                and not self.stackedWidget.currentWidget().okToClose():
+            self.treeWidget.clearSelection()
+            self._findItem(self.currentPath).setSelected(True) # Reset
+            return
+        self.currentPath = path
         if path not in self.panelWidgets:
             panel = self.getPanel(path)
             widget = PanelWidget(self, panel)
@@ -177,13 +188,26 @@ class PreferencesDialog(QtGui.QDialog):
     def getPanel(self, path):
         """Return the Panel-instance (not the actual widget!) with the given *path*.""" 
         keys = path.split('/')
-        i = 0
         currentPanels = panels
-        while i < len(keys) - 1:
-            currentPanels = panels[keys[i]].subPanels
-            i += 1
+        for key in keys[:-1]:
+            currentPanels = currentPanels[key].subPanels    
         return currentPanels[keys[-1]]
         
+    def _findItem(self, path):
+        """Return the QTreeWidgetItem for the given path from the menu.""" 
+        def getItems(item):
+            yield item
+            for i in range(item.childCount()):
+                for it in getItems(item.child(i)):
+                    yield it
+        items = [self.treeWidget.topLevelItem(i) for i in range(self.treeWidget.topLevelItemCount())]
+        for i in range(self.treeWidget.topLevelItemCount()):
+            toplevelItem = self.treeWidget.topLevelItem(i)
+            for item in getItems(toplevelItem):
+                if item.data(0, Qt.UserRole) == path:
+                    return item
+        raise KeyError("Path '{}' not found.".format(path))
+    
     def _handleSelectionChanged(self):
         """Handle clicks on a panel in the treeview."""
         items = self.treeWidget.selectedItems()
@@ -205,6 +229,7 @@ class PanelWidget(QtGui.QWidget):
     """
     def __init__(self, dialog, panel):
         super().__init__(dialog)
+        self.dialog = dialog
         
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
@@ -230,10 +255,10 @@ class PanelWidget(QtGui.QWidget):
         self.buttonBar = QtGui.QHBoxLayout()
         
         # Create configuration widget
-        innerWidget = panel.createWidget(self.buttonBar)
+        self.innerWidget = panel.createWidget(self)
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
-        scrollArea.setWidget(innerWidget)
+        scrollArea.setWidget(self.innerWidget)
         self.layout().addWidget(scrollArea, 1)
         
         # Add button bar
@@ -245,8 +270,17 @@ class PanelWidget(QtGui.QWidget):
             self.buttonBar.addStretch(1)
         closeButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCloseButton),
                                         self.tr("Close"))
-        closeButton.clicked.connect(dialog.accept)
+        closeButton.clicked.connect(self._handleCloseButton)
         self.buttonBar.addWidget(closeButton)
+        
+    def _handleCloseButton(self):
+        if self.okToClose():
+            self.dialog.accept()
+            
+    def okToClose(self):
+        """Give the current panel a chance to abort closing the preferences dialog or switching to
+        another panel. Return True if closing is admissible."""
+        return not hasattr(self.innerWidget, 'okToClose') or self.innerWidget.okToClose()
         
     
 def _getParentPanel(path):

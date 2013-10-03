@@ -236,9 +236,9 @@ class DelegateProfile(profiles.Profile):
         self._updateFromState(self.type.defaultState())
         category.profileChanged.emit(self)
     
-    def configurationWidget(self):
+    def configurationWidget(self, parent):
         from ..preferences.delegates import DelegateOptionsPanel
-        return DelegateOptionsPanel(self)
+        return DelegateOptionsPanel(self, parent)
         
 
 class DataPiece:

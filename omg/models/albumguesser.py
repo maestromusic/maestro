@@ -200,8 +200,8 @@ class StandardGuesser(profiles.Profile):
                 if c in self.toplevels:
                     self.toplevels.remove(c)
 
-    def configurationWidget(self):
-        return GuessProfileConfigWidget(self)
+    def configurationWidget(self, parent):
+        return GuessProfileConfigWidget(self, parent)
 
 
 profileCategory = profiles.TypedProfileCategory(
@@ -229,8 +229,8 @@ class GuessProfileConfigWidget(QtGui.QWidget):
     for automatic meta-container guessing. Additionally, each profile sets the "directory mode" flag. If 
     that is enabled, only albums within the same directory on the filesystem will be grouped together."""
     
-    def __init__(self, profile=None):
-        super().__init__()
+    def __init__(self, profile, parent):
+        super().__init__(parent)
         self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding,QtGui.QSizePolicy.MinimumExpanding)
         mainLayout = QtGui.QVBoxLayout(self)
         descriptionLabel = QtGui.QLabel(self.tr("""\

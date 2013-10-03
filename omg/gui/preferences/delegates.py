@@ -31,8 +31,8 @@ class DelegateOptionsPanel(QtGui.QWidget):
     Two DataPiecesEditors to edit the datapieces displayed in the left and those displayed in the right
     column and a list of widgets (checkboxes, comboboxes etc.) to edit the configuration's options.
     """
-    def __init__(self, profile):
-        super().__init__()
+    def __init__(self, profile, parent):
+        super().__init__(parent)
         self.profile = profile
         
         layout = QtGui.QVBoxLayout(self)

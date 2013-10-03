@@ -52,7 +52,7 @@ class Profile(QtCore.QObject):
         """
         pass
     
-    def configurationWidget(self):
+    def configurationWidget(self, parent):
         """Return a widget that can be used to configure this profile."""
         return None
     

@@ -28,6 +28,7 @@ class FilesystemSettings(QtGui.QWidget):
         
         layout = QtGui.QVBoxLayout()
         self.recheckButton = QtGui.QPushButton(self.tr("Force recheck of all files"))
+        self.recheckButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
         self.recheckButton.clicked.connect(self._handleRecheckButton)
         self.enableBox = QtGui.QCheckBox(self.tr("Enable file system monitoring"))
         self.enableBox.toggled.connect(self.recheckButton.setEnabled)

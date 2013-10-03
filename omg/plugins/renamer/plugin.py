@@ -198,7 +198,7 @@ class GrammarRenamer(profiles.Profile):
         self.traverse(element)
         return self.result
     
-    def configurationWidget(self):
+    def configurationWidget(self, parent):
         from . import gui
         return gui.GrammarConfigurationWidget(temporary=False, profile=self)
     

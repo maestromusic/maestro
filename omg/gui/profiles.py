@@ -84,11 +84,12 @@ class CreateProfileDialog(QtGui.QDialog):
         
         
 class ProfileConfigurationPanel(QtGui.QWidget):
-    def __init__(self, buttonBar, category, profile=None):
-        super().__init__()
+    def __init__(self, parent, category, profile=None):
+        super().__init__(parent)
         style = QtGui.QApplication.style()
         
         self.category = category
+        self.profile = profile
         self.category.profileAdded.connect(self._handleProfileAdded)
         self.category.profileRenamed.connect(self._handleProfileRenamed)
         self.category.profileRemoved.connect(self._handleProfileRemoved)
@@ -161,16 +162,21 @@ class ProfileConfigurationPanel(QtGui.QWidget):
             self.profileTree.selectProfile(self.category.profiles()[0])
     
     def showProfile(self, profile):
+        if profile == self.profile or not self.okToClose():
+            return
+        self.profile = profile
+        
         if profile is None:
             self.titleLabel.setText('')
             self.stackedLayout.setCurrentIndex(0)
         else:
             if profile not in self.profileWidgets:
-                widget = profile.configurationWidget()
+                widget = profile.configurationWidget(self)
                 if widget is None:
                     widget = QtGui.QLabel(self.tr("There are no options for this profile."))
                     widget.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-                widget.layout().setContentsMargins(0,0,0,0)
+                else:
+                    widget.layout().setContentsMargins(0,0,0,0)
                 self.stackedLayout.addWidget(widget)
                 self.profileWidgets[profile] = widget
             
@@ -194,7 +200,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
             
     def _handleProfileRenamed(self, profile):
         """Handle profileRenamed-signal of the profile category."""
-        if profile == self.profileTree.selectedProfile():
+        if profile == self.profile:
             self.titleLabel.setText(self.tr("Configure profile '{}'".format(profile.name)))
         
     def _handleProfileRemoved(self, profile):
@@ -218,30 +224,34 @@ class ProfileConfigurationPanel(QtGui.QWidget):
                     
     def _handleRenameButton(self):
         """Ask the user for a new name of the current profile and change names."""
-        profile = self.profileTree.selectedProfile()
-        if profile is None:
+        if self.profile is None:
             return
         text, ok = QtGui.QInputDialog.getText(self,
                                               self.tr("Profile name"),
                                               self.tr("Choose a new name:"),
-                                              text=profile.name)
+                                              text=self.profile.name)
         if ok and len(text) > 0:
             existingProfile = self.category.get(text)
-            if existingProfile == profile:
+            if existingProfile == self.profile:
                 return # no change
             elif existingProfile is not None:
                 dialogs.warning(self.tr("Invalid name"), self.tr("There is already a profile of this name."))
             else:
-                self.category.renameProfile(profile, text)
+                self.category.renameProfile(self.profile, text)
                 
     def _handleDeleteButton(self):
         """Ask the user again and delete the current profile."""
-        profile = self.profileTree.selectedProfile()
-        if profile is not None and dialogs.question(
+        if self.profile is not None and dialogs.question(
                             self.tr("Delete profile"),
-                            self.tr("Should the profile '{}' really be deleted?").format(profile.name),
+                            self.tr("Should the profile '{}' really be deleted?").format(self.profile.name),
                             parent=self):
-            self.category.deleteProfile(profile)
+            self.category.deleteProfile(self.profile)
+            
+    def okToClose(self):
+        """Give the current profile configuration widget a chance to abort closing the preferences dialog
+        or switching to another profile or preferences panel. Return True if closing is admissible."""
+        return not hasattr(self.stackedLayout.currentWidget(), 'okToClose') \
+                    or self.stackedLayout.currentWidget().okToClose()
         
         
 class ProfileTree(QtGui.QTreeWidget):
