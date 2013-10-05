@@ -341,6 +341,13 @@ class ProfileManager(QtCore.QObject):
     def __init__(self):
         super().__init__()
         self.categories = []
+        
+    def getCategory(self, name):
+        """Return the profile category with the given name."""
+        for category in self.categories:
+            if category.name == name:
+                return category
+        raise ValueError("There is no profile category with name '{}'.".format(name))
     
     def addCategory(self, category):
         """Add a profile category. Load all of its profiles whose type has been added to the category yet

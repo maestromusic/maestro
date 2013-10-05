@@ -15,13 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import functools
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import dialogs
-from .. import profiles, utils
+from .. import dialogs
+from ... import profiles, utils
 
   
 class CreateProfileDialog(QtGui.QDialog):
@@ -84,8 +82,10 @@ class CreateProfileDialog(QtGui.QDialog):
         
         
 class ProfileConfigurationPanel(QtGui.QWidget):
-    def __init__(self, parent, category, profile=None):
-        super().__init__(parent)
+    """Panel to configure profiles of a given category. It consists of a tree of profiles and (for typed
+    categories) types on the left and the category-specific configuration widget on the right."""
+    def __init__(self, dialog, panel, category, profile=None):
+        super().__init__(panel)
         style = QtGui.QApplication.style()
         
         self.category = category
@@ -162,6 +162,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
             self.profileTree.selectProfile(self.category.profiles()[0])
     
     def showProfile(self, profile):
+        """Show the configuration widget for the given profile in the right part of the panel."""
         if profile == self.profile or not self.okToClose():
             return
         self.profile = profile
@@ -285,17 +286,21 @@ class ProfileTree(QtGui.QTreeWidget):
     sizeHint = minimumSizeHint
     
     def selectedProfile(self):
+        """Return the currently selected profile."""
         items = self.selectedItems()
         if len(items) > 0:
             return items[0].data(0, Qt.UserRole)
         else: return None
     
     def selectProfile(self, profile):
+        """Select the given profile."""
         item, i = self._findProfileItem(profile)
         if item is not None:
             item.setSelected(True)
                     
     def _findToplevelItem(self, data):
+        """Return the toplevel QTreeWidgetItem corresponding to *data* which must be a type (in typed
+        categories) or a profile (otherwise)."""
         for i in range(self.topLevelItemCount()):
             item = self.topLevelItem(i)
             if item.data(0, Qt.UserRole) == data:
@@ -303,6 +308,7 @@ class ProfileTree(QtGui.QTreeWidget):
         else: return None, None
                     
     def _findProfileItem(self, profile):
+        """Return the QTreeWidgetItem corresponding to the given profile."""
         if not isinstance(self.category, profiles.TypedProfileCategory):
             return self._findToplevelItem(profile)
         else:
@@ -315,6 +321,7 @@ class ProfileTree(QtGui.QTreeWidget):
             return None, None
                     
     def _handleTypeAdded(self, type):
+        """Handle the typeAdded-signal of the profile category."""
         text = self.tr("{}:").format(type.title)
         if type != self.category.types[0]:
             text = '\n' + text # create space between subtrees
@@ -328,6 +335,7 @@ class ProfileTree(QtGui.QTreeWidget):
         typeItem.setExpanded(True)
     
     def _handleTypeRemove(self, type):
+        """Handle the typeRemoved-signal of the profile category."""
         item, i = self._findToplevelItem(type)
         if item is not None:
             self.takeToplevelItem(i)
@@ -340,6 +348,7 @@ class ProfileTree(QtGui.QTreeWidget):
                     firstItem.setText(0, text[1:])
     
     def _handleProfileAdded(self, profile):
+        """Handle the profileAdded-signal of the profile category."""
         if not isinstance(self.category, profiles.TypedProfileCategory):
             item = QtGui.QTreeWidgetItem([profile.name])
             item.setData(0, Qt.UserRole, profile)
@@ -354,6 +363,7 @@ class ProfileTree(QtGui.QTreeWidget):
                 typeItem.addChild(item)
         
     def _handleProfileRemoved(self, profile):
+        """Handle the profileRemoved-signal of the profile category."""
         if not isinstance(self.category, profiles.TypedProfileCategory):
             item, i = self._findToplevelItem(profile)
             if item is not None:
@@ -364,14 +374,14 @@ class ProfileTree(QtGui.QTreeWidget):
                 item.parent().removeChild(item)
                 
     def _handleProfileRenamed(self, profile):
-        """React to profileRenamed signals from the profile category."""
+        """Handle the profileRenamed-signal of the profile category."""
         item, i = self._findProfileItem(profile)
         if item is not None:
             item.setText(0, profile.name)
                 
         
 class NoProfileYetWidget(QtGui.QWidget):
-    """This widget is displayed in a ProfileConfigurationWidget if the underlying profile category does
+    """This widget is displayed in a ProfileConfigurationPanel if the underlying profile category does
     not have a profile yet."""
     def __init__(self, parent):
         super().__init__(parent)
@@ -392,6 +402,29 @@ class NoProfileYetWidget(QtGui.QWidget):
         self.createButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
         layout.addWidget(self.createButton)
         layout.addStretch()
+    
+
+class CategoryMenu(QtGui.QLabel):
+    """Simple menu of available profile categories. A click on a category will open the corresponding
+    preferences panel."""
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
+        self.setWordWrap(True)
+        self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.linkActivated.connect(dialog.showPanel)
+        self.setIndent(10)
+        profiles.manager.categoryAdded.connect(self._updateText)
+        profiles.manager.categoryRemoved.connect(self._updateText)
+        self._updateText()
+        
+    def _updateText(self):
+        """Reset the HTML text of this label."""
+        parts = [self.tr("Choose a profile category:"), "<ul>"]
+        for category in profiles.manager.categories:
+            parts.append('<li style="margin-bottom: 10px"><a href="profiles/{}">{}</a></li>'
+                         .format(category.name, category.title))
+        parts.append("</ul>")
+        self.setText(''.join(parts))
         
 
 class ProfileComboBox(QtGui.QComboBox):

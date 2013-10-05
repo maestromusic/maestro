@@ -19,8 +19,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import config, logging
-from ...gui import treeview, treeactions, delegates, profiles as profilesgui
+from ...gui import treeview, treeactions, delegates
 from ...gui.delegates import abstractdelegate
+from ...gui.preferences import profiles as profilesgui
 from ...models import leveltreemodel
 from ...core import levels
 from . import plugin

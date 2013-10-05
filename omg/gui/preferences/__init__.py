@@ -52,8 +52,9 @@ class Panel:
           Alternatively, a tuple can be passed. It must consist of either a callable or a module name (e.g.
           "gui.preferences.tagmanager") and the name of a callable that is found in the module. In both cases
           this mandatory components can be followed by an arbitrary number of arguments.
-          The callable will be invoked with the PreferencesDialog-instance and the arguments from the tuple.
-          In the second case, the module will only be imported when the panel is actually shown.
+          The callable will be invoked with the PreferencesDialog-instance, the PanelWidget-instance and
+          the arguments from the tuple.
+          In the second form, the module will only be imported when the panel is actually shown.
         - *icon*: Icon that will be displayed in the preferences' menu.
         
     \ """
@@ -66,9 +67,9 @@ class Panel:
         self.description = description
         self.subPanels = utils.OrderedDict()
         
-    def createWidget(self, parent):
+    def createWidget(self, dialog, panel):
         """Create a configuration widget for this panel using the 'callable' argument of the constructor.
-        *buttonBar* is the button bar of the panel and may be used to add buttons.
+        *dialog* and *panel* will be passed to the widget's constructor.
         """
         if isinstance(self._callable, tuple) and isinstance(self._callable[0], str):
             import importlib
@@ -86,8 +87,8 @@ class Panel:
         if self._callable is None:
             return QtGui.QWidget()  
         elif not isinstance(self._callable, tuple):
-            return self._callable(parent)
-        else: return self._callable[0](parent, *self._callable[1:])
+            return self._callable(dialog, panel)
+        else: return self._callable[0](dialog, panel, *self._callable[1:])
         
         
 class PreferencesDialog(QtGui.QDialog):
@@ -169,7 +170,6 @@ class PreferencesDialog(QtGui.QDialog):
     
     def showPanel(self, path):
         """Show the panel with the given path, constructing it, if it is shown for the first time."""
-        print("SHOW PANEL", path, self.currentPath)
         if path == self.currentPath:
             return
         if self.stackedWidget.currentWidget() is not None \
@@ -184,6 +184,8 @@ class PreferencesDialog(QtGui.QDialog):
             self.panelWidgets[path] = widget
             self.stackedWidget.addWidget(widget)
         self.stackedWidget.setCurrentWidget(self.panelWidgets[path])
+        self.treeWidget.clearSelection()
+        self._findItem(path).setSelected(True)
             
     def getPanel(self, path):
         """Return the Panel-instance (not the actual widget!) with the given *path*.""" 
@@ -255,7 +257,7 @@ class PanelWidget(QtGui.QWidget):
         self.buttonBar = QtGui.QHBoxLayout()
         
         # Create configuration widget
-        self.innerWidget = panel.createWidget(self)
+        self.innerWidget = panel.createWidget(dialog, self)
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
         scrollArea.setWidget(self.innerWidget)
@@ -351,6 +353,10 @@ addPanel("main/tagmanager", translate("Preferences", "Tag Manager"),
 )
 addPanel("main/flagmanager", translate("Preferences", "Flag Manager"),
             ('gui.preferences.flagmanager', 'FlagManager'),
+            description = translate("Preferences", "Flags can be added to elements to mark e.g. your "
+                                    "favourite songs, CDs that you own, music that should go on your "
+                                    "portable music player etc. Flags are not stored in music files, "
+                                    "but only in the database."),
             iconPath = ':omg/icons/flag_blue.png')
 addPanel("main/filesystem", translate("Preferences", "File system"),
             ('filesystem.preferences', 'FilesystemSettings'),
@@ -358,7 +364,7 @@ addPanel("main/filesystem", translate("Preferences", "File system"),
 
 # Profile panels                   
 def _addProfileCategory(category):
-    classTuple = ('gui.profiles', 'ProfileConfigurationPanel', category)
+    classTuple = ('gui.preferences.profiles', 'ProfileConfigurationPanel', category)
     addPanel(path = "profiles/" + category.name,
              title = category.title,
              callable = classTuple,
@@ -369,7 +375,10 @@ def _addProfileCategory(category):
 def _removeProfileCategory(category):
     removePanel("profiles/" + category.name)
     
-addPanel("profiles", translate("Preferences", "Profiles"), None,
+addPanel("profiles", translate("Preferences", "Profiles"),
+         description = translate("Preferences",
+                        "To manage groups of configuration OMG uses profiles of various categories."),
+         callable = ('gui.preferences.profiles', 'CategoryMenu'),
          iconPath = ':omg/icons/preferences/profiles_small.png',
          pixmapPath = ':omg/icons/preferences/profiles.png')
 profiles.manager.categoryAdded.connect(_addProfileCategory)

@@ -32,8 +32,8 @@ CUSTOM_MIME = 'application/x-omgtagtype'
 class TagManager(QtGui.QWidget):
     """The TagManager allows to add, edit and remove tagtypes (like artist, composer,...). To make things
     easy it only allows changing tagtypes which do not appear in any internal element."""
-    def __init__(self, buttonBar, parent=None):
-        super().__init__(parent)
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
         self.layout().setSpacing(0)

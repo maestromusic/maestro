@@ -31,8 +31,8 @@ translate = QtCore.QCoreApplication.translate
 
 class FlagManager(QtGui.QWidget):
     """The FlagManager allows to add, edit and delete flagtypes."""
-    def __init__(self, buttonBar, parent=None):
-        super().__init__(parent)
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
         self.layout().setSpacing(0)
@@ -284,7 +284,7 @@ class FlagManager(QtGui.QWidget):
         raise ValueError("Invalid key {}".format(columnKey))
     
 
-def createNewFlagType(parent = None):
+def createNewFlagType(parent=None):
     """Ask the user to supply a name and then create a new flag with this name. Return the new flag or None
     if no flag is created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
     name, ok = QtGui.QInputDialog.getText(parent, translate("FlagManager", "New Flag"),

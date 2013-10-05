@@ -105,7 +105,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
         
         
 class ConfigSectionWidget(QtGui.QTableWidget):
-    def __init__(self, section, parent = None):
+    def __init__(self, section, parent=None):
         super().__init__(parent)
         self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
         self.setSection(section)
@@ -157,8 +157,8 @@ class ConfigSectionWidget(QtGui.QTableWidget):
         
         
 class PreferencesDialog(QtGui.QWidget):
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
         mainLayout = QtGui.QVBoxLayout(self)
         layout = QtGui.QHBoxLayout()
         self.tree = QtGui.QTreeWidget()
@@ -176,8 +176,8 @@ class PreferencesDialog(QtGui.QWidget):
         mainLayout.addLayout(layout)
         saveButton = QtGui.QPushButton(self.tr('Save'))
         saveButton.clicked.connect(self.sectionWidget.save)
-        parent.buttonBar.addStretch(1)
-        parent.buttonBar.addWidget(saveButton)
+        panel.buttonBar.addStretch(1)
+        panel.buttonBar.addWidget(saveButton)
         self.setLayout(mainLayout)
         self._ignoreDirty = False
         

@@ -21,9 +21,10 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from . import profiles as profilesgui
+from .. import dialogs, delegates
 from ... import application, constants, utils
 from ...core import tags
-from .. import dialogs, delegates, profiles as profilesgui
 
         
 class DelegateOptionsPanel(QtGui.QWidget):

@@ -22,9 +22,8 @@ from PyQt4.QtCore import Qt
 from .. import filesystem, config
 
 class FilesystemSettings(QtGui.QWidget):
-    
-    def __init__(self, buttonBar, parent=None):
-        super().__init__(parent)
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
         
         layout = QtGui.QVBoxLayout()
         self.recheckButton = QtGui.QPushButton(self.tr("Force recheck of all files"))
