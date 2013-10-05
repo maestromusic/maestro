@@ -83,7 +83,7 @@ class SetPathAction(treeactions.TreeAction):
         if path != "":
             newUrl = FileURL(path)
             from . import getNewfileHash
-            db.query("UPDATE {}files SET url=?,hash=? WHERE element_id=?".format(db.prefix),
+            db.query("UPDATE {p}files SET url=?,hash=? WHERE element_id=?",
                      str(newUrl), getNewfileHash(newUrl), elem.id)
             db.write.changeUrls([ (str(newUrl), elem.id) ])
             self.setPaths.append( (elem.url, newUrl) )

@@ -227,9 +227,9 @@ class SynchronizeHelper(QtCore.QObject):
         """Updates the hashes of *tracks* in the files table and also their timestamps.
         """ 
         if len(tracks):
-            db.multiQuery("UPDATE {}files SET hash=?, verified=CURRENT_TIMESTAMP "
-                                         "WHERE element_id=?".format(db.prefix),
-                                         [ (track.hash, track.id) for track in tracks ]) 
+            db.multiQuery("UPDATE {p}files SET hash=?, verified=CURRENT_TIMESTAMP "
+                                          "WHERE element_id=?",
+                          [ (track.hash, track.id) for track in tracks ]) 
 
     def changeURL(self, id, newUrl):
         """Call when a URL change was detected. Displays a notice and updates the files table."""
@@ -238,7 +238,7 @@ class SynchronizeHelper(QtCore.QObject):
         warning(self.tr("Move detected"),
                 self.tr("A file was renamed (or moved) outside OMG:\n"
                         "{}".format(str(newUrl))), application.mainWindow)
-        db.query('UPDATE {}files SET url=? WHERE element_id=?'.format(db.prefix), str(newUrl), id)
+        db.query('UPDATE {p}files SET url=? WHERE element_id=?', str(newUrl), id)
         if id in levels.real.elements:
             levels.real.collect(id).url = newUrl
             levels.real.emitEvent(dataIds=[id])
@@ -372,8 +372,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         Creates the tree of Directory objects and initializes self.directories and
         self.tableFolders.
         """
-        for path, state in db.query(
-                    "SELECT path, state FROM {}folders ORDER BY LENGTH(path)".format(db.prefix)):
+        for path, state in db.query("SELECT path, state FROM {p}folders ORDER BY LENGTH(path)"):
             parent, basename = split(path)
             if parent == '' and basename == '':
                 dir = Directory(path='', parent=None)                    
@@ -398,7 +397,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         newDirectories = []
         missingHashes = set()
         for elid, urlstring, elhash, verified in db.query(
-                       "SELECT element_id, url, hash, verified FROM {}files".format(db.prefix)):
+                           "SELECT element_id, url, hash, verified FROM {p}files"):
             url = BackendURL.fromString(urlstring)
             if url.scheme != "file":
                 continue
@@ -416,7 +415,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             newDirectories += newDirs
         if len(newDirectories) > 0:
             logger.debug("{} dirs with DBfiles but not in folders".format(len(newDirectories)))
-            db.multiQuery("INSERT INTO {}folders (path, state) VALUES (?,?)".format(db.prefix),
+            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES (?,?)",
                           [(dir.path, dir.state) for dir in newDirectories])
         return missingHashes
     
@@ -426,8 +425,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         URLs from newfiles already contained in files are deleted.
         """
         toDelete = []
-        for urlstring, elhash, verified in db.query(
-                       "SELECT url, hash, verified FROM {}newfiles".format(db.prefix)):
+        for urlstring, elhash, verified in db.query("SELECT url, hash, verified FROM {p}newfiles"):
             track = Track(BackendURL.fromString(urlstring))
             if track.url in self.dbTracks:
                 logger.warning("url {} is BOTH n files and newfiles!".format(urlstring))
@@ -440,7 +438,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             dir = self.directories[dirname(track.url.path)]
             dir.addTrack(track)
         if len(toDelete) > 0:
-            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix), toDelete)  
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", toDelete)  
 
     
     def getDirectory(self, path):
@@ -482,8 +480,8 @@ class FileSystemSynchronizer(QtCore.QThread):
                 track.hash = newHash
             else:
                 logger.debug("... and updating timestamp")
-            db.query("UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?"
-                     .format(db.prefix), track.hash, str(track.url))
+            db.query("UPDATE {p}newfiles SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?",
+                     track.hash, str(track.url))
         else:
             if track.id in levels.real:
                 dbTags = levels.real.get(track.id).tags
@@ -519,34 +517,33 @@ class FileSystemSynchronizer(QtCore.QThread):
     def storeDirectories(self, directories):
         """Insert the given list of Directory objects into the folders table."""
         if len(directories) > 0:
-            db.multiQuery("INSERT INTO {}folders (path, state) VALUES(?,?)".format(db.prefix),
+            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES(?,?)",
                           [ (dir.path, dir.state) for dir in directories])
     
     def updateDirectories(self, directories):
         """Update the given list of directories in the folders table."""
         if len(directories) > 0:
-            db.multiQuery("UPDATE {}folders SET state=? WHERE path=?".format(db.prefix),
+            db.multiQuery("UPDATE {p}folders SET state=? WHERE path=?",
                           [ (dir.state, dir.path) for dir in directories])
     
     def storeNewTracks(self, tracks):
         """Insert the given list of Track objects into the newfiles table."""
         if len(tracks) > 0:
-            db.multiQuery("INSERT INTO {}newfiles (url, hash, verified) VALUES (?,?,?)"
-                          .format(db.prefix), [(str(track.url), track.hash,
+            db.multiQuery("INSERT INTO {p}newfiles (url, hash, verified) VALUES (?,?,?)",
+                          [(str(track.url), track.hash,
                               track.verified.strftime("%Y-%m-%d %H:%M:%S")) for track in tracks])
     
     def removeTracks(self, tracks):
-        removedURLs = []
+        urls = []
         for track in tracks: 
-            removedURLs.append(track.url)
+            urls.append(track.url)
             track.directory.tracks.remove(track)
             track.directory.updateState(True, False, True, self.folderStateChanged)
             del self.tracks[track.url]
             if track.url in self.dbTracks:
                 del self.dbTracks[track.url]
-        if len(removedURLs) > 0:
-            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
-                                  [ (str(url),) for url in removedURLs])
+        if len(urls) > 0:
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", [ (str(url),) for url in urls])
     
 
     def scanFilesystem(self):
@@ -668,8 +665,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                 self.removeTracks([self.tracks[url] for url in result["removed"]])
         notFound = [dir for dir, found in self.tableFolders.items() if not found]
         if all(self.dbTracks.values()) and len(notFound) > 0:
-            db.multiQuery("DELETE FROM {}folders WHERE path=?".format(db.prefix),
-                          [ (dir, ) for dir in notFound ])
+            db.multiQuery("DELETE FROM {p}folders WHERE path=?", [ (dir, ) for dir in notFound ])
             for dirPath in notFound:
                 dir = self.directories[dirPath]
                 assert len(dir.tracks) == 0
@@ -694,8 +690,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             existingTrack = self.tracks[newUrl]
             assert existingTrack.id is None
             newDir.tracks.remove(existingTrack)
-            db.query("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
-                             str(newUrl))
+            db.query("DELETE FROM {p}newfiles WHERE url=?", str(newUrl))
         newDir.addTrack(track)
         del self.tracks[track.url]
         track.url = newUrl
@@ -713,8 +708,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         for oldURL, newURL in event.renamed:
             if oldURL in self.tracks:
                 if self.tracks[oldURL].id is None:
-                    db.query("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
-                             str(oldURL))                        
+                    db.query("DELETE FROM {p}newfiles WHERE url=?", str(oldURL))                        
                 self.moveTrack(self.tracks[oldURL], newURL)
     
         for url in event.modified:
@@ -724,15 +718,14 @@ class FileSystemSynchronizer(QtCore.QThread):
             track = self.tracks[url]
             track.verified = mTimeStamp(url)
             if track.id is None:
-                db.query("UPDATE {}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?"
-                         .format(db.prefix), str(url))
+                db.query("UPDATE {p}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?", str(url))
             else:
                 self._requestHelper.emit("updateFileHashes", ((track,),))
     
         modifiedDirs = []
         if len(event.added) > 0:
             newHashes = []
-            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?",
                           [ (str(elem.url),) for elem in event.added ])
             for elem in event.added:
                 url = elem.url
