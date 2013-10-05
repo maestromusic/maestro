@@ -105,8 +105,8 @@ def init(cmdConfig = [],testMode=False):
 
     # Initialize config and storage
     global options, storage, optionObject, storageObject
-    optionObject = MainSection(_getPath("config" if not testMode else "testconfig"),cmdConfig,storage=False)
-    storageObject = MainSection(_getPath("storage") if not testMode else None,[],storage=True)
+    optionObject = MainSection(getPath("config" if not testMode else "testconfig"),cmdConfig,storage=False)
+    storageObject = MainSection(getPath("storage") if not testMode else None,[],storage=True)
     options = ValueSection(optionObject)
     storage = ValueSection(storageObject)
 
@@ -114,7 +114,7 @@ def init(cmdConfig = [],testMode=False):
     global binary
     binary = {}
     if not testMode:
-        path = _getPath("binary")
+        path = getPath("binary")
         if os.path.exists(path):
             try:
                 with open(path,'rb') as file:
@@ -127,7 +127,7 @@ def shutdown():
     """Store the configuration persistently on application shutdown."""
     optionObject.write()
     storageObject.write()
-    pickle.dump(binary,open(_getPath("binary"),"wb"))
+    pickle.dump(binary,open(getPath("binary"),"wb"))
 
 
 class Option:
@@ -275,7 +275,7 @@ class Section:
         The format of *rawDict* depends on ''self.storage'' and is the same that is returned by the
         corresponding read-methods in configio.
         """
-        path = _getPath('storage' if self.storage else 'config')
+        path = getPath('storage' if self.storage else 'config')
         for name,member in rawDict.items():
             if isinstance(member,dict) and (not self.storage or name.startswith('SECTION:')):
                 if self.storage:
@@ -462,7 +462,7 @@ class ValueSection:
         else: option.setValue(value)
 
 
-def _getPath(fileName):
+def getPath(fileName):
     """Get the path to a configugation file. *fileName* may be ``'config'`` or ``'storage'`` or``'binary'``.
     This method checks for version-dependent config-files.
     """
