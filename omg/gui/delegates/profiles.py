@@ -37,11 +37,15 @@ class DelegateProfileCategory(profiles.TypedProfileCategory):
                 return profile
         return restrictToType.default()
     
-category = DelegateProfileCategory(name = "delegates",
-                                   title = translate("Delegates","Item display"),
-                                   storageOption = config.storageObject.gui.delegates,
-                                   iconPath = ':omg/icons/preferences/delegates_small.png',
-                                   pixmapPath = ':omg/icons/preferences/delegates.png')
+category = DelegateProfileCategory(
+       name = "delegates",
+       title = translate("Delegates","Item display"),
+       storageOption = config.storageObject.gui.delegates,
+       description = translate("Delegates",
+                "Configure how elements are rendered in treeviews like browser, editor and playlist."),
+       iconPath = ':omg/icons/preferences/delegates_small.png',
+       pixmapPath = ':omg/icons/preferences/delegates.png'
+)
                                    
 profiles.manager.addCategory(category)
 
@@ -232,9 +236,9 @@ class DelegateProfile(profiles.Profile):
         self._updateFromState(self.type.defaultState())
         category.profileChanged.emit(self)
     
-    def configurationWidget(self):
+    def configurationWidget(self, parent):
         from ..preferences.delegates import DelegateOptionsPanel
-        return DelegateOptionsPanel(self)
+        return DelegateOptionsPanel(self, parent)
         
 
 class DataPiece:

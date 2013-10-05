@@ -21,39 +21,35 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from . import profiles as profilesgui
+from .. import dialogs, delegates
 from ... import application, constants, utils
 from ...core import tags
-from .. import dialogs, delegates, profiles as profilesgui
 
         
-class DelegateOptionsPanel(QtGui.QScrollArea):
+class DelegateOptionsPanel(QtGui.QWidget):
     """This panel allows the user to edit a single delegate configuration. It consists of three parts:
     Two DataPiecesEditors to edit the datapieces displayed in the left and those displayed in the right
     column and a list of widgets (checkboxes, comboboxes etc.) to edit the configuration's options.
     """
-    def __init__(self, profile):
-        super().__init__()
+    def __init__(self, profile, parent):
+        super().__init__(parent)
         self.profile = profile
-        self.setMinimumSize(600,500) #TODO: make this cleverer
         
-        innerWidget = QtGui.QWidget()
-        layout = QtGui.QVBoxLayout(innerWidget)
-        layout.setSizeConstraint(QtGui.QLayout.SetFixedSize)
-        self.setWidget(innerWidget)
+        layout = QtGui.QVBoxLayout(self)
         
+        layout.addWidget(QtGui.QLabel("Decide which tags should be displayed on the left and right side:"))
         dataLayout = QtGui.QHBoxLayout()
         layout.addLayout(dataLayout)
         dataLayout.addWidget(DataPiecesEditor(self,True,))
         dataLayout.addWidget(DataPiecesEditor(self,False))
         
-        # A horizontal ruler between datapiece editors and option editors
-        frame = QtGui.QFrame()
-        frame.setFrameStyle(QtGui.QFrame.Sunken | QtGui.QFrame.HLine)
-        innerWidget.layout().addWidget(frame)
+        layout.addSpacing(20)
         
-        grid = QtGui.QGridLayout()
+        optionsBox = QtGui.QGroupBox(self.tr("Options"))
+        layout.addWidget(optionsBox)
+        grid = QtGui.QGridLayout(optionsBox)
         grid.setContentsMargins(0,0,0,0)
-        innerWidget.layout().addLayout(grid)
         
         # Create an editor for each option
         row = 0
@@ -68,6 +64,7 @@ class DelegateOptionsPanel(QtGui.QScrollArea):
         grid.setRowStretch(row,1)
         grid.setColumnStretch(1,1)
         
+        layout.addStretch(1)
         delegates.profiles.category.profileChanged.connect(self._handleProfileChanged)
         
     def _handleValueChanged(self,option,editor):
@@ -242,11 +239,6 @@ class ListWidget(QtGui.QListWidget):
         self.viewport().setAcceptDrops(True)
         self.setDropIndicatorShown(True)
         self.setDefaultDropAction(Qt.MoveAction)
-        
-    def sizeHint(self):
-        # Effectively this sets the minimum size of listWidget. Note that QListWidgets have a fixed sizeHint
-        # by default, but the default is too large for our purposes here. So we decrease it.
-        return QtCore.QSize(150,120)
     
     def dropEvent(self,event):
         if isinstance(event.source(),ListWidget):

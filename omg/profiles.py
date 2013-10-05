@@ -52,7 +52,7 @@ class Profile(QtCore.QObject):
         """
         pass
     
-    def configurationWidget(self):
+    def configurationWidget(self, parent):
         """Return a widget that can be used to configure this profile."""
         return None
     
@@ -194,13 +194,6 @@ class ProfileCategory(QtCore.QObject):
         self.storageOption.setValue([[profile.name,
                                       profile.save()]
                                       for profile in self._profiles])
-    
-    def openConfigDialog(self, currentProfile=None):
-        """Open a dialog that allows to configure profiles of this category. If *currentProfile* is not None,
-        select that profile first."""
-        from .gui import profiles
-        dialog = profiles.ProfileDialog(self, currentProfile)
-        dialog.exec_()
         
     def suggestProfileName(self):
         """Suggest an unused name for a new profile of this category. Use self.defaultProfileName for this.
@@ -341,6 +334,13 @@ class ProfileManager(QtCore.QObject):
     def __init__(self):
         super().__init__()
         self.categories = []
+        
+    def getCategory(self, name):
+        """Return the profile category with the given name."""
+        for category in self.categories:
+            if category.name == name:
+                return category
+        raise ValueError("There is no profile category with name '{}'.".format(name))
     
     def addCategory(self, category):
         """Add a profile category. Load all of its profiles whose type has been added to the category yet

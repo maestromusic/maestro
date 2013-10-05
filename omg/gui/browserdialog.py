@@ -21,13 +21,14 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import dialogs, profiles as profilesgui, delegates
+from . import dialogs, delegates
 from .. import config, utils, database as db
 from ..core import tags, flags
 from ..models import browser as browsermodel
 from ..search import criteria
 from .delegates import browser as browserdelegate
 from .misc import lineedits
+from .preferences import profiles as profilesgui
 
 MAX_SUB_BROWSERS = 5
 

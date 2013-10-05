@@ -19,7 +19,8 @@
 from PyQt4 import QtCore, QtGui, QtSvg
 from PyQt4.QtCore import Qt
 
-from . import mainwindow, dialogs, profiles as profilesgui, dockwidget
+from . import mainwindow, dialogs, dockwidget
+from .preferences import profiles as profilesgui
 from .. import player, utils, logging, strutils
 from ..core import levels
 

@@ -16,9 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import contextlib
-import socket, threading, time
-import re
+import re, contextlib, socket, threading, time
+
 try:
     import mpd
     # Disable the 'Calling <this or that>' messages
@@ -31,13 +30,14 @@ mpd_version = [ int(x) for x in pkg_resources.get_distribution("python-mpd2").ve
 if mpd_version < [0,4,4]:
     raise ImportError("The installed version of python-mpd2 is too old. OMG needs at least "
                       "python-mpd2-0.4.4 to function properly.")
+    
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import application, filebackends, player, logging, profiles
-from omg.filebackends.filesystem import FileURL
-from omg.core import tags
-from omg.models import playlist
+from ... import application, filebackends, player, logging, profiles
+from ...filebackends.filesystem import FileURL
+from ...core import tags
+from ...models import playlist
 from . import filebackend as mpdfilebackend
 
 translate = QtCore.QCoreApplication.translate
@@ -359,9 +359,9 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.commander.move(fromOffset, toOffset)
                 self.mpdthread.playlistVersion += 1
     
-    def configurationWidget(self):
+    def configurationWidget(self, parent):
         """Return a config widget, initialized with the data of the given *profile*."""
-        return MPDConfigWidget(self)
+        return MPDConfigWidget(self, parent)
     
     def getInfo(self, path):
         """Query MPD to get tags & length of the file at *path* (relative to this MPD instance).
@@ -424,45 +424,59 @@ class MPDPlayerBackend(player.PlayerBackend):
 
 class MPDConfigWidget(QtGui.QWidget):
     """Widget to configure playback profiles of type MPD."""
-    modified = QtCore.pyqtSignal(bool)
-    
-    def __init__(self, profile=None):
-        super().__init__()
+    def __init__(self, profile, parent):
+        super().__init__(parent)
+        
         layout = QtGui.QVBoxLayout(self)
         formLayout = QtGui.QFormLayout()
-        layout.addLayout(formLayout,1)
+        layout.addLayout(formLayout)
         
         self.hostEdit = QtGui.QLineEdit()
-        self.hostEdit.textChanged.connect(lambda text: self.modified.emit(True))
-        formLayout.addRow(self.tr("Host:"),self.hostEdit)
+        formLayout.addRow(self.tr("Host:"), self.hostEdit)
         
         self.portEdit = QtGui.QLineEdit()
         self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
-        self.portEdit.textChanged.connect(lambda text: self.modified.emit(True))
-        formLayout.addRow(self.tr("Port:"),self.portEdit)
+        formLayout.addRow(self.tr("Port:"), self.portEdit)
         
         self.passwordEdit = QtGui.QLineEdit()
-        self.passwordEdit.textChanged.connect(lambda text: self.modified.emit(True))
-        formLayout.addRow(self.tr("Password:"),self.passwordEdit)
+        formLayout.addRow(self.tr("Password:"), self.passwordEdit)
         
         self.passwordVisibleBox = QtGui.QCheckBox()
         self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
-        formLayout.addRow(self.tr("Password visible?"),self.passwordVisibleBox)
+        formLayout.addRow(self.tr("Password visible?"), self.passwordVisibleBox)
+        
+        self.saveButton = QtGui.QPushButton(self.tr("Save"))
+        self.saveButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        self.saveButton.setEnabled(False)
+        self.saveButton.clicked.connect(self.save)
+        layout.addWidget(self.saveButton)
+        layout.addStretch(1)
         
         self.setProfile(profile)
+        
+        self.hostEdit.textChanged.connect(self._handleChange)
+        self.portEdit.textChanged.connect(self._handleChange)
+        self.passwordEdit.textChanged.connect(self._handleChange)
     
     def setProfile(self, profile):
         """Change the profile whose data is displayed."""
-        assert profile is not None
         self.profile = profile
         self.hostEdit.setText(profile.mpdthread.host)
         self.portEdit.setText(str(profile.mpdthread.port))
         self.passwordEdit.setText(profile.mpdthread.password)
         self.passwordVisibleBox.setChecked(len(profile.mpdthread.password) == 0)
     
+    def _handleChange(self):
+        """(De)activate save button when configuration is modified."""
+        self.saveButton.setEnabled(self.isModified())
+        
     def isModified(self):
+        """Return whether the configuration in the GUI differs from the stored configuration."""
         host = self.hostEdit.text()
-        port = int(self.portEdit.text())
+        try:
+            port = int(self.portEdit.text())
+        except ValueError:
+            return True # Not an int
         password = self.passwordEdit.text()
         mpdThread = self.profile.mpdthread
         return [host, port, password] != [mpdThread.host, mpdThread.port, mpdThread.password]
@@ -474,7 +488,23 @@ class MPDConfigWidget(QtGui.QWidget):
         password = self.passwordEdit.text()
         self.profile.setConnectionParameters(host, port, password)
         player.profileCategory.save()
+        self.saveButton.setEnabled(False)
     
     def _handlePasswordVisibleBox(self,checked):
         """Change whether the password is visible in self.passwordEdit."""
         self.passwordEdit.setEchoMode(QtGui.QLineEdit.Normal if checked else QtGui.QLineEdit.Password)
+        
+    def okToClose(self):
+        """In case of unsaved configuration data, ask the user what to do."""
+        if self.isModified():
+            button = QtGui.QMessageBox.question(
+                                    self, self.tr("Unsaved changes"),
+                                    self.tr("MPD configuration has been modified. Save changes?"),
+                                    QtGui.QMessageBox.Abort | QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+            if button == QtGui.QMessageBox.Abort:
+                return False
+            elif button == QtGui.QMessageBox.Yes:
+                self.save()
+            else: self.setProfile(self.profile) # reset
+        return True
+    

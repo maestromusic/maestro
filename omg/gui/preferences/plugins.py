@@ -43,8 +43,8 @@ COLUMN_HEADERS = [translate("PluginDialog", "Enabled"),
 class PluginPanel(QtGui.QWidget):
     """Preferences panel to display all plugins with the info from the PLUGININFO file and allow the user to
     enable or disable them."""
-    def __init__(self, buttonBar, parent=None):
-        super().__init__(parent)
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
         self.setLayout(QtGui.QVBoxLayout())
             
         self.table = QtGui.QTableWidget()

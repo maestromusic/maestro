@@ -19,8 +19,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import config, logging
-from ...gui import treeview, treeactions, delegates, profiles as profilesgui
+from ...gui import treeview, treeactions, delegates
 from ...gui.delegates import abstractdelegate
+from ...gui.preferences import profiles as profilesgui
 from ...models import leveltreemodel
 from ...core import levels
 from . import plugin
@@ -34,7 +35,7 @@ class RenameFilesAction(treeactions.TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr('rename files'))
+        self.setText(self.tr("Rename files"))
     
     def initialize(self, selection):
         for fileW in selection.fileWrappers(True):

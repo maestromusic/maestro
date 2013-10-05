@@ -20,13 +20,14 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, profiles as profilesgui, delegates
+from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, delegates
 from . import dockwidget
 from .. import utils
 from ..core import levels, tags
 from ..models import albumguesser
 from ..models.editor import EditorModel
 from .delegates import editor as editordelegate
+from .preferences import profiles as profilesgui
 
         
 class EditorTreeView(treeview.DraggingTreeView):

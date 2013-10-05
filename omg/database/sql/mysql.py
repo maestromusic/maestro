@@ -22,6 +22,7 @@ http://dev.mysql.com/doc/relnotes/connector-python/en/
 
 import mysql.connector
 from . import AbstractSql, AbstractSqlResult, DBException, EmptyResultException
+from .. import prefix
 from ... import utils
 
 
@@ -37,7 +38,8 @@ class Sql(AbstractSql):
         self._db.close()
                     
     def query(self, queryString, *args):
-        if args:
+        queryString = queryString.format(p=prefix)
+        if len(args) > 0:
             queryString = queryString.replace('?','%s')
             args = [a.toSql() if isinstance(a, utils.FlexiDate) else a for a in args]
         try:
@@ -52,7 +54,7 @@ class Sql(AbstractSql):
             # Usually this means that argSets is some other iterable object,
             # but mysql connector will complain.
             argSets = list(argSets)
-        queryString = queryString.replace('?','%s')
+        queryString = queryString.format(p=prefix).replace('?','%s')
         argSets = [[a.toSql() if isinstance(a, utils.FlexiDate) else a for a in argSet]
                    for argSet in argSets]
         try:

@@ -31,34 +31,40 @@ translate = QtCore.QCoreApplication.translate
 
 class FlagManager(QtGui.QWidget):
     """The FlagManager allows to add, edit and delete flagtypes."""
-    def __init__(self, buttonBar, parent=None):
-        super().__init__(parent)
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
         self.setLayout(QtGui.QVBoxLayout())
+        self.layout().setContentsMargins(0,0,0,0)
+        self.layout().setSpacing(0)
         
-        buttonLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(buttonLayout)
+        buttonBar = QtGui.QToolBar()
+        self.layout().addWidget(buttonBar)
                 
-        addButton = QtGui.QPushButton(utils.getIcon("add.png"), '')
+        addButton = QtGui.QToolButton()
+        addButton.setIcon(utils.getIcon("add.png"))
         addButton.setToolTip("Add flag...")
         addButton.clicked.connect(self._handleAddButton)
-        buttonLayout.addWidget(addButton)
-        self.undoButton = QtGui.QPushButton(utils.getIcon("undo.png"), '')
+        buttonBar.addWidget(addButton)
+        self.undoButton = QtGui.QToolButton()
+        self.undoButton.setIcon(utils.getIcon("undo.png"))
         self.undoButton.clicked.connect(application.stack.undo)
-        buttonLayout.addWidget(self.undoButton)
-        self.redoButton = QtGui.QPushButton(utils.getIcon("redo.png"), '')
+        buttonBar.addWidget(self.undoButton)
+        self.redoButton = QtGui.QToolButton()
+        self.redoButton.setIcon(utils.getIcon("redo.png"))
         self.redoButton.clicked.connect(application.stack.redo)
-        buttonLayout.addWidget(self.redoButton)
-        self.showInBrowserButton = QtGui.QPushButton(utils.getIcon("preferences/goto.png"), '')
+        buttonBar.addWidget(self.redoButton)
+        self.showInBrowserButton = QtGui.QToolButton()
+        self.showInBrowserButton.setIcon(utils.getIcon("preferences/goto.png"))
         self.showInBrowserButton.setToolTip(self.tr("Show in browser"))
         self.showInBrowserButton.setEnabled(False)
         self.showInBrowserButton.clicked.connect(self._handleShowInBrowserButton)
-        buttonLayout.addWidget(self.showInBrowserButton)
-        self.deleteButton = QtGui.QPushButton(utils.getIcon("delete.png"), '')
+        buttonBar.addWidget(self.showInBrowserButton)
+        self.deleteButton = QtGui.QToolButton()
+        self.deleteButton.setIcon(utils.getIcon("delete.png"))
         self.deleteButton.setToolTip(self.tr("Delete flag"))
         self.deleteButton.setEnabled(False)
         self.deleteButton.clicked.connect(self._handleDeleteButton)
-        buttonLayout.addWidget(self.deleteButton)
-        buttonLayout.addStretch(1)
+        buttonBar.addWidget(self.deleteButton)
         
         self.columns = [
                 ("icon",   self.tr("Icon")),
@@ -278,7 +284,7 @@ class FlagManager(QtGui.QWidget):
         raise ValueError("Invalid key {}".format(columnKey))
     
 
-def createNewFlagType(parent = None):
+def createNewFlagType(parent=None):
     """Ask the user to supply a name and then create a new flag with this name. Return the new flag or None
     if no flag is created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
     name, ok = QtGui.QInputDialog.getText(parent, translate("FlagManager", "New Flag"),

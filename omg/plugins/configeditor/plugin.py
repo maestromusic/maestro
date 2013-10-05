@@ -28,7 +28,13 @@ translate = QtCore.QCoreApplication.translate
 
 
 def enable():
-    preferences.addPanel('plugins/configeditor',translate("ConfigEditor", 'ConfigEditor'),PreferencesDialog)
+    preferences.addPanel(
+        path = 'plugins/configeditor',
+        title = translate("ConfigEditor", "Configuration Editor"),
+        callable = PreferencesDialog,
+        description = translate("ConfigEditor", "Edit the configuration file <i>{}</i>.")
+                                .format(config.getPath('config')),
+    )
 
 
 def disable():
@@ -77,7 +83,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
                 self.option.fromString(value)
             except config.ConfigError:
                 QtGui.QMessageBox.critical(self.widget, translate("ConfigEditor", 'Invalid entry'),
-                                           translate("ConfigEditor", 'The data you entered is not valid for this option'))
+                            translate("ConfigEditor", 'The data you entered is not valid for this option'))
                 return
             self.dirty = True
             self.widget.dirty = True
@@ -99,7 +105,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
         
         
 class ConfigSectionWidget(QtGui.QTableWidget):
-    def __init__(self, section, parent = None):
+    def __init__(self, section, parent=None):
         super().__init__(parent)
         self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
         self.setSection(section)
@@ -151,8 +157,8 @@ class ConfigSectionWidget(QtGui.QTableWidget):
         
         
 class PreferencesDialog(QtGui.QWidget):
-    def __init__(self, buttonBar):
-        super().__init__()
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
         mainLayout = QtGui.QVBoxLayout(self)
         layout = QtGui.QHBoxLayout()
         self.tree = QtGui.QTreeWidget()
@@ -170,8 +176,8 @@ class PreferencesDialog(QtGui.QWidget):
         mainLayout.addLayout(layout)
         saveButton = QtGui.QPushButton(self.tr('Save'))
         saveButton.clicked.connect(self.sectionWidget.save)
-        buttonBar.addStretch(1)
-        buttonBar.addWidget(saveButton)
+        panel.buttonBar.addStretch(1)
+        panel.buttonBar.addWidget(saveButton)
         self.setLayout(mainLayout)
         self._ignoreDirty = False
         
@@ -181,7 +187,8 @@ class PreferencesDialog(QtGui.QWidget):
         if self.sectionWidget.dirty:
             ans = QtGui.QMessageBox.question(self, self.tr('Unsaved changes'),
                                              self.tr('Do you want to save your changes before proceeding?'),
-                                             QtGui.QMessageBox.Cancel | QtGui.QMessageBox.Ignore | QtGui.QMessageBox.Save)
+                                             QtGui.QMessageBox.Cancel | QtGui.QMessageBox.Ignore |
+                                             QtGui.QMessageBox.Save)
             if ans == QtGui.QMessageBox.Save:
                 self.sectionWidget.save()
             elif ans == QtGui.QMessageBox.Cancel:
