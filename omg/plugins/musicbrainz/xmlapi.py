@@ -46,6 +46,7 @@ def query(resource, mbid, includes=[]):
         queryCallback(url)
     if len(includes) > 0:
         url += "?inc={}".format("+".join(includes))
+    logger.debug('querying {}'.format(url))
     ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
     if len(ans):
         data = ans.getSingle()
@@ -414,14 +415,17 @@ class Recording(MBTreeItem):
                 tag = simpleTags[reltype]
             elif reltype == "vocal":
                 voice = relation.findtext("attribute-list/attribute")
-                for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
-                    if voice.startswith(vtype):
-                        tag = "performer:" + vtype
-                        continue
-                if voice == "choir vocals":
-                    tag = "performer:choir"
+                if voice is None:
+                    tag = "vocals"
                 else:
-                    logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
+                    for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
+                        if voice.startswith(vtype):
+                            tag = "performer:" + vtype
+                            continue
+                    if voice == "choir vocals":
+                        tag = "performer:choir"
+                    else:
+                        logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
             else:
                 logger.warning("unknown artist relation '{}' in recording '{}'"
                                .format(relation.get("type"), self.mbid))

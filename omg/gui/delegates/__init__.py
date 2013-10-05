@@ -33,6 +33,7 @@ class StandardDelegate(AbstractDelegate):
     """While still abstract, this class implements almost all of the features used by the usual delegates in
     OMG. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default values
     for these options."""
+    
     def layout(self,index,availableWidth):
         node = self.model.data(index)
         if isinstance(node, TextNode):
@@ -77,18 +78,16 @@ class StandardDelegate(AbstractDelegate):
         preTitleItem = self.getPreTitleItem(wrapper)
         if preTitleItem is not None:
             self.addCenter(preTitleItem)
-        if element.isFile() and element.url.scheme != "file":
-            urlWarning = TextItem(element.url.scheme, DelegateStyle(bold=True, color=Qt.red))
-        else: urlWarning = None
+        urlWarningItem = self.getUrlWarningItem(wrapper)
         titleItem = TextItem(wrapper.getTitle(prependPosition=self.profile.options['showPositions'],
                                            usePath=False),
                              BOLD_STYLE if element.isContainer() else STD_STYLE,
                              minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
         
         if not element.isInDb():
-            self.addCenter(ColorBarItem(QtGui.QColor(255,255,0),5,titleItem.sizeHint(self)[1]))
-        if urlWarning is not None:
-            self.addCenter(urlWarning)
+            self.addCenter(ColorBarItem(QtGui.QColor(255,255,0), 5, titleItem.sizeHint(self)[1]))
+        if urlWarningItem is not None:
+            self.addCenter(urlWarningItem)
         if self.profile.options['showType'] and element.isContainer():
             pixmap = elements.getTypePixmap(element.type)
             if pixmap is not None:
@@ -183,7 +182,7 @@ class StandardDelegate(AbstractDelegate):
         # Path
         self.addPath(element)
         
-    def addPath(self,element):
+    def addPath(self, element):
         """Add the path of *element* to the DelegateItems. Subclasses may overwrite this method to use e.g.
         two items for an old and a new path.""" 
         if self.profile.options['showPaths'] and element.isFile():
@@ -326,6 +325,16 @@ class StandardDelegate(AbstractDelegate):
         first line. This is used by PlaylistDelegate to add a small triangle in front of the currently
         playing element."""
         return None
+    
+    def getUrlWarningItem(self, wrapper):
+        """An optional string to place before the title for unusual URL types.
+        
+        The default is to display nothing for "file" URLs and the scheme (bold and red) for any
+        other scheme.
+        """
+        element = wrapper.element
+        if element.isFile() and element.url.scheme != "file":
+            return TextItem(element.url.scheme, DelegateStyle(bold=True, color=Qt.red))
             
             
 def _join(sep,strings):

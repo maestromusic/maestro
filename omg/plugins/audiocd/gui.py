@@ -23,70 +23,97 @@ from PyQt4.QtGui import QDialogButtonBox
 from omg import config
 from omg.core import levels, tags
 from omg.gui import dialogs, delegates, mainwindow, treeactions, treeview
+from omg.gui.delegates.abstractdelegate import *
 from omg.models import leveltreemodel
 from omg.plugins.musicbrainz import plugin as mbplugin, xmlapi
+
 
 class ImportAudioCDAction(treeactions.TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent)
         self.setText(self.tr('load audio CD'))
+    
+    def _getDiscId(self):
+        """Asks the user for a CDROM device and returns (discid, trackcount).
         
-    def doAction(self):
+        This method also creates a Ripper as self.ripper and starts it unless earlyrip is
+        turned off.
+        """
         import discid
-        device, ok = QtGui.QInputDialog.getText(mainwindow.mainWindow,
-                                            "Select device",
-                                            "CDROM device:",
-                                            QtGui.QLineEdit.Normal,
-                                            discid.get_default_device())
+        device, ok = QtGui.QInputDialog.getText(
+                            mainwindow.mainWindow,
+                            "Select device", "CDROM device:",
+                            QtGui.QLineEdit.Normal,
+                            discid.get_default_device())
         if not ok:
-            return
+            return None
         with discid.read(device) as disc:
             try:
                 disc.read(device)
             except discid.disc.DiscError as e:
                 dialogs.warning(self.tr("CDROM drive is empty"), str(e))
-                return False
-            theDiscid = disc.id
-        try:
-            releases = xmlapi.findReleasesForDiscid(theDiscid)
-        except xmlapi.UnknownDiscException:
-            dialogs.warning(self.tr("Disc not found"),
-                            self.tr("The MusicBrainz database does not contain an "
-                                    "entry for this disc."))
-            return 
+                return None
+            from . import ripper
+            self.ripper = ripper.Ripper(device, disc.id)
+            if config.options.audiocd.earlyrip: 
+                self.ripper.start()
+            return disc.id, len(disc.tracks)
+
+    def _getRelease(self, theDiscid):
+        releases = xmlapi.findReleasesForDiscid(theDiscid)
         if len(releases) > 1:
             dialog = ReleaseSelectionDialog(releases, theDiscid)
             if dialog.exec_():
-                release = dialog.selectedRelease
+                return dialog.selectedRelease
             else:
-                return
+                return None
         else:
-            release = releases[0]
-        from . import ripper
-        ripper = ripper.Ripper(device, theDiscid)
-        if config.options.audiocd.earlyrip: 
-            ripper.start()
-        progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
-        progress.open()        
-        stack = self.level().stack.createSubstack(modalDialog=True)
-        level = levels.Level("audiocd", self.level(), stack=stack)
-        def callback(url):
-            progress.setText(self.tr("Fetching data from:\n{}").format(url))
+            return releases[0]
+    
+    def doAction(self):
+        theDiscid, trackCount = self._getDiscId()
+        if theDiscid is None:
+            return
+        try:
+            raise xmlapi.UnknownDiscException()
+            release = self._getRelease(theDiscid)
+            if release is None:
+                return
+            progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
+            progress.open()        
+            stack = self.level().stack.createSubstack(modalDialog=True)
+            level = levels.Level("audiocd", self.level(), stack=stack)
+            def callback(url):
+                progress.setText(self.tr("Fetching data from:\n{}").format(url))
+                QtGui.qApp.processEvents()
+            xmlapi.queryCallback = callback 
+            container = xmlapi.makeReleaseContainer(release, theDiscid, level)
+            progress.close()
+            xmlapi.queryCallback = None
             QtGui.qApp.processEvents()
-        xmlapi.queryCallback = callback 
-        container = xmlapi.makeReleaseContainer(release, theDiscid, level)
-        progress.close()
-        xmlapi.queryCallback = None
-        QtGui.qApp.processEvents()
-        dialog = ImportAudioCDDialog(level, release, container)
-        if dialog.exec_():
-            model = self.parent().model()
-            model.insertElements(model.root, len(model.root.contents), [dialog.container])
+            dialog = ImportAudioCDDialog(level, release, container)
+            if dialog.exec_():
+                model = self.parent().model()
+                model.insertElements(model.root, len(model.root.contents), [dialog.container])
+                if not config.options.audiocd.earlyrip:
+                    self.ripper.start()
+            stack.close()
+        except xmlapi.UnknownDiscException:
+            dialogs.warning(self.tr("Disc not found"),
+                            self.tr("The disc was not found in the MusicBrainz database. "
+                                    "You need to tag the album yourself."))
+            from .plugin import simpleDiscContainer
             if not config.options.audiocd.earlyrip:
-                ripper.start()
-        stack.close()
-        
+                self.ripper.start()
+            
+            self.level().stack.beginMacro(self.tr("Load Audio CD"))
+            container = simpleDiscContainer(theDiscid, trackCount, self.level())
+            model = self.parent().model()
+            model.insertElements(model.root, len(model.root.contents), [container])
+            self.level().stack.endMacro()
+
+
 class ReleaseSelectionDialog(QtGui.QDialog):
     
     def __init__(self, releases, discid):
@@ -119,6 +146,7 @@ class ReleaseSelectionDialog(QtGui.QDialog):
         self.selectedRelease = self.sender().release
         self.accept()
 
+
 class CDROMDelegate(delegates.StandardDelegate):
 
     def __init__(self, view): 
@@ -127,6 +155,14 @@ class CDROMDelegate(delegates.StandardDelegate):
         self.profile.options['appendRemainingTags'] = True
         self.profile.options['showPaths'] = True
         super().__init__(view, self.profile)
+        
+    def getUrlWarningItem(self, wrapper):
+        element = wrapper.element
+        if element.isFile() and element.url.scheme == "audiocd":
+            return TextItem(self.tr("[Track {:2d}]").format(element.url.tracknr),
+                            DelegateStyle(bold=True, color=Qt.blue))
+        return super().getUrlWarningItem(wrapper)
+
 
 class AliasComboDelegate(QtGui.QStyledItemDelegate):
     

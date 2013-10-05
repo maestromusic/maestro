@@ -62,7 +62,8 @@ class RealFileEvent(application.ChangeEvent):
         return True
     
     def __str__(self):
-        return "RealFileEvent({})".format(", ".join(("{}={}".format(attr, getattr(self, attr)) for attr in self._attrs)))
+        return "RealFileEvent({})".format(", ".join(("{}={}".format(attr, getattr(self, attr))
+                                                     for attr in self._attrs)))
             
         
 class RealLevel(levels.Level):

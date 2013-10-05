@@ -15,11 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import subprocess
+
 
 from PyQt4 import QtCore, QtGui
 from omg import filebackends
 from omg.gui import editor
+from omg import config
+
 
 def defaultConfig():
     return {"audiocd": {
@@ -44,12 +46,15 @@ def disable():
     from .ripper import fileChangerHook
     real.commitHooks.remove(fileChangerHook)
 
-def findDrives():
-    output = subprocess.check_output("cd-drive")
-    drives = []
-    for line in output.decode().splitlines():
-        if line.startswith("                       Drive: "):
-            drives.append(line[30:])
-    return drives
+def simpleDiscContainer(discid, trackCount, level):
+    from omg.core.elements import TYPE_ALBUM
+    
+    elems = []
+    for i in range(1, trackCount+1):
+        url = filebackends.BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
+                        discid, i, config.options.audiocd.rippath))
+        elems.append(level.collect(url))
+    return level.createContainer(contents=elems, type=TYPE_ALBUM)
+    
 
         
