@@ -198,7 +198,7 @@ class ProfileCategory(QtCore.QObject):
     def openConfigDialog(self, currentProfile=None):
         """Open a dialog that allows to configure profiles of this category. If *currentProfile* is not None,
         select that profile first."""
-        from .gui import profiles
+        from .gui.preferences import profiles
         dialog = profiles.ProfileDialog(self, currentProfile)
         dialog.exec_()
         

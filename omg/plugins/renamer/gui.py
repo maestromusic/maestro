@@ -35,7 +35,7 @@ class RenameFilesAction(treeactions.TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr('rename files'))
+        self.setText(self.tr("Rename files"))
     
     def initialize(self, selection):
         for fileW in selection.fileWrappers(True):

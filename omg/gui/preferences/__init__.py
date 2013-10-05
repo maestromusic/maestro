@@ -19,7 +19,7 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, logging, config, profiles
+from ... import utils, logging, config
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -381,9 +381,12 @@ addPanel("profiles", translate("Preferences", "Profiles"),
          callable = ('gui.preferences.profiles', 'CategoryMenu'),
          iconPath = ':omg/icons/preferences/profiles_small.png',
          pixmapPath = ':omg/icons/preferences/profiles.png')
-profiles.manager.categoryAdded.connect(_addProfileCategory)
-profiles.manager.categoryRemoved.connect(_removeProfileCategory)
-for category in profiles.manager.categories:
+
+# Bugfix: do not call this profiles, otherwise the submodule is unreachable
+from ... import profiles as profilesModule
+profilesModule.manager.categoryAdded.connect(_addProfileCategory)
+profilesModule.manager.categoryRemoved.connect(_removeProfileCategory)
+for category in profilesModule.manager.categories:
     _addProfileCategory(category)
 
 
