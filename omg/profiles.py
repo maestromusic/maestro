@@ -194,13 +194,6 @@ class ProfileCategory(QtCore.QObject):
         self.storageOption.setValue([[profile.name,
                                       profile.save()]
                                       for profile in self._profiles])
-    
-    def openConfigDialog(self, currentProfile=None):
-        """Open a dialog that allows to configure profiles of this category. If *currentProfile* is not None,
-        select that profile first."""
-        from .gui.preferences import profiles
-        dialog = profiles.ProfileDialog(self, currentProfile)
-        dialog.exec_()
         
     def suggestProfileName(self):
         """Suggest an unused name for a new profile of this category. Use self.defaultProfileName for this.

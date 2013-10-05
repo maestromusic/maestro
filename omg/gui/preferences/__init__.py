@@ -179,14 +179,19 @@ class PreferencesDialog(QtGui.QDialog):
             return
         self.currentPath = path
         if path not in self.panelWidgets:
-            panel = self.getPanel(path)
-            widget = PanelWidget(self, panel)
-            self.panelWidgets[path] = widget
-            self.stackedWidget.addWidget(widget)
+            self._createPanelWidget(path)
         self.stackedWidget.setCurrentWidget(self.panelWidgets[path])
         self.treeWidget.clearSelection()
         self._findItem(path).setSelected(True)
-            
+        
+    def _createPanelWidget(self, path):
+        """Create a PanelWidget for the given path inside the preferences."""
+        assert path not in self.panelWidgets
+        panel = self.getPanel(path)
+        widget = PanelWidget(self, panel)
+        self.panelWidgets[path] = widget
+        self.stackedWidget.addWidget(widget)
+        
     def getPanel(self, path):
         """Return the Panel-instance (not the actual widget!) with the given *path*.""" 
         keys = path.split('/')
@@ -194,6 +199,12 @@ class PreferencesDialog(QtGui.QDialog):
         for key in keys[:-1]:
             currentPanels = currentPanels[key].subPanels    
         return currentPanels[keys[-1]]
+    
+    def getConfigurationWidget(self, path):
+        """Return the configuration widget for the given path inside the preferences."""
+        if not path in self.panelWidgets:
+            self._createPanelWidget(path)
+        return self.panelWidgets[path].configurationWidget
         
     def _findItem(self, path):
         """Return the QTreeWidgetItem for the given path from the menu.""" 
@@ -257,10 +268,10 @@ class PanelWidget(QtGui.QWidget):
         self.buttonBar = QtGui.QHBoxLayout()
         
         # Create configuration widget
-        self.innerWidget = panel.createWidget(dialog, self)
+        self.configurationWidget = panel.createWidget(dialog, self)
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
-        scrollArea.setWidget(self.innerWidget)
+        scrollArea.setWidget(self.configurationWidget)
         self.layout().addWidget(scrollArea, 1)
         
         # Add button bar
@@ -282,7 +293,7 @@ class PanelWidget(QtGui.QWidget):
     def okToClose(self):
         """Give the current panel a chance to abort closing the preferences dialog or switching to
         another panel. Return True if closing is admissible."""
-        return not hasattr(self.innerWidget, 'okToClose') or self.innerWidget.okToClose()
+        return not hasattr(self.configurationWidget, 'okToClose') or self.configurationWidget.okToClose()
         
     
 def _getParentPanel(path):

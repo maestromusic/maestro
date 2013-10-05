@@ -21,7 +21,18 @@ from PyQt4.QtCore import Qt
 from .. import dialogs
 from ... import profiles, utils
 
-  
+
+def showPreferences(category, profile=None):
+    """Open the preferences dialog on the panel for the given profile or category."""
+    from .. import mainwindow
+    from . import PreferencesDialog
+    dialog = PreferencesDialog(mainwindow.mainWindow)
+    dialog.showPanel('profiles/'+category.name)
+    if profile is not None:
+        dialog.getConfigurationWidget('profiles/'+category.name).showProfile(profile)
+    dialog.exec_()
+
+
 class CreateProfileDialog(QtGui.QDialog):
     """Small dialog that is used to create a new profile of a TypedProfileCategory. It asks the user for 
     the type and name of the new profile. NewProfileDialog works only with typed categories. For normal
@@ -294,6 +305,7 @@ class ProfileTree(QtGui.QTreeWidget):
     
     def selectProfile(self, profile):
         """Select the given profile."""
+        self.clearSelection()
         item, i = self._findProfileItem(profile)
         if item is not None:
             item.setSelected(True)
@@ -541,13 +553,13 @@ class ProfileComboBox(QtGui.QComboBox):
             # 'Configure...' entry is selected automatically (see above).
             # If there are no profiles, the dialog is opened in mousePressEvent instead.
             self._selectProfile(self._profile) # to reset the current index
-            self.category.openConfigDialog(self._profile)
+            showPreferences(self.category, self._profile)
             
     def mousePressEvent(self, event):
         """If this box contains only the entry 'Configure...', a mouse press on it must open the dialog, 
         because it is obviously not possible to trigger currentIndexChanged."""
         if self.includeConfigure and self.count() == 1 and event.button() == Qt.LeftButton:
-            self.category.openConfigDialog(None)
+            showPreferences(self.category)
             event.accept()
         else:
             return super().mousePressEvent(event)
