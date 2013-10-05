@@ -38,19 +38,14 @@ HAS_NEW_FILES = 2
 PROBLEM = 4
 
 def init():
-    global synchronizer, notifier, enabled, idProvider
+    global synchronizer, notifier, idProvider
     import _strptime
     from . import identification
     if config.options.filesystem.disable:
         return
     apikey = "8XaBELgH" #TODO: AcoustID test key - we should change this
     idProvider = identification.AcoustIDIdentifier(apikey)
-         
-        
     synchronizer = FileSystemSynchronizer()
-    synchronizer.eventThread.start()
-    levels.real.filesystemDispatcher.connect(synchronizer.handleRealFileEvent, Qt.QueuedConnection)
-    enabled = True
     
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
@@ -288,6 +283,8 @@ class EventThread(QtCore.QThread):
         self.timer = QtCore.QTimer(self)
         
     def run(self):
+        global enabled
+        enabled = True
         self.timer.start(config.options.filesystem.scan_interval * 1000)
         self.exec_()
         db.close()
@@ -326,6 +323,9 @@ class FileSystemSynchronizer(QtCore.QObject):
         self.directories = {}      # maps (rel) path -> Directory object
         self.dbTracks = set()      # urls in the files or newfiles table
         self.dbDirectories = set() # paths in the folders table
+        
+        QtCore.QTimer.singleShot(2000, self.eventThread.start)
+        levels.real.filesystemDispatcher.connect(self.handleRealFileEvent, Qt.QueuedConnection)
 
     def loadFolders(self):
         """Load the folders table from the database.
