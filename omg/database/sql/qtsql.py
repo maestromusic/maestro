@@ -22,6 +22,7 @@ import datetime
 
 from PyQt4 import QtSql, QtCore
 from . import DBException, EmptyResultException, AbstractSql, AbstractSqlResult
+from .. import prefix
 from ... import utils
 
 
@@ -45,6 +46,7 @@ class Sql(AbstractSql):
     def query(self,queryString,*args):
         query = QtSql.QSqlQuery(self._db)
         query.setForwardOnly(True) # improves performance
+        queryString = queryString.format(p=prefix)
 
         # Prepare
         if not query.prepare(queryString):
@@ -69,6 +71,7 @@ class Sql(AbstractSql):
             argSets = list(argSets)
         if len(argSets) == 0:
             raise ValueError("You must give at least one set of arguments.")
+        queryString = queryString.format(p=prefix)
         
         # Prepare
         query = QtSql.QSqlQuery(self._db)

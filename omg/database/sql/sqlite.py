@@ -19,6 +19,7 @@
 import sqlite3, datetime, threading
 
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
+from .. import prefix
 from ... import utils, logging
 
 sqlite3.register_adapter(utils.FlexiDate, utils.FlexiDate.toSql)
@@ -40,6 +41,7 @@ class Sql(AbstractSql):
         self._db.close()
             
     def query(self,queryString,*args):
+        queryString = queryString.format(p=prefix)
         with transactionLock:
             while True:
                 try:
@@ -53,6 +55,7 @@ class Sql(AbstractSql):
                     raise DBException(str(e),query=queryString,args=args)
     
     def multiQuery(self,queryString,argSets):
+        queryString = queryString.format(p=prefix)
         with transactionLock:
             while True:
                 try:
