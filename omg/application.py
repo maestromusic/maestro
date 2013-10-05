@@ -278,8 +278,10 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     plugins.mainWindowInit()
     
     # Launch application
+    logger.debug("showing mainwindow")
     mainWindow.show()
     splash.finish(mainWindow)
+    logger.debug("entering event loop")
     returnValue = app.exec_()
     
     # Close operations
