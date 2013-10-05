@@ -570,5 +570,6 @@ class RealLevel(levels.Level):
                 oldUrl, newUrl = renamings[elem]
                 newUrl.getBackendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
-        db.write.changeUrls([ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
+        db.multiQuery("UPDATE {p}files SET url=? WHERE element_id=?",
+                      [ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
         super()._renameFiles(renamings)

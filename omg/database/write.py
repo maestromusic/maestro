@@ -53,13 +53,6 @@ def updateElementsCounter(elids=None):
         SET elements = (SELECT COUNT(*) FROM {0}contents WHERE container_id = id)
         {1}
         """.format(db.prefix, whereClause))
-        
-
-def changeUrls(data):
-    """Change the urls of files by the (urlString, id) list *data*."""
-    db.multiQuery("UPDATE {}files SET url=? WHERE element_id=?".format(db.prefix), data)
-
-
 
 
 def setTags(elid,tags):

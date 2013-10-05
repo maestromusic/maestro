@@ -85,7 +85,6 @@ class SetPathAction(treeactions.TreeAction):
             from . import getNewfileHash
             db.query("UPDATE {p}files SET url=?,hash=? WHERE element_id=?",
                      str(newUrl), getNewfileHash(newUrl), elem.id)
-            db.write.changeUrls([ (str(newUrl), elem.id) ])
             self.setPaths.append( (elem.url, newUrl) )
             self.dialog.problemURLs.remove(elem.url)
             elem.url = newUrl
