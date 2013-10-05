@@ -16,7 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, subprocess, hashlib, threading
+import subprocess, hashlib, threading
+from os.path import basename, dirname, join, getmtime, split
 from datetime import datetime, timezone, MINYEAR
 
 from PyQt4 import QtGui, QtCore
@@ -38,6 +39,10 @@ HAS_NEW_FILES = 2
 PROBLEM = 4
 
 def init():
+    """Initialize file system watching.
+    
+    This will start a separate thread that repeatedly scans the music folder for changes.
+    """
     global synchronizer, notifier, idProvider
     import _strptime
     from . import identification
@@ -62,21 +67,11 @@ def shutdown():
 
 
 def folderState(path):
-    """Return the state of a given folder, or 'unknown' if it can't be obtained.
-    """
+    """Return the state of a given folder, or 'unknown' if it can't be obtained. """
     if enabled and synchronizer.initialized.is_set():
         try:
-            state = synchronizer.directories[path].state
-            if state & PROBLEM:
-                return 'problem'
-            elif state & HAS_NEW_FILES:
-                return 'unsynced'
-            elif state & HAS_FILES:
-                return 'ok'
-            else:
-                return 'nomusic'
-        except KeyError:
-            pass
+            return synchronizer.directories[path].simpleState()
+        except KeyError: pass
     return 'unknown'
 
 
@@ -85,16 +80,10 @@ def fileState(url):
     """
     if enabled and synchronizer.initialized.is_set():
         try:
-            track = synchronizer.tracks[url]
-            if track.problem:
-                return 'problem'
-            elif track.id is not None:
-                return 'ok'
-            else:
-                return 'unsynced'
-        except KeyError:
-            pass
+            return synchronizer.tracks[url].simpleState()
+        except KeyError: pass
     return 'unknown'
+
 
 def getNewfileHash(url):
     """Return the hash of a file specified by *url* which is not yet in the database.
@@ -104,26 +93,21 @@ def getNewfileHash(url):
     if enabled:
         try:
             return synchronizer.tracks[url].hash
-        except KeyError:
-            return None
+        except KeyError: pass
     return None
 
+
 def mTimeStamp(url):
-    """Get the modification timestamp of a file given by *url*.
-    
-    Returns a datetime object with timezone UTC.
-    """
-    return datetime.fromtimestamp(os.path.getmtime(url.absPath), tz=timezone.utc\
-                                 ).replace(microsecond=0)
+    """Get the modification timestamp of a file given by *url* as UTC datetime."""
+    return datetime.fromtimestamp(getmtime(url.absPath), tz=timezone.utc).replace(microsecond=0)
 
 
 
 class Track:
     """A track represents a real audio file inside the music collection folder.
     
-    This class is a pure data class, storing URL, directory, possibly the ID (or None if the track
-    is not in the database), and a *problem* flag if there is a synchronization problem with this
-    track.
+    It stores URL, directory, possibly the ID (or None if the track is not in the database),
+    and a *problem* flag if there is a synchronization problem with this track.
     """
     
     def __init__(self, url):
@@ -132,10 +116,20 @@ class Track:
         self.id = self.lastChecked = self.hash = None
         self.problem = False
     
+    def simpleState(self):
+        """Return the state of this file as one of the strings "problem", "ok", "unsynced".
+        """
+        if self.problem:
+            return 'problem'
+        if self.id is not None:
+            return 'ok'
+        return 'unsynced'
+    
     def __str__(self):
         if self.id is not None:
             return "DB Track[{}](url={})".format(self.id, self.url)
         return ("New Track(url={})".format(self.url))
+
 
 class Directory:
     """A directory inside the music collection directory.
@@ -205,9 +199,19 @@ class Directory:
             return ret
         return []
             
-        
+    def simpleState(self):
+        """Return the state as one of the strings "problem", "unsynced", "ok", "nomusic"."""
+        if self.state & PROBLEM:
+            return 'problem'
+        if self.state & HAS_NEW_FILES:
+            return 'unsynced'
+        if self.state & HAS_FILES:
+            return 'ok'
+        return 'nomusic'
+
+
 class SynchronizeHelper(QtCore.QObject):
-    """Cdoe running in the main event thread to change the files table and display GUIs."""
+    """An object living in the main event thread to change the files table and display GUIs."""
     
     def __init__(self):
         super().__init__()
@@ -335,7 +339,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         """
         for path, state in db.query(
                     "SELECT path, state FROM {}folders ORDER BY LENGTH(path)".format(db.prefix)):
-            parent, basename = os.path.split(path)
+            parent, basename = split(path)
             if parent == '' and basename == '':
                 dir = Directory(path='', parent=None)                    
             else:
@@ -372,7 +376,7 @@ class FileSystemSynchronizer(QtCore.QObject):
             track.verified = db.getDate(verified)
             self.tracks[track.url] = track
             self.dbTracks.add(track.url)
-            dir, newDirs = self.getDirectory(os.path.dirname(track.url.path))
+            dir, newDirs = self.getDirectory(dirname(track.url.path))
             dir.addTrack(track)
             newDirectories += newDirs
         if len(newDirectories) > 0:
@@ -399,7 +403,7 @@ class FileSystemSynchronizer(QtCore.QObject):
             track.verified = db.getDate(verified)
             self.tracks[track.url] = track
             self.dbTracks.add(track.url)
-            dir = self.directories[os.path.dirname(track.url.path)]
+            dir = self.directories[dirname(track.url.path)]
             dir.addTrack(track)
         if len(deleteFromNewFiles) > 0:
             db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
@@ -442,7 +446,7 @@ class FileSystemSynchronizer(QtCore.QObject):
             return None, []
         if path in self.directories:
             return self.directories[path], []
-        parentPath = None if path == "" else os.path.split(path)[0]
+        parentPath = None if path == "" else split(path)[0]
         parent, new = self.getDirectory(parentPath)
         dir = Directory(path, parent)
         self.directories[path] = dir
@@ -460,7 +464,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         modified = mTimeStamp(track.url)
         if modified <= track.verified:
             return None
-        logger.debug('checking track {}...'.format(os.path.basename(track.url.path)))
+        logger.debug('checking track {}...'.format(basename(track.url.path)))
         newHash = idProvider(track.url) if idProvider is not None else None
         if track.id is None:
             track.verified = modified
@@ -568,7 +572,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                     break
                 if not utils.hasKnownExtension(file):
                     continue
-                url = filebackends.filesystem.FileURL(os.path.join(relPath, file))
+                url = filebackends.filesystem.FileURL(join(relPath, file))
                 if url in self.tracks:
                     if url in self.dbTracks:
                         self.dbTracks.remove(url)
@@ -671,7 +675,7 @@ class FileSystemSynchronizer(QtCore.QObject):
         Also if newUrl is in a directory not yet contained in self.directories it (and potential
         parents which are also new) is added to the folders table.
         """
-        newDir, created = self.getDirectory(os.path.dirname(newUrl.path))
+        newDir, created = self.getDirectory(dirname(newUrl.path))
         if len(created) > 0:
             self.storeDirectories(created)
         oldDir = track.directory
@@ -725,7 +729,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 if url not in self.tracks:
                     logger.error("adding url not in self.tracks: {}".format(url))
                     continue
-                dir = self.directories[os.path.dirname(url.path)]
+                dir = self.directories[dirname(url.path)]
                 track = self.tracks[url]
                 if track.hash is None and idProvider is not None:
                     logger.warning("hash is None in add to db handling {}".format(url))

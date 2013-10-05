@@ -28,15 +28,19 @@ logger = logging.getLogger(__name__)
 _logOSError = True
 
 class AcoustIDIdentifier:
-    """An identification provider using the AcoustID fingerprinter and web service.
+    """An identifier using the AcoustID fingerprinter and web service.
     
     First, the fingerprint of a file is generated using the "fpcalc" utility which must be
     installed. Afterwards, an API lookup is made to find out the AcoustID track ID. If the
     AcoustID database contains an associated MusicBrainz ID, that one is preferred. The returend
     strings are prepended by "acoustid:" or "mbid:" to distinguish the two cases.
+    
+    In case the AcoustID lookup fails, an md5 hash of the first 15 seconds of raw audio is used
+    for identifying the file.
     """
       
-    requestURL = "http://api.acoustid.org/v2/lookup?client={}&meta=recordingids&duration={}&fingerprint={}"
+    requestURL = ("http://api.acoustid.org/v2/lookup?"
+                  "client={}&meta=recordingids&duration={}&fingerprint={}")
     
     def __init__(self, apikey):
         self.apikey = apikey
@@ -48,10 +52,11 @@ class AcoustIDIdentifier:
         except OSError as e: # fpcalc not found, not executable etc.
             global _logOSError
             if _logOSError:
-                _logOSError = False # This error will probably occurr for all files. Don't print it again.
+                _logOSError = False # This error will always occur  - don't print it again.
                 logger.warning(e)
             return self.fallbackHash(url)
         except subprocess.CalledProcessError as e:
+            # fpcalc returned non-zero exit status
             logger.warning(e)
             return self.fallbackHash(url)
         data = data.decode(sys.getfilesystemencoding())
