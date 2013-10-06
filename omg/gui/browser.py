@@ -143,7 +143,7 @@ class Browser(dockwidget.DockWidget):
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
-                    self.filterCriterion = criteria.FlagCriterion(flagList)
+                    self.flagCriterion = criteria.FlagCriterion(flagList)
             if 'filter' in state:
                 try:
                     self.filterCriterion = criteria.parse(state['filter'])
