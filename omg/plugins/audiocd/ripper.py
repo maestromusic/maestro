@@ -75,7 +75,9 @@ class Ripper(QtCore.QObject):
     def _handleRipperFinished(self):
         tracks = sorted(os.listdir(self.tmpdir))
         print('ripper finisehd. tracks: {}'.format(tracks))
-        self.tracksToEncode = list(enumerate(tracks, 1))
+        import re
+        regex = re.compile("track([0-9]+)\\.cdda\\.wav")
+        self.tracksToEncode = [(track, int(regex.findall(track)[0])) for track in tracks]
         self.lastEncoded = None
         self.encode()
     
@@ -92,7 +94,7 @@ class Ripper(QtCore.QObject):
                 levels.real.stack.push(InsertRippedFileCommand(elem, encodedFile))
                 
             except db.sql.EmptyResultException:
-                "adding finished Track"
+                print("adding finished Track")
                 finishedTracks.append((self.discid, tracknr, encodedFile))
             self.lastEncoded = None
 
