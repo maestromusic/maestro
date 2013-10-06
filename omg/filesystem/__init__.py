@@ -229,7 +229,6 @@ class SynchronizeHelper(QtCore.QObject):
     def changeURL(self, id, newUrl):
         """Call when a URL change was detected. Displays a notice and updates the files table."""
         from ..gui.dialogs import warning
-        from .. import application
         warning(self.tr("Move detected"),
                 self.tr("A file was renamed (or moved) outside OMG:\n"
                         "{}".format(str(newUrl))), application.mainWindow)
@@ -243,7 +242,6 @@ class SynchronizeHelper(QtCore.QObject):
         from . import dialogs
         dialog = dialogs.MissingFilesDialog([track.id for track in tracks])
         dialog.exec_()
-        from .. import application
         application.stack.clear()
         self._dialogResult = {"removed" : dialog.deleteAction.removedURLs,
                               "renamed" : dialog.setPathAction.setPaths } 
@@ -265,7 +263,6 @@ class SynchronizeHelper(QtCore.QObject):
                     backendFile.tags = dbTags.withoutPrivateTags()
                     backendFile.saveTags()
                 else:
-                    from .. import application
                     application.stack.clear()
                     diff = tags.TagStorageDifference(dbTags.withoutPrivateTags(), fsTags)
                     levels.real._changeTags({levels.real.get(track.id) : diff }, dbOnly=True)
@@ -368,8 +365,8 @@ class FileSystemSynchronizer(QtCore.QThread):
         """ 
         newDirectories = []
         missingHashes = set()
-        for elid, urlstring, elhash, verified in db.query(
-                           "SELECT element_id, url, hash, verified FROM {p}files"):
+        ans = db.query("SELECT element_id, url, hash, verified FROM {p}files")
+        for elid, urlstring, elhash, verified in ans:
             url = BackendURL.fromString(urlstring)
             if url.scheme != "file":
                 continue
