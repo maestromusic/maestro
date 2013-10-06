@@ -27,38 +27,32 @@ from omg.gui.delegates.abstractdelegate import *
 from omg.models import leveltreemodel
 from omg.plugins.musicbrainz import plugin as mbplugin, xmlapi
 
+translate = QtCore.QCoreApplication.translate
+
+def askForDiscId():
+    import discid
+    device, ok = QtGui.QInputDialog.getText(
+                        mainwindow.mainWindow,
+                        translate("AudioCD Plugin", "Select device"),
+                        translate("AudioCD Plugin", "CDROM device:"),
+                        QtGui.QLineEdit.Normal,
+                        discid.get_default_device())
+    if not ok:
+        return None
+    with discid.read(device) as disc:
+        try:
+            disc.read(device)
+        except discid.disc.DiscError as e:
+            dialogs.warning(translate("AudioCD Plugin", "CDROM drive is empty"), str(e))
+            return None
+    return device, disc.id, len(disc.tracks)
+
 
 class ImportAudioCDAction(treeactions.TreeAction):
     
     def __init__(self, parent):
         super().__init__(parent)
         self.setText(self.tr('load audio CD'))
-    
-    def _getDiscId(self):
-        """Asks the user for a CDROM device and returns (discid, trackcount).
-        
-        This method also creates a Ripper as self.ripper and starts it unless earlyrip is
-        turned off.
-        """
-        import discid
-        device, ok = QtGui.QInputDialog.getText(
-                            mainwindow.mainWindow,
-                            "Select device", "CDROM device:",
-                            QtGui.QLineEdit.Normal,
-                            discid.get_default_device())
-        if not ok:
-            return None
-        with discid.read(device) as disc:
-            try:
-                disc.read(device)
-            except discid.disc.DiscError as e:
-                dialogs.warning(self.tr("CDROM drive is empty"), str(e))
-                return None
-            from . import ripper
-            self.ripper = ripper.Ripper(device, disc.id)
-            if config.options.audiocd.earlyrip: 
-                self.ripper.start()
-            return disc.id, len(disc.tracks)
 
     def _getRelease(self, theDiscid):
         releases = xmlapi.findReleasesForDiscid(theDiscid)
@@ -72,9 +66,14 @@ class ImportAudioCDAction(treeactions.TreeAction):
             return releases[0]
     
     def doAction(self):
-        theDiscid, trackCount = self._getDiscId()
-        if theDiscid is None:
+        ans = askForDiscId()
+        if ans is None:
             return
+        device, theDiscid, trackCount = ans
+        from . import ripper
+        self.ripper = ripper.Ripper(device, theDiscid)
+        if config.options.audiocd.earlyrip: 
+            self.ripper.start()
         try:
             release = self._getRelease(theDiscid)
             if release is None:
@@ -395,3 +394,9 @@ class ImportAudioCDDialog(QtGui.QDialog):
                 changes[item.element] = tags.TagStorageDifference(item.element.tags, elemTags)
         if len(changes):
             self.level.changeTags(changes)
+            
+class RipMissingTracksDialog(QtGui.QDialog):
+    
+    def __init__(self):
+        super().__init__(mainwindow.mainWindow)
+        

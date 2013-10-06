@@ -541,7 +541,6 @@ def findReleasesForDiscid(discid):
             mbit.tags.add("barcode", release.findtext('barcode'))
         relGroup = release.find('release-group')
         if relGroup is not None and relGroup.get("type") == "Compilation":
-            print('COMPILATION')
             mbit.containerType = elements.TYPE_COLLECTION
             for medium in mbit.children.values():
                 medium.containerType = elements.TYPE_ALBUM

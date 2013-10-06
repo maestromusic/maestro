@@ -74,10 +74,6 @@ class BackendURL:
     def scheme(self):
         return self.parsedUrl.scheme
     
-    @property
-    def path(self):
-        return str(self.parsedUrl)
-    
     def getBackendFile(self):
         """Create and return a BackendFile object matching this URL.
         

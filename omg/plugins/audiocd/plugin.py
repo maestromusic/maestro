@@ -18,10 +18,11 @@
 
 
 from PyQt4 import QtCore, QtGui
-from omg import filebackends
+from omg import application, database as db, filebackends
 from omg.gui import editor
 from omg import config
 
+translate = QtCore.QCoreApplication.translate
 
 def defaultConfig():
     return {"audiocd": {
@@ -39,12 +40,20 @@ def enable():
     from .ripper import fileChangerHook
     real.commitHooks.append(fileChangerHook)
 
+def mainWindowInit():
+    global _action
+    _action = QtGui.QAction(application.mainWindow)
+    _action.setText(translate("AudioCD Plugin", "rip missing tracks..."))
+    _action.triggered.connect(showRipMissingDialog)
+    application.mainWindow.menus['extras'].addAction(_action)
+    
 def disable():
     del filebackends.urlTypes["audiocd"]
     editor.EditorTreeView.actionConfig.removeActionDefinition( (("plugins", "audiocd"),) )
     from omg.core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.remove(fileChangerHook)
+    application.mainWindow.menus['extras'].removeAction(_action)
 
 def simpleDiscContainer(discid, trackCount, level):
     from omg.core.elements import TYPE_ALBUM
@@ -57,4 +66,31 @@ def simpleDiscContainer(discid, trackCount, level):
     return level.createContainer(contents=elems, type=TYPE_ALBUM)
     
 
+def showRipMissingDialog():
+    ans = list(db.query("SELECT url, element_id FROM {p}files WHERE url LIKE 'audiocd://%'"))
+    from omg.gui.dialogs import warning
+    if len(ans) == 0:    
+        warning(translate("AudioCD Plugin", "no unripped tracks"),
+                translate("AudioCD Plugin", "Your database does not contain any unripped audio-cd tracks!"))
+        return
+    discids = {}
+    for url, id in ans:
+        url = filebackends.BackendURL.fromString(url)
+        if url.discid not in discids:
+            discids[url.discid] = (id, set())
+        assert url.tracknr not in discids[url.discid][1]
+        discids[url.discid][1].add(url.tracknr)
+    from . import gui
+    dev, discid, ntracks = gui.askForDiscId()
+    if discid in discids:
+        id, tracks = discids[discid]
+        from . import ripper
+        rppr = ripper.Ripper(dev, discid, tracks)
+        rppr.start()
+        warning(translate("AudioCD Plugin", "unripped tracks found"),
+                translate("AudioCD Plugin", "The disc in the selected drive contains {} tracks "
+                          "that are marked as un-ripped in the database. Ripping started ...")
+                .format(len(tracks)))
+    
         
+    

@@ -26,12 +26,13 @@ from os.path import dirname, exists,join
 
 from PyQt4 import QtCore, QtGui
 
-from omg import utils, database as db
+from omg import utils, database as db, logging
 from omg.core import levels
 from omg.gui import mainwindow
 from omg.filebackends.filesystem import RealFile, FileURL
 
 translate = QtCore.QCoreApplication.translate
+logger = logging.getLogger(__name__)
 
 finishedTracks = []
 activeRipper = None
@@ -40,7 +41,7 @@ class Ripper(QtCore.QObject):
     
     trackFinished = QtCore.pyqtSignal(str, int, str)
     
-    def __init__(self, device, discid):
+    def __init__(self, device, discid, tracks=None):
         super().__init__()
         self.device = device
         self.discid = discid
@@ -48,16 +49,23 @@ class Ripper(QtCore.QObject):
         self.encodingProcess = self.ripProcess = None
         QtGui.qApp.aboutToQuit.connect(self.cleanup)
         global activeRipper
+        if tracks is not None:
+            self.trackArg = "{}-{}".format(min(tracks), max(tracks))
+            #TODO: really only rip needed files. unfortunatelly cdparanoia can't select
+            # individual tracks, only ranges :(
+        else:
+            self.trackArg = "1-"
         activeRipper = self
         
     def start(self):
+        logger.debug("starting to rip tracks {} from {}".format(self.trackArg, self.device))
         self.watcher = QtCore.QFileSystemWatcher([self.tmpdir])
         self.watcher.directoryChanged.connect(self._handleDirChanged)
         self.ripProcess = QtCore.QProcess()
         self.ripProcess.setWorkingDirectory(self.tmpdir)
         self.ripProcess.finished.connect(self._handleRipperFinished)
         self.ripProcess.start("cdparanoia",
-                              ["-q", "-B", "-d", self.device, "1"])
+                              ["-q", "-B", "-d", self.device, self.trackArg])
         mainwindow.mainWindow.statusBar().addWidget(
             QtGui.QLabel("ripping disc in drive {} ...".format(self.device)))
         
