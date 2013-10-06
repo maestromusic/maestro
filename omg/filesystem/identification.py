@@ -108,4 +108,4 @@ class AcoustIDIdentifier:
         data = proc.stdout.read()
         proc.wait()
         hash = hashlib.md5(data).hexdigest()
-        return hash
+        return "hash:{}".format(hash)
