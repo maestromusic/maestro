@@ -153,6 +153,7 @@ class CDROMDelegate(delegates.StandardDelegate):
         self.profile = delegates.profiles.DelegateProfile("cdrom")
         self.profile.options['appendRemainingTags'] = True
         self.profile.options['showPaths'] = True
+        self.profile.options['showType'] = True
         super().__init__(view, self.profile)
         
     def getUrlWarningItem(self, wrapper):
