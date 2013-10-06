@@ -77,7 +77,7 @@ class Ripper(QtCore.QObject):
         print('ripper finisehd. tracks: {}'.format(tracks))
         import re
         regex = re.compile("track([0-9]+)\\.cdda\\.wav")
-        self.tracksToEncode = [(track, int(regex.findall(track)[0])) for track in tracks]
+        self.tracksToEncode = [(int(regex.findall(track)[0]), track) for track in tracks]
         self.lastEncoded = None
         self.encode()
     
