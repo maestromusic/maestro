@@ -76,7 +76,6 @@ class ImportAudioCDAction(treeactions.TreeAction):
         if theDiscid is None:
             return
         try:
-            raise xmlapi.UnknownDiscException()
             release = self._getRelease(theDiscid)
             if release is None:
                 return

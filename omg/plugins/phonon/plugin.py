@@ -59,6 +59,7 @@ def defaultStorage():
     
 
 class PhononPlayerBackend(player.PlayerBackend):
+    
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
         self._flags = 0

@@ -17,13 +17,13 @@
 #
 
 import os, subprocess, hashlib, threading
-from os.path import basename, dirname, join, getmtime, split
+from os.path import basename, dirname, join, split
 from datetime import datetime, timezone, MINYEAR
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import logging, config, utils, database as db
+from omg import application, logging, config, utils, database as db
 from omg.filebackends import BackendURL
 from omg.filebackends.filesystem import FileURL
 from omg.core import levels, tags
@@ -33,7 +33,6 @@ translate = QtCore.QCoreApplication.translate
 
 synchronizer = None
 enabled = False
-idProvider = None
 
 NO_MUSIC = 0
 HAS_FILES = 1
@@ -45,32 +44,34 @@ def init():
     
     This will start a separate thread that repeatedly scans the music folder for changes.
     """
-    global synchronizer, notifier, idProvider
+    global enabled, synchronizer
     import _strptime
     from . import identification
     if config.options.filesystem.disable:
         return
-    apikey = "8XaBELgH" #TODO: AcoustID test key - we should change this
-    idProvider = identification.AcoustIDIdentifier(apikey)
     synchronizer = FileSystemSynchronizer()
+    application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "enabled"))
+    enabled = True
     
+
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
-    global synchronizer, enabled
+    global enabled, synchronizer
     if config.options.filesystem.disable or synchronizer is None:
         return
-    enabled = False
     levels.real.filesystemDispatcher.disconnect(synchronizer.handleRealFileEvent)
     synchronizer.shouldStop.set()
     synchronizer.exit()
     synchronizer.wait()
     synchronizer = None
+    application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "disabled"))
+    enabled = False
     logger.debug("Filesystem module: shutdown complete")
 
 
 def folderState(path):
     """Return the state of a given folder, or 'unknown' if it can't be obtained. """
-    if enabled and synchronizer.initialized.is_set():
+    if enabled:
         try:
             return synchronizer.directories[path].simpleState()
         except KeyError: pass
@@ -80,7 +81,7 @@ def folderState(path):
 def fileState(url):
     """Return the state of a given file (one of 'problem', 'ok', 'unsynced', 'unknown').
     """
-    if enabled and synchronizer.initialized.is_set():
+    if enabled:
         try:
             return synchronizer.tracks[url].simpleState()
         except KeyError: pass
@@ -97,12 +98,6 @@ def getNewfileHash(url):
             return synchronizer.tracks[url].hash
         except KeyError: pass
     return None
-
-
-def mTimeStamp(url):
-    """Get the modification timestamp of a file given by *url* as UTC datetime."""
-    return datetime.fromtimestamp(getmtime(url.absPath), tz=timezone.utc).replace(microsecond=0)
-
 
 
 class Track:
@@ -290,7 +285,6 @@ class FileSystemSynchronizer(QtCore.QThread):
     # signals for external use (e.g. in FilesystemBrowser)
     folderStateChanged = QtCore.pyqtSignal(object)
     fileStateChanged = QtCore.pyqtSignal(object)
-    initializationComplete = QtCore.pyqtSignal()
     
     # internal signal, connected to the SynchronizeHelper
     _requestHelper = QtCore.pyqtSignal(str, object)
@@ -299,7 +293,6 @@ class FileSystemSynchronizer(QtCore.QThread):
         """Create the synchronizer. Also creates and connects to a SynchronizeHelper."""
         super().__init__()
         self.shouldStop = threading.Event()
-        self.initialized = threading.Event()
         self.timer = QtCore.QTimer(self)
         self.helper = SynchronizeHelper()
         self.moveToThread(self)
@@ -309,13 +302,13 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.directories = {}      # maps (rel) path -> Directory object
         self.dbTracks = {}     # urls in the files table
         self.tableFolders = {} # paths in the folders table
+        from .identification import AcoustIDIdentifier
+        self.idProvider = AcoustIDIdentifier(config.options.filesystem.acoustid_apikey)
         
         QtCore.QTimer.singleShot(2000, self.start)
         levels.real.filesystemDispatcher.connect(self.handleRealFileEvent, Qt.QueuedConnection)
 
     def run(self):
-        global enabled
-        enabled = True
         self.init()
         self.timer.start(config.options.filesystem.scan_interval * 1000)
         self.exec_()
@@ -324,8 +317,6 @@ class FileSystemSynchronizer(QtCore.QThread):
     def init(self):
         """Initialize the synchronizer by building Directory tree and Tracks from DB tables.
         
-        After everything is loaded, the event self.initialized is set and the signal
-        self.initializationComplete emitted.
         Afterwards, potential missing hashes in the DB table will be updated, if hashing is
         enabled. At last a filesystem scan is initiated.
         """
@@ -333,13 +324,12 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.loadFolders()
         missingHashes = self.loadDBFiles()
         self.loadNewFiles()
-        self.initialized.set()
-        self.initializationComplete.emit()
+        application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "initialized"))
         if len(missingHashes) > 0:
             successful = []
             for i, track in enumerate(missingHashes, start=1):
                 logger.info("Computing hash of {} of {} files".format(i, len(missingHashes)))
-                track.hash = idProvider(track.url)
+                track.hash = self.idProvider(track.url)
                 if track.hash:
                     successful.append(track)
                 if self.shouldStop.is_set():
@@ -453,11 +443,11 @@ class FileSystemSynchronizer(QtCore.QThread):
         - if it's in the DB, additionally the tags are checked and compared against those in the
           database. If they differ, a tuple (dbTags, fileTags) is returned, in any other case None.
         """
-        modified = mTimeStamp(track.url)
+        modified = utils.mTimeStamp(track.url)
         if modified <= track.verified:
             return None
         logger.debug('checking track {}...'.format(basename(track.url.path)))
-        newHash = idProvider(track.url)
+        newHash = self.idProvider(track.url)
         if track.id is None:
             track.verified = modified
             if newHash != track.hash:
@@ -496,8 +486,8 @@ class FileSystemSynchronizer(QtCore.QThread):
         dir.addTrack(track)
         self.tracks[url] = track
         if computeHash:
-            track.hash = idProvider(url)
-        track.verified = mTimeStamp(url)
+            track.hash = self.idProvider(url)
+        track.verified = utils.mTimeStamp(url)
         return track
     
     def storeDirectories(self, directories):
@@ -701,7 +691,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             if url not in self.tracks:
                 continue
             track = self.tracks[url]
-            track.verified = mTimeStamp(url)
+            track.verified = utils.mTimeStamp(url)
             if track.id is None:
                 db.query("UPDATE {p}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?", str(url))
             else:
@@ -721,7 +711,7 @@ class FileSystemSynchronizer(QtCore.QThread):
                     dir = self.directories[dirname(url.path)]
                     track = self.tracks[url]
                 if track.hash is None:
-                    track.hash = idProvider(url)
+                    track.hash = self.idProvider(url)
                     if track.hash is not None:
                         newHashes.append(track)
                 track.id = elem.id
