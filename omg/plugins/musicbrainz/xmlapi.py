@@ -73,7 +73,8 @@ class MBTagStorage(dict):
         
     def add(self, key, value):
         if key in self:
-            self[key].append(value)
+            if value not in self[key]:
+                self[key].append(value)
         else:
             self[key] = [value]
             
@@ -181,7 +182,10 @@ class AliasEntity:
 
     def __repr__(self):
         return "AliasEntity({},{})".format(self.type, self.name)
+    
     def __eq__(self, other):
+        if not isinstance(other, AliasEntity):
+            return False
         return self.mbid == other.mbid and self.type == other.type
     
     def __hash__(self):
