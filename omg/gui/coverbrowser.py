@@ -25,7 +25,7 @@ from . import mainwindow, browserdialog, selection, dockwidget
 from .misc import busyindicator
 from ..models import browser as browsermodel
 from .. import database as db, utils, imageloader, config
-from ..core import covers, levels, nodes, tags
+from ..core import covers, levels, nodes, tags, elements
 from ..search import searchbox, criteria
 
 translate = QtCore.QCoreApplication.translate
@@ -133,29 +133,27 @@ class CoverBrowser(dockwidget.DockWidget):
             self.reset()
             
     def reset(self):
-        if tags.isInDb("artist") and tags.isInDb("date") \
-            and tags.get("artist").type == tags.TYPE_VARCHAR and tags.get("date").type == tags.TYPE_DATE:
-            result = db.query("""
-                SELECT el.id, st.data
-                FROM {1} AS el
-                    JOIN {0}stickers AS st ON el.id = st.element_id
-                    JOIN {0}tags AS t1 ON t1.element_id = el.id AND t1.tag_id = {2}
-                    JOIN {0}values_varchar AS v1 ON t1.value_id = v1.id
-                    JOIN {0}tags AS t2 ON t2.element_id = el.id AND t2.tag_id = {3}
-                    JOIN {0}values_date AS v2 ON t2.value_id = v2.id
-                WHERE st.type='COVER'
-                GROUP BY el.id, st.data
-                ORDER BY COALESCE(v1.sort_value, v1.value), v2.value
-                """.format(db.prefix, self.table, tags.get("artist").id, tags.get("date").id))
-        else:
-            result = db.query("""
-                SELECT el.id, st.data
-                FROM {1} AS el
-                    JOIN {0}stickers AS st ON el.id = st.element_id
-                WHERE st.type = 'COVER'
-                """.format(db.prefix, self.table))
+        result = db.query("""
+            SELECT el.id, st.data
+            FROM {1} AS el
+                JOIN {0}stickers AS st ON el.id = st.element_id
+            WHERE st.type = 'COVER'
+            """.format(db.prefix, self.table))
         
-        self.coverTable.scene().setCovers(result)
+        coverPaths = {id: path for id, path in result}
+        ids = list(coverPaths.keys())
+        levels.real.collectMany(ids)
+        if tags.isInDb("artist") and tags.isInDb("date"):
+            sortValues = {}
+            artistTag = tags.get("artist")
+            dateTag = tags.get("date")
+            for id in ids:
+                el = levels.real[id]
+                sortValues[id] = (el.tags[artistTag][0] if artistTag in el.tags else utils.PointAtInfinity(),
+                                  el.tags[dateTag][0] if dateTag in el.tags else utils.PointAtInfinity())
+            ids.sort(key=sortValues.get)
+
+        self.coverTable.scene().setCovers(ids, coverPaths)
     
     def getCoverSize(self):
         return self.coverTable.scene().getCoverSize()
@@ -203,6 +201,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
     
     def __init__(self):
         super().__init__()
+        self.columnCount = 0
         
         self.coverItems = {}
         self._setCoverSize(80)
@@ -218,12 +217,12 @@ class CoverTableScene(QtGui.QGraphicsScene):
         
         self.imageLoader = imageloader.ImageLoader()
 
-    def setCovers(self, idsAndPaths):
+    def setCovers(self, ids, coverPaths):
         """Set the covers that are displayed. *idsAndPaths* must contain tuples of element ids and the
         corresponding cover. The path should point to the original (large) cover, not to a cached version."""
         self.loadingTimer.stop()
         self.clear()
-        self.coverItems = collections.OrderedDict((id, CoverItem(self, id, path)) for id,path in idsAndPaths)
+        self.coverItems = collections.OrderedDict((id, CoverItem(self, id, coverPaths[id])) for id in ids)
         for item in self.coverItems.values():
             self.addItem(item)
         self.arrange()
@@ -294,7 +293,51 @@ class CoverTableScene(QtGui.QGraphicsScene):
         """Return a Selection object based on the selected covers."""
         return selection.Selection.fromElements(levels.real,
                                     levels.real.collectMany([item.elid for item in self.selectedItems()]))
+        
+    def helpEvent(self, helpEvent):
+        # Note: Setting all tooltips when the scene is generated takes much too long. Reimplementing
+        # QGraphicsItem.toolTip does not work for some reason. Thus we reimplement the code that displays
+        # tooltips.
+        item = self.itemAt(helpEvent.scenePos())
+        if item is not None:
+            QtGui.QToolTip.showText(helpEvent.screenPos(), self._createToolTip(item))
+        helpEvent.accept()
             
+    def _createToolTip(self, item, coverSize=150, showTags=True, showFlags=False, showParents=True):
+        #TODO: merge with RootedTreeModel.createWrapperToolTip
+        el = levels.real[item.elid]
+        lines = [el.getTitle()]
+        if el.isFile() and el.url is not None:
+            lines.append(str(el.url))
+        elif el.isContainer():
+            lines.append(elements.getTypeTitle(el.type))
+        if showTags and el.tags is not None:
+            lines.extend("{}: {}".format(tag.title, ', '.join(map(str, values)))
+                         for tag, values in el.tags.items() if tag != tags.TITLE)
+        
+        if showFlags and el.tags is not None and len(el.flags) > 0:
+            lines.append(translate("RootedTreeModel", "Flags: ")+','.join(flag.name for flag in el.flags))
+            
+        if showParents and el.parents is not None:
+            parentIds = list(el.parents)
+            parents = levels.real.collectMany(parentIds)
+            parents.sort(key=elements.Element.getTitle)
+            lines.extend(translate("RootedTreeModel", "#{} in {}").format(p.contents.positionOf(el.id),
+                                                                          p.getTitle())
+                         for p in parents)
+        
+        # Escape tags for use in HTML
+        import html
+        lines = '<br/>'.join(html.escape(line) for line in lines)
+        
+        if coverSize is not None and el.hasCover():
+            imgTag = el.getCoverHTML(coverSize, 'style="float: left"')
+            return imgTag + '<div style="margin-left: {}">{}</div>'.format(coverSize+5, lines)
+        else:
+            # enclose in a div so that Qt formats this as rich text.
+            # Otherwise HTML escapes would be printed as plain text.
+            return '<div>{}</div>'.format(lines)
+
 
 class CoverItem(QtGui.QGraphicsItem):
     """A GraphicsItem which draws either a cover and a dropshadow or a loading animation."""

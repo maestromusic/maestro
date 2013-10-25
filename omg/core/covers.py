@@ -67,7 +67,6 @@ def init():
 def shutdown():
     """Shut down the cover framework. Occasionally this will delete superfluous cover files from the 
     internal folder."""
-    
     # Delete cached covers in sizes that have not been added to cacheSizes in this application run
     for folder in os.listdir(COVER_DIR):
         if re.match('cache_\d+$', folder) is not None:
@@ -202,10 +201,8 @@ def removeUnusedCovers():
     if not os.path.exists(os.path.join(COVER_DIR, 'large')):
         return
     from .. import database as db
-    usedPaths = [path
-                 for path in db.query("SELECT data FROM {}stickers WHERE type = 'COVER'".format(db.prefix))
-                                .getSingleColumn()
-                 if not os.path.isabs(path)] # never remove external covers
+    usedPaths = [path for path in db.query("SELECT data FROM {p}stickers WHERE type = 'COVER'")
+                 .getSingleColumn() if not os.path.isabs(path)] # never remove external covers
     for path in os.listdir(os.path.join(COVER_DIR, 'large')):
         path = os.path.join('large', path)
         if path not in usedPaths:
