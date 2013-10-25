@@ -45,7 +45,7 @@ class ChangeSortValueCommand:
         self.setSortValue(self.newSort,self.oldSort)
        
     def undo(self):
-        self.setSortValue(self.tag,self.valueId,self.oldSort,self.newSort)
+        self.setSortValue(self.oldSort,self.newSort)
     
     def setSortValue(self, new, old):
         db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?"
