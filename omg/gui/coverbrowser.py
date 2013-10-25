@@ -25,7 +25,7 @@ from . import mainwindow, browserdialog, selection, dockwidget
 from .misc import busyindicator
 from ..models import browser as browsermodel
 from .. import database as db, utils, imageloader, config
-from ..core import covers, levels, nodes
+from ..core import covers, levels, nodes, tags
 from ..search import searchbox, criteria
 
 translate = QtCore.QCoreApplication.translate
@@ -133,11 +133,27 @@ class CoverBrowser(dockwidget.DockWidget):
             self.reset()
             
     def reset(self):
-        result = db.query("""
-            SELECT el.id, st.data
-            FROM {1} AS el JOIN {0}stickers AS st ON el.id = st.element_id
-            WHERE st.type = 'COVER'
-            """.format(db.prefix, self.table))
+        if tags.isInDb("artist") and tags.isInDb("date") \
+            and tags.get("artist").type == tags.TYPE_VARCHAR and tags.get("date").type == tags.TYPE_DATE:
+            result = db.query("""
+                SELECT el.id, st.data
+                FROM {1} AS el
+                    JOIN {0}stickers AS st ON el.id = st.element_id
+                    JOIN {0}tags AS t1 ON t1.element_id = el.id AND t1.tag_id = {2}
+                    JOIN {0}values_varchar AS v1 ON t1.value_id = v1.id
+                    JOIN {0}tags AS t2 ON t2.element_id = el.id AND t2.tag_id = {3}
+                    JOIN {0}values_date AS v2 ON t2.value_id = v2.id
+                WHERE st.type='COVER'
+                GROUP BY el.id, st.data
+                ORDER BY COALESCE(v1.sort_value, v1.value), v2.value
+                """.format(db.prefix, self.table, tags.get("artist").id, tags.get("date").id))
+        else:
+            result = db.query("""
+                SELECT el.id, st.data
+                FROM {1} AS el
+                    JOIN {0}stickers AS st ON el.id = st.element_id
+                WHERE st.type = 'COVER'
+                """.format(db.prefix, self.table))
         
         self.coverTable.scene().setCovers(result)
     
