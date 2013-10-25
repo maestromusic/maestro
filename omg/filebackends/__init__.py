@@ -121,10 +121,19 @@ class BackendURL:
         """Create an URL object for the given string. The type is derived from the scheme part."""
         try:
             scheme = urlString.split("://", 1)[0]
+            return urlTypes[scheme](urlString)
         except ValueError:
             raise ValueError("Invalid URL (no scheme?): {}".format(urlString)) 
-        else:
-            return urlTypes[scheme](urlString)
+        except KeyError:
+            logger.warning("unknown URL {}".format(urlString))
+            return UnknownURL(urlString)
+            
+
+class UnknownURL(BackendURL):
+    
+    @property
+    def scheme(self):
+        return "(!)" + self.parsedUrl.scheme
 
 
 class BackendFile:

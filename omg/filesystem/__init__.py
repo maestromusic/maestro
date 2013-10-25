@@ -16,21 +16,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, subprocess, hashlib, threading
+import os, subprocess, hashlib, threading
+from os.path import basename, dirname, join, split
 from datetime import datetime, timezone, MINYEAR
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import logging, config, utils, database as db, filebackends
-from ..core import levels, tags
+from omg import application, logging, config, utils, database as db
+from omg.filebackends import BackendURL
+from omg.filebackends.filesystem import FileURL
+from omg.core import levels, tags
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
 
 synchronizer = None
 enabled = False
-idProvider = None
 
 NO_MUSIC = 0
 HAS_FILES = 1
@@ -38,63 +40,53 @@ HAS_NEW_FILES = 2
 PROBLEM = 4
 
 def init():
-    global synchronizer, notifier, idProvider
+    """Initialize file system watching.
+    
+    This will start a separate thread that repeatedly scans the music folder for changes.
+    """
+    global enabled, synchronizer
     import _strptime
     from . import identification
     if config.options.filesystem.disable:
         return
-    apikey = "8XaBELgH" #TODO: AcoustID test key - we should change this
-    idProvider = identification.AcoustIDIdentifier(apikey)
     synchronizer = FileSystemSynchronizer()
+    application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "enabled"))
+    enabled = True
     
+
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
-    global synchronizer, enabled
+    global enabled, synchronizer
     if config.options.filesystem.disable or synchronizer is None:
         return
-    enabled = False
     levels.real.filesystemDispatcher.disconnect(synchronizer.handleRealFileEvent)
-    synchronizer.should_stop.set()
-    synchronizer.eventThread.exit()
-    synchronizer.eventThread.wait()
+    synchronizer.shouldStop.set()
+    synchronizer.exit()
+    synchronizer.wait()
     synchronizer = None
+    application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "disabled"))
+    enabled = False
     logger.debug("Filesystem module: shutdown complete")
 
 
 def folderState(path):
-    """Return the state of a given folder, or 'unknown' if it can't be obtained.
-    """
-    if enabled and synchronizer.initialized.is_set():
+    """Return the state of a given folder, or 'unknown' if it can't be obtained. """
+    if enabled:
         try:
-            state = synchronizer.directories[path].state
-            if state & PROBLEM:
-                return 'problem'
-            elif state & HAS_NEW_FILES:
-                return 'unsynced'
-            elif state & HAS_FILES:
-                return 'ok'
-            else:
-                return 'nomusic'
-        except KeyError:
-            pass
+            return synchronizer.directories[path].simpleState()
+        except KeyError: pass
     return 'unknown'
 
 
 def fileState(url):
     """Return the state of a given file (one of 'problem', 'ok', 'unsynced', 'unknown').
     """
-    if enabled and synchronizer.initialized.is_set():
+    if enabled:
         try:
-            track = synchronizer.tracks[url]
-            if track.problem:
-                return 'problem'
-            elif track.id is not None:
-                return 'ok'
-            else:
-                return 'unsynced'
-        except KeyError:
-            pass
+            return synchronizer.tracks[url].simpleState()
+        except KeyError: pass
     return 'unknown'
+
 
 def getNewfileHash(url):
     """Return the hash of a file specified by *url* which is not yet in the database.
@@ -104,26 +96,15 @@ def getNewfileHash(url):
     if enabled:
         try:
             return synchronizer.tracks[url].hash
-        except KeyError:
-            return None
+        except KeyError: pass
     return None
-
-def mTimeStamp(url):
-    """Get the modification timestamp of a file given by *url*.
-    
-    Returns a datetime object with timezone UTC.
-    """
-    return datetime.fromtimestamp(os.path.getmtime(url.absPath), tz=timezone.utc\
-                                 ).replace(microsecond=0)
-
 
 
 class Track:
     """A track represents a real audio file inside the music collection folder.
     
-    This class is a pure data class, storing URL, directory, possibly the ID (or None if the track
-    is not in the database), and a *problem* flag if there is a synchronization problem with this
-    track.
+    It stores URL, directory, possibly the ID (or None if the track is not in the database),
+    and a *problem* flag if there is a synchronization problem with this track.
     """
     
     def __init__(self, url):
@@ -132,10 +113,20 @@ class Track:
         self.id = self.lastChecked = self.hash = None
         self.problem = False
     
+    def simpleState(self):
+        """Return the state of this file as one of the strings "problem", "ok", "unsynced".
+        """
+        if self.problem:
+            return 'problem'
+        if self.id is not None:
+            return 'ok'
+        return 'unsynced'
+    
     def __str__(self):
         if self.id is not None:
             return "DB Track[{}](url={})".format(self.id, self.url)
         return ("New Track(url={})".format(self.url))
+
 
 class Directory:
     """A directory inside the music collection directory.
@@ -205,9 +196,19 @@ class Directory:
             return ret
         return []
             
-        
+    def simpleState(self):
+        """Return the state as one of the strings "problem", "unsynced", "ok", "nomusic"."""
+        if self.state & PROBLEM:
+            return 'problem'
+        if self.state & HAS_NEW_FILES:
+            return 'unsynced'
+        if self.state & HAS_FILES:
+            return 'ok'
+        return 'nomusic'
+
+
 class SynchronizeHelper(QtCore.QObject):
-    """Cdoe running in the main event thread to change the files table and display GUIs."""
+    """An object living in the main event thread to change the files table and display GUIs."""
     
     def __init__(self):
         super().__init__()
@@ -221,18 +222,17 @@ class SynchronizeHelper(QtCore.QObject):
         """Updates the hashes of *tracks* in the files table and also their timestamps.
         """ 
         if len(tracks):
-            db.multiQuery("UPDATE {}files SET hash=?, verified=CURRENT_TIMESTAMP "
-                                         "WHERE element_id=?".format(db.prefix),
-                                         [ (track.hash, track.id) for track in tracks ]) 
+            db.multiQuery("UPDATE {p}files SET hash=?, verified=CURRENT_TIMESTAMP "
+                                          "WHERE element_id=?",
+                          [ (track.hash, track.id) for track in tracks ]) 
 
     def changeURL(self, id, newUrl):
         """Call when a URL change was detected. Displays a notice and updates the files table."""
         from ..gui.dialogs import warning
-        from .. import application
         warning(self.tr("Move detected"),
                 self.tr("A file was renamed (or moved) outside OMG:\n"
                         "{}".format(str(newUrl))), application.mainWindow)
-        db.query('UPDATE {}files SET url=? WHERE element_id=?'.format(db.prefix), str(newUrl), id)
+        db.query('UPDATE {p}files SET url=? WHERE element_id=?', str(newUrl), id)
         if id in levels.real.elements:
             levels.real.collect(id).url = newUrl
             levels.real.emitEvent(dataIds=[id])
@@ -242,7 +242,6 @@ class SynchronizeHelper(QtCore.QObject):
         from . import dialogs
         dialog = dialogs.MissingFilesDialog([track.id for track in tracks])
         dialog.exec_()
-        from .. import application
         application.stack.clear()
         self._dialogResult = {"removed" : dialog.deleteAction.removedURLs,
                               "renamed" : dialog.setPathAction.setPaths } 
@@ -264,7 +263,6 @@ class SynchronizeHelper(QtCore.QObject):
                     backendFile.tags = dbTags.withoutPrivateTags()
                     backendFile.saveTags()
                 else:
-                    from .. import application
                     application.stack.clear()
                     diff = tags.TagStorageDifference(dbTags.withoutPrivateTags(), fsTags)
                     levels.real._changeTags({levels.real.get(track.id) : diff }, dbOnly=True)
@@ -275,25 +273,7 @@ class SynchronizeHelper(QtCore.QObject):
         self.dialogFinished.set()
 
 
-class EventThread(QtCore.QThread):
-    """The dedicated thread for filesystem access."""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.timer = QtCore.QTimer(self)
-        
-    def run(self):
-        global enabled
-        enabled = True
-        self.timer.start(config.options.filesystem.scan_interval * 1000)
-        self.exec_()
-        db.close()
-        
-    def __str__(self):
-        return "FilesystemThread"  
-
-
-class FileSystemSynchronizer(QtCore.QObject):
+class FileSystemSynchronizer(QtCore.QThread):
     """This is the main class responsible for scanning the filesystem and updating tracks and dirs.
     
     It runs in its own thread in order not to cause GUI hangs.
@@ -302,7 +282,6 @@ class FileSystemSynchronizer(QtCore.QObject):
     # signals for external use (e.g. in FilesystemBrowser)
     folderStateChanged = QtCore.pyqtSignal(object)
     fileStateChanged = QtCore.pyqtSignal(object)
-    initializationComplete = QtCore.pyqtSignal()
     
     # internal signal, connected to the SynchronizeHelper
     _requestHelper = QtCore.pyqtSignal(str, object)
@@ -310,32 +289,60 @@ class FileSystemSynchronizer(QtCore.QObject):
     def __init__(self):
         """Create the synchronizer. Also creates and connects to a SynchronizeHelper."""
         super().__init__()
-        self.should_stop = threading.Event()
-        self.initialized = threading.Event()
-        
+        self.shouldStop = threading.Event()
+        self.timer = QtCore.QTimer(self)
         self.helper = SynchronizeHelper()
-        self.eventThread = EventThread(self)
-        self.moveToThread(self.eventThread)
+        self.moveToThread(self)
         self._requestHelper.connect(self.helper.handleSynchronizerRequest)
-        self.eventThread.started.connect(self.init)
-        self.eventThread.timer.timeout.connect(self.scanFilesystem)
+        self.timer.timeout.connect(self.scanFilesystem)
         self.tracks = {}           # maps URL->track
         self.directories = {}      # maps (rel) path -> Directory object
-        self.dbTracks = set()      # urls in the files or newfiles table
-        self.dbDirectories = set() # paths in the folders table
+        self.dbTracks = {}     # urls in the files table
+        self.tableFolders = {} # paths in the folders table
+        from .identification import AcoustIDIdentifier
+        self.idProvider = AcoustIDIdentifier(config.options.filesystem.acoustid_apikey)
         
-        QtCore.QTimer.singleShot(2000, self.eventThread.start)
+        QtCore.QTimer.singleShot(2000, self.start)
         levels.real.filesystemDispatcher.connect(self.handleRealFileEvent, Qt.QueuedConnection)
 
+    def run(self):
+        self.init()
+        self.timer.start(config.options.filesystem.scan_interval * 1000)
+        self.exec_()
+        db.close()
+    
+    def init(self):
+        """Initialize the synchronizer by building Directory tree and Tracks from DB tables.
+        
+        Afterwards, potential missing hashes in the DB table will be updated, if hashing is
+        enabled. At last a filesystem scan is initiated.
+        """
+        db.connect()
+        self.loadFolders()
+        missingHashes = self.loadDBFiles()
+        self.loadNewFiles()
+        application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "initialized"))
+        if len(missingHashes) > 0:
+            successful = []
+            for i, track in enumerate(missingHashes, start=1):
+                logger.info("Computing hash of {} of {} files".format(i, len(missingHashes)))
+                track.hash = self.idProvider(track.url)
+                if track.hash:
+                    successful.append(track)
+                if self.shouldStop.is_set():
+                    break
+            if len(successful):
+                self._requestHelper.emit("updateFileHashes", (successful,))
+        self.scanFilesystem()
+    
     def loadFolders(self):
         """Load the folders table from the database.
         
         Creates the tree of Directory objects and initializes self.directories and
-        self.dbDirectories.
+        self.tableFolders.
         """
-        for path, state in db.query(
-                    "SELECT path, state FROM {}folders ORDER BY LENGTH(path)".format(db.prefix)):
-            parent, basename = os.path.split(path)
+        for path, state in db.query("SELECT path, state FROM {p}folders ORDER BY LENGTH(path)"):
+            parent, basename = split(path)
             if parent == '' and basename == '':
                 dir = Directory(path='', parent=None)                    
             else:
@@ -343,7 +350,7 @@ class FileSystemSynchronizer(QtCore.QObject):
                 dir = Directory(path, parent)
             dir.state = state
             self.directories[dir.path] = dir
-            self.dbDirectories.add(dir.path)
+            self.tableFolders[dir.path] = False
     
     def loadDBFiles(self):
         """Load the commited files from the files table.
@@ -358,9 +365,9 @@ class FileSystemSynchronizer(QtCore.QObject):
         """ 
         newDirectories = []
         missingHashes = set()
-        for elid, urlstring, elhash, verified in db.query(
-                       "SELECT element_id, url, hash, verified FROM {}files".format(db.prefix)):
-            url = filebackends.BackendURL.fromString(urlstring)
+        ans = db.query("SELECT element_id, url, hash, verified FROM {p}files")
+        for elid, urlstring, elhash, verified in ans:
+            url = BackendURL.fromString(urlstring)
             if url.scheme != "file":
                 continue
             track = Track(url)
@@ -371,81 +378,57 @@ class FileSystemSynchronizer(QtCore.QObject):
                 track.hash = elhash
             track.verified = db.getDate(verified)
             self.tracks[track.url] = track
-            self.dbTracks.add(track.url)
-            dir, newDirs = self.getDirectory(os.path.dirname(track.url.path))
+            self.dbTracks[track.url] = False
+            dir, newDirs = self.getDirectory(dirname(track.url.path))
             dir.addTrack(track)
             newDirectories += newDirs
         if len(newDirectories) > 0:
-            logger.debug("Found {} directories which have DB files but are not in the folders table"
-                         .format(len(newDirectories)))
-            db.multiQuery("INSERT INTO {}folders (path, state) VALUES (?,?)".format(db.prefix),
+            logger.debug("{} dirs with DBfiles but not in folders".format(len(newDirectories)))
+            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES (?,?)",
                           [(dir.path, dir.state) for dir in newDirectories])
         return missingHashes
     
     def loadNewFiles(self):
         """Load the newfiles table and add the tracks to self.tracks.
         
-        If an URL from newfiles is already contained in files, the newfiles entry is deleted.
+        URLs from newfiles already contained in files are deleted.
         """
-        deleteFromNewFiles = []
-        for urlstring, elhash, verified in db.query(
-                       "SELECT url, hash, verified FROM {}newfiles".format(db.prefix)):
-            track = Track(filebackends.BackendURL.fromString(urlstring))
+        toDelete = []
+        for urlstring, elhash, verified in db.query("SELECT url, hash, verified FROM {p}newfiles"):
+            track = Track(BackendURL.fromString(urlstring))
             if track.url in self.dbTracks:
-                logger.warning("url {} in both files and newfiles ... ?".format(urlstring))
-                deleteFromNewFiles.append((urlstring,))
+                logger.warning("url {} is BOTH n files and newfiles!".format(urlstring))
+                toDelete.append((urlstring,))
                 continue
             track.hash = elhash
             track.verified = db.getDate(verified)
             self.tracks[track.url] = track
-            self.dbTracks.add(track.url)
-            dir = self.directories[os.path.dirname(track.url.path)]
+            self.dbTracks[track.url] = False
+            dir = self.directories[dirname(track.url.path)]
             dir.addTrack(track)
-        if len(deleteFromNewFiles) > 0:
-            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
-                          deleteFromNewFiles)  
+        if len(toDelete) > 0:
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", toDelete)  
+
     
-    def init(self):
-        """Initialize the synchronizer by building Directory tree and Tracks from DB tables.
-        
-        After everything is loaded, the event self.initialized is set and the signal
-        self.initializationComplete emitted.
-        Afterwards, potential missing hashes in the DB table will be updated, if hashing is
-        enabled. At last a filesystem scan is initiated.
-        """
-        db.connect()
-        self.loadFolders()
-        missingHashes = self.loadDBFiles()
-        self.loadNewFiles()
-        self.initialized.set()
-        self.initializationComplete.emit()
-        if len(missingHashes) > 0 and idProvider is not None:
-            lenMissing = len(missingHashes)
-            for i, track in enumerate(missingHashes):
-                track.hash = idProvider(track.url)
-                logger.info("Computing hash of {}/{} unhashed files".format(i, lenMissing))
-                if self.should_stop.is_set():
-                    break
-            if lenMissing > 0:
-                self._requestHelper.emit("updateFileHashes", (missingHashes,))
-        self.scanFilesystem()
-    
-    def getDirectory(self, path):
+    def getDirectory(self, path, storeNew=False):
         """Get a Directory object for *path*.
         
         If necessary, the path and potential parents are created and inserted into self.directories
         (but not into the database). The result is a pair consisting of the requested Directory and
-        a list of newly created Directory objects. The caller is responsible for adding them to
-        the database.
+        a list of newly created Directory objects.
+        When *storeNew* is True and new directories were created, they will be inserted into the
+        database. Otherwise the caller is responsible for that.
         """        
         if path is None:
             return None, []
         if path in self.directories:
             return self.directories[path], []
-        parentPath = None if path == "" else os.path.split(path)[0]
+        parentPath = None if path == "" else split(path)[0]
         parent, new = self.getDirectory(parentPath)
         dir = Directory(path, parent)
         self.directories[path] = dir
+        if storeNew:
+            self.storeDirectories(new + [dir])
         return dir, new + [dir]
         
     def checkTrack(self, track):
@@ -457,22 +440,20 @@ class FileSystemSynchronizer(QtCore.QObject):
         - if it's in the DB, additionally the tags are checked and compared against those in the
           database. If they differ, a tuple (dbTags, fileTags) is returned, in any other case None.
         """
-        modified = mTimeStamp(track.url)
+        modified = utils.mTimeStamp(track.url)
         if modified <= track.verified:
             return None
-        logger.debug('checking track {}...'.format(os.path.basename(track.url.path)))
-        newHash = idProvider(track.url) if idProvider is not None else None
+        logger.debug('checking track {}...'.format(basename(track.url.path)))
+        newHash = self.idProvider(track.url)
         if track.id is None:
             track.verified = modified
-            if idProvider is None:
-                return
             if newHash != track.hash:
                 logger.debug("... and updating hash in newfiles")
                 track.hash = newHash
             else:
                 logger.debug("... and updating timestamp")
-            db.query("UPDATE {}newfiles SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?"
-                     .format(db.prefix), track.hash, str(track.url))
+            db.query("UPDATE {p}newfiles SET hash=?, verified=CURRENT_TIMESTAMP WHERE url=?",
+                     track.hash, str(track.url))
         else:
             if track.id in levels.real:
                 dbTags = levels.real.get(track.id).tags
@@ -482,19 +463,18 @@ class FileSystemSynchronizer(QtCore.QObject):
             backendFile.readTags()
             if dbTags.withoutPrivateTags() != backendFile.tags:
                 logger.debug('Detected modification on file "{}": tags differ'.format(track.url))
-                if idProvider is not None:
-                    track.hash = newHash
+                track.hash = newHash
                 self.modifiedTags[track] = (dbTags, backendFile.tags)
                 track.problem = True
                 self.fileStateChanged.emit(track.url)
-            elif idProvider is not None:
+            else:
                 if newHash != track.hash:
                     logger.debug("audio data modified! {} != {} ".format(newHash, track.hash))
                     track.hash = newHash
                     track.verified = modified
                 self._requestHelper.emit("updateFileHashes", ((track,),)) # will also update verified
     
-    def addTrack(self, dir, url):
+    def addTrack(self, dir, url, computeHash=True):
         """Create a new Track at *url* and add it to the Directory *dir*.
         
         Computes the track's hash if enabled and adds it to self.tracks.
@@ -502,85 +482,90 @@ class FileSystemSynchronizer(QtCore.QObject):
         track = Track(url)
         dir.addTrack(track)
         self.tracks[url] = track
-        track.hash = idProvider(url) if idProvider is not None else None
-        track.verified = mTimeStamp(url)
+        if computeHash:
+            track.hash = self.idProvider(url)
+        track.verified = utils.mTimeStamp(url)
         return track
     
     def storeDirectories(self, directories):
         """Insert the given list of Directory objects into the folders table."""
         if len(directories) > 0:
-            db.multiQuery("INSERT INTO {}folders (path, state) VALUES(?,?)".format(db.prefix),
+            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES(?,?)",
                           [ (dir.path, dir.state) for dir in directories])
     
     def updateDirectories(self, directories):
         """Update the given list of directories in the folders table."""
         if len(directories) > 0:
-            db.multiQuery("UPDATE {}folders SET state=? WHERE path=?".format(db.prefix),
+            db.multiQuery("UPDATE {p}folders SET state=? WHERE path=?",
                           [ (dir.state, dir.path) for dir in directories])
     
     def storeNewTracks(self, tracks):
         """Insert the given list of Track objects into the newfiles table."""
         if len(tracks) > 0:
-            db.multiQuery("INSERT INTO {}newfiles (url, hash, verified) VALUES (?,?,?)"
-                          .format(db.prefix), [(str(track.url), track.hash,
+            db.multiQuery("INSERT INTO {p}newfiles (url, hash, verified) VALUES (?,?,?)",
+                          [(str(track.url), track.hash,
                               track.verified.strftime("%Y-%m-%d %H:%M:%S")) for track in tracks])
     
     def removeTracks(self, tracks):
-        removedURLs = []
+        urls = []
         for track in tracks: 
-            removedURLs.append(track.url)
+            urls.append(track.url)
             track.directory.tracks.remove(track)
             track.directory.updateState(True, False, True, self.folderStateChanged)
             del self.tracks[track.url]
             if track.url in self.dbTracks:
-                self.dbTracks.remove(track.url)
-        if len(removedURLs) > 0:
-            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
-                                  [ (str(url),) for url in removedURLs])
+                del self.dbTracks[track.url]
+        if len(urls) > 0:
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", [ (str(url),) for url in urls])
     
-    @QtCore.pyqtSlot()
+
     def scanFilesystem(self):
         """Walks through the collection, updating folders and searching for new files.
         """
         #  updates on directories and tracks are collected  and then commited batch-wise
         #  to improve database performance. 
         newDirectories, modifiedDirectories, newTracks = set(), set(), set()
+        def storeChanges():
+            db.transaction()
+            self.storeDirectories(newDirectories)
+            self.updateDirectories(modifiedDirectories)
+            self.storeNewTracks(newTracks)
+            db.commit()
         THRESHOLD = 100  # number of updates before database is called
-        self.eventThread.timer.stop()
+        self.timer.stop()
         self.modifiedTags = {}
-        
-        # run through the filesystem. Any directories or tracks being found that are also in
-        # self.dbDirectories or self.dbTracks, respectively, will be removed there. Thus, any
-        # entries remaining in that sets after scanFilesystem() is complete can be detected as
-        # missing during the first run of scanFilesystem().
+        for url in self.dbTracks:
+            self.dbTracks[url] = False
+        for dir in self.tableFolders:
+            self.tableFolders[dir] = False 
+        # run through the filesystem. Any directories or tracks being found will be set to True
+        # in self.dbTracks and self.tableFolders, respectively. Thus, any entries remaining False
+        # in that dicts after scanFilesystem() are detected as missing.
         for root, dirs, files in os.walk(config.options.main.collection, topdown=True):
             dirs.sort()
             newTracksInDir = 0
             relPath = utils.relPath(root)
             if relPath == ".":
                 relPath = ""
-            if relPath in self.dbDirectories:
-                self.dbDirectories.remove(relPath)
+            self.tableFolders[relPath] = True
             dir, newDirs = self.getDirectory(relPath)
             newDirectories.update(newDirs)
             for file in files:
-                if self.should_stop.is_set():
+                if self.shouldStop.is_set():
                     break
                 if not utils.hasKnownExtension(file):
                     continue
-                url = filebackends.filesystem.FileURL(os.path.join(relPath, file))
+                url = FileURL(join(relPath, file))
                 if url in self.tracks:
-                    if url in self.dbTracks:
-                        self.dbTracks.remove(url)
+                    self.dbTracks[url] = True
                     track = self.tracks[url]
-                    ret = self.checkTrack(track)
-                    if ret is not None:
-                        self.modifiedTags[track] = ret
+                    tagDiffs = self.checkTrack(track)
+                    if tagDiffs is not None:
+                        self.modifiedTags[track] = tagDiffs
                 else:
                     track = self.addTrack(dir, url)
-                    if idProvider is not None: # no point in adding tracks without hash to nefwfiles
-                        newTracks.add(track)
-                        newTracksInDir += 1
+                    newTracks.add(track)
+                    newTracksInDir += 1
             for modifiedDir in dir.updateState(True, True, True, signal=self.folderStateChanged):
                 logger.debug('state of {} updated'.format(modifiedDir.path))
                 if modifiedDir not in newDirectories:
@@ -588,21 +573,14 @@ class FileSystemSynchronizer(QtCore.QObject):
             if newTracksInDir > 0:
                 logger.debug("Found {} new tracks in {}".format(newTracksInDir, relPath))
             if len(newTracks) + len(newDirectories) + len(modifiedDirectories) > THRESHOLD:
-                db.transaction()
-                self.storeDirectories(newDirectories)
-                self.updateDirectories(modifiedDirectories)
-                self.storeNewTracks(newTracks)
-                db.commit()
+                storeChanges()
                 newTracks, newDirectories, modifiedDirectories = set(), set(), set()
-        db.transaction()
-        self.storeDirectories(newDirectories)
-        self.updateDirectories(modifiedDirectories)
-        self.storeNewTracks(newTracks)
-        db.commit()
-        if self.should_stop.is_set():
+        if len(newTracks) + len(newDirectories) + len(modifiedDirectories) > 0:
+            storeChanges()
+        if self.shouldStop.is_set():
             return
         self.analyzeScanResults()
-        self.eventThread.timer.start()
+        self.timer.start()
         logger.debug("filesystem scan complete")
       
     def analyzeScanResults(self):
@@ -621,12 +599,13 @@ class FileSystemSynchronizer(QtCore.QObject):
             self.helper.dialogFinished.clear()
             self._requestHelper.emit("showModifiedTagsDialog", (self.modifiedTags,))
             self.helper.dialogFinished.wait()
-        if len(self.dbTracks) > 0: # some DB files or newfiles have been (re)moved outside OMG
-            removedNewTracks = [ self.tracks[url] for url in self.dbTracks
-                                                  if self.tracks[url].id is None ]
-            self.removeTracks(removedNewTracks)
-            missingHashes = {}
-            for url in self.dbTracks:
+        if not all(self.dbTracks.values()): # some files have been (re)moved outside OMG
+            notFound = [url for url, found in self.dbTracks.items() if not found]
+            notFoundNew = [url for url in notFound if self.tracks[url].id is None]
+            notFoundDB = [url for url in notFound if self.tracks[url].id is not None]
+            self.removeTracks([self.tracks[url] for url in notFoundNew])
+            missingHashes = {} # hashes of missing files mapped to Track objects
+            for url in notFoundDB:
                 track = self.tracks[url]
                 if track.hash is not None:
                     missingHashes[track.hash] = track
@@ -637,31 +616,35 @@ class FileSystemSynchronizer(QtCore.QObject):
                     if newTrack.id is None and newTrack.hash in missingHashes:
                         oldTrack = missingHashes[newTrack.hash]
                         detectedMoves.append( (oldTrack, newTrack))
-                        self.dbTracks.remove(oldTrack.url)
+                        del self.dbTracks[oldTrack.url]
+                        notFoundDB.remove(oldTrack.url)
                         del missingHashes[newTrack.hash]
                 for dbTrack, newTrack in detectedMoves:
                     self._requestHelper.emit("changeURL", (dbTrack.id, newTrack.url)) # updates DB
                     self.moveTrack(dbTrack, newTrack.url) # updates directories
-        if len(self.dbTracks) > 0:
-            # still not empty -> some files are lost. Show a dialog and let the user fix this
-            self.helper.dialogFinished.clear()
-            logger.debug("requesting lost tracks dialog for {}".format(self.dbTracks))
-            self._requestHelper.emit("showLostTracksDialog",
-                                     ([self.tracks[url] for url in self.dbTracks],))
-            self.helper.dialogFinished.wait()
-            result = self.helper._dialogResult
-            for oldURL, newURL in result["renamed"]:
-                self.dbTracks.remove(oldURL)
-                self.moveTrack(self.tracks[oldURL], newURL)
-            self.removeTracks([self.tracks[url] for url in result["removed"]])
-        if len(self.dbTracks) == 0 and len(self.dbDirectories) > 0:
-            db.multiQuery("DELETE FROM {}folders WHERE path=?".format(db.prefix),
-                          [ (dir, ) for dir in self.dbDirectories ])
-            for dirPath in self.dbDirectories:
+            if len(notFoundDB) > 0:
+                # --> some files are lost. Show a dialog and let the user fix this
+                self.helper.dialogFinished.clear()
+                logger.debug("Some files could not be found:")
+                for url in notFoundDB:
+                    logger.debug("  {}".format(url))
+                self._requestHelper.emit("showLostTracksDialog",
+                                         ([self.tracks[url] for url in notFoundDB],))
+                self.helper.dialogFinished.wait()
+                result = self.helper._dialogResult
+                for oldURL, newURL in result["renamed"]:
+                    del self.dbTracks[oldURL]
+                    self.moveTrack(self.tracks[oldURL], newURL)
+                self.removeTracks([self.tracks[url] for url in result["removed"]])
+        notFound = [dir for dir, found in self.tableFolders.items() if not found]
+        if all(self.dbTracks.values()) and len(notFound) > 0:
+            db.multiQuery("DELETE FROM {p}folders WHERE path=?", [ (dir, ) for dir in notFound ])
+            for dirPath in notFound:
                 dir = self.directories[dirPath]
                 assert len(dir.tracks) == 0
                 dir.parent.subdirs.remove(dir)
-            self.dbDirectories = set()
+                del self.tableFolders[dirPath]
+
     
     def moveTrack(self, track, newUrl):
         """Internally move *track* to *newUrl* by updating the Directories and their states.
@@ -671,17 +654,14 @@ class FileSystemSynchronizer(QtCore.QObject):
         Also if newUrl is in a directory not yet contained in self.directories it (and potential
         parents which are also new) is added to the folders table.
         """
-        newDir, created = self.getDirectory(os.path.dirname(newUrl.path))
-        if len(created) > 0:
-            self.storeDirectories(created)
+        newDir = self.getDirectory(dirname(newUrl.path), storeNew=True)[0]
         oldDir = track.directory
         oldDir.tracks.remove(track)
         if newUrl in self.tracks:
             existingTrack = self.tracks[newUrl]
             assert existingTrack.id is None
             newDir.tracks.remove(existingTrack)
-            db.query("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
-                             str(newUrl))
+            db.query("DELETE FROM {p}newfiles WHERE url=?", str(newUrl))
         newDir.addTrack(track)
         del self.tracks[track.url]
         track.url = newUrl
@@ -694,49 +674,48 @@ class FileSystemSynchronizer(QtCore.QObject):
     
     @QtCore.pyqtSlot(object)
     def handleRealFileEvent(self, event):
+        """Handle an event issued by levels.real if something has affected the filesystem."""
         db.transaction()
         
         for oldURL, newURL in event.renamed:
             if oldURL in self.tracks:
                 if self.tracks[oldURL].id is None:
-                    db.query("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
-                             str(oldURL))                        
+                    db.query("DELETE FROM {p}newfiles WHERE url=?", str(oldURL))                        
                 self.moveTrack(self.tracks[oldURL], newURL)
-    
+        
+        newHashes = []
         for url in event.modified:
             if url not in self.tracks:
-                logger.warning("handleRealFileEvent got modify for non-existing track: {}".format(url))
                 continue
             track = self.tracks[url]
-            track.verified = mTimeStamp(url)
+            track.verified = utils.mTimeStamp(url)
             if track.id is None:
-                db.query("UPDATE {}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?"
-                         .format(db.prefix), str(url))
+                db.query("UPDATE {p}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?", str(url))
             else:
-                self._requestHelper.emit("updateFileHashes", ((track,),))
+                newHashes.append(track)
     
         modifiedDirs = []
         if len(event.added) > 0:
-            newHashes = []
-            db.multiQuery("DELETE FROM {}newfiles WHERE url=?".format(db.prefix),
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?",
                           [ (str(elem.url),) for elem in event.added ])
             for elem in event.added:
                 url = elem.url
                 if url not in self.tracks:
-                    logger.error("adding url not in self.tracks: {}".format(url))
-                    continue
-                dir = self.directories[os.path.dirname(url.path)]
-                track = self.tracks[url]
-                if track.hash is None and idProvider is not None:
-                    logger.warning("hash is None in add to db handling {}".format(url))
-                    track.hash = idProvider(url)
-                    newHashes.append(track.hash)
+                    dir = self.getDirectory(dirname(url.path), storeNew=True)[0]
+                    track = self.addTrack(dir, url, computeHash=False)
+                    logger.info("adding url not in self.tracks: {}".format(url))
+                else:
+                    dir = self.directories[dirname(url.path)]
+                    track = self.tracks[url]
+                if track.hash is None:
+                    track.hash = self.idProvider(url)
+                    if track.hash is not None:
+                        newHashes.append(track)
                 track.id = elem.id
                 modifiedDirs += dir.updateState(True, False, True, self.folderStateChanged)
                 self.fileStateChanged.emit(url)
-            if len(newHashes) > 0:
-                self._requestHelper.emit("updateFileHashes", (newHashes,))
-            
+        if len(newHashes) > 0:
+            self._requestHelper.emit("updateFileHashes", (newHashes,))
         
         if len(event.removed) > 0:
             newTracks = []
@@ -760,6 +739,5 @@ class FileSystemSynchronizer(QtCore.QObject):
     def recheck(self, directory):
         for track in self.tracks.values():
             if directory == "" or track.url.path.startswith(directory+"/"):
-                print('unverifying {}'.format(track))
                 track.verified = datetime(MINYEAR, 1, 1, tzinfo=timezone.utc)
         self.scanFilesystem()

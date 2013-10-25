@@ -21,10 +21,10 @@ import os
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from . import mainwindow, selection, dockwidget
-from .. import filebackends, filesystem, config
-from ..utils import relPath, getIcon, hasKnownExtension
-from ..core import levels
+from omg import application, filebackends, filesystem, config
+from omg.gui import mainwindow, selection, dockwidget
+from omg.utils import relPath, getIcon, hasKnownExtension
+from omg.core import levels
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -35,6 +35,11 @@ special icon."""
 translate = QtCore.QCoreApplication.translate
 
 class FileSystemBrowserModel(QtGui.QFileSystemModel):
+    """Model class for the file system browser.
+    
+    In contrast to QFileSystemModel, this returns folder and file icons depending on the state
+    ("nomusic", "unsynced", etc.) and according tooltips.
+    """
     
     folderIcons = {
         'unsynced' : getIcon("folder_unsynced.svg"),
@@ -69,6 +74,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         self.dataChanged.emit(index, index)    
     
     def data(self, index, role=Qt.DisplayRole):
+        """Overridden for DecorationRole and ToolTipRole."""
         if role == Qt.DecorationRole or role == Qt.ToolTipRole:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
@@ -96,16 +102,15 @@ class FileSystemBrowser(QtGui.QTreeView):
     rescanRequested = QtCore.pyqtSignal(str)
     
     def __init__(self, rootDirectory=config.options.main.collection, parent=None):
-        QtGui.QTreeView.__init__(self, parent)
+        super().__init__(parent)
         self.setAlternatingRowColors(True)
         self.setModel(FileSystemBrowserModel())
-        musikindex = self.model().setRootPath(rootDirectory)
-        self.setRootIndex(musikindex)
+        rootIndex = self.model().setRootPath(rootDirectory)
+        self.setRootIndex(rootIndex)
+        
+        application.dispatcher.connect(self._handleDispatcher)
         if filesystem.enabled:
-            filesystem.synchronizer.folderStateChanged.connect(self.model().handleStateChange)
-            filesystem.synchronizer.fileStateChanged.connect(self.model().handleStateChange)
-            filesystem.synchronizer.initializationComplete.connect(self.model().layoutChanged)
-            self.rescanRequested.connect(filesystem.synchronizer.recheck)
+            self.connectFilesystemSignals()            
         
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
@@ -113,6 +118,19 @@ class FileSystemBrowser(QtGui.QTreeView):
         self.rescanDirectoryAction = QtGui.QAction(self.tr("rescan"), self)
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
+    
+    def _handleDispatcher(self, event):
+        if isinstance(event, application.ModuleStateChangeEvent):
+            if event.module == "filesystem":
+                if event.state in ("initialized", "disabled"):
+                    self.model().layoutChanged.emit()
+                elif event.state == "enabled":
+                    self.connectFilesystemSignals()
+    
+    def connectFilesystemSignals(self):
+        filesystem.synchronizer.folderStateChanged.connect(self.model().handleStateChange)
+        filesystem.synchronizer.fileStateChanged.connect(self.model().handleStateChange)
+        self.rescanRequested.connect(filesystem.synchronizer.recheck)
     
     def contextMenuEvent(self, event):
         index = self.indexAt(event.pos())

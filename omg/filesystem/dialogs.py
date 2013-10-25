@@ -21,7 +21,7 @@ import itertools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application
+from .. import application, database as db
 from ..core import levels
 from ..models.leveltreemodel import LevelTreeModel
 from ..gui import delegates, treeactions, treeview
@@ -60,13 +60,14 @@ class SetPathAction(treeactions.TreeAction):
     Used by the LostFilesDialog to correct URLs of files moved outside of OMG.
     """
     
-    def __init__(self, parent, text=None, shortcut=None):
+    def __init__(self, parent, dialog, text=None, shortcut=None):
         super().__init__(parent, shortcut)
         if text is None:
             self.setText(self.tr('choose path'))
         else:
             self.setText(text)
         self.setPaths = []
+        self.dialog = dialog
     
     def initialize(self, selection):
         self.setEnabled(selection.singleWrapper() and \
@@ -74,9 +75,6 @@ class SetPathAction(treeactions.TreeAction):
                         not os.path.exists(next(selection.fileWrappers()).element.url.absPath))
     
     def doAction(self):
-        """Open a dialog to edit the tags of the currently selected elements (and the children, if
-        *recursive* is True). This is called by the edit tags actions in the contextmenu.
-        """
         from ..filebackends.filesystem import FileURL
         elem = next(self.parent().selection.fileWrappers()).element
         path = QtGui.QFileDialog.getOpenFileName(application.mainWindow,
@@ -84,13 +82,14 @@ class SetPathAction(treeactions.TreeAction):
                                                  os.path.dirname(elem.url.absPath))
         if path != "":
             newUrl = FileURL(path)
-            from .. import database as db
-            from ..database import write
-            db.write.changeUrls([ (str(newUrl), elem.id) ])
+            from . import getNewfileHash
+            db.query("UPDATE {p}files SET url=?,hash=? WHERE element_id=?",
+                     str(newUrl), getNewfileHash(newUrl), elem.id)
             self.setPaths.append( (elem.url, newUrl) )
+            self.dialog.problemURLs.remove(elem.url)
             elem.url = newUrl
             levels.real.emitEvent(dataIds=(elem.id,))
-            elem.problem = False
+            
 
 
 class RemoveMissingFilesAction(treeactions.TreeAction):
@@ -142,8 +141,7 @@ class MissingFilesDialog(QtGui.QDialog):
         layout.addWidget(label)
         
         files = [ levels.real.collect(id) for id in ids ]
-        for file in files:
-            file.problem = True
+        self.problemURLs = set([file.url for file in files])
         containers = []
         for pid in set(itertools.chain(*(file.parents for file in files))):
             containers.append(levels.real.collect(pid))
@@ -159,7 +157,7 @@ class MissingFilesDialog(QtGui.QDialog):
         self.view.setItemDelegate(LostFilesDelegate(self.view))
         self.view.expandAll()
         
-        self.setPathAction = SetPathAction(self.view)
+        self.setPathAction = SetPathAction(self.view, self)
         self.deleteAction = RemoveMissingFilesAction(self.view)
         self.view.addLocalAction(self.setPathAction)
         self.view.addLocalAction(self.deleteAction)
@@ -181,7 +179,9 @@ class MissingFilesDialog(QtGui.QDialog):
         self.resize(800,400)
     
     def updateCloseButton(self):
-        numProblem = sum(hasattr(f.element, "problem") for f in self.model.root.getAllFiles())
+        numProblem = sum(f.element.url in self.problemURLs for f in self.model.root.getAllFiles())
+        if numProblem == 0:
+            self.accept()
         self.closeButton.setText(self.tr("Close (%n files still missing)", None, numProblem))
 
 

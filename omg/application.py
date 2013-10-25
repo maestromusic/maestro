@@ -52,6 +52,18 @@ class ChangeEvent:
         return False
 
 
+class ModuleStateChangeEvent(ChangeEvent):
+    """Class for the event that the state of a module (a component of OMG) has changed.
+    
+    Possible states are "enabled", "initialized", "disabled".
+    """
+    
+    def __init__(self, module, state):
+        super().__init__()
+        self.module = module
+        self.state = state
+
+    
 class ChangeEventDispatcher(QtCore.QObject):
     """A dispatcher emits events. Unlike a Qt-signal it communicates with the application's stack to
     queue events during macros and undo/redo.""" 
@@ -71,7 +83,7 @@ class ChangeEventDispatcher(QtCore.QObject):
             self._signal.emit(event)
         else: self.stack.addEvent(self,event)
     
-    def connect(self,handler, type=Qt.AutoConnection):
+    def connect(self, handler, type=Qt.AutoConnection):
         """Connect a function to this dispatcher."""
         self._signal.connect(handler, type)
         

@@ -16,17 +16,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""This module is in charge of the actual ripping process of the audiocd plugin.
+"""
+
 import tempfile
 import os, shutil
+from glob import glob
 from os.path import dirname, exists,join
 
 from PyQt4 import QtCore, QtGui
 
-from omg import utils, database as db
+from omg import utils, database as db, logging
 from omg.core import levels
+from omg.gui import mainwindow
 from omg.filebackends.filesystem import RealFile, FileURL
 
 translate = QtCore.QCoreApplication.translate
+logger = logging.getLogger(__name__)
 
 finishedTracks = []
 activeRipper = None
@@ -35,7 +41,7 @@ class Ripper(QtCore.QObject):
     
     trackFinished = QtCore.pyqtSignal(str, int, str)
     
-    def __init__(self, device, discid):
+    def __init__(self, device, discid, tracks=None):
         super().__init__()
         self.device = device
         self.discid = discid
@@ -43,19 +49,35 @@ class Ripper(QtCore.QObject):
         self.encodingProcess = self.ripProcess = None
         QtGui.qApp.aboutToQuit.connect(self.cleanup)
         global activeRipper
+        if tracks is not None:
+            self.trackArg = "{}-{}".format(min(tracks), max(tracks))
+            #TODO: really only rip needed files. unfortunatelly cdparanoia can't select
+            # individual tracks, only ranges :(
+        else:
+            self.trackArg = "1-"
         activeRipper = self
         
     def start(self):
+        logger.debug("starting to rip tracks {} from {}".format(self.trackArg, self.device))
+        self.watcher = QtCore.QFileSystemWatcher([self.tmpdir])
+        self.watcher.directoryChanged.connect(self._handleDirChanged)
         self.ripProcess = QtCore.QProcess()
         self.ripProcess.setWorkingDirectory(self.tmpdir)
         self.ripProcess.finished.connect(self._handleRipperFinished)
         self.ripProcess.start("cdparanoia",
-                              ["-q", "-B", "-d", self.device, "1-"])
+                              ["-q", "-B", "-d", self.device, self.trackArg])
+        mainwindow.mainWindow.statusBar().addWidget(
+            QtGui.QLabel("ripping disc in drive {} ...".format(self.device)))
         
+    def _handleDirChanged(self, dir):
+        wavs = glob(join(self.tmpdir, "track*.wav"))
+
     def _handleRipperFinished(self):
         tracks = sorted(os.listdir(self.tmpdir))
         print('ripper finisehd. tracks: {}'.format(tracks))
-        self.tracksToEncode = list(enumerate(tracks, 1))
+        import re
+        regex = re.compile("track([0-9]+)\\.cdda\\.wav")
+        self.tracksToEncode = [(int(regex.findall(track)[0]), track) for track in tracks]
         self.lastEncoded = None
         self.encode()
     
@@ -72,7 +94,7 @@ class Ripper(QtCore.QObject):
                 levels.real.stack.push(InsertRippedFileCommand(elem, encodedFile))
                 
             except db.sql.EmptyResultException:
-                "adding finished Track"
+                print("adding finished Track")
                 finishedTracks.append((self.discid, tracknr, encodedFile))
             self.lastEncoded = None
 
@@ -115,7 +137,7 @@ class InsertRippedFileCommand:
         tmpFile.tags = self.element.tags.withoutPrivateTags(copy=True)
         tmpFile.specialTags = {"tracknumber" : "{:02d}".format(self.element.url.tracknr)}
         tmpFile.saveTags()
-        db.query("UPDATE {}files SET url=?,length=? WHERE element_id=?".format(db.prefix),
+        db.query("UPDATE {p}files SET url=?,length=? WHERE element_id=?",
                  str(self.newUrl), length, self.element.id)
         for level in levels.allLevels:
             if self.element.id in level:
@@ -123,6 +145,7 @@ class InsertRippedFileCommand:
                 levelElem.length = length
                 levelElem.url = self.newUrl
                 level.emitEvent(dataIds=[self.element.id])
+        levels.real.emitFilesystemEvent(added=[self.element])
         
     def undo(self):
         if not exists(dirname(self.tmpPath)):
@@ -135,6 +158,7 @@ class InsertRippedFileCommand:
                 levelElem = level[self.element.id]
                 levelElem.url = self.oldUrl
                 level.emitEvent(dataIds=[self.element.id])
+        levels.real.emitFilesystemEvent(deleted=[self.element])
 
 def fileChangerHook(level,elements):
     """Commit-hook for the real level."""

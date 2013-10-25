@@ -120,7 +120,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         """Start a new row in the center. Use addCenter to add items to it."""
         self.center.append([])
         
-    def addCenter(self,item,align=LEFT):
+    def addCenter(self, item, align=LEFT):
         """Add an item to the current row in the center. Depending on the optional parameter *align*, which
         must be one of the module constants ''LEFT'' or ''RIGHT'', the item will be drawn on the right or on
         the left of the row (default is left). In both cases items added first will be drawn further on the

@@ -16,9 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import datetime, locale, os, functools, re, itertools, collections
+import locale, os, functools, re, itertools, collections
+from datetime import date, datetime, timezone
+from os.path import getmtime
 
 from PyQt4 import QtCore, QtGui
+
 from . import config, strutils
 
 translate = QtCore.QCoreApplication.translate
@@ -48,6 +51,7 @@ def hasKnownExtension(file):
     else:
         return s[1].lower() in config.options.main.extensions
 
+
 def parsePosition(string):
     """Parse a string like "7" or "2/5" to a (integer) position.
     
@@ -59,6 +63,7 @@ def parsePosition(string):
         return int(string.split('/')[0])
     else:
         return None
+
 
 def relPath(file):
     """Return the relative path of a music file against the collection base path."""
@@ -75,6 +80,11 @@ def absPath(file):
         return os.path.join(config.options.main.collection, file)
     else:
         return file
+
+
+def mTimeStamp(url):
+    """Get the modification timestamp of a file given by *url* as UTC datetime."""
+    return datetime.fromtimestamp(getmtime(url.absPath), tz=timezone.utc).replace(microsecond=0)
 
 
 def collectFiles(urls):
@@ -190,7 +200,7 @@ class FlexiDate:
             self.day = None
         else:
             self.day = int(day)
-            datetime.date(self.year,self.month,self.day) # Check date
+            date(self.year,self.month,self.day) # Check date
     
     @staticmethod
     def _initFormat():

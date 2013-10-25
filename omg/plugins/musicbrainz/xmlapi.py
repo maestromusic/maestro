@@ -46,6 +46,7 @@ def query(resource, mbid, includes=[]):
         queryCallback(url)
     if len(includes) > 0:
         url += "?inc={}".format("+".join(includes))
+    logger.debug('querying {}'.format(url))
     ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
     if len(ans):
         data = ans.getSingle()
@@ -72,7 +73,8 @@ class MBTagStorage(dict):
         
     def add(self, key, value):
         if key in self:
-            self[key].append(value)
+            if value not in self[key]:
+                self[key].append(value)
         else:
             self[key] = [value]
             
@@ -180,7 +182,10 @@ class AliasEntity:
 
     def __repr__(self):
         return "AliasEntity({},{})".format(self.type, self.name)
+    
     def __eq__(self, other):
+        if not isinstance(other, AliasEntity):
+            return False
         return self.mbid == other.mbid and self.type == other.type
     
     def __hash__(self):
@@ -241,16 +246,16 @@ class MBTreeItem:
 
     def makeElements(self, level, includeParentTags=True):
         elTags = self.makeOMGTags(mbplugin.tagMap, includeParentTags)
-        if not isinstance(self, Recording):
+        if isinstance(self, Recording):
+            elem = level.collect(self.backendUrl)
+            diff = tags.TagStorageDifference(None, elTags)
+            level.changeTags({elem: diff})
+        else:
             contents = elements.ContentList()
             for pos, child in self.children.items():
                 elem = child.makeElements(level)            
                 contents.insert(pos, elem.id)
-            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType)
-        else:
-            elem = level.collect(self.backendUrl)
-            diff = tags.TagStorageDifference(None, elTags)
-            level.changeTags({elem: diff})
+            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType)            
         elem.mbItem = self
         self.element = elem
         return elem
@@ -414,14 +419,17 @@ class Recording(MBTreeItem):
                 tag = simpleTags[reltype]
             elif reltype == "vocal":
                 voice = relation.findtext("attribute-list/attribute")
-                for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
-                    if voice.startswith(vtype):
-                        tag = "performer:" + vtype
-                        continue
-                if voice == "choir vocals":
-                    tag = "performer:choir"
+                if voice is None:
+                    tag = "vocals"
                 else:
-                    logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
+                    for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
+                        if voice.startswith(vtype):
+                            tag = "performer:" + vtype
+                            continue
+                    if voice == "choir vocals":
+                        tag = "performer:choir"
+                    else:
+                        logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
             else:
                 logger.warning("unknown artist relation '{}' in recording '{}'"
                                .format(relation.get("type"), self.mbid))
@@ -505,7 +513,7 @@ def findReleasesForDiscid(discid):
     recordings.
     """
     try:
-        root = query("discid", discid, ("artists",))
+        root = query("discid", discid, ("artists", "release-groups"))
     except urllib.error.HTTPError as e:
         if e.code == 404:
             raise UnknownDiscException()
@@ -520,9 +528,9 @@ def findReleasesForDiscid(discid):
             pos = int(medium.findtext('position'))
             disctitle = medium.findtext('title')
             discids = [disc.get("id") for disc in medium.iterfind('disc-list/disc')]
-            Medium(pos, mbit, discids, disctitle if disctitle else None)
+            Medium(pos, mbit, discids, disctitle)
         mbit.tags.add('title', title)
-        mbit.tags.add('musicbrainz_albumid', mbit.mbid)
+        
         artists = release.iterfind('artist-credit/name-credit/artist')
         if artists:
             for art in artists:
@@ -535,6 +543,16 @@ def findReleasesForDiscid(discid):
             mbit.tags.add("country", release.findtext('country'))
         if release.find('barcode') is not None:
             mbit.tags.add("barcode", release.findtext('barcode'))
+        relGroup = release.find('release-group')
+        if relGroup is not None and relGroup.get("type") == "Compilation":
+            mbit.containerType = elements.TYPE_COLLECTION
+            for medium in mbit.children.values():
+                medium.containerType = elements.TYPE_ALBUM
+                medium.tags.add('album', medium.tags['title'][0])
+                mbit.tags.add('musicbrainz_albumid', mbit.mbid)
+        else:
+            mbit.tags.add('album', title)
+            mbit.tags.add('musicbrainz_albumid', mbit.mbid)
         releases.append(mbit)
     return releases
 
@@ -565,6 +583,6 @@ def makeReleaseContainer(MBrelease, discid, level):
             MBrelease.insertChild(p, child)
     for p in list(MBrelease.children.keys()):
         if isinstance(MBrelease.children[p], Medium) and MBrelease.children[p] != MBmedium:
-            del MBrelease.children[p] 
+            del MBrelease.children[p]
     return MBrelease.makeElements(level)
             

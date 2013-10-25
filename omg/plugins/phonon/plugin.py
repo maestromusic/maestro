@@ -59,6 +59,7 @@ def defaultStorage():
     
 
 class PhononPlayerBackend(player.PlayerBackend):
+    
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
         self._flags = 0
@@ -72,7 +73,7 @@ class PhononPlayerBackend(player.PlayerBackend):
             
         # Initialize Phonon       
         self.mediaObject = phonon.MediaObject()
-        self.mediaObject.aboutToFinish.connect(self._handleAboutToFinish)
+        self.mediaObject.finished.connect(self._handleFinished)
         self.mediaObject.currentSourceChanged.connect(self._handleSourceChanged)
         self.mediaObject.setTickInterval(200)
         self.mediaObject.tick.connect(self._handleTick)
@@ -289,14 +290,15 @@ class PhononPlayerBackend(player.PlayerBackend):
             return self._randomList.pop()
         else: return self._randomList[-1] 
     
-    def _handleAboutToFinish(self):
+    def _handleFinished(self):
         # do not remove the offset from _randomList directly because this method is called in
-        # _handleAboutToFinish. If the user seeks backward or skips, _nextOffset might be called
+        # _handleFinished. If the user seeks backward or skips, _nextOffset might be called
         # another time before the source is actually changed.
         self._no = self._nextOffset(removeFromRandomList=False)
         if self._no is not None:
             self._nextSource = phonon.MediaSource(self._getPath(self._no))
-            self.mediaObject.enqueue(self._nextSource)
+            self.mediaObject.setCurrentSource(self._nextSource)
+            self.mediaObject.play()
             
     def _handleSourceChanged(self, newSource):
         if newSource == self._nextSource:

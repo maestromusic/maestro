@@ -62,7 +62,8 @@ class RealFileEvent(application.ChangeEvent):
         return True
     
     def __str__(self):
-        return "RealFileEvent({})".format(", ".join(("{}={}".format(attr, getattr(self, attr)) for attr in self._attrs)))
+        return "RealFileEvent({})".format(", ".join(("{}={}".format(attr, getattr(self, attr))
+                                                     for attr in self._attrs)))
             
         
 class RealLevel(levels.Level):
@@ -570,5 +571,6 @@ class RealLevel(levels.Level):
                 oldUrl, newUrl = renamings[elem]
                 newUrl.getBackendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
-        db.write.changeUrls([ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
+        db.multiQuery("UPDATE {p}files SET url=? WHERE element_id=?",
+                      [ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])
         super()._renameFiles(renamings)

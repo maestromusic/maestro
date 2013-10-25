@@ -73,7 +73,7 @@ class FilesystemSettings(QtGui.QWidget):
             self.scanIntervalLabel.setText(self.scanIntervalText.format(val))
         config.options.filesystem.scan_interval = val
         if filesystem.enabled:
-            timer = filesystem.synchronizer.eventThread.timer
+            timer = filesystem.synchronizer.timer
             timer.stop()
             if val != 0:
                 timer.setInterval(val*1000)
