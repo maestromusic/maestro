@@ -23,7 +23,8 @@ from ... import profiles, utils
 
 
 def showPreferences(category, profile=None):
-    """Open the preferences dialog on the panel for the given profile or category."""
+    """Open the preferences dialog on the panel for the given profile category. Optionally pre-select a
+    profile."""
     from .. import mainwindow
     from . import PreferencesDialog
     dialog = PreferencesDialog(mainwindow.mainWindow)

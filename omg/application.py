@@ -282,7 +282,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     splash.showMessage(translate("Splash", "Loading GUI classes"))
     # First import all modules that want to add WidgetData
     from .gui import filesystembrowser, editor, browser, tageditor, mainwindow, playback, playlist, \
-                        coverbrowser
+                        coverbrowser, covertable
     
     global mainWindow
     splash.showMessage(translate("Splash", "Creating main window"))
