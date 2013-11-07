@@ -28,7 +28,8 @@ from ..core import covers, levels, elements
 
 
 class CoverTable(coverbrowser.AbstractCoverWidget):
-    """QGraphicsView for the CoverBrowser."""
+    """Standard display class for coverbrowser.CoverBrowser. It uses a QGraphicsView to draw covers in a
+    table layout."""
     def __init__(self, state, parent=None):
         super().__init__(parent)
         layout = QtGui.QHBoxLayout(self)
@@ -106,8 +107,9 @@ class CoverTableScene(QtGui.QGraphicsScene):
         self.imageLoader = imageloader.ImageLoader()
 
     def setCovers(self, ids, coverPaths):
-        """Set the covers that are displayed. *idsAndPaths* must contain tuples of element ids and the
-        corresponding cover. The path should point to the original (large) cover, not to a cached version."""
+        """Set the covers that are displayed. *ids* is a list of elements-ids (which can be used to fetch
+        information besides covers, e.g. for tooltips). *coverPaths* is a dict mapping ids to the cover path
+        (relative to the cover directory). Covers should be displayed in the order specified by *ids*."""
         self.loadingTimer.stop()
         self.clear()
         self.coverItems = collections.OrderedDict((id, CoverItem(self, id, coverPaths[id])) for id in ids)
@@ -156,9 +158,11 @@ class CoverTableScene(QtGui.QGraphicsScene):
             item.reload()
         
     def getCoverSize(self):
+        """Return the current cover size as int (covers are always drawn quadratically)."""
         return self.coverSize
     
     def setCoverSize(self, size):
+        """Set the current cover size to size x size (covers are always drawn quadratically)."""
         assert size is not None
         if size != self.coverSize:
             self._setCoverSize(size)
@@ -168,6 +172,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
             item.update()
             
     def _setCoverSize(self, size):
+        """Set or initialize cover size and variables depending on it."""
         self.coverSize = size
         self.innerSpace = int(self.innerSpaceFactor * size)
         newShadowOffset = int(round(self.shadowFactor * size))
@@ -178,7 +183,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
                     item.graphicsEffect().setOffset(newShadowOffset)
             
     def selection(self):
-        """Return a Selection object based on the selected covers."""
+        """Return a selection.Selection object based on the selected covers."""
         return selection.Selection.fromElements(levels.real,
                                     levels.real.collectMany([item.elid for item in self.selectedItems()]))
         
@@ -192,6 +197,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
         helpEvent.accept()
             
     def _createToolTip(self, item, coverSize=150, showTags=True, showFlags=False, showParents=True):
+        """Create a tool tip for the given CoverItem."""
         #TODO: merge with RootedTreeModel.createWrapperToolTip
         el = levels.real[item.elid]
         lines = [el.getTitle()]
@@ -257,6 +263,7 @@ class CoverItem(QtGui.QGraphicsItem):
         self.setCoverPath(self.path)
         
     def _handleTimer(self):
+        """React to the scene's loading timer: Move loading animation to the next frame."""
         if self.cover.loaded:
             self.scene.loadingTimer.timeout.disconnect(self._handleTimer)
             self._addShadow()

@@ -26,6 +26,7 @@ if __name__ != "__main__":
     from ...gui import coverbrowser
 
 
+# Possible values for the 'curve' option along with user friendly titles
 CURVES = [
     (translate("CoverFlow", "Arc"),     "arc"),
     (translate("CoverFlow", "V-Shape"), "v"),
@@ -34,6 +35,7 @@ CURVES = [
     (translate("CoverFlow", "Gallery"), "gallery"),
 ]
 
+# Colors from which the user can choose in the configuration widget.
 COLORS = [
     (translate("CoverFlow", "Black"),      QtGui.QColor(0,0,0)),
     (translate("CoverFlow", "Dark gray"),  QtGui.QColor(0x40, 0x40, 0x40)),
@@ -49,18 +51,25 @@ def disable():
     
 
 class Cover:
+    """A Cover object stores information about a cover used in the cover flow: the path, the full-size
+    pixmap and a cache which contains the pixmap (resized CoverFlow.option('size')) and the reflection
+    (if enabled). Pixmaps are only loaded when first requested.
+    """
     def __init__(self, path):
         self.path = path
         self.pixmap = None
         self._cache = None
         
     def load(self):
+        """Load the cover's pixmap."""
         if __name__ != "__main__":
             self.pixmap = covers.get(self.path)
         else:
             self.pixmap = QtGui.QPixmap(self.path)
        
     def cache(self, options):
+        """Return the cached version of this cover. *options* is the set of options
+        returned by CoverFlow.options."""
         if self.pixmap is None:
             self.load()
         if self._cache is None:
@@ -68,6 +77,8 @@ class Cover:
         return self._cache
       
     def _createCache(self, options):
+        """Create the cached version of this cover using the specified options (from CoverFlow.options).
+        The cache version contains the resized cover together with its reflection."""
         w = options['size'].width()
         h = options['size'].height()
         if options['reflection']:
@@ -95,9 +106,12 @@ class Cover:
             painter.end()
     
     def _clearCache(self):
+        """Delete the cached version. Use this whenever options which affect
+        the cached version have changed."""
         self._cache = None
 
 
+# Make sure that this file can be used stand-alone for testing purposes
 class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__" else QtGui.QWidget):
     """
     Options:
@@ -125,7 +139,9 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
     reflection: bool. Enable/disable reflection.
     reflectionFactor: float in [0,1]. Ratio of reflection height divided by cover height
     fadeOut: bool. Fade out covers on both sides.
-    fadeStart: bool. #TODO
+    fadeStart: float in [0, 1]. If fadeOut is True, covers will start fading out on both sides at the 
+               position specified by fadeStart, i.e. 0 means that all covers will fade out, 1 means that
+               only covers at the outermost position will fade out.
     """
     indexChanged = QtCore.pyqtSignal(int)   
     
@@ -166,15 +182,20 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         return translate("CoverBrowser", "Coverflow")
     
     def option(self, key):
+        """Return the value of the option with the given key."""
         return self._o[key]
       
     def options(self):
+        """Return a dict with all options."""
         return self._o.copy()
     
     def setOption(self, key, value):
+        """Set the option with the given key."""
         self.setOptions({key: value})
         
     def setOptions(self, options):
+        """Set several options: *options* must be a dict mapping option keys to values. Options which are
+        not contained in *options* remain unchanged."""
         types = {
             'background': QtGui.QColor,
             'size': QtCore.QSize,
@@ -203,14 +224,9 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
                 cover._clearCache()
         if len(changed):
             self.triggerRender()
-            
-    def getCoverSize(self): # implemented for AbstractCoverWidget
-        return self.option('size').width()
-    
-    def setCoverSize(self, size):
-        self.setOption('size', QtCore.QSize(size, size))
         
     def coverCount(self):
+        """Return the number of covers."""
         return len(self.covers)
         
     def setCovers(self, ids, coverPaths):
@@ -220,27 +236,33 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         self.triggerRender()
         
     def clear(self):
+        """Remove all covers from display."""
         self.setCovers([], None)
         
     def showPrevious(self):
+        """Move to the previous cover (using animation)."""
         pos = math.floor(self._pos)
         if pos == self._pos:
             pos -= 1
         self.showPosition(pos)
     
     def showNext(self):
+        """Move to the next cover (using animation)."""
         pos = math.ceil(self._pos)
         if pos == self._pos:
             pos += 1
         self.showPosition(pos)
     
     def showPosition(self, position):
+        """Move to the cover at *position* (using animation). *position* must be an index of self.covers."""
         position = max(0, min(position, len(self.covers)-1))
         if position != self._pos:
             self.animator.start(position)
         else: self.animator.stop()
         
     def setPosition(self, position):
+        """Move directly to the cover at *position*, i.e. without animation.
+        *position* must be an index of self.covers."""
         position = max(0, min(position, len(self.covers)-1))
         self.animator.stop()
         if position != self._pos:
@@ -251,6 +273,7 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         self.renderer.paint()
         
     def triggerRender(self):
+        """Schedule a repaint of the cover flow."""
         self.renderer.dirty = True
         self.update()
         
@@ -325,17 +348,21 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         
       
 class Renderer:
+    """Renderer for the cover flow. The renderer will render the covers of the given CoverFlowWidget into
+    an internal buffer and draw that buffer to the widget."""
     def __init__(self, widget):
         self.widget = widget
         self._o = widget._o
         self.init()
     
     def init(self):
+        """Initialize the internal buffer. Call this whenever the widget's size has changed."""
         self.size = self.widget.size()
         self.buffer = QtGui.QPixmap(self.size)
         self.dirty = True
     
     def paint(self):
+        """Render covers if self.dirty is true. In any case copy the buffer to the CoverFlowWidget."""
         if self.widget.size() != self.size:
             self.init()
         
@@ -346,11 +373,13 @@ class Renderer:
         painter.drawPixmap(0, 0, self.buffer)
   
     def render(self):
+        """Render background and all covers."""
         self.buffer.fill(self._o['background'])
         self.renderCovers()
         self.dirty = False
         
     def renderCovers(self):
+        """Render all covers."""
         if len(self.widget.covers) == 0:
             return
         o = self._o
@@ -390,6 +419,7 @@ class Renderer:
         painter.end()
             
     def renderCover(self, painter, index):
+        """Render the cover at *index* (index within the list of covers) using the given QPainter."""
         o = self._o
         w = o['size'].width()
         h = o['size'].height()
@@ -438,7 +468,8 @@ class Renderer:
                 alpha = round(255 * max(0, 1-(abs(x)-o['fadeStart'])))
             else: alpha = 255
          
-        # x refers to the center of the cover. Leave enough space at the borders to show the outer images completely
+        # x refers to the center of the cover.
+        # Leave enough space at the borders to show the outer images completely
         availableWidth = self.buffer.width() - o['minScale']*w
         x *= availableWidth / 2
             
@@ -459,6 +490,7 @@ class Renderer:
            
 
 class Animator:
+    """This class moves covers during animation."""
     INTERVAL = 30
     
     def __init__(self, widget):
@@ -473,11 +505,13 @@ class Animator:
         self._v = 0.
         
     def target(self):
+        """Return the current target index."""
         if self._target is not None:
             return self._target
         else: return self.widget._pos
        
     def start(self, target):
+        """Start animation moving to the given target index."""
         target = max(0, min(target, len(self.widget.covers)-1))
         if not self.timer.isActive() \
                 or (self._target - self.widget._pos) * (target - self.widget._pos) < 0: # different direction
@@ -488,10 +522,12 @@ class Animator:
             self._target = target
        
     def stop(self):
+        """Stop animation immediately."""
         self.timer.stop()
         self._target = None
         
     def update(self):
+        """Called by the timer: Move animated covers to the next position."""
         t = self._target
         if self.widget._pos == t:
             self.stop()
@@ -505,6 +541,8 @@ class Animator:
         
         
 class ConfigWidget(QtGui.QWidget):
+    """Configuration widget for AbstractCoverWidget.createConfigWidget. Allows to change some but not all
+    options of CoverFlowWidget."""
     def __init__(self, coverFlow, parent):
         super().__init__(parent)
         self.coverFlow = coverFlow

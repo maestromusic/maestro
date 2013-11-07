@@ -20,6 +20,7 @@ import os.path, collections, functools, weakref
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, browserdialog, selection, dockwidget
 from .misc import busyindicator
@@ -28,13 +29,15 @@ from .. import database as db, utils, imageloader, config
 from ..core import covers, levels, nodes, tags, elements
 from ..search import searchbox, criteria
 
-translate = QtCore.QCoreApplication.translate
 
 _displayClasses = {}
 _coverBrowsers = weakref.WeakSet()
 
 
 def addDisplayClass(key, theClass):
+    """Add a class to the list of display classes. When more than one class is available, the cover
+    browser will display a combobox where the user can choose his preferred display class.
+    *class* should be a subclass of AbstractCoverWidget."""
     if key in _displayClasses:
         from .. import logging
         logger = logging.getLogger(__name__)
@@ -47,6 +50,8 @@ def addDisplayClass(key, theClass):
 
         
 def removeDisplayClass(key):
+    """Remove the display class identified by *key*. Switch cover browsers that currently use this class to
+    the standard class "table"."""
     assert key != "table"
     del _displayClasses[key]
     for coverBrowser in _coverBrowsers:
@@ -56,6 +61,14 @@ def removeDisplayClass(key):
     
 
 class CoverBrowser(dockwidget.DockWidget):
+    """A cover browser is similar to the usual browser but shows covers instead of a tree structure of
+    elements. Like the browser it has a search box and a configuration widget that allows to set filters.
+    
+    To actually display covers CoverBrowser uses a display class (subclass of AbstractCoverDisplayWidget).
+    The default display class is provided by covertable.CoverTable. Plugins can add more classes via
+    addDisplayClass. When more than one class is available, CoverBrowser will contain a combobox where the
+    user can choose his preferred display class. 
+    """
     # The option dialog if it is open, and the index of the tab that was active when the dialog was closed.
     _dialog = None
     _lastDialogTabIndex = 0
@@ -120,12 +133,15 @@ class CoverBrowser(dockwidget.DockWidget):
         return {'display': self._display, 'config': config}
     
     def display(self):
+        """Return the current display widget (instance of the current display class)."""
         return self._displayWidgets[self._display]
     
     def displayKey(self):
+        """Return the key of the current display class/widget."""
         return self._display
     
     def setDisplayKey(self, key):
+        """Set the current display class/widget to the one identified by *key*."""
         if self._display is not None:
             display = self._displayWidgets[self._display]
             display.selectionChanged.disconnect(self._handleSelectionChanged)
@@ -168,6 +184,7 @@ class CoverBrowser(dockwidget.DockWidget):
             self.load()
             
     def search(self):
+        """Start a search."""
         self.searchCriterion = self.searchBox.criterion
         self.load()
         
@@ -225,7 +242,8 @@ class CoverBrowser(dockwidget.DockWidget):
         self.display().setCovers(ids, coverPaths)
         
     def _handleSelectionChanged(self):
-        s = self.display.selection()
+        """React to selection changes in the current display widget."""
+        s = self._display.selection()
         if s is not None:
             selection.setGlobalSelection(s)
         
@@ -238,6 +256,7 @@ class CoverBrowser(dockwidget.DockWidget):
             self.optionButton.setVisible(checked)
             
     def updateDisplayChooser(self):
+        """Update contents and visibility of the combobox which lets the user choose a display class."""
         self.displayChooser.currentIndexChanged.disconnect(self._handleDisplayChooser)
         self.displayChooser.clear()
         values = [(theClass.getTitle(), key) for key, theClass in _displayClasses.items()]
@@ -252,6 +271,7 @@ class CoverBrowser(dockwidget.DockWidget):
             self.reset()
                 
     def _handleDisplayChooser(self, i):
+        """Handle the combobox which lets the user choose a display class."""
         key = self.displayChooser.itemData(i)
         if key != self._display:
             self.setDisplayKey(key)
@@ -266,26 +286,38 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
 
 
 class AbstractCoverWidget(QtGui.QWidget):
+    """Base class for classes which can be used as display class for CoverBrowser. Plugins can subclass
+    this class and register their cover widgets with addDisplayClass."""
     selectionChanged = QtCore.pyqtSignal()
     
     @classmethod
     def getTitle(cls):
+        """Return a user-friendly title for this display class."""
         raise NotImplementedError()
     
     def setCovers(self, ids, coverPaths):
+        """Set the covers that are displayed. *ids* is a list of elements-ids (which can be used to fetch
+        information besides covers, e.g. for tooltips). *coverPaths* is a dict mapping ids to the cover path
+        (relative to the cover directory). Covers should be displayed in the order specified by *ids*."""
         raise NotImplementedError()
     
     def selection(self):
+        """Return the current selection as selection.Selection instance."""
         return None
     
     def createConfigWidget(self, parent):
+        """Return a configuration widget for this display widget. May return None."""
         return None
     
     def state(self):
+        """Return a dict storing the configuration of this widget. It will be passed into the constructor
+        when the program is launched the next time."""
         return {}
 
             
 class BrowserDialog(browserdialog.AbstractBrowserDialog):
+    """Configuration dialog for the cover browser. Besides the usual filter configuration widgets it contains
+    the configuration widget provided by AbstractCoverWidget.createConfigWidget."""
     def __init__(self, parent, browser):
         super().__init__(parent, browser)
         optionLayout = self.optionTab.layout()
