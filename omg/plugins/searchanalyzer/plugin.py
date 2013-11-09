@@ -106,7 +106,6 @@ class SearchAnalyzer(QtGui.QDialog):
         
         self.instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
         self.instantSearchBox.setChecked(True)
-        #self.searchBox.setInstantSearch(False)
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
         topLayout.addWidget(self.instantSearchBox)
         topLayout.addStretch(1)

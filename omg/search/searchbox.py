@@ -27,10 +27,13 @@ logger = logging.getLogger(__name__)
 
 
 class SearchBox(IconLineEdit):
+    """This is a lineedit that will parse the given text as a search criterion and will emit criterionChanged
+    whenever a new valid criterion is entered. If the attribute 'instant' is set to False, the signal
+    will only be emitted when the user hits return/enter."""
     criterionChanged = QtCore.pyqtSignal()
 
     def __init__(self, text=''):
-        IconLineEdit.__init__(self, utils.getIcon("clear.png"))
+        super().__init__(utils.getIcon("clear.png"))
         self.setText(text)
         self.button.clicked.connect(self.clear)
         self.textChanged.connect(self._handleTextChanged)
@@ -40,22 +43,25 @@ class SearchBox(IconLineEdit):
     @property
     def criterion(self):
         return self._criterion
-
-    def getInstantSearch(self):
-        return self.instant
-
-    def setInstantSearch(self,instant):
+    
+    def setInstantSearch(self, instant):
+        """Set the attribute 'instant'. This is a convenience method to be connected to e.g. the
+        toggled-signal of checkboxes."""
         self.instant = instant
 
     def _handleTextChanged(self, text):
         if self.instant:
-            criterion = criteria.parse(text)
+            try:
+                criterion = criteria.parse(self.text())
+            except criteria.ParseException as e:
+                # No logger message as this appears normally while a long query is entered.
+                return
             if criterion != self._criterion:
                 self._criterion = criterion
                 self.criterionChanged.emit()
                 
     def keyPressEvent(self,event):
-        QtGui.QLineEdit.keyPressEvent(self,event)
+        QtGui.QLineEdit.keyPressEvent(self, event)
         if event.key() in (Qt.Key_Return,Qt.Key_Enter):
             try:
                 criterion = criteria.parse(self.text())

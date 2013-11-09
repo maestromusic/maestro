@@ -101,7 +101,7 @@ class BrowserDialog(AbstractBrowserDialog):
         lineLayout.addWidget(profileChooser)
         
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
-        instantSearchBox.setChecked(self.browser.searchBox.getInstantSearch())
+        instantSearchBox.setChecked(self.browser.searchBox.instant)
         instantSearchBox.clicked.connect(self.browser.searchBox.setInstantSearch)
         optionLayout.addWidget(instantSearchBox)
         

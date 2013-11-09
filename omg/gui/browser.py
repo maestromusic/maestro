@@ -122,7 +122,7 @@ class Browser(dockwidget.DockWidget):
         self.sortTags = {}
         if state is not None and isinstance(state, dict):
             if 'instant' in state:
-                self.searchBox.setInstantSearch(state['instant'])
+                self.searchBox.instant = bool(state['instant'])
 #            if 'showHiddenValues' in state:
 #                self.showHiddenValues = state['showHiddenValues']
             if 'views' in state:
@@ -165,7 +165,7 @@ class Browser(dockwidget.DockWidget):
 
     def saveState(self):
         state = {
-            'instant': self.searchBox.getInstantSearch(),
+            'instant': self.searchBox.instant,
             #'showHiddenValues': self.showHiddenValues,
         }
         if len(self.views) > 0:
