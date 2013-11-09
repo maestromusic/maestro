@@ -243,7 +243,7 @@ class CoverBrowser(dockwidget.DockWidget):
         
     def _handleSelectionChanged(self):
         """React to selection changes in the current display widget."""
-        s = self._display.selection()
+        s = self._displayWidgets[self._display].selection()
         if s is not None:
             selection.setGlobalSelection(s)
         
@@ -323,7 +323,7 @@ class BrowserDialog(browserdialog.AbstractBrowserDialog):
         optionLayout = self.optionTab.layout()
                 
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
-        instantSearchBox.setChecked(self.browser.searchBox.getInstantSearch())
+        instantSearchBox.setChecked(self.browser.searchBox.instant)
         instantSearchBox.clicked.connect(self.browser.searchBox.setInstantSearch)
         optionLayout.addWidget(instantSearchBox)
         

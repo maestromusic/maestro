@@ -24,7 +24,7 @@ translate = QtCore.QCoreApplication.translate
 
 from . import coverbrowser, selection
 from .. import imageloader
-from ..core import covers, levels, elements
+from ..core import covers, levels, elements, tags
 
 
 class CoverTable(coverbrowser.AbstractCoverWidget):
