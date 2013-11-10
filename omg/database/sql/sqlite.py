@@ -20,7 +20,7 @@ import sqlite3, datetime, threading
 
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 from .. import prefix
-from ... import utils, logging
+from ... import utils, logging, strutils
 
 sqlite3.register_adapter(utils.FlexiDate, utils.FlexiDate.toSql)
 
@@ -36,6 +36,8 @@ class Sql(AbstractSql):
         self._db = sqlite3.connect(path, isolation_level=isolation_level)
         # Foreign keys must be enabled in each connection
         self._db.execute("PRAGMA foreign_keys = ON")
+        
+        self._db.create_function('REMOVE_DIACRITICS', 1, strutils.removeDiacritics)
 
     def close(self):
         self._db.close()

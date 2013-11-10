@@ -20,14 +20,14 @@ import pyparsing
 from pyparsing import Optional, MatchFirst, Suppress, CharsNotIn, Word
 from pyparsing import Literal, Combine, ZeroOrMore, Group, Forward, OneOrMore
 
-from .. import database as db
+from .. import database as db, strutils
 from ..core import tags, flags
 
 # Initialized in search.init
 SEARCH_TAGS = set()
 
 PREFIX_NEGATE = '!'
-PREFIX_CASE_SENSITIVE = '_'
+PREFIX_BINARY = '_'
 PREFIX_SINGLE_WORD = '#'
 
 # Abbreviations for tags which may be used in queries #TODO make these configurable
@@ -49,6 +49,7 @@ def parse(string):
     """Parse a string into a criterion. If the string is ill-formatted, raise a ParseException."""
     words = parseToWords(string)
     return parseWords(words)
+    
     
     
 def _nestedExpr():
@@ -350,12 +351,12 @@ class TagCriterion(Criterion):
     is None it matches tags which have at least one tag of *tagList*.
     
     Usually a tag value must simply contain *value* as substring in order to be matched by this criterion.
-    With the optional arguments *singleWord* and *caseSensitive* this behavior can be changed.
+    With the optional arguments *singleWord* and *binary* this behavior can be changed.
     
     If the list of tags contains date-tags and value is an interval, the criterion will also search for
     matching date values.
     """
-    def __init__(self, value=None, tagList=None, singleWord=False, caseSensitive=False):
+    def __init__(self, value=None, tagList=None, singleWord=False, binary=False):
         assert value is None or (isinstance(value, str) and len(value) > 0)
         self.value = value
         if tagList is None:
@@ -373,7 +374,7 @@ class TagCriterion(Criterion):
                 self.interval = interval
                 
         self.singleWord = singleWord
-        self.caseSensitive = caseSensitive
+        self.binary = binary
         
     def isUsingTag(self, tag):
         return tag in self.tagList
@@ -390,13 +391,14 @@ class TagCriterion(Criterion):
                 prefixes = ''
                 if self.singleWord:
                     prefixes += PREFIX_SINGLE_WORD
-                if self.caseSensitive:
-                    prefixes += PREFIX_CASE_SENSITIVE
+                if self.binary:
+                    prefixes += PREFIX_BINARY
                 return _negHelper(self, '{tag='+tagNames+'='+prefixes+_quoteIfNecessary(self.value)+'}')
             
     def __eq__(self, other):
         return isinstance(other, TagCriterion) and other.value == self.value\
-                and other.tagList == self.tagList and other.negate == self.negate
+                and other.tagList == self.tagList and other.negate == self.negate\
+                and other.binary == self.binary and other.singleWord == self.singleWord
             
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -427,19 +429,35 @@ class TagCriterion(Criterion):
                 if len(tagList) == 0:
                     continue
                 if valueType != tags.TYPE_DATE:
-                    # INSTR does not respect the collation correctly: INSTR('a','ä') = 0, INSTR('ä','á') = 1
-                    # whereClause = "INSTR(v.value,?)"
-                    # Therefore we have to use LIKE '%...%' and this means escaping...
-                    escapedParameter = self.value.replace('\\','\\\\').replace('_','\\_').replace('%','\\%')
-                    parameter = '%{}%'.format(escapedParameter)
-                    whereClause = "value LIKE ?"
-                    if db.type == 'sqlite':
-                        whereClause += " ESCAPE '\\'"
+                    if db.type == 'mysql' and self.binary:
+                        whereClause = 'INSTR(value, BINARY ?)'
+                        parameter = self.value
+                    else:
+                        # Now we have to use LIKE instead of INSTR because
+                        # - INSTR does not exist in SQLite prior to 3.7.15 (and is case-sensitive)
+                        # - INSTR does not respect the collation correctly in MySQL (with charset utf8):
+                        #   INSTR('a','ä') = 0, INSTR('ä','á') = 1
+                        # Using LIKE means escaping...
+                        escapedParameter = self.value.replace('\\','\\\\')\
+                                                     .replace('_','\\_').replace('%','\\%')
+                        parameter = '%{}%'.format(escapedParameter)
+                        if db.type == 'mysql':
+                            whereClause = "value LIKE ?"
+                        else:
+                            if self.binary:
+                                queries.append('PRAGMA case_sensitive_like = 1')
+                                whereClause = "value LIKE ?"
+                            else:
+                                parameter = strutils.removeDiacritics(parameter)
+                                whereClause = "REMOVE_DIACRITICS(value) LIKE ?"
 
                     queries.append(("INSERT INTO {} (value_id, tag_id) "
                                     "SELECT id, tag_id FROM {}values_{} WHERE tag_id IN({}) AND {}"
                                     .format(TT_HELP, db.prefix, valueType.name, db.csIdList(tagList),
                                             whereClause), parameter))
+                    
+                    if db.type == 'sqlite' and self.binary:
+                        queries.append('PRAGMA case_sensitive_like = 0')
                 else:
                     if self.interval is None:
                         continue
@@ -740,7 +758,7 @@ def parseTextCriterion(origString, tagList=None, negate=None):
     if tagList is None:
         tagList = SEARCH_TAGS
     string = origString.strip()
-    prefixes = PREFIX_SINGLE_WORD + PREFIX_CASE_SENSITIVE
+    prefixes = PREFIX_SINGLE_WORD + PREFIX_BINARY
     if negate is None:
         prefixes += PREFIX_NEGATE
     prefixes, string = _splitPrefixes(string, prefixes)
@@ -763,8 +781,8 @@ def parseTextCriterion(origString, tagList=None, negate=None):
         criterion.negate = True
     if PREFIX_SINGLE_WORD in prefixes:
         criterion.singleWord = True
-    if PREFIX_CASE_SENSITIVE in prefixes:
-        criterion.caseSensitive = True
+    if PREFIX_BINARY in prefixes:
+        criterion.binary = True
     return criterion
         
     

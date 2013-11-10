@@ -18,24 +18,24 @@
 
 """This module just contains several useful string functions."""
 
+import re, string, unicodedata
+
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
-
-import re, string
 
 from . import constants
 
 
-def replace(text,dict):
+def replace(text, dict):
     """Replace multiple pairs at a single blow. To be exact: The keys of *dict* are replaced by the
     corresponding values."""
-    regex = re.compile('|'.join(map(re.escape,dict)))
+    regex = re.compile('|'.join(map(re.escape, dict)))
     def translate(match):
         return dict[match.group(0)]
     return regex.sub(translate, text)
 
 
-def nextNonWhiteSpace(string,pos=0):
+def nextNonWhiteSpace(string, pos=0):
     """Return the position of the first non-whitespace character in *string*, beginning at *pos*. If no such
     character is found, return the length of *string*."""
     while pos < len(string) and string[pos].isspace():
@@ -43,7 +43,7 @@ def nextNonWhiteSpace(string,pos=0):
     return pos
 
 
-def nextWhiteSpace(string,pos=0):
+def nextWhiteSpace(string, pos=0):
     """Return the position of the first whitespace character in *string*, beginning at *pos*. If no such
     character is found, return the length of *string*."""
     while pos < len(string) and not string[pos].isspace():
@@ -55,19 +55,19 @@ def formatLength(lengthInSeconds):
     """Convert a number of seconds into a string like "01:34", "00:05", "1:20:00" or "2 days 14:25:30".
     Display days and hours are only when necessary. Display minutes and seconds with leading zeros.
     """
-    if not isinstance(lengthInSeconds,int):
+    if not isinstance(lengthInSeconds, int):
         lengthInSeconds = int(lengthInSeconds)
         
     seconds = lengthInSeconds % 60
     minutes = int(lengthInSeconds / 60) % 60
     if lengthInSeconds < 3600:
-        return "{0:02d}:{1:02d}".format(minutes,seconds)
+        return "{0:02d}:{1:02d}".format(minutes, seconds)
     else:
         hours = int(lengthInSeconds / 3600)
-        timeString = "{0:d}:{1:02d}:{2:02d}".format(hours % 24,minutes,seconds)
+        timeString = "{0:d}:{1:02d}:{2:02d}".format(hours % 24, minutes, seconds)
         if hours < 24:
             return timeString
-        else: return translate("formatLength","%n days",'',QtCore.QCoreApplication.CodecForTr,
+        else: return translate("formatLength", "%n days", '', QtCore.QCoreApplication.CodecForTr,
                                int(hours/24)) + ' ' + timeString
 
 
@@ -105,16 +105,16 @@ def numberFromPrefix(string):
         * the prefix. This is the part at the beginning of *string* containing the number and -- if present
           -- a period directly following the number and/or subsequent whitespace.
 
-    If no number is found, this method returns ``(None,"")``. For example::
+    If no number is found, this method returns ``(None, "")``. For example::
 
         >>> numberFromPrefix("IV. Allegro vivace")
-        (4,"IV. ")
+        (4, "IV. ")
 
     This method is used to find numbers in song titles. To avoid false positives, it only detects numbers if
-    they are followed by whitespace or a period or a colon and finds only roman numbers build from I,V and X.
+    they are followed by whitespace or a period or a colon and finds only roman numbers build from I, V and X.
     """
     if len(string) == 0:
-        return (None,"")
+        return (None, "")
 
     # First try arabic numbers
     i = 0
@@ -130,8 +130,8 @@ def numberFromPrefix(string):
             try:
                 number = romanToArabic(string[:i])
             except ValueError:
-                return (None,"") # just looks like a roman number...give up
-        else: return (None,"") # no number found...give up
+                return (None, "") # just looks like a roman number...give up
+        else: return (None, "") # no number found...give up
         
     # Ok I found a prefix
     indexWhereNumberEnds = i
@@ -141,8 +141,8 @@ def numberFromPrefix(string):
         i += 1
     # Only detect a number if at least one whitespace or a period was found
     if indexWhereNumberEnds < i:
-        return (number,string[:i])
-    else: return (None,'')
+        return (number, string[:i])
+    else: return (None, '')
 
     
 def rstripSeparator(string):
@@ -173,7 +173,7 @@ def romanToArabic(roman):
     if not all(c in "MDCLXVI" for c in roman):
         raise ValueError("Invalid character in roman number.")
 
-    values = {'M': 1000,'D': 500,'C': 100,'L': 50,'X': 10,'V': 5,'I': 1}
+    values = {'M': 1000, 'D': 500, 'C': 100, 'L': 50, 'X': 10, 'V': 5, 'I': 1}
 
     i = 0
     result = 0
@@ -203,3 +203,8 @@ def romanToArabic(roman):
     if i != len(roman):
         raise ValueError("Invalid roman number") # For example XMM, XLIX
     else: return result
+
+
+def removeDiacritics(s):
+    """Return *s* with all diacritics removed: Replace 'ä' -> 'a', 'é' -> 'e' etc."""  
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.combining(c) == 0)
