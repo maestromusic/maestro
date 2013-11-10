@@ -139,7 +139,8 @@ class GrammarRenamer(profiles.Profile):
         if len(self.replaceChars) != len(self.replaceBy):
             raise ValueError("replaceChars and replaceBy must equal in length")
         self.translation = str.maketrans(self.replaceChars, self.replaceBy, self.removeChars)
-            
+        
+        oldDefaultWhitespaceChars = pyparsing.ParserElement.DEFAULT_WHITE_CHARS    
         pyparsing.ParserElement.setDefaultWhitespaceChars("\t\n")
         #pyparsing.ParserElement.enablePackrat() does not work (buggy)
         lbrace = Literal("<").suppress()
@@ -167,6 +168,7 @@ class GrammarRenamer(profiles.Profile):
         staticText = pyparsing.CharsNotIn("<>!?")#Word("".join(p for p in printables if p not in "<>"))
         expression << OneOrMore(condition | staticText)
         self.expression = expression
+        pyparsing.ParserElement.setDefaultWhitespaceChars(oldDefaultWhitespaceChars)
     
     def save(self):
         return {'formatString': self.formatString,
