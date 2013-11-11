@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sqlite3, datetime, threading
+import sqlite3, datetime, threading, re
 
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 from .. import prefix
@@ -27,7 +27,7 @@ sqlite3.register_adapter(utils.FlexiDate, utils.FlexiDate.toSql)
 logger = logging.getLogger(__name__)
 transactionLock = threading.RLock()
 
-
+    
 class Sql(AbstractSql):
     def connect(self,path, isolation_level=None):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
@@ -37,7 +37,8 @@ class Sql(AbstractSql):
         # Foreign keys must be enabled in each connection
         self._db.execute("PRAGMA foreign_keys = ON")
         
-        self._db.create_function('REMOVE_DIACRITICS', 1, strutils.removeDiacritics)
+        self._db.create_function('remove_diacritics', 1, strutils.removeDiacritics)
+        self._db.create_function('regexp', 2, lambda p,s: re.search(p, s) is not None)
 
     def close(self):
         self._db.close()

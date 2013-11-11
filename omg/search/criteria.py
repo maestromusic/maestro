@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import re
 import pyparsing
 from pyparsing import Optional, MatchFirst, Suppress, CharsNotIn, Word
 from pyparsing import Literal, Combine, ZeroOrMore, Group, Forward, OneOrMore
@@ -429,27 +430,44 @@ class TagCriterion(Criterion):
                 if len(tagList) == 0:
                     continue
                 if valueType != tags.TYPE_DATE:
-                    if db.type == 'mysql' and self.binary:
-                        whereClause = 'INSTR(value, BINARY ?)'
-                        parameter = self.value
-                    else:
-                        # Now we have to use LIKE instead of INSTR because
-                        # - INSTR does not exist in SQLite prior to 3.7.15 (and is case-sensitive)
-                        # - INSTR does not respect the collation correctly in MySQL (with charset utf8):
-                        #   INSTR('a','ä') = 0, INSTR('ä','á') = 1
-                        # Using LIKE means escaping...
-                        escapedParameter = self.value.replace('\\','\\\\')\
-                                                     .replace('_','\\_').replace('%','\\%')
-                        parameter = '%{}%'.format(escapedParameter)
-                        if db.type == 'mysql':
-                            whereClause = "value LIKE ?"
+                    if db.type == 'mysql':
+                        if not self.singleWord:
+                            if self.binary:
+                                whereClause = 'INSTR(value, BINARY ?)'
+                                parameter = self.value
+                            else:
+                                # Now we have to use LIKE instead of INSTR because INSTR does not respect the
+                                # collation correctly in MySQL (with charset utf8):
+                                # INSTR('a','ä') = 0, INSTR('ä','á') = 1
+                                whereClause = "value LIKE ?"
+                                parameter = '%{}%'.format(self._escapeParameter(self.value))
                         else:
                             if self.binary:
+                                whereClause = 'value REGEXP BINARY ?' # case-sensitive
+                            else:
+                                #TODO: While this is case-insensitive, it still is diacritics-sensitive 
+                                whereClause = 'value REGEXP ?'
+                            parameter = '[[:<:]]{}[[:>:]]'.format(re.escape(self.value))
+                            
+                    else: # SQLite
+                        if not self.singleWord:
+                            if self.binary:
+                                # INSTR exists only in SQLite 3.7.15 and later
                                 queries.append('PRAGMA case_sensitive_like = 1')
                                 whereClause = "value LIKE ?"
+                                parameter = '%{}%'.format(self._escapeParameter(self.value))
                             else:
-                                parameter = strutils.removeDiacritics(parameter)
-                                whereClause = "REMOVE_DIACRITICS(value) LIKE ?"
+                                whereClause = "remove_diacritics(value) LIKE ?"
+                                parameter = '%{}%'.format(self._escapeParameter( 
+                                                                    strutils.removeDiacritics(self.value)))
+                        else:
+                            if self.binary:
+                                whereClause = "value REGEXP ?"
+                                parameter = '\\b{}\\b'.format(re.escape(self.value))
+                            else:
+                                whereClause = "remove_diacritics(value) REGEXP ?" 
+                                parameter = '(?i)\\b{}\\b'.format(re.escape(
+                                                                    strutils.removeDiacritics(self.value)))
 
                     queries.append(("INSERT INTO {} (value_id, tag_id) "
                                     "SELECT id, tag_id FROM {}values_{} WHERE tag_id IN({}) AND {}"
@@ -484,6 +502,10 @@ class TagCriterion(Criterion):
                     """.format(fromTable, db.prefix, TT_HELP))
 
             return queries
+    
+    def _escapeParameter(self, parameter):
+        """Escape parameter for use in LIKE expression."""
+        return parameter.replace('\\','\\\\').replace('_','\\_').replace('%','\\%')
     
     @staticmethod
     def parse(key, data):
