@@ -108,7 +108,7 @@ class Browser(dockwidget.DockWidget):
         # This option button is only used when dock widget title bars are hidden (otherwise the dock widget
         # title bar contains an analogous button).
         self.optionButton = dockwidget.DockWidgetTitleButton('options')
-        self.optionButton.clicked.connect(functools.partial(self.openOptionDialog, self.optionButton))
+        self.optionButton.clicked.connect(functools.partial(self.toggleOptionDialog, self.optionButton))
         controlLineLayout.addWidget(self.optionButton)
         self.optionButton.setVisible(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
         layout.addLayout(controlLineLayout)

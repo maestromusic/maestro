@@ -74,16 +74,12 @@ class FancyPopup(QtGui.QFrame):
     # Whether a timer is active that will close this widget (to prevent starting more than one timer)
     _timerActive = False
     
-    # A set of parents whose popup is open (static). Confer isActive
-    _activeParents = set()
-    
     def __init__(self, parent, width=300, height=170):
         super().__init__(parent)
-        self.setWindowFlags(self.windowFlags() | Qt.Popup)
-        FancyPopup._activeParents.add(parent)
+        self.setWindowFlags(self.windowFlags() | Qt.Window | Qt.FramelessWindowHint)
         
-        # Popup windows get mouse move events even if the pointer is outside the window
         self.setMouseTracking(True)
+        parent.installEventFilter(self)
         
         # Fancy design code
         self.setAutoFillBackground(True)
@@ -119,8 +115,7 @@ class FancyPopup(QtGui.QFrame):
         
     def close(self):
         self.parent().removeEventFilter(self)
-        FancyPopup._activeParents.discard(self.parent())
-        QtGui.QFrame.close(self)
+        super().close()
     
     def showEvent(self,event):
         super().showEvent(event)
@@ -128,26 +123,38 @@ class FancyPopup(QtGui.QFrame):
     
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
-        pos = self.mapToGlobal(event.pos())
-        widget = QtGui.QApplication.widgetAt(pos)
-        if widget is not None and widget is not self.parent() and not self.isAncestorOf(widget)\
-                 and not self._timerActive:
+        self._tryClose(self.mapToGlobal(event.pos()))
+    
+    def eventFilter(self, watched, event):
+        if event.type() == QtCore.QEvent.Leave:
+            self._tryClose(None)
+        return False
+    
+    def _tryClose(self, pos):
+        if self._timerActive:
+            return
+        if pos is None:
+            underMouse = self.underMouse() or self.parent().underMouse()
+        else:
+            # for mouseMoveEvent of windows, underMouse() doesn't work here. On the last received
+            # mouseMoveEvent when leaving the window, we are still "underMouse" (otherwise we shouldn't
+            # get the event...) but the following test return false and correctly closes the window.
+            widget = QtGui.QApplication.widgetAt(pos)
+            if widget is None:
+                underMouse = False
+            else: underMouse = widget is self.parent() or self.isAncestorOf(widget)
+            
+        if not underMouse:
             QtCore.QTimer.singleShot(150, self._handleTimer)
             self._timerActive = True
-        
+            
     def _handleTimer(self):
         """Close the window shortly after the parent has been left by the cursor unless the cursor has
         entered the popup in the meantime."""
         self._timerActive = False
         if not self.underMouse():
             self.close()
-    
-    @staticmethod
-    def isActive(parent):
-        """Return whether a fancy popup with *parent* as parent has been opened. Use this to avoid showing
-        a second popup on the second click."""
-        return parent in FancyPopup._activeParents
-    
+            
             
 class FancyTabbedPopup(FancyPopup):
     """Fancy popup that contains a fancy TabWidget."""

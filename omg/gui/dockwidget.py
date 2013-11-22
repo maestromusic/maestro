@@ -68,10 +68,10 @@ class DockWidget(QtGui.QDockWidget):
         """
         return hasattr(self, 'createOptionDialog')
     
-    def openOptionDialog(self, button=None):
-        """Open the option dialog. Call self.createOptionDialog to get the dialog (must be implemented in
-        all subclasses that use option dialogs). If the result is a FancyPopup, take care of it. If *button*
-        is not None, it may be used to position the dialog.
+    def toggleOptionDialog(self, button=None):
+        """Open/close the option dialog. Call self.createOptionDialog to create the dialog (must be
+        implemented in all subclasses that use option dialogs). If the result is a FancyPopup, take care of
+        it. If *button* is not None, it may be used to position the dialog.
         """
         if self._dialog is None:
             self._dialog = self.createOptionDialog(button)
@@ -80,6 +80,8 @@ class DockWidget(QtGui.QDockWidget):
                 if isinstance(self._dialog, dialogs.FancyTabbedPopup):
                     self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
                 self._dialog.show()
+        else:
+            self._dialog.close()
             
     def eventFilter(self, object, event):
         if event.type() == QtCore.QEvent.Close and self._dialog is not None:
@@ -148,7 +150,8 @@ class DockWidgetTitleBar(QtGui.QFrame):
         
         if parent.hasOptionDialog():
             self.optionButton = DockWidgetTitleButton('options')
-            self.optionButton.clicked.connect(functools.partial(parent.openOptionDialog, self.optionButton))
+            self.optionButton.clicked.connect(
+                                        functools.partial(parent.toggleOptionDialog, self.optionButton))
             layout.addWidget(self.optionButton)
         self.closeButton = DockWidgetTitleButton('close')
         layout.addWidget(self.closeButton)
