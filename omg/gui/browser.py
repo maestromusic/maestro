@@ -386,31 +386,14 @@ class BrowserTreeView(treeview.TreeView):
             self.expand(self.model().getIndex(node.contents[0]))
     
     def mouseDoubleClickEvent(self, event):
-        # Because the must access modifiers, mouseDoubleClickEvent is used instead of the equivalent signal.
+        # Because we must access modifiers, mouseDoubleClickEvent is used instead of the equivalent signal.
         index = self.indexAt(event.pos())
         if not index.isValid():
             return
+        mimeData = browsermodel.BrowserMimeData.fromIndexes(self.model(), [index])
+        wrappers = [w.copy() for w in mimeData.wrappers()]
         from . import playlist
-        from .. import player
-        if playlist.defaultPlaylist is None:
-            return
-        
-        model = playlist.defaultPlaylist.model()
-        if model.backend.connectionState != player.CONNECTED:
-            return
-        # TODO: this seems too complicated ...
-        wrappers = [w.copy() for w in browsermodel.BrowserMimeData.fromIndexes(self.model(), [index]).wrappers()]
-        if event.modifiers() & Qt.ControlModifier:
-            model.stack.beginMacro(self.tr("Replace Playlist"))
-            model.clear()
-        insertOffset = model.root.fileCount()
-        model.insert(model.root, len(model.root.contents), wrappers)
-        if event.modifiers() & Qt.ControlModifier:
-            model.backend.play()            
-            model.stack.endMacro()
-        elif model.backend.state() is player.STOP:
-            model.backend.setCurrent(insertOffset)
-            model.backend.play()
+        playlist.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
             
 
 class RestoreExpander:

@@ -34,6 +34,29 @@ translate = QtCore.QCoreApplication.translate
 defaultPlaylist = None
 
 
+def appendToDefaultPlaylist(wrappers, replace=False):
+    """Append the given wrappers to the default playlist. Just do nothing if there is no default playlist.
+    If *replace* is true, clear the playlist. If the playlist is currently stopped, start it with the new
+    wrappers.
+    """
+    if defaultPlaylist is None:
+        return
+    model = defaultPlaylist.model()
+    if model.backend.connectionState != player.CONNECTED:
+        return
+    if replace:
+        model.stack.beginMacro(translate("PlaylistWidget", "Replace Playlist"))
+        model.clear()
+    insertOffset = model.root.fileCount()
+    model.insert(model.root, len(model.root.contents), wrappers)
+    if replace:
+        model.backend.play()            
+        model.stack.endMacro()
+    elif model.backend.state() is player.STOP:
+        model.backend.setCurrent(insertOffset)
+        model.backend.play()
+
+
 class PlaylistTreeView(treeview.DraggingTreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = None

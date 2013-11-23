@@ -24,7 +24,7 @@ translate = QtCore.QCoreApplication.translate
 
 from . import coverbrowser, selection
 from .. import imageloader
-from ..core import covers, levels, elements, tags
+from ..core import nodes, covers, levels, elements, tags
 
 
 class CoverTable(coverbrowser.AbstractCoverWidget):
@@ -313,7 +313,17 @@ class CoverItem(QtGui.QGraphicsItem):
         if QtCore.QLineF(QtCore.QLine(event.screenPos(), event.buttonDownScreenPos(Qt.LeftButton))).length() \
                 > QtGui.QApplication.startDragDistance():
             drag = QtGui.QDrag(event.widget())
-            mimeData = selection.MimeData(self.scene.selection())
-            drag.setMimeData(mimeData)
+            sel = self.scene.selection()
+            drag.setMimeData(selection.MimeData(sel))
+            if len(sel.wrappers()) == 1:
+                drag.setPixmap(sel.wrappers()[0].element.getCover(100))
+                drag.setHotSpot(QtCore.QPoint(50, 50))
             drag.exec_()
             self.setCursor(Qt.OpenHandCursor)
+            
+    def mouseDoubleClickEvent(self, event):
+        wrapper = nodes.Wrapper(levels.real.get(self.elid))
+        wrapper.loadContents(recursive=True)
+        from . import playlist
+        playlist.appendToDefaultPlaylist([wrapper], replace=event.modifiers() & Qt.ControlModifier)
+        

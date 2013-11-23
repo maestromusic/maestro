@@ -15,15 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import math, time, functools
+import math, functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 if __name__ != "__main__":
-    from ...core import covers
-    from ...gui import coverbrowser
+    from ...core import covers, levels, nodes
+    from ...gui import coverbrowser, playlist, selection
 
 
 # Possible values for the 'curve' option along with user friendly titles
@@ -55,7 +55,8 @@ class Cover:
     pixmap and a cache which contains the pixmap (resized CoverFlow.option('size')) and the reflection
     (if enabled). Pixmaps are only loaded when first requested.
     """
-    def __init__(self, path):
+    def __init__(self, elid, path):
+        self.elid = elid
         self.path = path
         self.pixmap = None
         self._cache = None
@@ -174,7 +175,6 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         
         self.renderer = Renderer(self)
         self.animator = Animator(self)
-        
         self.clear() # initialize
      
     @classmethod
@@ -231,7 +231,7 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         
     def setCovers(self, ids, coverPaths):
         self.animator.stop()
-        self.covers = [Cover(coverPaths[id]) for id in ids]
+        self.covers = [Cover(id, coverPaths[id]) for id in ids]
         self._pos = min(len(self.covers)//2, self._o['coversPerSide'])
         self.triggerRender()
         
@@ -290,43 +290,76 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
     def wheelEvent(self, event):
         self.showPosition(self.animator.target() - round(event.delta()/120))
         event.accept()
+    
+    def coverAt(self, point):
+        """Return the Cover-instance at the given point (or None)."""
+        if isinstance(point, QtCore.QPoint):
+            point = QtCore.QPointF(point)
+        o = self._o
+        centerIndex = max(0, min(round(self._pos), len(self.covers)-1))
+        rect = self.renderer.coverRect(centerIndex)
+        if rect.contains(point):
+            return self.covers[centerIndex]
         
-    _mousePos = None
-    #_mouseTime = None
-    #_mouseV = None
+        coversLeft = coversRight = o['coversPerSide']
+        if self._pos < round(self._pos):
+            coversLeft += 1
+        elif self._pos > round(self._pos):
+            coversRight += 1
+            
+        if point.x() < rect.left():
+            # test covers to the left
+            for index in reversed(range(max(0, centerIndex-coversLeft), centerIndex)):
+                rect = self.renderer.coverRect(index)
+                if rect.contains(point):
+                    return self.covers[index]
+                elif point.x() >= rect.left():
+                    return None
+        elif point.x() > rect.right():
+            # test covers to the right
+            for index in range(centerIndex+1, min(centerIndex+coversRight+1, len(self.covers))):
+                rect = self.renderer.coverRect(index)
+                if rect.contains(point):
+                    return self.covers[index]
+                elif point.x() <= rect.right():
+                    return None
+        return None
+    
+    def wrapperAt(self, point):
+        """Return the wrapper (with all contents loaded) at the given point (or None)."""
+        cover = self.coverAt(point)
+        if cover is not None:
+            wrapper = nodes.Wrapper(levels.real.get(cover.elid))
+            wrapper.loadContents(recursive=True)
+            return wrapper
+        else: return None
+    
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            if self._mousePos is None:
-                self._mousePos = event.pos()
-                #self._mouseTime = time.time()
+        self._mousePressPosition = event.pos()
+        wrapper = self.wrapperAt(event.pos())
+        if wrapper is not None:
+            selection.setGlobalSelection(selection.Selection(levels.real, [wrapper]))
         super().mousePressEvent(event)
-        
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            #if self._mouseV is not None:
-                #brakingDistance = min(3, self._mouseV**2/(2*self.animator._a))
-                #self.showPosition(self._pos + brakingDistance)
-                #self.animator._v = abs(self._mouseV)
-            self._mousePos = None
-            #self._mouseTime = None
-            #self._mouseV = None
-        super().mouseReleaseEvent(event)
-        
+            
+    def mouseDoubleClickEvent(self, event):
+        wrapper = self.wrapperAt(event.pos())
+        if wrapper is not None:
+            playlist.appendToDefaultPlaylist([wrapper], replace=event.modifiers() & Qt.ControlModifier)
+        event.accept()
+    
     def mouseMoveEvent(self, event):
-        if Qt.LeftButton & event.buttons() and self._mousePos is not None:
-            distance = event.pos().x() - self._mousePos.x()
-            distance *= 2*self._o['coversPerSide'] / self.width()
-            self.setPosition(self._pos - distance)
-            self._mousePos = event.pos()
-            #timeDelta = (time.time() - self._mouseTime)
-            #if timeDelta > 0:
-            #    self._mouseV = distance / timeDelta
-            #else: self._mouseV = None
-            #self._mouseTime = time.time()
-            event.accept()
-        else:
-            event.ignore()
-        
+        if event.buttons() & Qt.LeftButton and (event.pos() - self._mousePressPosition).manhattanLength() \
+                                                >= QtGui.QApplication.startDragDistance():
+            wrapper = self.wrapperAt(event.pos())
+            if wrapper is not None:
+                drag = QtGui.QDrag(self)
+                mimeData = selection.MimeData(selection.Selection(levels.real, [wrapper]))
+                drag.setMimeData(mimeData)
+                drag.setPixmap(wrapper.element.getCover(100))
+                drag.setHotSpot(QtCore.QPoint(50, 50))
+                drag.exec_()
+                self.setCursor(Qt.OpenHandCursor)
+            
     def resizeEvent(self, event):
         self.triggerRender()
         super().resizeEvent(event)
@@ -383,20 +416,14 @@ class Renderer:
         if len(self.widget.covers) == 0:
             return
         o = self._o
-        w = self.buffer.width()
-        h = self.buffer.height()
         painter = QtGui.QPainter(self.buffer)
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
-        dx = w // 2
-        if o['reflection']:
-            necessaryHeight = (1+o['reflectionFactor']) * o['size'].height()
-        else: necessaryHeight = o['size'].height()
-        dy = int((h-necessaryHeight) * o['vAlign'])
+        dx, dy = self._getTranslation()
         painter.translate(dx, dy)
         
         centerIndex = max(0, min(round(self.widget._pos), len(self.widget.covers)-1))
         centerRect = self.renderCover(painter, centerIndex)
-        clipRect = QtCore.QRect(-dx, -dy, dx+centerRect.left(), h)
+        clipRect = QtCore.QRect(-dx, -dy, dx+centerRect.left(), self.buffer.height())
         coversLeft = coversRight = o['coversPerSide']
         if self.widget._pos < round(self.widget._pos):
             coversLeft += 1
@@ -408,7 +435,10 @@ class Renderer:
             if rect is None:
                 break
             clipRect.setRight(min(clipRect.right(), rect.left()-1))
-        clipRect = QtCore.QRect(centerRect.right(), -dy, w-centerRect.right(), h)
+        clipRect = QtCore.QRect(centerRect.right(),
+                                -dy,
+                                self.buffer.width()-centerRect.right(),
+                                self.buffer.height())
         for i in range(centerIndex+1, min(centerIndex+coversRight+1, len(self.widget.covers))):
             painter.setClipRect(clipRect)
             rect = self.renderCover(painter, i)
@@ -417,14 +447,26 @@ class Renderer:
             clipRect.setLeft(max(clipRect.left(), rect.right()))
             
         painter.end()
-            
-    def renderCover(self, painter, index):
-        """Render the cover at *index* (index within the list of covers) using the given QPainter."""
+
+    def _getTranslation(self):
+        """Return the translation of the coordinate system used for drawing covers as (dx, dy)."""
+        o = self._o
+        dx = self.buffer.width() // 2
+        if o['reflection']:
+            necessaryHeight = (1+o['reflectionFactor']) * o['size'].height()
+        else: necessaryHeight = o['size'].height()
+        dy = int((self.buffer.height()-necessaryHeight) * o['vAlign'])
+        return (dx, dy)
+        
+    def coverRect(self, index, translate=True):
+        """Return the rectangle of a cover (identified by an index within the list of covers). The
+        rectangle is the area in which the cover is rendered, including parts that are behind other covers.
+        If *translate* is set to false the result will be relative to the coordinate system used for
+        drawing. Otherwise it will be relative to the widgets usual coordinate system.
+        """
         o = self._o
         w = o['size'].width()
         h = o['size'].height()
-        cover = self.widget.covers[index]
-        pixmap = cover.cache(self._o)
         
         # When seen from above, the covers are arranged on a curve, with the central cover
         # being "nearest" to the user and the outermost covers being "farthest".
@@ -462,32 +504,48 @@ class Renderer:
                 z = (x*o['coversPerSide'] + 1)**2
         else:
             assert False
-            
-        if o['fadeOut']:
-            if abs(x) > o['fadeStart']:
-                alpha = round(255 * max(0, 1-(abs(x)-o['fadeStart'])))
-            else: alpha = 255
          
-        # x refers to the center of the cover.
-        # Leave enough space at the borders to show the outer images completely
-        availableWidth = self.buffer.width() - o['minScale']*w
-        x *= availableWidth / 2
+        # Scale x from [-1, 1] to pixel coordinates (x refers to the center of the cover)
+        x *= self._availableWidth() / 2
             
         if z > 1:
             z = 1
         scale = o['minScale'] + z * (1.-o['minScale'])
         y = (1-scale) * h * o['coverVAlign']
         
+        pixmap = self.widget.covers[index].cache(self._o)
         rect = QtCore.QRectF(round(x-scale*w/2), y, round(scale*pixmap.width()), scale*pixmap.height())
+        if translate:
+            rect.translate(*self._getTranslation())
+        return rect
+        
+    def _availableWidth(self):
+        """Return the width of the region that can be used for the center of covers. This is a bit less than
+        the widget's width to leave enough space at the edges so that the outer images are completely
+        visible."""
+        return self.buffer.width() - self._o['minScale']*self._o['size'].width()
+        
+    def renderCover(self, painter, index):
+        """Render the cover at *index* (index within the list of covers) using the given QPainter. Return
+        the cover's rectangle."""
+        o = self._o
+        cover = self.widget.covers[index]
+        pixmap = cover.cache(self._o)
+        rect = self.coverRect(index, translate=False)
         painter.drawPixmap(rect, pixmap, QtCore.QRectF(pixmap.rect()))
 
-        if o['fadeOut'] and alpha < 255:
-            color = QtGui.QColor(o['background'])
-            color.setAlpha(255-alpha)
-            painter.fillRect(rect, color)
+        if o['fadeOut']:
+            # Scale x into [-1, 1] (this inverts a scaling in self.coverRect)
+            x = rect.center().x() / self._availableWidth() * 2
+            if abs(x) > o['fadeStart']:
+                alpha = round(255 * max(0, 1-(abs(x)-o['fadeStart'])))
+                if alpha < 255:
+                    color = QtGui.QColor(o['background'])
+                    color.setAlpha(255-alpha)
+                    painter.fillRect(rect, color)
             
         return rect
-           
+
 
 class Animator:
     """This class moves covers during animation."""
@@ -500,9 +558,8 @@ class Animator:
         self.timer.timeout.connect(self.update)
         self._target = None
         self._start = None
-        
-        self._a = 4./self.INTERVAL
-        self._v = 0.
+        self._a = 4. / self.INTERVAL  # acceleration
+        self._v = 0.                  # velocity
         
     def target(self):
         """Return the current target index."""
