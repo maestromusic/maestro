@@ -41,14 +41,14 @@ class Check:
         """Return a description of this check for the user."""
         return self.__class__.__doc__
 
-    def getNumber(self,refresh = False):
+    def getNumber(self, refresh=False):
         """Return the number of errors in the database and cache it. Return the cached value unless
         *refresh* is true."""
         if refresh or self.number is None:
             self.number = self.check(data=False)
         return self.number
 
-    def getData(self,refresh = False):
+    def getData(self, refresh=False):
         """Return detail data to errors in the database and cache it. Return the cached data unless
         *refresh* is true. The result is a list of tuples where each tuple contains information to a single
         error. The meaning of the tuple entries is returned by :meth:`getColumnHeaders`.
@@ -247,6 +247,40 @@ class ValueIdsCheck(Check):
             db.query(self._query(type.name,False,True))
 
 
+class DoubleTagsCheck(Check):
+    """Check for tag-relations that appear twice in the database.""" 
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID"), translate("DBAnalyzerChecks", "Name"),
+                      translate("DBAnalyzerChecks", "Tag ID"), translate("DBAnalyzerChecks", "Value ID"),
+                      translate("DBAnalyzerChecks", "Value"))
+
+    _name = translate("DBAnalyzerChecks","Double tags")
+    
+    def check(self,data):
+        result = db.query("""
+            SELECT element_id, tag_id, value_id
+            FROM {p}tags
+            GROUP BY element_id, tag_id, value_id
+            HAVING COUNT(*) > 1
+            """)
+        if not data:
+            return len(result)
+        else:
+            return [(row[0], getTitle(row[0]), row[1], row[2], str(db.valueFromId(row[1],row[2])))
+                    for row in result]
+
+    def _fix(self):
+        result = db.query("""
+            SELECT element_id, tag_id, value_id
+            FROM {p}tags
+            GROUP BY element_id, tag_id, value_id
+            HAVING COUNT(*) > 1
+            """)
+        values = list(result)
+        db.transaction()
+        db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?", values)
+        db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)", values)
+        db.commit()
+
 class WithoutTagsCheck(Check):
     """Check for elements without tags. WARNING: Fixing this means removing those elements from the
     database!"""
@@ -301,7 +335,7 @@ class DoubledFilesCheck(Check):
         
     def fix(self): pass
     
-    
+
 def getTitle(id):
     """Return a displayable title for the element with the given id."""
     titles = list(db.query("""

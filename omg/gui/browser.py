@@ -298,6 +298,8 @@ class Browser(dockwidget.DockWidget):
     def _handleChangeEvent(self, event):
         """Handle a change event from the application's dispatcher or the real level."""
         #TODO: Optimize some cases in which we do not have to start a new search and reload everything.
+        if isinstance(event, application.ModuleStateChangeEvent):
+            return
         for view in self.views:
             view.expander = RestoreExpander(view)
         self.load()

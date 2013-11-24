@@ -50,6 +50,7 @@ class Record:
         self.value = value
         self.allElements = allElements
         assert isinstance(elementsWithValue, tuple)
+        assert len(elementsWithValue) <= len(allElements)
         self.elementsWithValue = elementsWithValue
     
     def copy(self):

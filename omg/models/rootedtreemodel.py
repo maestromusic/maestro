@@ -136,11 +136,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         
         if coverSize is not None and el.hasCover():
             imgTag = el.getCoverHTML(coverSize, 'style="float: left"')
-            return imgTag + '<div style="margin-left: {}">{}</div>'.format(coverSize+5, lines)
-        else:
-            # enclose in a div so that Qt formats this as rich text.
-            # Otherwise HTML escapes would be printed as plain text.
-            return '<div>{}</div>'.format(lines)
+            if imgTag is not None:
+                return imgTag + '<div style="margin-left: {}">{}</div>'.format(coverSize+5, lines)
+        # enclose in a div so that Qt formats this as rich text.
+        # Otherwise HTML escapes would be printed as plain text.
+        return '<div>{}</div>'.format(lines)
             
     def hasChildren(self,index):
         if not index.isValid():
