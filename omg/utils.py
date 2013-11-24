@@ -118,7 +118,7 @@ def collectFiles(urls):
             while file[i].isdigit():
                 i += 1
             if i == 0:
-                return (dir, PointAtInfinity, file)
+                return (dir, PointAtInfinity(), file)
             else: return (dir, int(file[:i]), file[i:], file)
                 
     for files in filePaths.values():
