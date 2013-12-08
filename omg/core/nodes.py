@@ -417,10 +417,15 @@ class Wrapper(Node):
         else: return title
         
     def getLength(self):
-        """Return the length of this element, i.e. the sum of the lengths of all contents."""
+        """Return the length of this element, i.e. the sum of the lengths of all contents. Return None if
+        length can not be computed because not all contents have been loaded."""
         if self.isFile():
             return self.element.length
-        else: return sum(wrapper.getLength() for wrapper in self.contents)
+        elif self.contents is not None:
+            lengths = [wrapper.getLength() for wrapper in self.contents]
+            if None not in lengths:
+                return sum(lengths)
+        return None
     
     def getExtension(self):
         """Return the extension of all files in this container. Return None if they have different extension

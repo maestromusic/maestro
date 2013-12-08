@@ -94,7 +94,7 @@ class WidgetData:
           persistently.
         - name: a nice name which will be displayed in the View menu.
         - theClass: the class that must be instantiated to create a widget of this type. Remember that this
-          must be a subclass of QDockWidget if central is False.
+          must be a subclass of QDockWidget if dock is true.
         - central: Whether this widget may be used in the center.
         - dock: Whether this widget may be used as dock widget.
         - unique: Only relevant for dock widgets. It stores whether there may be more than one instance of

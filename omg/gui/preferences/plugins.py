@@ -84,7 +84,7 @@ class PluginPanel(QtGui.QWidget):
                     plugin.mainWindowInit()
                 except Exception as e:
                     item.setCheckState(False)
-                    from ..gui.dialogs import warning
+                    from ..dialogs import warning
                     warning(self.tr("Error enabling plugin"),
                             self.tr("Could not enable plugin {}:\n{}")
                             .format(plugin.name, e))

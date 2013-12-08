@@ -619,14 +619,6 @@ class TagNode(CriterionNode):
     
     def getKey(self):
         return "tag:"+str(self.tagPairs)
-    
-    def toolTipText(self):
-        if config.options.misc.show_ids: # Display the value-ids
-            lines = ["[{}]".format(", ".join("{}->{}".format(tags.get(tagId).name, valueId)
-                                    for tagId,valueId in self.tagPairs))]
-            lines.extend(self.values)
-        else: lines = self.values
-        return '\n'.join(lines)
 
 
 class VariousNode(CriterionNode):

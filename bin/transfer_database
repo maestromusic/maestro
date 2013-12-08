@@ -16,8 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Convenience script to reset the database (drop all tables and create them again)."""
-
 import argparse, sys, threading
 
 from omg import application, config, database
@@ -33,7 +31,9 @@ args = parser.parse_args()
 if args.source == args.target:
     print("Error: Source equals target.")
     sys.exit()
-
+if args.config is None:
+    args.config = []
+    
 application.init(args.config, exitPoint="config")
 
 if args.sourcePrefix is None:
@@ -50,7 +50,7 @@ database.connect()
 target = database
 
 tables = [
-('elements', 'id,file,toplevel,elements,major', True, []),
+('elements', 'id,file,type,elements', True, []),
 ('contents', 'container_id,position,element_id', False, []),          
 ('files', 'element_id,url,hash,verified,length', False, [3]),
 ('tagids', 'id,tagname,tagtype,title,icon,private,sort', True, []),
