@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ... import database as db
-from ...core import tags, elements
+from ...core import tags, elements, levels
 from ...gui import mainwindow
 
 try:
@@ -60,8 +60,13 @@ class StatisticsWidget(QtGui.QWidget):
             return
         
         self.setLayout(QtGui.QHBoxLayout())
-        scroll = QtGui.QScrollArea()
-        self.layout().addWidget(scroll)
+        self.scroll = QtGui.QScrollArea()
+        self.layout().addWidget(self.scroll)
+        self.updateCharts()
+        levels.real.connect(self.updateCharts)
+        
+    def updateCharts(self):
+        """Create or update the charts."""
         innerWidget = QtGui.QWidget()
         self.innerLayout = QtGui.QGridLayout(innerWidget)
         if tags.get("genre").isInDb() and tags.get("genre").type == tags.TYPE_VARCHAR:
@@ -75,7 +80,7 @@ class StatisticsWidget(QtGui.QWidget):
             heights, labels = zip(*self.getDates())
             self._addBars(self.tr("Dates"), 1, 0, heights, labels, 4, 4)
             
-        scroll.setWidget(innerWidget)
+        self.scroll.setWidget(innerWidget)
     
     def _addPie(self, title, row, column, sizes, labels, width, height):
         """Add a bar chart at position (row, column) to the layout."""
