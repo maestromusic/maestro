@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/omg/plugins/statistics">
+        <file>statistics.png</file>
+    </qresource>
+</RCC>
