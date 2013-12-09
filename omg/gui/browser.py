@@ -340,7 +340,7 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
     sect = translate("BrowserTreeView", "elements")
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
-    actionConfig.addActionDefinition(((sect, 'rename'),), treeactions.RenameAction)
+    actionConfig.addActionDefinition(((sect, 'changeFileUrls'),), treeactions.ChangeFileUrlsAction)
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
                                      text=translate("BrowserTreeView", "Delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)

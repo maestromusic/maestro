@@ -120,7 +120,7 @@ class Selection:
         
     def elements(self, recursive=False):
         """Return all elements that are selected. Remove duplicates (elements might be selected in several
-        wrappers."""
+        wrappers)."""
         elids = set()
         def check(w):
             if w.element.id in elids:
@@ -132,12 +132,12 @@ class Selection:
     
     def files(self, recursive=False):
         """Return all files (not file wrappers!) that are selected. Remove duplicates (elements might be
-        selected in several wrappers."""
+        selected in several wrappers)."""
         return (element for element in self.elements(recursive) if element.isFile())
 
     def containers(self, recursive=False):
         """Return all containers (not container wrappers!) that are selected. Remove duplicates
-        (elements might be selected in several wrappers."""
+        (elements might be selected in several wrappers)."""
         return (element for element in self.elements(recursive) if element.isContainer())
     
     def hasWrappers(self):

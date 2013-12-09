@@ -16,10 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os.path
+
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, utils, filebackends
+from .. import application, utils, filebackends, config, strutils
 from ..core import levels, tags, elements
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
@@ -74,29 +76,113 @@ class EditTagsAction(TreeAction):
         dialog.exec_()
 
 
-class RenameAction(TreeAction):
-    """Action to rename (or move) a file."""
-    def __init__(self, parent, text=None, shortcut=None):
-        super().__init__(parent, shortcut)
-        if text is None:
-            self.setText(self.tr('Rename'))
-        else:
-            self.setText(text)
-    
+class ChangeFileUrlsAction(TreeAction):
+    """Action to change the URL of a single file or the directory of several files in the same directory."""
     def initialize(self, selection):
-        self.setEnabled(selection.singleWrapper() and selection.hasFiles())
+        self.setText(self.tr("Change file URLs"))
+        self.setEnabled(False)
+        if selection.singleWrapper():
+            self.setText(self.tr("Change file URL"))
+            element = selection.wrappers()[0].element
+            if element.isFile() and element.url is not None and element.url.CAN_RENAME:
+                self.setEnabled(True)
+        elif selection.hasFiles():
+            elements = list(selection.files())
+            if all(isinstance(el.url, filebackends.filesystem.FileURL) for el in elements):
+                dir = self._getDirectory(elements)
+                if dir is not None:
+                    self.setEnabled(True)
+        
+    def _getDirectory(self, elements):
+        """Return the common directory (relative to the collection directory) of *elements* (or None)."""
+        paths = [element.url.path for element in elements]
+        dir = None
+        for path in paths:
+            # make sure all files are in the same directory
+            if dir is None:
+                dir = os.path.dirname(path)
+            elif dir != os.path.dirname(path):
+                return None
+        return dir if len(dir) > 0 else None
     
     def doAction(self):
-        import os.path
         from ..filebackends.filesystem import FileURL
-        elem = next(self.parent().selection.fileWrappers()).element
-        path = QtGui.QFileDialog.getOpenFileName(self, self.tr("Select new file location"),
-                                                 (os.path.dirname(elem.url.path)))
-        if path != "":
-            newUrl = FileURL(path)
-            self.level().renameFiles( {elem: (elem.url, newUrl) })
-   
-   
+        selection = self.parent().selection
+        if selection.singleWrapper():
+            element = next(fileWrappers()).element
+            if isinstance(element.url, FileURL):
+                self.changeFileUrl(element)
+            else: self.changeOtherUrl(element)
+        else:
+            elements = list(selection.files())
+            self.changeElementsDirectory(elements)
+    
+    def _checkFilePath(self, path, shouldExist, oldPath):
+        """Check whether the *path* is valid, not equal to *oldPath* and exists if and only if *shouldExist*
+        is True."""
+        if path in [None, '', oldPath]:
+            return False
+        if not shouldExist and os.path.exists(path):
+            QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
+                                      self.tr("The given path exists already."))
+            return False
+        elif shouldExist and not os.path.exists(path):
+            QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
+                                      self.tr("The given path does not exists."))
+            return False
+        if not path.startswith(config.options.main.collection):
+            QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
+                                      self.tr("Path must be inside collection directory"))
+            return False
+        return True
+        
+    def changeFileUrl(self, element):
+        """Ask the user for a new URL for *element* and change the URL. Element must be a filesystem-file."""
+        path = QtGui.QFileDialog.getSaveFileName(None,
+                                                 self.tr("Select new file location"),
+                                                 element.url.absPath,
+                                                 options=QtGui.QFileDialog.DontConfirmOverwrite)
+        if self._checkFilePath(path, shouldExist=False, oldPath=element.url.absPath):
+            self.level().renameFiles( {element: (element.url, FileURL(path)) })
+            
+    def changeOtherUrl(self, element):
+        """Ask the user for a new URL for *element* and change the URL. For filesystem-files use
+        changeFileUrl instead."""
+        path, ok = QtGui.QInputDialog.getText(None, self.tr("Change file URL"),
+                                              self.tr("Select new file URL:"),
+                                              QtGui.QLineEdit.Normal, str(element.url))
+        if not ok or path is None or path == '':
+            return
+        try:
+            newUrl = filebackends.BackendURL.fromString(path)
+        except ValueError:
+            QtGui.QMessageBox.warning(None, self.tr("Invalid URL"), self.tr("Please enter a valid URL."))
+            return
+        
+        self.level().renameFiles( {element: (element.url, newUrl) })
+        
+    def changeElementsDirectory(self, elements):
+        """Given a list of elements from the same directory, ask the user for a new directory and move
+        all files to the new directory."""
+        dir = self._getDirectory(elements)
+        if dir is None:
+            return
+        path = QtGui.QFileDialog.getExistingDirectory(None,
+                                                      self.tr("Select new files directory"),
+                                                      utils.absPath(dir))
+        if self._checkFilePath(path, shouldExist=True, oldPath=utils.absPath(dir)):
+            from ..filebackends.filesystem import FileURL
+            changes = {element: (element.url, FileURL(os.path.join(path, os.path.basename(element.url.path))))
+                       for element in elements}
+            for oldUrl, newUrl in changes.values():
+                if os.path.exists(newUrl.absPath):
+                    QtGui.QMessageBox.warning(None, self.tr("Path collision"),
+                                self.tr("Cannot move '{}' to '{}' because the latter path exists already."
+                                        .format(str(oldUrl), str(newUrl))))
+                    return
+            self.level().renameFiles(changes)
+
+
 class RemoveFromParentAction(TreeAction):
     """Action to remove selected elements from the parent container or rootnode.
     """
