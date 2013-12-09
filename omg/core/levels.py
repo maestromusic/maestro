@@ -550,6 +550,7 @@ class Level(application.ChangeEventDispatcher):
             return
         self.stack.beginMacro(self.tr("Commit"), transaction=(self.parent is real))
       
+        # 1.-4. mostly only on real, see real._commitHelper
         if self.parent is real:
             real._commitHelper(elements)
         else:

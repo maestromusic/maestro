@@ -272,7 +272,7 @@ class RealLevel(levels.Level):
                 fileTagChanges[inReal] = tags.TagStorageDifference(inReal.tags, newTags)
         for container in filter(lambda e: e.isContainer(), elements):
             if container.isInDb():
-                inReal = self[element.id]
+                inReal = self[container.id]
                 remainingTagChanges[inReal] = tags.TagStorageDifference(inReal.tags,
                                                                         container.tags.copy())
             else:
