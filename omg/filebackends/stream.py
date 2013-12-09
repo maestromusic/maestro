@@ -18,9 +18,9 @@
 
 from PyQt4 import QtCore
 
-
 from . import BackendURL, BackendFile, urlTypes
 from ..core import tags
+
 
 def init():
     # register the http:// URL scheme
@@ -30,8 +30,7 @@ def init():
 class HTTPStreamURL(BackendURL):
     """A URL type for HTTP streams (e.g. web radio stations).
     """
-    
-    CAN_RENAME = False
+    CAN_RENAME = True
     CAN_DELETE = False
     
     def __init__(self, urlString):
@@ -42,8 +41,12 @@ class HTTPStreamURL(BackendURL):
     def toQUrl(self):
         return QtCore.QUrl(self.parsedUrl.geturl())
     
-class HTTPStream(BackendFile):
+    def renamed(self, newPath):
+        """Return a new URL object with path *newPath*, while all other attributes are unchanged."""
+        return HTTPStreamURL("http://" + newPath)
     
+
+class HTTPStream(BackendFile):
     DUMMY_TAGS = True
     
     @staticmethod
@@ -63,5 +66,8 @@ class HTTPStream(BackendFile):
     
     def saveTags(self):
         return None
+    
+    def rename(self, newUrl):
+        self.url = newUrl
     
 HTTPStreamURL.IMPLEMENTATIONS = [HTTPStream]
