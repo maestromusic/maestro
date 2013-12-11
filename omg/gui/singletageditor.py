@@ -117,7 +117,7 @@ class SingleTagEditor(QtGui.QWidget):
         recordEditor = RecordEditor(self.model, record)
         theList = self.commonList if record.isCommon() else self.uncommonList
         if pos >= 0:
-            self._computePosition(record.isCommon(), pos)
+            pos = self._computePosition(record.isCommon(), pos)
         else: pos = len(theList)
         theList.insertWidget(pos, recordEditor)
     
@@ -133,9 +133,8 @@ class SingleTagEditor(QtGui.QWidget):
     def _handleRecordInserted(self, pos, record):
         """React to recordInserted-signals from the model."""
         if record.tag == self.tag:
-            if not self._uncommonLoaded and not record.isCommon():
-                self._loadUncommonRecords()
-            self._insertRecord(pos, record)
+            if self._uncommonLoaded or record.isCommon():
+                self._insertRecord(pos, record)
             self._updateListVisibility()
             
     def _handleRecordRemoved(self, record):
@@ -148,14 +147,14 @@ class SingleTagEditor(QtGui.QWidget):
     def _handleRecordChanged(self, tag, oldRecord, newRecord):
         """React to recordChanged-signals from the model."""
         if tag == self.tag and oldRecord.isCommon() != newRecord.isCommon():
-            if not self._uncommonLoaded:
-                self._loadUncommonRecords()
-            # Change the list in which the record is displayed
-            # BUGFIX: When level events are handled, it may happen that the model contains two equal records
-            # for a short moment (change a,b to b,c. After one step you have b,b).
-            # We must remove the correct one.
-            self._removeRecord(oldRecord, exact=True)
-            self._insertRecord(self.model.getRecords(self.tag).index(newRecord), newRecord)
+            if self._uncommonLoaded or oldRecord.isCommon():
+                # Change the list in which the record is displayed
+                # BUGFIX: When level events are handled, it may happen that the model contains two equal records
+                # for a short moment (change a,b to b,c. After one step you have b,b).
+                # We must remove the correct one.
+                self._removeRecord(oldRecord, exact=True)
+            if self._uncommonLoaded or newRecord.isCommon():
+                self._insertRecord(self.model.getRecords(self.tag).index(newRecord), newRecord)
             self._updateListVisibility()
 
     def _updateListVisibility(self):
@@ -167,7 +166,7 @@ class SingleTagEditor(QtGui.QWidget):
             uncommonCount = sum(0 if record.isCommon() else 1 for record in self.model.getRecords(self.tag))
             if 0 < uncommonCount <= self.EXPAND_LINE_LIMIT: # no expandline necessary
                 self._loadUncommonRecords()
-            
+
         expandLineNecessary = uncommonCount > self.EXPAND_LINE_LIMIT
         self.expandLine.setVisible(expandLineNecessary)
         self.uncommonList.setVisible(uncommonCount > 0 and (self.expanded or not expandLineNecessary))
