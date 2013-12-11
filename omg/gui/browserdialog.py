@@ -64,7 +64,7 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         flagList = self.browser.flagCriterion.flags if self.browser.flagCriterion is not None else []
         
         self.flagView = FlagView(flagList)
-        self.flagView.selectionChanged.connect(self._handleSelectionChanged)
+        self.flagView.selectionChanged.connect(browser.setFlagFilter)
         filterTab.layout().addWidget(self.flagView)
         
         filterCriterionLayout = QtGui.QHBoxLayout()
@@ -80,11 +80,8 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         self.tabWidget.addTab(self.optionTab,self.tr("Options"))
         
         # Option tab is filled in subclasses
-        
-    def _handleSelectionChanged(self):
-        self.browser.setFlagFilter(self.flagView.selectedFlagTypes)
-          
-          
+
+
 class BrowserDialog(AbstractBrowserDialog):
     def __init__(self, parent, browser):
         super().__init__(parent, browser)
@@ -133,7 +130,7 @@ class FlagView(QtGui.QTableWidget):
         self.itemChanged.connect(self._handleItemChanged)
         self.setShowGrid(False)
         
-        self.selectedFlagTypes = selectedFlagTypes[:]
+        self.selectedFlagTypes = list(selectedFlagTypes)
         self._loadFlags()
         
     def _loadFlags(self):
@@ -170,7 +167,8 @@ class FlagView(QtGui.QTableWidget):
             item = self.findItem(flagType)
             if item is not None: # should always be true
                 item.setCheckState(Qt.Checked)
-            self.selectionChanged.emit(self.selectedFlagTypes)
+            # Copy the list so that external code doesn't use the internal list
+            self.selectionChanged.emit(list(self.selectedFlagTypes))
     
     def unselectFlagType(self,flagType):
         if flagType in self.selectedFlagTypes:
@@ -178,7 +176,7 @@ class FlagView(QtGui.QTableWidget):
             item = self.findItem(flagType)
             if item is not None: # should always be true
                 item.setCheckState(Qt.Unchecked)
-            self.selectionChanged.emit(self.selectedFlagTypes)
+            self.selectionChanged.emit(list(self.selectedFlagTypes))
                 
     def _handleItemChanged(self,item):
         flagType = item.data(Qt.UserRole)

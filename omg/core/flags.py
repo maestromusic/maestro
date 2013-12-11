@@ -79,7 +79,7 @@ class Flag:
             self.icon = QtGui.QIcon(iconPath)
         else: self.icon = None
         
-    def __str__(self):
+    def __repr__(self):
         return self.name
     
     def __eq__(self, other):
