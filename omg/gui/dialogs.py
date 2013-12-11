@@ -321,12 +321,12 @@ class MergeDialog(QtGui.QDialog):
         # Before creating anything, change tags of children (might raise filesystem errors)
         removePrefixes = hasattr(self, 'removePrefixBox') and self.removePrefixBox.isChecked()
         removeNumbers = hasattr(self, 'removeNumbersBox') and self.removeNumbersBox.isChecked()
-        if removePrefixes or removeNumbers:
-            tagChanges = {}
-            prefix = self.removeEdit.text() if removePrefixes else ''
-            for element in self.elements:
-                if tags.TITLE not in element.tags:
-                    continue
+
+        tagChanges = {}
+        prefix = self.removeEdit.text() if removePrefixes else ''
+        for element in self.elements:
+            additions = removals = replacements = None
+            if (removePrefixes or removeNumbers) and tags.TITLE in element.tags:
                 removals, replacements = [], []
                 for value in element.tags[tags.TITLE]:
                     if removePrefixes and value.startswith(prefix):
@@ -337,22 +337,24 @@ class MergeDialog(QtGui.QDialog):
                         if len(number) > 0:
                             newValue = newValue[len(number):]
                     if len(newValue) == 0:
-                        removals.append(value)
+                        removals.append((tags.TITLE, value))
                     elif value != newValue:
-                        replacements.append((value, newValue))
-                tagChanges[element] = tags.SingleTagDifference(tags.TITLE,
-                                                               removals=removals,
-                                                               replacements=replacements)
-    
-            if len(tagChanges) > 0:
-                from ..filebackends import TagWriteError
-                try:
-                    self.level.changeTags(tagChanges)
-                except TagWriteError as e:
-                    e.displayMessage()
-                    self.level.stack.abortMacro()
-                    self.reject()
-                    return
+                        replacements.append((tags.TITLE, value, newValue))
+            if containerType == elements.TYPE_ALBUM and tags.ALBUM not in element.tags:
+                additions = [(tags.ALBUM, containerTitle)]
+            tagChanges[element] = tags.TagDifference(additions=additions,
+                                                     removals=removals,
+                                                     replacements=replacements)
+
+        if len(tagChanges) > 0:
+            from ..filebackends import TagWriteError
+            try:
+                self.level.changeTags(tagChanges)
+            except TagWriteError as e:
+                e.displayMessage()
+                self.level.stack.abortMacro()
+                self.reject()
+                return
                 
         if hasattr(self, 'changeTypeBox') and self.changeTypeBox.isChecked():
             newType = self.childrenTypeBox.currentType()
