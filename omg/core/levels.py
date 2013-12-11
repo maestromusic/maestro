@@ -388,7 +388,6 @@ class Level(application.ChangeEventDispatcher):
         """Set the type of one or more containers. The action can be undone. *containerTypes* maps containers
         to their desired type.
         """
-        print(containerTypes)
         if len(containerTypes) > 0:
             oldTypes = {container: container.type for container in containerTypes}
             command = GenericLevelCommand(redoMethod=self._setTypes,

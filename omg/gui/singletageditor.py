@@ -141,9 +141,8 @@ class SingleTagEditor(QtGui.QWidget):
     def _handleRecordRemoved(self, record):
         """React to recordRemoved-signals from the model."""
         if record.tag == self.tag:
-            if not self._uncommonLoaded and not record.isCommon():
-                self._loadUncommonRecords()
-            self._removeRecord(record)
+            if self._uncommonLoaded or record.isCommon():
+                self._removeRecord(record)
             self._updateListVisibility()
 
     def _handleRecordChanged(self, tag, oldRecord, newRecord):

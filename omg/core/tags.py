@@ -988,7 +988,14 @@ class TagDifference:
         return utils.InverseDifference(self)
         
     def __str__(self):
-        return "{}(additions={}, removals={})".format(str(type(self)), self.additions, self.removals)
+        parts = []
+        if self.additions is not None:
+            parts.append("additions={}".format(self.additions))
+        if self.removals is not None:
+            parts.append("removals={}".format(self.removals))
+        if self.replacements is not None:
+            parts.append("replacements={}".format(self.replacements))
+        return "{}({})".format(str(type(self)), ', '.join(parts))
 
 
 class SingleTagDifference(TagDifference):
