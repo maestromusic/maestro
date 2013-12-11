@@ -24,7 +24,7 @@ translate = QtCore.QCoreApplication.translate
 
 from ... import database as db
 from ...core import tags, elements, levels
-from ...gui import mainwindow
+from ...gui import mainwindow, dockwidget
 
 try:
     import matplotlib.pyplot as pyplot
@@ -48,20 +48,19 @@ def disable():
     mainwindow.removeWidgetData("statistics")
     
 
-class StatisticsWidget(QtGui.QWidget):
+class StatisticsWidget(dockwidget.DockWidget):
     """Widget that displays some statistics (or an error message if matplotlib cannot be loaded)."""
-    def __init__(self, state=None):
+    def __init__(self, state=None, **kwargs):
         super().__init__()
         if pyplot is None:
-            layout = QtGui.QHBoxLayout(self)
+            #layout = QtGui.QHBoxLayout(self)
             errorLabel = QtGui.QLabel(pyplotError)
             errorLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-            layout.addWidget(errorLabel)
+            self.setWidget(errorLabel)
             return
         
-        self.setLayout(QtGui.QHBoxLayout())
         self.scroll = QtGui.QScrollArea()
-        self.layout().addWidget(self.scroll)
+        self.setWidget(self.scroll)
         self.updateCharts()
         levels.real.connect(self.updateCharts)
         
@@ -184,11 +183,11 @@ class StatisticsWidget(QtGui.QWidget):
     def getDates(self):
         """Return heights and labels of the bars in the date chart."""
         result = db.query("""
-            SELECT v.value DIV 10000 AS date, COUNT(*) AS count 
-            FROM new_tags AS t JOIN new_values_date AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
+            SELECT v.value {1} 10000 AS date, COUNT(*) AS count 
+            FROM {0}tags AS t JOIN {0}values_date AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
             WHERE t.tag_id = 8
             GROUP BY date
-            """)
+            """.format(db.prefix, '/' if db.type == 'sqlite' else 'DIV')) # SQLite uses integer division
         counters = collections.defaultdict(int)
         for date, count in result:
             if date < 1700:

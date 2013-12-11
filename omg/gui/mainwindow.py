@@ -114,7 +114,7 @@ class WidgetData:
         self.central = central
         self.dock = dock
         self.unique = unique
-        self.preferredDockArea = preferredDockArea
+        self.preferredDockArea = preferredDockArea or Qt.BottomDockWidgetArea
         self.icon = icon
 
     def __eq__(self,other):
