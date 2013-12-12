@@ -59,7 +59,7 @@ import os, threading, functools
 from PyQt4 import QtCore
 
 from . import sql
-from .. import config, logging, utils, constants
+from .. import config, logging, utils, constants, strutils
 from ..core import tags as tagsModule
 
 # Table type and prefix
@@ -433,8 +433,8 @@ def idFromValue(tagSpec, value, insert=False):
         id = query(q,tag.id,value).getSingle()
     except sql.EmptyResultException:
         if insert:
-            result = query("INSERT INTO {}values_{} (tag_id,value) VALUES (?,?)"
-                             .format(prefix,tag.type.name),tag.id,value)
+            result = query("INSERT INTO {}values_{} (tag_id,value,search_value) VALUES (?,?,?)"
+                             .format(prefix, tag.type.name), tag.id, value, strutils.removeDiacritics(value))
             id = result.insertId()
         else: raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
     

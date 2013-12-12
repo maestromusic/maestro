@@ -429,25 +429,21 @@ class TagCriterion(Criterion):
                 tagList = [tag for tag in self.tagList if tag.type == valueType]
                 if len(tagList) == 0:
                     continue
-                if valueType != tags.TYPE_DATE:
+                if valueType == tags.TYPE_VARCHAR:
+                    if self.binary:
+                       value = self.value
+                    else: value = strutils.removeDiacritics(self.value) 
                     if db.type == 'mysql':
                         if not self.singleWord:
                             if self.binary:
                                 whereClause = 'INSTR(value, BINARY ?)'
-                                parameter = self.value
-                            else:
-                                # Now we have to use LIKE instead of INSTR because INSTR does not respect the
-                                # collation correctly in MySQL (with charset utf8):
-                                # INSTR('a','ä') = 0, INSTR('ä','á') = 1
-                                whereClause = "value LIKE ?"
-                                parameter = '%{}%'.format(self._escapeParameter(self.value))
+                            else: whereClause = "INSTR(COALESCE(search_value, value), ?)"
+                            parameter = value
                         else:
                             if self.binary:
                                 whereClause = 'value REGEXP BINARY ?' # case-sensitive
-                            else:
-                                #TODO: While this is case-insensitive, it still is diacritics-sensitive 
-                                whereClause = 'value REGEXP ?'
-                            parameter = '[[:<:]]{}[[:>:]]'.format(re.escape(self.value))
+                            else: whereClause = 'COALESCE(search_value, value) REGEXP ?'
+                            parameter = '[[:<:]]{}[[:>:]]'.format(re.escape(value))
                             
                     else: # SQLite
                         if not self.singleWord:
@@ -455,28 +451,33 @@ class TagCriterion(Criterion):
                                 # INSTR exists only in SQLite 3.7.15 and later
                                 queries.append('PRAGMA case_sensitive_like = 1')
                                 whereClause = "value LIKE ?"
-                                parameter = '%{}%'.format(self._escapeParameter(self.value))
-                            else:
-                                whereClause = "remove_diacritics(value) LIKE ?"
-                                parameter = '%{}%'.format(self._escapeParameter( 
-                                                                    strutils.removeDiacritics(self.value)))
+                            else: whereClause = "COALESCE(search_value, value) LIKE ?"
+                            parameter = '%{}%'.format(self._escapeParameter(value))
                         else:
                             if self.binary:
                                 whereClause = "value REGEXP ?"
-                                parameter = '\\b{}\\b'.format(re.escape(self.value))
+                                parameter = '\\b{}\\b'.format(re.escape(value))
                             else:
-                                whereClause = "remove_diacritics(value) REGEXP ?" 
-                                parameter = '(?i)\\b{}\\b'.format(re.escape(
-                                                                    strutils.removeDiacritics(self.value)))
+                                whereClause = "COALESCE(search_value, value) REGEXP ?" 
+                                parameter = '(?i)\\b{}\\b'.format(re.escape(value))
 
                     queries.append(("INSERT INTO {} (value_id, tag_id) "
-                                    "SELECT id, tag_id FROM {}values_{} WHERE tag_id IN({}) AND {}"
-                                    .format(TT_HELP, db.prefix, valueType.name, db.csIdList(tagList),
-                                            whereClause), parameter))
+                                    "SELECT id, tag_id FROM {}values_varchar WHERE tag_id IN({}) AND {}"
+                                    .format(TT_HELP, db.prefix, db.csIdList(tagList), whereClause),
+                                    parameter))
                     
-                    if db.type == 'sqlite' and self.binary:
+                    if db.type == 'sqlite' and not self.singleWord and self.binary:
                         queries.append('PRAGMA case_sensitive_like = 0')
-                else:
+                        
+                elif valueType == tags.TYPE_TEXT:
+                    whereClause = "value LIKE ?"
+                    parameter = '%{}%'.format(self._escapeParameter(self.value))
+                    queries.append(("INSERT INTO {} (value_id, tag_id) "
+                                    "SELECT id, tag_id FROM {}values_text WHERE tag_id IN({}) AND {}"
+                                    .format(TT_HELP, db.prefix, db.csIdList(tagList), whereClause),
+                                    parameter))
+                    
+                elif valueType == tags.TYPE_DATE:
                     if self.interval is None:
                         continue
                     whereClause = self.interval.toDateSql().queryPart()

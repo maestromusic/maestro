@@ -20,7 +20,7 @@ import sqlite3, datetime, threading, re
 
 from . import DBException, AbstractSql, AbstractSqlResult, EmptyResultException
 from .. import prefix
-from ... import utils, logging, strutils
+from ... import utils, logging
 
 sqlite3.register_adapter(utils.FlexiDate, utils.FlexiDate.toSql)
 
@@ -37,7 +37,6 @@ class Sql(AbstractSql):
         # Foreign keys must be enabled in each connection
         self._db.execute("PRAGMA foreign_keys = ON")
         
-        self._db.create_function('remove_diacritics', 1, strutils.removeDiacritics)
         self._db.create_function('regexp', 2, lambda p,s: re.search(p, s) is not None)
 
     def close(self):

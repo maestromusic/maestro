@@ -223,6 +223,7 @@ CREATE TABLE {0}values_varchar (
     tag_id          SMALLINT  UNSIGNED NOT NULL,
     value           VARCHAR({1})       NOT NULL,
     sort_value      VARCHAR({1}),
+    search_value    VARCHAR({1}),
     hide            BOOLEAN            NOT NULL,
     PRIMARY KEY(id),
     INDEX tag_value_idx(tag_id,value),
@@ -231,11 +232,12 @@ CREATE TABLE {0}values_varchar (
 """.format(db.prefix,constants.TAG_VARCHAR_LENGTH))
 _addSQLite("""
 CREATE TABLE {0}values_varchar (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    tag_id     SMALLINT  UNSIGNED NOT NULL,
-    value      VARCHAR({1})       NOT NULL,
-    sort_value VARCHAR({1}),
-    hide       BOOLEAN            NOT NULL DEFAULT 0,
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tag_id          SMALLINT  UNSIGNED NOT NULL,
+    value           VARCHAR({1})       NOT NULL,
+    sort_value      VARCHAR({1}),
+    search_value    VARCHAR({1}),
+    hide            BOOLEAN            NOT NULL DEFAULT 0,
     FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
 )
 """.format(db.prefix,constants.TAG_VARCHAR_LENGTH),

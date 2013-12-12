@@ -18,7 +18,7 @@
 
 from PyQt4 import QtCore
 
-from ... import config, database as db
+from ... import config, database as db, strutils
 from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
@@ -323,25 +323,60 @@ class DoubledFilesCheck(Check):
         if not data:
             return db.query("""
                     SELECT COUNT(DISTINCT f1.element_id)
-                    FROM {0}files AS f1 JOIN {0}files AS f2
+                    FROM {p}files AS f1 JOIN {p}files AS f2
                                             ON f1.url = f2.url AND f1.element_id != f2.element_id
-                """.format(db.prefix)).getSingle()
+                    """).getSingle()
         else:
             return [(row[0],row[1],getTitle(row[1]),row[2]) for row in db.query("""
                     SELECT f1.element_id,f2.element_id,f1.url
-                    FROM {0}files AS f1 JOIN {0}files AS f2
+                    FROM {p}files AS f1 JOIN {p}files AS f2
                                             ON f1.url = f2.url AND f1.element_id != f2.element_id
-                """.format(db.prefix))]
+                    """)]
         
     def fix(self): pass
     
 
+class SearchValuesCheck(Check):
+    """Check for entries in values_varchar with incorrect search_value. The search_value is used in
+    diacritics-insensitive searches and should contain the normal value with all diacritics removed.
+    """
+    _name = translate("DBAnalyzerChecks", "Search Values")
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID"),
+                      translate("DBAnalyzerChecks", "Value"),
+                      translate("DBAnalyzerChecks", "Search value"))
+    
+    def check(self, data, fixData=False):
+        result = db.query("SELECT id,value,search_value FROM {p}values_varchar")
+        tuples = []
+        counter = 0
+        for id, value, searchValue in result:
+            if db.isNull(searchValue):
+                searchValue = None
+            correct = strutils.removeDiacritics(value)
+            if correct == value:
+                correct = None
+            if correct != searchValue:
+                if data:
+                    if not fixData:
+                        tuples.append((id, value, searchValue))
+                    else: tuples.append((correct, id))
+                else: counter += 1
+        if data:
+            return tuples
+        else: return counter
+        
+    def fix(self):
+        data = self.check(True, True)
+        if len(data):
+            db.multiQuery("UPDATE {p}values_varchar SET search_value = ? WHERE id = ?", data)
+
+        
 def getTitle(id):
     """Return a displayable title for the element with the given id."""
     titles = list(db.query("""
             SELECT value FROM {0}values_{1}
             WHERE id IN (SELECT value_id FROM {0}tags WHERE element_id = ? AND tag_id = ?)
-            """.format(db.prefix,tags.TITLE.type.name),id,tags.TITLE.id).getSingleColumn())
+            """.format(db.prefix, tags.TITLE.type.name), id, tags.TITLE.id).getSingleColumn())
     if len(titles) > 0:
         return " - ".join(titles)
     else: return translate("DBAnalyzerChecks","<No title>")
