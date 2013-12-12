@@ -50,18 +50,17 @@ def disable():
 
 class StatisticsWidget(dockwidget.DockWidget):
     """Widget that displays some statistics (or an error message if matplotlib cannot be loaded)."""
-    def __init__(self, state=None, **kwargs):
-        super().__init__()
+    def __init__(self, parent=None, **kwargs):
+        super().__init__(parent, **kwargs)
         if pyplot is None:
-            #layout = QtGui.QHBoxLayout(self)
             errorLabel = QtGui.QLabel(pyplotError)
             errorLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
             self.setWidget(errorLabel)
             return
         
-        self.scroll = QtGui.QScrollArea()
-        self.setWidget(self.scroll)
+        self.scrollArea = QtGui.QScrollArea()
         self.updateCharts()
+        self.setWidget(self.scrollArea)
         levels.real.connect(self.updateCharts)
         
     def updateCharts(self):
@@ -79,7 +78,7 @@ class StatisticsWidget(dockwidget.DockWidget):
             heights, labels = zip(*self.getDates())
             self._addBars(self.tr("Dates"), 1, 0, heights, labels, 4, 4)
             
-        self.scroll.setWidget(innerWidget)
+        self.scrollArea.setWidget(innerWidget)
     
     def _addPie(self, title, row, column, sizes, labels, width, height):
         """Add a bar chart at position (row, column) to the layout."""
