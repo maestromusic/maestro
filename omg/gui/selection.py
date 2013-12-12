@@ -44,8 +44,9 @@ def getGlobalSelection():
 def setGlobalSelection(selection):
     """Set the global selection."""
     global _globalSelection
-    _globalSelection = selection
-    changed.emit(_globalSelection)
+    if _globalSelection != selection:
+        _globalSelection = selection
+        changed.emit(_globalSelection)
 
 
 class Selection:
