@@ -433,8 +433,12 @@ def idFromValue(tagSpec, value, insert=False):
         id = query(q,tag.id,value).getSingle()
     except sql.EmptyResultException:
         if insert:
-            result = query("INSERT INTO {}values_{} (tag_id,value,search_value) VALUES (?,?,?)"
+            if tag.type is tagsModule.TYPE_VARCHAR:
+                result = query("INSERT INTO {}values_{} (tag_id,value,search_value) VALUES (?,?,?)"
                              .format(prefix, tag.type.name), tag.id, value, strutils.removeDiacritics(value))
+            else:
+                result = query("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
+                              .format(prefix, tag.type.name), tag.id, value)
             id = result.insertId()
         else: raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
     
