@@ -434,8 +434,11 @@ def idFromValue(tagSpec, value, insert=False):
     except sql.EmptyResultException:
         if insert:
             if tag.type is tagsModule.TYPE_VARCHAR:
-                result = query("INSERT INTO {}values_{} (tag_id,value,search_value) VALUES (?,?,?)"
-                             .format(prefix, tag.type.name), tag.id, value, strutils.removeDiacritics(value))
+                searchValue = strutils.removeDiacritics(value)
+                if searchValue == value:
+                    searchValue = None
+                result = query("INSERT INTO {p}values_varchar (tag_id,value,search_value) VALUES (?,?,?)",
+                               tag.id, value, searchValue)
             else:
                 result = query("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
                               .format(prefix, tag.type.name), tag.id, value)
