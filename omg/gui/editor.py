@@ -52,7 +52,7 @@ class EditorTreeView(treeview.DraggingTreeView):
         self.setItemDelegate(editordelegate.EditorDelegate(self, delegateProfile))
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
-        self.model().rowsDropped.connect(self._selectDroppedRows)
+        self.model().rowsDropped.connect(self._selectDroppedRows, Qt.QueuedConnection)
        
     def _expandInsertedRows(self, parent, start, end):
         if self.autoExpand:
