@@ -521,7 +521,8 @@ class TagEditorWidget(QtGui.QWidget):
 
         if len(selectedRecords) > 0:
             if len(selectedRecords) > 1 and all(r.tag.type == tags.TYPE_VARCHAR for r in selectedRecords):
-                commonPrefix = strutils.commonPrefix([record.value for record in selectedRecords])
+                commonPrefix = strutils.commonPrefix([record.value for record in selectedRecords],
+                                                     separated=True)
                 
                 if len(commonPrefix) > 0:
                     action = fancyMenu.addAction(self.tr("Edit common start..."))
