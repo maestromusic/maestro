@@ -79,18 +79,18 @@ class ElementCounterCheck(Check):
     def check(self,data):
         if not data:
             return db.query("""
-                SELECT COUNT(*) FROM {0}elements
+                SELECT COUNT(*) FROM {p}elements
                 WHERE elements !=
-                    (SELECT COUNT(*) FROM {0}contents
+                    (SELECT COUNT(*) FROM {p}contents
                      WHERE container_id = id)
-                """.format(db.prefix)).getSingle()
+                """).getSingle()
         else:
             result = db.query("""
                 SELECT id,elements,COUNT(element_id) AS realelements
-                FROM {0}elements LEFT JOIN {0}contents ON container_id = id
+                FROM {p}elements LEFT JOIN {p}contents ON container_id = id
                 GROUP BY id
                 HAVING realelements != elements
-                """.format(db.prefix))
+                """)
             return [(row[0],getTitle(row[0]),row[1],row[2]) for row in result]
 
     def _fix(self):
@@ -108,21 +108,21 @@ class FileFlagCheck(Check):
     def check(self,data):
         if not data:
             return db.query("""
-                SELECT COUNT(*) FROM {0}elements LEFT JOIN {0}files ON id = element_id
+                SELECT COUNT(*) FROM {p}elements LEFT JOIN {p}files ON id = element_id
                 WHERE (file != 0) != (element_id IS NOT NULL)
-                """.format(db.prefix)).getSingle()
+                """).getSingle()
         else:
             result = db.query("""
-                SELECT id,file FROM {0}elements LEFT JOIN {0}files ON id = element_id
+                SELECT id,file FROM {p}elements LEFT JOIN {p}files ON id = element_id
                 WHERE (file != 0) != (element_id IS NOT NULL)
-                """.format(db.prefix))
+                """)
             return [(row[0],getTitle(row[0]),row[1],(row[1] + 1) % 2) for row in result]
 
     def _fix(self):
         db.query("""
-            UPDATE {0}elements LEFT JOIN {0}files ON id = element_id
+            UPDATE {p}elements LEFT JOIN {p}files ON id = element_id
             SET file = (element_id IS NOT NULL)
-            """.format(db.prefix))
+            """)
 
 
 class EmptyContainerCheck(Check):
@@ -141,30 +141,40 @@ class EmptyContainerCheck(Check):
     def check(self,data):
         if not data:
             return db.query("""
-                SELECT COUNT(*) FROM {0}elements LEFT JOIN {0}contents ON id = container_id
+                SELECT COUNT(*) FROM {p}elements LEFT JOIN {p}contents ON id = container_id
                 WHERE file = 0 AND container_id IS NULL
-                """.format(db.prefix)).getSingle()
+                """).getSingle()
         else:
             result = db.query("""
-                SELECT id,elements,({0}files.element_id IS NOT NULL)
-                FROM {0}elements LEFT JOIN {0}contents ON id = container_id
-                                 LEFT JOIN {0}files ON id = {0}files.element_id
+                SELECT id,elements,({p}files.element_id IS NOT NULL)
+                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
+                                 LEFT JOIN {p}files ON id = {p}files.element_id
                 WHERE file = 0 AND container_id IS NULL
-                """.format(db.prefix))
+                """)
             return [(row[0],getTitle(row[0]),row[1],row[2]) for row in result]
 
     def _fix(self):
-        db.query("""
-                UPDATE {0}elements LEFT JOIN {0}contents ON id = container_id
-                                   LEFT JOIN {0}files ON id = {0}files.element_id
-                SET file = 1
-                WHERE file = 0 AND container_id IS NULL AND {0}files.element_id IS NOT NULL
-                """.format(db.prefix))
-        db.query("""
-                DELETE {0}elements FROM {0}elements LEFT JOIN {0}contents ON id = container_id
+        # Set file=1 for empty containers which appear in the files-table
+        db.transaction()
+        # Note: SQLite does not support JOIN in UPDATE or DELETE queries.
+        ids = list(db.query("""
+                SELECT id
+                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
+                                 LEFT JOIN {p}files ON id = {p}files.element_id
+                WHERE file = 0 AND container_id IS NULL AND {p}files.element_id IS NOT NULL
+                """))
+        if len(ids):
+            db.multiQuery("UPDATE {p}elements SET file=1 WHERE id=?", ids)
+            
+        # Delete remaining empty containers
+        ids = list(db.query("""
+                SELECT id
+                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
                 WHERE file = 0 AND container_id IS NULL
-                """.format(db.prefix))
-
+                """))
+        if len(ids):
+            db.multiQuery("DELETE FROM {p}elements WHERE id=?", ids)
+        db.commit()
 
 class SuperfluousTagValuesCheck(Check):
     """Check for tag values which are not referenced by any element."""
