@@ -109,7 +109,7 @@ class ChangeFileUrlsAction(TreeAction):
         from ..filebackends.filesystem import FileURL
         selection = self.parent().selection
         if selection.singleWrapper():
-            element = next(fileWrappers()).element
+            element = next(selection.fileWrappers()).element
             if isinstance(element.url, FileURL):
                 self.changeFileUrl(element)
             else: self.changeOtherUrl(element)
@@ -138,6 +138,7 @@ class ChangeFileUrlsAction(TreeAction):
         
     def changeFileUrl(self, element):
         """Ask the user for a new URL for *element* and change the URL. Element must be a filesystem-file."""
+        from ..filebackends.filesystem import FileURL
         path = QtGui.QFileDialog.getSaveFileName(None,
                                                  self.tr("Select new file location"),
                                                  element.url.absPath,
