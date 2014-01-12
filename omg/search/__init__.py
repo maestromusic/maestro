@@ -146,7 +146,7 @@ class SearchEngine(QtCore.QObject):
     def addRequest(self, request):
         """Search for *request*."""
         assert request.engine is self
-        logger.debug("Search: Got new request {}".format(request))
+        #logger.debug("Search: Got new request {}".format(request))
         self._thread.requests.put(request)
 
     def _handleSearchFinished(self, request):
@@ -233,7 +233,7 @@ class SearchThread(threading.Thread):
         self.requests = queue.Queue()
 
     def run(self):      
-        logger.debug('Search connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
+        #logger.debug('Search connecting with thread {}'.format(QtCore.QThread.currentThreadId()))
 
         with db.connect():
             if db.type == 'mysql':
@@ -264,7 +264,7 @@ class SearchThread(threading.Thread):
                 try:
                     result = None
                     for criterion in request.criterion.getCriteriaDepthFirst():
-                        logger.debug("Processing criterion: ".format(criterion))
+                        #logger.debug("Processing criterion: ".format(criterion))
                         if not isinstance(criterion, criteria.MultiCriterion):
                             for queryData in criterion.getQueries(request.fromTable):
                                 #print(queryData)
@@ -290,7 +290,7 @@ class SearchThread(threading.Thread):
                             if self.quit or request.stopped:
                                 raise StopRequestException()
     
-                    logger.debug("Request finished")
+                    #logger.debug("Request finished")
                     assert criterion.result is not None
                     request.result = criterion.result
                     if request.postProcessing is not None:
@@ -309,7 +309,7 @@ class SearchThread(threading.Thread):
                     if request._fireEvent:
                         self.engine._finishedEvent.set()
                 except StopRequestException:
-                    logger.debug("StopRequestException")
+                    #logger.debug("StopRequestException")
                     if request._fireEvent:
                         self.engine._finishedEvent.set()
                     continue
