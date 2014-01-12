@@ -50,7 +50,7 @@ class Profile(QtCore.QObject):
         storage file. The result of this method will be passed as state to the constructor the next time the
         application starts.
         """
-        pass
+        return None
     
     def configurationWidget(self, parent):
         """Return a widget that can be used to configure this profile."""
@@ -150,26 +150,31 @@ class ProfileCategory(QtCore.QObject):
         """Return a list of all profiles of this category."""
         return self._profiles
     
-    def addProfile(self, name, type=None, state=None):
-        """Add a profile to the category. The arguments will be passed to the constructor of the correct
-        subclass of Profile.
+    def addProfile(self, nameOrProfile, type=None, state=None):
+        """Add a profile to the category. You can specify the profile either directly or pass a name
+        and, optionally, a type and state. In the latter case the arguments will be passed to the constructor
+        of the correct subclass of Profile.
         
         The argument *type* is ignored and only available to be compatible with TypedCategory.
         """
-        assert isinstance(name,str)
-        profile = self.profileClass(name, type, state)
+        if isinstance(nameOrProfile, str):
+            profile = self.profileClass(nameOrProfile, type, state)
+        else: profile = nameOrProfile
         self._profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile
     
+    def changeProfile(self, profile, newProfile):
+        """Change the profile *profile* to the state of *new*. This does not replace the profile instance
+        because references to *profile* might be in use. Both profiles must have the same name. *profile*
+        must support the Profile.read method."""
+        assert profile.name == newProfile.name
+        profile.read(newProfile.save())
+        self.profileChanged.emit(profile)
+    
     def deleteProfile(self,profile):
         """Delete a profile so that it disappears from the storage file at application end."""
         assert not profile.builtIn
-        # TODO: comment these lines
-        for data in self.storageOption.getValue():
-            if data[0] == profile.name:
-                data[2] = profile.save()
-                break
         self._profiles.remove(profile)
         self.profileRemoved.emit(profile)
         
@@ -265,12 +270,18 @@ class TypedProfileCategory(ProfileCategory):
         self.types.remove(type)
         self.typeRemoved.emit(type)
     
-    def addProfile(self, name, type, state=None):
-        """Add a profile to the category. The arguments will be passed to the constructor of the correct
-        subclass of Profile."""
-        assert type is not None
-        profileClass = type.profileClass if type.profileClass is not None else self.profileClass
-        profile = profileClass(name, type, state)
+    def addProfile(self, nameOrProfile, type=None, state=None):
+        """Add a profile to the category. You can specify the profile either directly or pass a name
+        and, optionally, a type and state. In the latter case the arguments will be passed to the constructor
+        of the correct subclass of Profile.
+        
+        The argument *type* is ignored and only available to be compatible with TypedCategory.
+        """
+        if isinstance(nameOrProfile, str):
+            assert type is not None
+            profileClass = type.profileClass if type.profileClass is not None else self.profileClass
+            profile = profileClass(nameOrProfile, type, state)
+        else: profile = nameOrProfile
         self._profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile

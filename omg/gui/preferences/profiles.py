@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import functools
+
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -564,3 +566,109 @@ class ProfileComboBox(QtGui.QComboBox):
             event.accept()
         else:
             return super().mousePressEvent(event)
+
+
+class ProfileActionDialog(QtGui.QDialog):
+    def __init__(self, category, parent=None, actionText=None):
+        super().__init__(parent)
+        self.setMinimumSize(400, 300)
+        self.category = category
+        self.category.profileAdded.connect(self._makeMenu)
+        self.category.profileRemoved.connect(self._makeMenu)
+        self.category.profileRenamed.connect(self._makeMenu)
+        
+        if len(category.profiles()) == 0:
+            profile = category.profileClass(category.suggestProfileName())
+        else: profile = category.profiles()[0].copy()
+        self.configWidget = profile.configurationWidget(self)
+        
+        layout = QtGui.QVBoxLayout(self)
+        topLayout = QtGui.QHBoxLayout()
+        topLayout.addStretch(1)
+        self.profileButton = QtGui.QPushButton(self.tr("Profiles..."))
+        topLayout.addWidget(self.profileButton)
+        self._makeMenu()
+        layout.addLayout(topLayout)
+        
+        layout.addWidget(self.configWidget)
+        
+        self.layout().addStretch(1)
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
+        if actionText is None:
+            buttonBox.addButton(QtGui.QDialogButtonBox.Ok)
+        else: buttonBox.addButton(actionText, QtGui.QDialogButtonBox.AcceptRole)
+        self.layout().addWidget(buttonBox)
+        buttonBox.rejected.connect(self.reject)
+        buttonBox.accepted.connect(self.accept)
+    
+    def _makeMenu(self):
+        """Fill the menu (only in temporary mode). This is necessary if the name of the current profile
+        changes."""
+        menu = QtGui.QMenu()
+        for profile in self.category.profiles():
+            action = menu.addAction(self.tr("Load '{}'").format(profile.name))
+            action.triggered.connect(functools.partial(self._setProfile, profile))
+        menu.addSeparator()
+        action = menu.addAction(self.tr("Save current configuration..."))
+        action.triggered.connect(self._handleSave)
+        action = menu.addAction(self.tr("Configure profiles..."))
+        action.triggered.connect(self._handleConfigure)
+        self.profileButton.setMenu(menu)
+        
+    def _setProfile(self, profile):
+        self.configWidget.setProfile(profile.copy())
+        
+    def _handleSave(self):
+        dialog = SaveProfileDialog(self.category, self.configWidget.getProfile(), self)
+        dialog.exec_()
+        
+    def _handleConfigure(self):
+        showPreferences(self.category)
+        
+    
+class SaveProfileDialog(QtGui.QDialog):
+    def __init__(self, category, profile, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Save configuration as profile"))
+        self.category = category
+        self.profile = profile
+        layout = QtGui.QVBoxLayout(self)
+        
+        nameLayout = QtGui.QHBoxLayout()
+        nameLayout.addWidget(QtGui.QLabel(self.tr("Choose a profile name: ")))
+        self.nameEdit = QtGui.QLineEdit(profile.name if profile is not None else '')
+        nameLayout.addWidget(self.nameEdit)
+        layout.addLayout(nameLayout)
+        
+        profileListLabel = QtGui.QLabel(self.tr("Or overwrite an existing profile:"))
+        layout.addWidget(profileListLabel)
+        self.profileList = QtGui.QListWidget()
+        self.profileList.addItems([profile.name for profile in category.profiles()])
+        self.profileList.itemClicked.connect(lambda item: self.nameEdit.setText(item.text()))
+        if len(category.profiles()) == 0:
+            profileListLabel.setEnabled(False)
+            self.profileList.setEnabled(False)
+        layout.addWidget(self.profileList)
+        
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
+        okButton = buttonBox.addButton(QtGui.QDialogButtonBox.Ok)
+        okButton.setEnabled(len(self._getProfileName()) > 0)
+        self.nameEdit.textChanged.connect(lambda: okButton.setEnabled(len(self._getProfileName()) > 0))
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+        layout.addWidget(buttonBox)
+        
+    def _getProfileName(self):
+        return self.nameEdit.text().strip()
+        
+    def accept(self):
+        name = self._getProfileName()
+        assert len(name) > 0 # button is deactivated otherwise
+        
+        self.profile.name = name
+        oldProfile = self.category.get(name)
+        if oldProfile is None:
+            self.category.addProfile(self.profile.copy())
+        else: self.category.changeProfile(oldProfile, self.profile)
+        super().accept()
+        
