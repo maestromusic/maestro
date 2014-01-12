@@ -108,7 +108,7 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
         icon = utils.getIcon('widgets/tageditor.png'),
         theClass = TagEditorDock,
         unique = True,
-        preferredDockArea = Qt.BottomDockWidgetArea))
+        preferredDockArea = Qt.RightDockWidgetArea))
     
     
 class TagEditorDialog(QtGui.QDialog):

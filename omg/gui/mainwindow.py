@@ -158,7 +158,7 @@ class MainWindow(QtGui.QMainWindow):
 
         # Resize and move the widget to the size and position it had when the program was closed
         if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
-            self.setWindowState(self.windowState() | Qt.WindowMaximized)
+            self.showMaximized()
         else:
             if "mainwindow_geometry" in config.binary \
                   and isinstance(config.binary["mainwindow_geometry"],bytearray):
@@ -181,11 +181,25 @@ class MainWindow(QtGui.QMainWindow):
                 logger.exception(e)
                 self.createDefaultWidgets()
         else: self.createDefaultWidgets()
-        self.updateWidgetMenus()  # view menu can only be initialized after all widgets have been created TODO check
+        self.updateWidgetMenus()  # view menu can only be initialized after all widgets have been created
+
 
         # TODO: Replace this hack by something clever.
         browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")),self,
                                           self._handleBrowserShortcut)
+        self.show()
+        QtCore.QTimer.singleShot(1000, self._initLater)
+
+    def _initLater(self):
+        print("_INITLATER")
+        if "mainwindow_dockwidget_sizes" in config.binary and "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
+            print("RESTORE")
+            print(config.binary["mainwindow_dockwidget_sizes"])
+            for w in self.dockWidgets():
+                name = w.objectName()
+                if name in config.binary["mainwindow_dockwidget_sizes"]:
+                    w.resize(*config.binary["mainwindow_dockwidget_sizes"][name])
+                    
 
     def centralWidgets(self):
         return [self.centralWidget().widget(i) for i in range(self.centralWidget().count())]
@@ -206,6 +220,12 @@ class MainWindow(QtGui.QMainWindow):
     def close(self):
         self.savePerspective()
         config.binary["mainwindow_maximized"] = self.isMaximized()
+        if self.isMaximized():
+            config.binary["mainwindow_dockwidget_sizes"] = \
+                        {w.objectName(): (w.size().width(), w.size().height())
+                         for w in self.dockWidgets(includeHidden=True)}
+            print("SAVE")
+            print(config.binary["mainwindow_dockwidget_sizes"])
         config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
         super().close()
 
@@ -490,7 +510,7 @@ class MainWindow(QtGui.QMainWindow):
             data = WidgetData.fromId(id)
             self.addCentralWidget(data)
         self.centralWidget().setCurrentIndex(1)
-        for id in 'browser','filesystembrowser','tageditor':
+        for id in 'browser', 'filesystembrowser', 'tageditor', 'playback':
             data = WidgetData.fromId(id)
             self.addDockWidget(data)
 
