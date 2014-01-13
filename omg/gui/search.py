@@ -77,18 +77,48 @@ class CriterionLineEdit(IconLineEdit):
     """Special LineEdit to enter search strings. When the focus leaves the box or Enter is pressed, it will
     check the syntax of the string (see search.criteria.parse) and emit criterionChanged with the given
     criterion or criterionCleared if the criterion is None.
+    
+    The optional parameter *criterion* may be either a Criterion-instance or a string and will be used to
+    fill the box at the beginning.
     """
     criterionChanged = QtCore.pyqtSignal(criteria.Criterion)
     criterionCleared = QtCore.pyqtSignal()
     
-    def __init__(self, criterion):
+    def __init__(self, criterion=None):
         super().__init__(utils.getIcon("clear.png"))
         self.button.clicked.connect(self.clear)
         self.button.clicked.connect(self._handleChange)
+        self._criterion = None
+        if isinstance(criterion, criteria.Criterion):
+            self.setText(repr(criterion))
+            self._criterion = criterion
+        elif isinstance(criterion, str):
+            self.setText(criterion)
+            self._handleChange()
+        elif criterion is not None:
+            raise TypeError("criterion must be either a Criterion-instance or a string.")
+        self.returnPressed.connect(self._handleChange)
+    
+    def getCriterion(self):
+        """Return the current criterion if it is valid or the last valid criterion from the box."""
+        return self._criterion
+    
+    def setCriterion(self, criterion):
+        """Set the criterion in the box. *criterion* may be None."""
         if criterion is not None:
             self.setText(repr(criterion))
-        self.criterion = criterion
-        self.returnPressed.connect(self._handleChange)
+        else: self.setText('')
+        
+    def isValid(self):
+        """Return whether the text in the box can be parsed to a criterion."""
+        text = self.text().strip()
+        if len(self.text()) == 0:
+            return True
+        try:
+            criterion = criteria.parse(text)
+            return True
+        except criteria.ParseException:
+            return False
         
     def focusOutEvent(self, event):
         super().focusOutEvent(event)
@@ -104,8 +134,8 @@ class CriterionLineEdit(IconLineEdit):
             self.setStyleSheet("QLineEdit { background-color : #FF7094 }")
         else:
             self.setStyleSheet('')
-            if criterion != self.criterion:
-                self.criterion = criterion
+            if criterion != self._criterion:
+                self._criterion = criterion
                 if criterion is not None:
                     self.criterionChanged.emit(criterion)
                 else: self.criterionCleared.emit()

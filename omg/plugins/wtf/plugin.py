@@ -25,6 +25,8 @@ from PyQt4.QtCore import Qt
 
 from ... import utils, profiles, config, application, database as db, search, logging
 from ...core import levels
+from ...gui import search as searchgui, dialogs
+from ...gui.preferences import profiles as profilesgui
 from ...search import criteria
 
 translate = QtCore.QCoreApplication.translate
@@ -51,7 +53,7 @@ def enable():
     
     _action = QtGui.QAction(application.mainWindow)
     _action.setText(QtGui.QApplication.translate("wtf", "Export..."))
-    _action.triggered[tuple()].connect(handleAction)
+    _action.triggered[tuple()].connect(Dialog.execute)
     
     
 def mainWindowInit():
@@ -71,18 +73,10 @@ def defaultStorage():
         }}
 
 
-def handleAction():
-    from ...gui.preferences import profiles as profilesgui
-    dialog = profilesgui.ProfileActionDialog(profileCategory)
-    dialog.setWindowTitle(translate("wtf", "Export"))
-    if dialog.exec_() == QtGui.QDialog.Accepted:
-        export(dialog.configWidget.getProfile())
-    
-    
 class Profile(profiles.Profile):
     def __init__(self, name, type=None, state=None):
         super().__init__(name, type, state)
-        self.filter = ''
+        self.criterion = None
         self.path = ''
         self.structure = STRUCTURE_KEEP
         self.delete = False
@@ -92,7 +86,7 @@ class Profile(profiles.Profile):
         return ConfigWidget(self, parent)
     
     def save(self):
-        return {'filter': self.filter,
+        return {'criterion': repr(self.criterion),
                 'path': self.path,
                 'structure': self.structure,
                 'delete': self.delete
@@ -100,16 +94,39 @@ class Profile(profiles.Profile):
     
     def read(self, state):
         if state is not None:
-            if 'filter' in state:
-                self.filter = state['filter']
+            if 'criterion' in state:
+                try:
+                    self.criterion = criteria.parse(state['criterion'])
+                except criteria.ParseException:
+                    pass
             if 'path' in state:
                 self.path = state['path']
             if 'structure' in state:
                 self.structure = state['structure']
             if 'delete' in state:
                 self.delete = state['delete']
-            
-            
+
+    
+class Dialog(profilesgui.ProfileActionDialog):
+    def __init__(self):
+        super().__init__(profileCategory)
+        self.setWindowTitle(self.tr("Export"))
+        
+    def accept(self):
+        if not self.configWidget.criterionLineEdit.isValid():
+            dialogs.warning(translate("wtf", "Invalid criterion"),
+                            translate("wtf", "The given filter criterion is invalid"))
+            return
+        if export(self.configWidget.getProfile()):
+            super().accept() # This will close the dialog
+        # otherwise something went wrong. Keep the dialog open.
+    
+    @staticmethod
+    def execute():
+        dialog = Dialog()
+        dialog.exec_()
+    
+    
 class CollapsingPanel(QtGui.QWidget):
     def __init__(self, title, widgetOrLayout, parent=None):
         super().__init__(parent)
@@ -150,13 +167,16 @@ class ConfigWidget(QtGui.QWidget):
         lineLayout.addSpacing(QtGui.QApplication.style()
                               .pixelMetric(QtGui.QStyle.PM_LayoutHorizontalSpacing))
         lineLayout.setSpacing(0)
-        self.filterLineEdit = QtGui.QLineEdit(profile.filter)
-        self.filterLineEdit.editingFinished.connect(self._handleFilterEditingFinished)
-        lineLayout.addWidget(self.filterLineEdit, 1)
-        flagButton = QtGui.QPushButton()
-        flagButton.setIcon(utils.getIcon("flag_blue.png"))
-        flagButton.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
-        lineLayout.addWidget(flagButton)
+        self.criterionLineEdit = searchgui.CriterionLineEdit(profile.criterion)
+        self.criterionLineEdit.criterionChanged.connect(self._handleCriterionLineEdit)
+        self.criterionLineEdit.criterionCleared.connect(self._handleCriterionLineEdit)
+        lineLayout.addWidget(self.criterionLineEdit, 1)
+        #TODO implement an easy way to select elements by flags. In the usual workflow the user should
+        # not need to know the complex search query syntax.
+        #flagButton = QtGui.QPushButton()
+        #flagButton.setIcon(utils.getIcon("flag_blue.png"))
+        #flagButton.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        #lineLayout.addWidget(flagButton)
         self.layout().addWidget(CollapsingPanel(self.tr("Choose elements to export"), layout))
         
         layout = QtGui.QFormLayout()
@@ -189,13 +209,13 @@ class ConfigWidget(QtGui.QWidget):
     
     def setProfile(self, profile):
         self.profile = profile
-        self.filterLineEdit.setText(profile.filter)
+        self.criterionLineEdit.setCriterion(profile.criterion)
         self.pathLineEdit.setText(profile.path)
         self.structureBox.setCurrentIndex(profile.structure)
         self.deleteBox.setChecked(profile.delete)
     
-    def _handleFilterEditingFinished(self):
-        self.profile.filter = self.filterLineEdit.text()
+    def _handleCriterionLineEdit(self):
+        self.profile.criterion = self.criterionLineEdit.getCriterion()
         
     def _handlePathEditingFinished(self):
         self.profile.path = self.pathLineEdit.text()
@@ -215,23 +235,19 @@ class ConfigWidget(QtGui.QWidget):
             
 
 def export(profile):
-    engine = search.SearchEngine()
-    try:
-        criterion = criteria.parse(profile.filter)
-    except criteria.ParseException:
-        QtGui.QMessageBox.warning(None, translate("wtf", "Invalid criterion"),
-                                  translate("wtf", "The given filter criterion is invalid"))
-        return
-    
-    request = engine.searchAndBlock(db.prefix+"elements", criterion)
+    if profile.criterion is not None:
+        engine = search.SearchEngine()
+        request = engine.searchAndBlock(db.prefix+"elements", profile.criterion)
+    else:
+        raise NotImplementedError()
     print("Found {} elements for export".format(len(request.result)))
     if len(request.result) == 0:
-        QtGui.QMessageBox.warning(None, translate("wft", "No elements found"),
-                                translate("wtf", "The given filter criterion does not match any elements."))
-        return
+        dialogs.warning(translate("wft", "No elements found"),
+                        translate("wtf", "The given filter criterion does not match any elements."))
+        return False
     
     exported = set()
-    if profile.structure == STRUCTURE_FLAT:
+    if profile.structure == STRUCTURE_FLAT or profile.delete:
         exportedPaths = set()
     toExport = levels.real.collectMany(request.result)
     while len(toExport) > 0:
@@ -249,7 +265,6 @@ def export(profile):
         if profile.structure == STRUCTURE_FLAT:
             exportPath = os.path.basename(element.url.path)
             if exportPath in exportedPaths:
-                # TODO mv path.mp3 to path-1.mp3
                 exportPath, ext = os.path.splitext(exportPath)
                 i = 1
                 while exportPath+"-" + str(i) + ext in exportedPaths:
@@ -259,9 +274,39 @@ def export(profile):
             exportedPaths.add(exportPath)
         else:
             exportPath = element.url.path
+            if profile.delete:
+                exportedPaths.add(exportPath)
         
         src = os.path.join(config.options.main.collection, element.url.path)
         dest = os.path.join(profile.path, exportPath)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.copyfile(src, dest)
+    
+    if profile.delete:
+        toDelete = []
+        for dirPath, dirNames, fileNames in os.walk(profile.path):
+            dirPath = os.path.relpath(dirPath, profile.path)
+            if dirPath == '.':
+                dirPath = ''
+            for filePath in fileNames:
+                filePath = os.path.join(dirPath, filePath)
+                if filePath not in exportedPaths:
+                    toDelete.append(os.path.join(profile.path, filePath))
+
+        if len(toDelete) > 0 and \
+                dialogs.question(translate("wtf", "Delete files?"),
+                                 translate("wtf",
+                                           "The target folder contains %n file(s) that have not been"
+                                           " exported. Should they be deleted?",
+                                           '', QtCore.QCoreApplication.CodecForTr, len(toDelete))):
+            for filePath in toDelete:
+                os.remove(filePath)
+                # Delete empty directories
+                dirPath = os.path.dirname(filePath)
+                while len(os.listdir(dirPath)) == 0:
+                    assert len(dirPath) > len(profile.path) # profile.path should never be empty
+                    os.rmdir(dirPath)
+                    dirPath = os.path.dirname(dirPath)
+            
+    return True
         
