@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -60,9 +60,9 @@ class SearchBox(IconLineEdit):
                 self._criterion = criterion
                 self.criterionChanged.emit()
                 
-    def keyPressEvent(self,event):
+    def keyPressEvent(self, event):
         QtGui.QLineEdit.keyPressEvent(self, event)
-        if event.key() in (Qt.Key_Return,Qt.Key_Enter):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             try:
                 criterion = criteria.parse(self.text())
             except criteria.ParseException as e:
@@ -74,6 +74,10 @@ class SearchBox(IconLineEdit):
 
 
 class CriterionLineEdit(IconLineEdit):
+    """Special LineEdit to enter search strings. When the focus leaves the box or Enter is pressed, it will
+    check the syntax of the string (see search.criteria.parse) and emit criterionChanged with the given
+    criterion or criterionCleared if the criterion is None.
+    """
     criterionChanged = QtCore.pyqtSignal(criteria.Criterion)
     criterionCleared = QtCore.pyqtSignal()
     
@@ -108,6 +112,9 @@ class CriterionLineEdit(IconLineEdit):
 
 
 class FlagView(QtGui.QTableWidget):
+    """A QTableWidget containing entries for all flags. Whenever the selection changes, selectionChanged is
+    emitted. Flags given in *selectedFlagTypes* are selected at the beginnning.
+    """
     selectionChanged = QtCore.pyqtSignal(list)
     
     def __init__(self, selectedFlagTypes, parent=None):
@@ -122,6 +129,7 @@ class FlagView(QtGui.QTableWidget):
         self._loadFlags()
         
     def _loadFlags(self):
+        """Fill the table with all flags from the database."""
         self.clear()
         flagList = sorted(flags.allFlags(), key=lambda f: f.name)
         
@@ -135,7 +143,7 @@ class FlagView(QtGui.QTableWidget):
             rowCount = len(flagList)
             self.setRowCount(len(flagList))
     
-        for row,flagType in enumerate(flagList):
+        for row, flagType in enumerate(flagList):
             column = 1 if row >= rowCount else 0
             
             item = QtGui.QTableWidgetItem()
@@ -145,11 +153,12 @@ class FlagView(QtGui.QTableWidget):
             item.setCheckState(Qt.Checked if flagType in self.selectedFlagTypes else Qt.Unchecked)
             if flagType.icon is not None:
                 item.setIcon(flagType.icon)
-            self.setItem(row % rowCount,column,item)
+            self.setItem(row % rowCount, column, item)
         
         self.resizeColumnsToContents()
     
-    def selectFlagType(self,flagType):
+    def selectFlagType(self, flagType):
+        """Select the given flag."""
         if flagType not in self.selectedFlagTypes: 
             self.selectedFlagTypes.append(flagType)
             item = self.findItem(flagType)
@@ -158,7 +167,8 @@ class FlagView(QtGui.QTableWidget):
             # Copy the list so that external code doesn't use the internal list
             self.selectionChanged.emit(list(self.selectedFlagTypes))
     
-    def unselectFlagType(self,flagType):
+    def unselectFlagType(self, flagType):
+        """Unselect the given flag."""
         if flagType in self.selectedFlagTypes:
             self.selectedFlagTypes.remove(flagType)
             item = self.findItem(flagType)
@@ -166,17 +176,18 @@ class FlagView(QtGui.QTableWidget):
                 item.setCheckState(Qt.Unchecked)
             self.selectionChanged.emit(list(self.selectedFlagTypes))
                 
-    def _handleItemChanged(self,item):
+    def _handleItemChanged(self, item):
         flagType = item.data(Qt.UserRole)
         if item.checkState() == Qt.Checked:
             self.selectFlagType(flagType)
         elif item.checkState() == Qt.Unchecked:
             self.unselectFlagType(flagType)
         
-    def findItem(self,flagType):
+    def findItem(self, flagType):
+        """Return the item for the given flag (or None)."""
         for row in range(self.rowCount()):
             for column in range(self.columnCount()):
-                item = self.item(row,column)
+                item = self.item(row, column)
                 if item is not None and item.data(Qt.UserRole) == flagType:
                     return item
         return None
