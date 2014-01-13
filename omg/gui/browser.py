@@ -24,8 +24,8 @@ from PyQt4.QtCore import Qt
 from .. import application, config, database as db, logging, utils, search as searchmodule
 from ..core import tags, flags, levels
 from ..core.elements import Element, Container
-from ..search import searchbox, criteria
-from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget
+from ..search import criteria
+from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget, search as searchgui
 from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
 
@@ -101,7 +101,7 @@ class Browser(dockwidget.DockWidget):
         layout.setContentsMargins(0,0,0,0)
         
         controlLineLayout = QtGui.QHBoxLayout()
-        self.searchBox = searchbox.SearchBox()
+        self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox)
         

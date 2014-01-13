@@ -24,8 +24,8 @@ from PyQt4.QtCore import Qt
 
 from ...core import tags
 from ... import search, config, application, database as db, constants, utils
-from ...search import searchbox, criteria
-from ...gui import mainwindow, dialogs
+from ...search import criteria
+from ...gui import mainwindow, dialogs, search as searchgui
 from . import resources
 
 
@@ -95,7 +95,7 @@ class SearchAnalyzer(QtGui.QDialog):
         topLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(topLayout)
 
-        self.searchBox = searchbox.SearchBox()
+        self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self._handleCriterionChanged)
         topLayout.addWidget(self.searchBox)
 

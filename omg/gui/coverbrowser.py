@@ -22,12 +22,12 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import mainwindow, browserdialog, selection, dockwidget
+from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui
 from .misc import busyindicator
 from ..models import browser as browsermodel
 from .. import database as db, utils, imageloader, config
 from ..core import covers, levels, nodes, tags, elements
-from ..search import searchbox, criteria
+from ..search import criteria
 
 
 _displayClasses = {}
@@ -82,7 +82,7 @@ class CoverBrowser(dockwidget.DockWidget):
         layout = QtGui.QVBoxLayout(widget)
         
         controlLineLayout = QtGui.QHBoxLayout()
-        self.searchBox = searchbox.SearchBox()
+        self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox, 1)
         

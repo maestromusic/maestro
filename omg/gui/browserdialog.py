@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import dialogs, delegates
+from . import dialogs, delegates, search as searchgui
 from .. import config, utils, database as db
 from ..core import tags, flags
 from ..models import browser as browsermodel
@@ -63,13 +63,13 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         filterTab.layout().addWidget(QtGui.QLabel(self.tr("Flags:")))
         flagList = self.browser.flagCriterion.flags if self.browser.flagCriterion is not None else []
         
-        self.flagView = FlagView(flagList)
+        self.flagView = searchgui.FlagView(flagList)
         self.flagView.selectionChanged.connect(browser.setFlagFilter)
         filterTab.layout().addWidget(self.flagView)
         
         filterCriterionLayout = QtGui.QHBoxLayout()
         filterCriterionLayout.addWidget(QtGui.QLabel(self.tr("General:")))
-        filterCriterionLine = CriterionLineEdit(self.browser.filterCriterion)
+        filterCriterionLine = searchgui.CriterionLineEdit(self.browser.filterCriterion)
         filterCriterionLine.criterionChanged.connect(self.browser.setFilterCriterion)
         filterCriterionLine.criterionCleared.connect(functools.partial(self.browser.setFilterCriterion,None))
         filterCriterionLayout.addWidget(filterCriterionLine)
@@ -117,115 +117,6 @@ class BrowserDialog(AbstractBrowserDialog):
     def _handleProfileChosen(self, profile):
         for view in self.browser.views:
             view.itemDelegate().setProfile(profile)
-            
-
-class FlagView(QtGui.QTableWidget):
-    selectionChanged = QtCore.pyqtSignal(list)
-    
-    def __init__(self, selectedFlagTypes, parent=None):
-        QtGui.QTableWidget.__init__(self,parent)
-        self.verticalHeader().hide()
-        self.horizontalHeader().hide()
-        self.verticalHeader().setDefaultSectionSize(self.verticalHeader().fontMetrics().height()+2)
-        self.itemChanged.connect(self._handleItemChanged)
-        self.setShowGrid(False)
-        
-        self.selectedFlagTypes = list(selectedFlagTypes)
-        self._loadFlags()
-        
-    def _loadFlags(self):
-        self.clear()
-        flagList = sorted(flags.allFlags(),key=lambda f: f.name)
-        
-        if len(flagList):
-            self.setColumnCount(2)
-            import math
-            rowCount = math.ceil(len(flagList)/2)
-            self.setRowCount(rowCount)
-        else:
-            self.setColumnCount(1)
-            rowCount = len(flagList)
-            self.setRowCount(len(flagList))
-    
-        for row,flagType in enumerate(flagList):
-            column = 1 if row >= rowCount else 0
-            
-            item = QtGui.QTableWidgetItem()
-            item.setText(flagType.name)
-            item.setData(Qt.UserRole,flagType)
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Checked if flagType in self.selectedFlagTypes else Qt.Unchecked)
-            if flagType.icon is not None:
-                item.setIcon(flagType.icon)
-            self.setItem(row % rowCount,column,item)
-        
-        self.resizeColumnsToContents()
-    
-    def selectFlagType(self,flagType):
-        if flagType not in self.selectedFlagTypes: 
-            self.selectedFlagTypes.append(flagType)
-            item = self.findItem(flagType)
-            if item is not None: # should always be true
-                item.setCheckState(Qt.Checked)
-            # Copy the list so that external code doesn't use the internal list
-            self.selectionChanged.emit(list(self.selectedFlagTypes))
-    
-    def unselectFlagType(self,flagType):
-        if flagType in self.selectedFlagTypes:
-            self.selectedFlagTypes.remove(flagType)
-            item = self.findItem(flagType)
-            if item is not None: # should always be true
-                item.setCheckState(Qt.Unchecked)
-            self.selectionChanged.emit(list(self.selectedFlagTypes))
-                
-    def _handleItemChanged(self,item):
-        flagType = item.data(Qt.UserRole)
-        if item.checkState() == Qt.Checked:
-            self.selectFlagType(flagType)
-        elif item.checkState() == Qt.Unchecked:
-            self.unselectFlagType(flagType)
-        
-    def findItem(self,flagType):
-        for row in range(self.rowCount()):
-            for column in range(self.columnCount()):
-                item = self.item(row,column)
-                if item is not None and item.data(Qt.UserRole) == flagType:
-                    return item
-        return None
-
-
-class CriterionLineEdit(lineedits.IconLineEdit):
-    criterionChanged = QtCore.pyqtSignal(criteria.Criterion)
-    criterionCleared = QtCore.pyqtSignal()
-    
-    def __init__(self, criterion):
-        super().__init__(utils.getIcon("clear.png"))
-        self.button.clicked.connect(self.clear)
-        self.button.clicked.connect(self._handleChange)
-        if criterion is not None:
-            self.setText(repr(criterion))
-        self.criterion = criterion
-        self.returnPressed.connect(self._handleChange)
-        
-    def focusOutEvent(self, event):
-        super().focusOutEvent(event)
-        self._handleChange()
-        
-    def _handleChange(self):
-        text = self.text().strip()
-        try:
-            if len(text) == 0:
-                criterion = None
-            else: criterion = criteria.parse(text)
-        except criteria.ParseException:
-            self.setStyleSheet("QLineEdit { background-color : #FF7094 }")
-        else:
-            self.setStyleSheet('')
-            if criterion != self.criterion:
-                self.criterion = criterion
-                if criterion is not None:
-                    self.criterionChanged.emit(criterion)
-                else: self.criterionCleared.emit()
             
         
 class ViewConfigurationDialog(QtGui.QDialog):

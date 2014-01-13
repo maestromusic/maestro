@@ -23,7 +23,7 @@ import functools, os, os.path, shutil
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import utils, profiles, config, application, database as db, search
+from ... import utils, profiles, config, application, database as db, search, logging
 from ...core import levels
 from ...search import criteria
 
@@ -35,6 +35,8 @@ _widget = None # the dialog widget must be stored in a variable or it will vanis
 profileCategory = None
 
 STRUCTURE_KEEP, STRUCTURE_FLAT = range(2)
+
+logger = logging.getLogger("wtf")
 
 
 def enable():
