@@ -26,6 +26,7 @@ from PyQt4.QtCore import Qt
 from ... import utils, profiles, config, application, database as db, search, logging
 from ...core import levels
 from ...gui import search as searchgui, dialogs
+from ...gui.misc import collapsiblepanel
 from ...gui.preferences import profiles as profilesgui
 from ...search import criteria
 
@@ -126,31 +127,8 @@ class Dialog(profilesgui.ProfileActionDialog):
         dialog = Dialog()
         dialog.exec_()
     
-    
-class CollapsingPanel(QtGui.QWidget):
-    def __init__(self, title, widgetOrLayout, parent=None):
-        super().__init__(parent)
-        layout = QtGui.QVBoxLayout(self)
-        layout.setSpacing(0)
-        layout.setContentsMargins(0,0,0,0)
-        groupBox = QtGui.QGroupBox(title)
-        groupBox.setFlat(True)
-        groupBox.setCheckable(True)
-        groupBox.setChecked(True)
-        layout.addWidget(groupBox)
-        if isinstance(widgetOrLayout, QtGui.QWidget):
-            widget = widgetOrLayout
-        else:
-            widget = QtGui.QWidget()
-            widgetOrLayout.setContentsMargins(1,1,1,1)
-            widget.setLayout(widgetOrLayout)
-        self.widget = widget
-        layout.addWidget(widget)
-        groupBox.toggled.connect(self._toggle)
-        
-    def _toggle(self, checked):
-        self.widget.setVisible(checked)
-        self.updateGeometry()
+
+
 
     
 class ConfigWidget(QtGui.QWidget):
@@ -177,7 +155,8 @@ class ConfigWidget(QtGui.QWidget):
         self.flagButton.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
         self.flagButton.clicked.connect(self._handleFlagButton)
         lineLayout.addWidget(self.flagButton)
-        self.layout().addWidget(CollapsingPanel(self.tr("Choose elements to export"), layout))
+        self.layout().addWidget(
+                            collapsiblepanel.CollapsiblePanel(self.tr("Choose elements to export"), layout))
         
         layout = QtGui.QFormLayout()
         lineLayout = QtGui.QHBoxLayout()
@@ -199,7 +178,7 @@ class ConfigWidget(QtGui.QWidget):
         self.deleteBox.setChecked(profile.delete)
         self.deleteBox.toggled.connect(self._handleDeleteBox)
         layout.addRow(self.deleteBox)
-        self.layout().addWidget(CollapsingPanel(self.tr("Export location"), layout))
+        self.layout().addWidget(collapsiblepanel.CollapsiblePanel(self.tr("Export location"), layout))
         
         self.layout().addStretch(1)
         self.setProfile(profile)
@@ -278,13 +257,18 @@ class FlagDialog(dialogs.FancyPopup):
                 newCriterion.flags = selectedFlags
             else: newCriterion = None
         elif isinstance(criterion, criteria.MultiCriterion) and criterion.junction == 'OR':
-            newCriteria = []
+            cList = []
             for c in criterion.criteria:
                 if not (isinstance(c, criteria.FlagCriterion) and criterion.junction == 'OR'): 
-                    newCriteria.append(c)
+                    cList.append(c)
             if len(selectedFlags) > 0:
-                newCriteria.append(criteria.FlagCriterion(selectedFlags))
+                cList.append(criteria.FlagCriterion(selectedFlags))
             newCriterion = criteria.MultiCriterion('OR', newCriteria)
+        else:
+            if len(selectedFlags) > 0:
+                cList = [criterion, criteria.FlagCriterion(selectedFlags)]
+            else: cList = [criterion]
+            newCriterion = criteria.combine('OR', cList)
         
         self.criterionLine.setCriterion(newCriterion)
         
@@ -297,7 +281,7 @@ def export(profile):
         raise NotImplementedError()
     print("Found {} elements for export".format(len(request.result)))
     if len(request.result) == 0:
-        dialogs.warning(translate("wft", "No elements found"),
+        dialogs.warning(translate("wtf", "No elements found"),
                         translate("wtf", "The given filter criterion does not match any elements."))
         return False
     

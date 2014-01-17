@@ -583,7 +583,14 @@ class ProfileActionDialog(QtGui.QDialog):
         self.configWidget = profile.configurationWidget(self)
         
         layout = QtGui.QVBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
         topLayout = QtGui.QHBoxLayout()
+        style = QtGui.QApplication.style()
+        topLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin),
+                                     style.pixelMetric(style.PM_LayoutTopMargin),
+                                     style.pixelMetric(style.PM_LayoutRightMargin),
+                                     1)
+                                       
         topLayout.addStretch(1)
         self.profileButton = QtGui.QPushButton(self.tr("Profiles..."))
         topLayout.addWidget(self.profileButton)
