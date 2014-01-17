@@ -188,17 +188,6 @@ class MainWindow(QtGui.QMainWindow):
         browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")),self,
                                           self._handleBrowserShortcut)
         self.show()
-        QtCore.QTimer.singleShot(1000, self._initLater)
-
-    def _initLater(self):
-        print("_INITLATER")
-        if "mainwindow_dockwidget_sizes" in config.binary and "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
-            print("RESTORE")
-            print(config.binary["mainwindow_dockwidget_sizes"])
-            for w in self.dockWidgets():
-                name = w.objectName()
-                if name in config.binary["mainwindow_dockwidget_sizes"]:
-                    w.resize(*config.binary["mainwindow_dockwidget_sizes"][name])
                     
 
     def centralWidgets(self):
@@ -220,12 +209,6 @@ class MainWindow(QtGui.QMainWindow):
     def close(self):
         self.savePerspective()
         config.binary["mainwindow_maximized"] = self.isMaximized()
-        if self.isMaximized():
-            config.binary["mainwindow_dockwidget_sizes"] = \
-                        {w.objectName(): (w.size().width(), w.size().height())
-                         for w in self.dockWidgets(includeHidden=True)}
-            print("SAVE")
-            print(config.binary["mainwindow_dockwidget_sizes"])
         config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
         super().close()
 
