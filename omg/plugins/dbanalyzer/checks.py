@@ -71,27 +71,27 @@ class Check:
 
 class ElementCounterCheck(Check):
     """Check for broken element counters in the element table."""
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
-                     translate("DBAnalyzerChecks","In DB"),translate("DBAnalyzerChecks","Real"))
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID"), translate("DBAnalyzerChecks", "Name"),
+                     translate("DBAnalyzerChecks", "In DB"), translate("DBAnalyzerChecks", "Real"))
 
-    _name = translate("DBAnalyzerChecks","Element counter")
+    _name = translate("DBAnalyzerChecks", "Element counter")
     
-    def check(self,data):
+    def check(self, data):
         if not data:
             return db.query("""
-                SELECT COUNT(*) FROM {0}elements
+                SELECT COUNT(*) FROM {p}elements
                 WHERE elements !=
-                    (SELECT COUNT(*) FROM {0}contents
+                    (SELECT COUNT(*) FROM {p}contents
                      WHERE container_id = id)
-                """.format(db.prefix)).getSingle()
+                """).getSingle()
         else:
             result = db.query("""
-                SELECT id,elements,COUNT(element_id) AS realelements
-                FROM {0}elements LEFT JOIN {0}contents ON container_id = id
+                SELECT id, elements, COUNT(element_id) AS realelements
+                FROM {p}elements LEFT JOIN {p}contents ON container_id = id
                 GROUP BY id
                 HAVING realelements != elements
-                """.format(db.prefix))
-            return [(row[0],getTitle(row[0]),row[1],row[2]) for row in result]
+                """)
+            return [(row[0], getTitle(row[0]), row[1], row[2]) for row in result]
 
     def _fix(self):
         db.write.updateElementsCounter()
@@ -100,29 +100,29 @@ class ElementCounterCheck(Check):
 class FileFlagCheck(Check):
     """Check for broken file flags in the element table. The file flag should be true if and only if the
     element is contained in the file table."""
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
-                     translate("DBAnalyzerChecks","In DB"),translate("DBAnalyzerChecks","Real"))
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID"), translate("DBAnalyzerChecks", "Name"),
+                     translate("DBAnalyzerChecks", "In DB"), translate("DBAnalyzerChecks", "Real"))
                      
-    _name = translate("DBAnalyzerChecks","File flags")
+    _name = translate("DBAnalyzerChecks", "File flags")
     
-    def check(self,data):
+    def check(self, data):
         if not data:
             return db.query("""
-                SELECT COUNT(*) FROM {0}elements LEFT JOIN {0}files ON id = element_id
+                SELECT COUNT(*) FROM {p}elements LEFT JOIN {p}files ON id = element_id
                 WHERE (file != 0) != (element_id IS NOT NULL)
-                """.format(db.prefix)).getSingle()
+                """).getSingle()
         else:
             result = db.query("""
-                SELECT id,file FROM {0}elements LEFT JOIN {0}files ON id = element_id
+                SELECT id, file FROM {p}elements LEFT JOIN {p}files ON id = element_id
                 WHERE (file != 0) != (element_id IS NOT NULL)
-                """.format(db.prefix))
-            return [(row[0],getTitle(row[0]),row[1],(row[1] + 1) % 2) for row in result]
+                """)
+            return [(row[0], getTitle(row[0]), row[1], (row[1] + 1) % 2) for row in result]
 
     def _fix(self):
         db.query("""
-            UPDATE {0}elements LEFT JOIN {0}files ON id = element_id
+            UPDATE {p}elements LEFT JOIN {p}files ON id = element_id
             SET file = (element_id IS NOT NULL)
-            """.format(db.prefix))
+            """)
 
 
 class EmptyContainerCheck(Check):
@@ -131,120 +131,131 @@ class EmptyContainerCheck(Check):
     files table. Otherwise it will be deleted. Warning: Actually empty containers do not make the database
     corrupt. Especially during editing containers may be empty on purpose.
     """
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),
-                      translate("DBAnalyzerChecks","Name"),
-                      translate("DBAnalyzerChecks","Element Counter"),
-                      translate("DBAnalyzerChecks","File (in file table)"))
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID"),
+                      translate("DBAnalyzerChecks", "Name"),
+                      translate("DBAnalyzerChecks", "Element Counter"),
+                      translate("DBAnalyzerChecks", "File (in file table)"))
                      
-    _name = translate("DBAnalyzerChecks","Empty containers")
+    _name = translate("DBAnalyzerChecks", "Empty containers")
     
-    def check(self,data):
+    def check(self, data):
         if not data:
             return db.query("""
-                SELECT COUNT(*) FROM {0}elements LEFT JOIN {0}contents ON id = container_id
+                SELECT COUNT(*) FROM {p}elements LEFT JOIN {p}contents ON id = container_id
                 WHERE file = 0 AND container_id IS NULL
-                """.format(db.prefix)).getSingle()
+                """).getSingle()
         else:
             result = db.query("""
-                SELECT id,elements,({0}files.element_id IS NOT NULL)
-                FROM {0}elements LEFT JOIN {0}contents ON id = container_id
-                                 LEFT JOIN {0}files ON id = {0}files.element_id
+                SELECT id, elements, ({p}files.element_id IS NOT NULL)
+                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
+                                 LEFT JOIN {p}files ON id = {p}files.element_id
                 WHERE file = 0 AND container_id IS NULL
-                """.format(db.prefix))
-            return [(row[0],getTitle(row[0]),row[1],row[2]) for row in result]
+                """)
+            return [(row[0], getTitle(row[0]), row[1], row[2]) for row in result]
 
     def _fix(self):
-        db.query("""
-                UPDATE {0}elements LEFT JOIN {0}contents ON id = container_id
-                                   LEFT JOIN {0}files ON id = {0}files.element_id
-                SET file = 1
-                WHERE file = 0 AND container_id IS NULL AND {0}files.element_id IS NOT NULL
-                """.format(db.prefix))
-        db.query("""
-                DELETE {0}elements FROM {0}elements LEFT JOIN {0}contents ON id = container_id
+        # Set file=1 for empty containers which appear in the files-table
+        db.transaction()
+        # Note: SQLite does not support JOIN in UPDATE or DELETE queries.
+        ids = list(db.query("""
+                SELECT id
+                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
+                                 LEFT JOIN {p}files ON id = {p}files.element_id
+                WHERE file = 0 AND container_id IS NULL AND {p}files.element_id IS NOT NULL
+                """))
+        if len(ids):
+            db.multiQuery("UPDATE {p}elements SET file=1 WHERE id=?", ids)
+            
+        # Delete remaining empty containers
+        ids = list(db.query("""
+                SELECT id
+                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
                 WHERE file = 0 AND container_id IS NULL
-                """.format(db.prefix))
+                """))
+        if len(ids):
+            db.multiQuery("DELETE FROM {p}elements WHERE id=?", ids)
+        db.commit()
 
 
 class SuperfluousTagValuesCheck(Check):
     """Check for tag values which are not referenced by any element."""
-    _columnHeaders = (translate("DBAnalyzerChecks","Value type"),translate("DBAnalyzerChecks","Tag ID"),
-                      translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Value"))
+    _columnHeaders = (translate("DBAnalyzerChecks", "Value type"), translate("DBAnalyzerChecks", "Tag ID"),
+                      translate("DBAnalyzerChecks", "ID"), translate("DBAnalyzerChecks", "Value"))
                      
-    _name = translate("DBAnalyzerChecks","Superfluous tag values")
+    _name = translate("DBAnalyzerChecks", "Superfluous tag values")
 
-    def _query(self,type,data,delete):
+    def _query(self, type, data, delete):
         """Build a query selecting superfluous tag values of value-type *type* (or only their number if
         *data* is false). If *delete* is True, return a query """
-        tableName = "{}values_{}".format(db.prefix,type)
+        tableName = "{}values_{}".format(db.prefix, type)
         # This is complicated because we need different queries for MySQL and SQLite.
         # Neither query works in both.
         mainPart = """ FROM {1} LEFT JOIN {0}tags ON {1}.tag_id = {0}tags.tag_id
                                                  AND {1}.id = {0}tags.value_id
                     WHERE element_id IS NULL
-                    """.format(db.prefix,tableName)
+                    """.format(db.prefix, tableName)
         if not delete:
             if not data:
                 return "SELECT COUNT(*)" + mainPart
-            else: return "SELECT {}.tag_id,id,value {}".format(tableName,mainPart)
+            else: return "SELECT {}.tag_id, id, value {}".format(tableName, mainPart)
         else:
             if config.options.database.type == 'mysql':
                 # Cannot use DELETE together with JOIN in SQLite
-                return "DELETE {} {}".format(tableName,mainPart)
+                return "DELETE {} {}".format(tableName, mainPart)
             else:
                 # Cannot delete from a table used in a subquery in MySQL
-                return "DELETE FROM {0} WHERE id IN (SELECT {0}.id {1})".format(tableName,mainPart)
+                return "DELETE FROM {0} WHERE id IN (SELECT {0}.id {1})".format(tableName, mainPart)
             
-    def check(self,data):
+    def check(self, data):
         if not data:
-            return sum(db.query(self._query(type.name,False,False)).getSingle() for type in tags.TYPES)
+            return sum(db.query(self._query(type.name, False, False)).getSingle() for type in tags.TYPES)
         else:
             result = []
             for type in tags.TYPES:
-                result.extend((type.name,row[0],row[1],row[2])
-                              for row in db.query(self._query(type.name,True,False)))
+                result.extend((type.name, row[0], row[1], row[2])
+                              for row in db.query(self._query(type.name, True, False)))
             return result
 
     def _fix(self):
         for type in tags.TYPES:
-            db.query(self._query(type.name,False,True))
+            db.query(self._query(type.name, False, True))
 
 
 class ValueIdsCheck(Check):
     """Check for entries in the tag table that reference a tag id which does not exist in the corresponding
     tag table."""
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","Name"),
-                      translate("DBAnalyzerChecks","Tag ID"),translate("DBAnalyzerChecks","Value ID"))
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID"), translate("DBAnalyzerChecks", "Name"),
+                      translate("DBAnalyzerChecks", "Tag ID"), translate("DBAnalyzerChecks", "Value ID"))
                       
-    _name = translate("DBAnalyzerChecks","Value IDs")
+    _name = translate("DBAnalyzerChecks", "Value IDs")
 
-    def _query(self,type,data,delete):
+    def _query(self, type, data, delete):
         """Build a query selecting invalid tag references in the tag-table of type *type* (or only their
         number if *data* is true)."""
         if not delete:
             if not data:
                 beginning = "SELECT COUNT(*)"
-            else: beginning = "SELECT element_id,{0}tags.tag_id,value_id".format(db.prefix)
+            else: beginning = "SELECT element_id, {0}tags.tag_id, value_id".format(db.prefix)
         else: beginning = "DELETE {0}tags".format(db.prefix)
         return beginning + """
             FROM {0}tags LEFT JOIN {0}values_{1} ON {0}tags.tag_id = {0}values_{1}.tag_id
                                                  AND {0}tags.value_id = {0}values_{1}.id
                   WHERE {0}tags.tag_id IN (SELECT id FROM {0}tagids WHERE tagtype = '{1}') AND id IS NULL
-            """.format(db.prefix,type)
+            """.format(db.prefix, type)
             
-    def check(self,data):
+    def check(self, data):
         if not data:
-            return sum(db.query(self._query(type.name,False,False)).getSingle() for type in tags.TYPES)
+            return sum(db.query(self._query(type.name, False, False)).getSingle() for type in tags.TYPES)
         else:
             result = []
             for type in tags.TYPES:
-                result.extend((row[0],getTitle(row[0]),row[1],row[2])
-                                    for row in db.query(self._query(type.name,True,False)))
+                result.extend((row[0], getTitle(row[0]), row[1], row[2])
+                                    for row in db.query(self._query(type.name, True, False)))
             return result
             
     def _fix(self):
         for type in tags.TYPES:
-            db.query(self._query(type.name,False,True))
+            db.query(self._query(type.name, False, True))
 
 
 class DoubleTagsCheck(Check):
@@ -253,9 +264,9 @@ class DoubleTagsCheck(Check):
                       translate("DBAnalyzerChecks", "Tag ID"), translate("DBAnalyzerChecks", "Value ID"),
                       translate("DBAnalyzerChecks", "Value"))
 
-    _name = translate("DBAnalyzerChecks","Double tags")
+    _name = translate("DBAnalyzerChecks", "Double tags")
     
-    def check(self,data):
+    def check(self, data):
         result = db.query("""
             SELECT element_id, tag_id, value_id
             FROM {p}tags
@@ -265,7 +276,7 @@ class DoubleTagsCheck(Check):
         if not data:
             return len(result)
         else:
-            return [(row[0], getTitle(row[0]), row[1], row[2], str(db.valueFromId(row[1],row[2])))
+            return [(row[0], getTitle(row[0]), row[1], row[2], str(db.valueFromId(row[1], row[2])))
                     for row in result]
 
     def _fix(self):
@@ -281,23 +292,24 @@ class DoubleTagsCheck(Check):
         db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)", values)
         db.commit()
 
+
 class WithoutTagsCheck(Check):
     """Check for elements without tags. WARNING: Fixing this means removing those elements from the
     database!"""
-    _columnHeaders = (translate("DBAnalyzerChecks","ID"),translate("DBAnalyzerChecks","URL"),
-                      translate("DBAnalyzerChecks","Elements"))
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID"), translate("DBAnalyzerChecks", "URL"),
+                      translate("DBAnalyzerChecks", "Elements"))
                       
-    _name = translate("DBAnalyzerChecks","Without Tags")
+    _name = translate("DBAnalyzerChecks", "Without Tags")
     
-    def _query(self,command):
+    def _query(self, command):
         return """
             {0}
             FROM {1}elements AS el LEFT JOIN {1}tags AS t ON el.id = t.element_id
                                    LEFT JOIN {1}files AS f ON el.id = f.element_id
             WHERE t.tag_id IS NULL
-            """.format(command,db.prefix)
+            """.format(command, db.prefix)
             
-    def check(self,data):
+    def check(self, data):
         if not data:
             query = self._query('SELECT COUNT(*)')
             return db.query(query).getSingle()
@@ -313,13 +325,13 @@ class WithoutTagsCheck(Check):
 class DoubledFilesCheck(Check):
     """Check for files that appear twice in the database. This check currently cannot be fixed automatically.
     """
-    _columnHeaders = (translate("DBAnalyzerChecks","ID 1"),translate("DBAnalyzerChecks","ID 2"),
-                      translate("DBAnalyzerChecks","Title"),
-                      translate("DBAnalyzerChecks","URL"))
+    _columnHeaders = (translate("DBAnalyzerChecks", "ID 1"), translate("DBAnalyzerChecks", "ID 2"),
+                      translate("DBAnalyzerChecks", "Title"),
+                      translate("DBAnalyzerChecks", "URL"))
     
-    _name = translate("DBAnalyzerChecks","Doubled files")
+    _name = translate("DBAnalyzerChecks", "Doubled files")
     
-    def check(self,data):
+    def check(self, data):
         if not data:
             return db.query("""
                     SELECT COUNT(DISTINCT f1.element_id)
@@ -327,8 +339,8 @@ class DoubledFilesCheck(Check):
                                             ON f1.url = f2.url AND f1.element_id != f2.element_id
                     """).getSingle()
         else:
-            return [(row[0],row[1],getTitle(row[1]),row[2]) for row in db.query("""
-                    SELECT f1.element_id,f2.element_id,f1.url
+            return [(row[0], row[1], getTitle(row[1]), row[2]) for row in db.query("""
+                    SELECT f1.element_id, f2.element_id, f1.url
                     FROM {p}files AS f1 JOIN {p}files AS f2
                                             ON f1.url = f2.url AND f1.element_id != f2.element_id
                     """)]
@@ -346,7 +358,7 @@ class SearchValuesCheck(Check):
                       translate("DBAnalyzerChecks", "Search value"))
     
     def check(self, data, fixData=False):
-        result = db.query("SELECT id,value,search_value FROM {p}values_varchar")
+        result = db.query("SELECT id, value, search_value FROM {p}values_varchar")
         tuples = []
         counter = 0
         for id, value, searchValue in result:
@@ -379,4 +391,4 @@ def getTitle(id):
             """.format(db.prefix, tags.TITLE.type.name), id, tags.TITLE.id).getSingleColumn())
     if len(titles) > 0:
         return " - ".join(titles)
-    else: return translate("DBAnalyzerChecks","<No title>")
+    else: return translate("DBAnalyzerChecks", "<No title>")

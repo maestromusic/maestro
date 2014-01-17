@@ -51,6 +51,7 @@ class DockWidget(QtGui.QDockWidget):
     
     def __init__(self, parent=None, title='', icon=None, state=None, location=None):
         super().__init__(parent)
+        self.setFeatures(QtGui.QDockWidget.DockWidgetClosable | QtGui.QDockWidget.DockWidgetMovable)
         self.setAttribute(Qt.WA_DeleteOnClose)
         if location is not None:
             self.tbWidget = DockWidgetTitleBar(self)
@@ -121,10 +122,10 @@ class DockWidget(QtGui.QDockWidget):
         """Freeze/unfreeze dockwidget. Frozen dockwidgets cannot be resized, moved or closed."""
         if frozen:
             self.setFixedSize(self.size())
-            self.setFeatures(self.features() & ~QtGui.QDockWidget.DockWidgetMovable)
+            self.setFeatures(QtGui.QDockWidget.NoDockWidgetFeatures)
         else:
             self.setFixedSize(mainwindow.QWIDGETSIZE_MAX, mainwindow.QWIDGETSIZE_MAX)
-            self.setFeatures(self.features() | QtGui.QDockWidget.DockWidgetMovable)
+            self.setFeatures(QtGui.QDockWidget.DockWidgetClosable | QtGui.QDockWidget.DockWidgetMovable)
         self.tbWidget.closeButton.setVisible(not frozen)
 
 

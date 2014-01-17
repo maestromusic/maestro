@@ -88,34 +88,47 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             return element
         
     def removeElements(self, parent, rows):
-        application.stack.beginMacro(self.tr('remove elements'))
-        # Get the ids of the elements that there removed in the editor
+        """This reimplements LevelTreeModel.removeElements so that elements that have been removed from
+        the tree are also removed from editor level (unless they still appear in some EditorModel)."""
+        application.stack.beginMacro(self.tr("Remove elements"))
+        
+        # All elements from toCheck that are nowhere present in the editor will be removed.
         if isinstance(parent, Element):
-            removedElids = [parent.contents[i] for i in rows]
-        else: removedElids = [parent.contents[i].element.id for i in rows]
+            toCheck = [parent.contents[i] for i in rows]
+        else: toCheck = [parent.contents[i].element.id for i in rows]
         super().removeElements(parent, rows)
         
+        checked = set()
+        elementsToRemove = []
         rootIds = [w.element.id for editorModel in EditorModel.instances for w in editorModel.root.contents]
-        # Check which elids do not appear in any editor anymore
-        elidsToRemove = set()
-        self._getElementsToRemove(elidsToRemove, rootIds, removedElids)
-        if len(elidsToRemove) > 0:
-            self.level.removeElements([self.level[id] for id in elidsToRemove])
-            
+        i = 0
+        while i < len(toCheck):
+            elid = toCheck[i]
+            i += 1
+            if elid in checked or elid not in self.level:
+                continue
+            element = self.level[id]
+            if not any(id in rootIds for id in self._getAncestors(element)):
+                elementsToRemove.append(element)
+                toCheck.extend(element.contents) # check contents recursively
+            checked.add(elid)
+        
+        if len(elementsToRemove) > 0:
+            empty = elements.ContentsList()
+            contentsDict = {element: empty for element in elementsToRemove if element.isContainer()}
+            self.level.changeContents(contentsDict)
+            self.level.removeElements(elementsToRemove)
+
         application.stack.endMacro()
         
-    def _inEditor(self, rootIds, elid):
-        return elid in rootIds or (elid in self.level and any(self._inEditor(rootIds,pid) for pid in self.level[elid].parents))
-
-    def _getElementsToRemove(self, elidsToRemove, rootIds, elids):
-        for id in elids:
-            if not self._inEditor(rootIds, id):
-                elidsToRemove.add(id)
-                # If we are going to remove this element, check its contents recursively
-                element = self.level[id]
-                if element.isContainer():
-                    self._getElementsToRemove(elidsToRemove, rootIds, element.contents.ids)
-        
+    def _getAncestorsInEditorLevel(self, element):
+        yield element.id
+        for pid in element.parents:
+            if pid in self.level:
+                yield self.level[pid]
+                for ancestor in self._getAncestorsInEditorLevel(self.level[pid]):
+                    yield ancestor
+    
     def _addToExtTagInfo(self,type,tag,newTag,element):
         """Add *element* to the ExternalTagInfo specified by *type*, *tag* and *newTag*. Create such an
         object if it does not yet exist."""
