@@ -18,7 +18,7 @@
 
 """WTF - The write-to-filesystem plugin."""
 
-import functools, os, os.path, shutil
+import functools, os, os.path, shutil, copy
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -171,12 +171,12 @@ class ConfigWidget(QtGui.QWidget):
         self.criterionLineEdit.criterionChanged.connect(self._handleCriterionLineEdit)
         self.criterionLineEdit.criterionCleared.connect(self._handleCriterionLineEdit)
         lineLayout.addWidget(self.criterionLineEdit, 1)
-        #TODO implement an easy way to select elements by flags. In the usual workflow the user should
-        # not need to know the complex search query syntax.
-        #flagButton = QtGui.QPushButton()
-        #flagButton.setIcon(utils.getIcon("flag_blue.png"))
-        #flagButton.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
-        #lineLayout.addWidget(flagButton)
+        self.flagButton = QtGui.QPushButton()
+        self.flagButton.setIcon(utils.getIcon("flag_blue.png"))
+        # Make the button as high as the QLineEdit
+        self.flagButton.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        self.flagButton.clicked.connect(self._handleFlagButton)
+        lineLayout.addWidget(self.flagButton)
         self.layout().addWidget(CollapsingPanel(self.tr("Choose elements to export"), layout))
         
         layout = QtGui.QFormLayout()
@@ -216,6 +216,10 @@ class ConfigWidget(QtGui.QWidget):
     
     def _handleCriterionLineEdit(self):
         self.profile.criterion = self.criterionLineEdit.getCriterion()
+    
+    def _handleFlagButton(self):
+        dialog = FlagDialog(self.flagButton, self.criterionLineEdit)
+        dialog.show()
         
     def _handlePathEditingFinished(self):
         self.profile.path = self.pathLineEdit.text()
@@ -226,7 +230,7 @@ class ConfigWidget(QtGui.QWidget):
                                                         self.pathLineEdit.text())
         if result:
             self.pathLineEdit.setText(result)
-            
+    
     def _handleStructureBox(self, index):
         self.profile.structure = self.structureBox.itemData(index)
         
@@ -234,6 +238,57 @@ class ConfigWidget(QtGui.QWidget):
         self.profile.delete = checked
             
 
+class FlagDialog(dialogs.FancyPopup):
+    """A FancyPopup that allows the user to modify the list of flags used in the criterion of *criterionLine*
+    (a gui.search.CriterionLineEdit). The dialog recognizes criteria.FlagCriterions if they appear alone
+    or grouped together in a criteria.MultiCriterion that uses 'OR' as junction.
+    
+    *parent* is the button there the FancyPopup should appear.
+    """
+    def __init__(self, parent, criterionLine):
+        super().__init__(parent)
+        self.criterionLine = criterionLine
+        layout = QtGui.QVBoxLayout(self)
+        self.flagView = searchgui.FlagView(self._getSelectedFlags())
+        self.flagView.selectionChanged.connect(self._setSelectedFlags)
+        layout.addWidget(self.flagView)
+    
+    def _getSelectedFlags(self):
+        """Get the list of flags used in the criterion of self.criterionLine."""
+        criterion = self.criterionLine.getCriterion()
+        selectedFlags = []
+        if isinstance(criterion, criteria.FlagCriterion) and criterion.junction == 'OR':
+            selectedFlags = criterion.flags
+        elif isinstance(criterion, criteria.MultiCriterion) and criterion.junction == 'OR':
+            for c in criterion.criteria:
+                if isinstance(c, criteria.FlagCriterion) and c.junction == 'OR':
+                    selectedFlags.extend(c.flags)
+        return selectedFlags
+    
+    def _setSelectedFlags(self, selectedFlags):
+        """Modify the criterion of self.criterionLine to use the given set of flags.""" 
+        criterion = self.criterionLine.getCriterion()
+        if criterion is None:
+            if len(selectedFlags) > 0:
+                newCriterion = criteria.FlagCriterion(selectedFlags)
+            else: return
+        elif isinstance(criterion, criteria.FlagCriterion) and criterion.junction == 'OR':
+            if len(selectedFlags) > 0:
+                newCriterion = copy.deepcopy(criterion)
+                newCriterion.flags = selectedFlags
+            else: newCriterion = None
+        elif isinstance(criterion, criteria.MultiCriterion) and criterion.junction == 'OR':
+            newCriteria = []
+            for c in criterion.criteria:
+                if not (isinstance(c, criteria.FlagCriterion) and criterion.junction == 'OR'): 
+                    newCriteria.append(c)
+            if len(selectedFlags) > 0:
+                newCriteria.append(criteria.FlagCriterion(selectedFlags))
+            newCriterion = criteria.MultiCriterion('OR', newCriteria)
+        
+        self.criterionLine.setCriterion(newCriterion)
+        
+        
 def export(profile):
     if profile.criterion is not None:
         engine = search.SearchEngine()

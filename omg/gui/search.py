@@ -20,6 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import utils, logging
+from ..core import flags
 from ..search import criteria
 from .misc.lineedits import IconLineEdit
 
