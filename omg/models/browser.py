@@ -720,6 +720,8 @@ class BrowserMimeData(selection.MimeData):
         be loaded, block until the search is finished. If *node* is an element return ''[node]''.
         """
         if isinstance(node, Wrapper):
+            if node.isContainer() and node.contents is None:
+                node.loadContents(recursive=True) 
             return [node]
         if isinstance(node, CriterionNode):
             if node.contents is None:

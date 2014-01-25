@@ -131,11 +131,11 @@ class MPDPlayerBackend(player.PlayerBackend):
     def connectBackend(self):
         assert self.client is None
         client = mpd.MPDClient()
-        client.timeout = 5
+        client.timeout = 2
         client.idletimeout = None
         try:
             client.connect(self.host, self.port)
-        except ConnectionRefusedError as e:
+        except (ConnectionRefusedError, OSError):
             return
         if self.password:
             client.password(self.password)
@@ -154,9 +154,9 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     
     def disconnectClient(self, skipSocket=False):
+        logger.debug("calling MPD disconnect host {}".format(self.host))
         if self.idleTimer.isActive():
             self.idleTimer.stop()
-        self.idling = False
         if not skipSocket:
             self.checkIdle(False)
             self.client.close()
@@ -171,8 +171,8 @@ class MPDPlayerBackend(player.PlayerBackend):
         try:
             canRead = select.select([self.client._sock], [], [], 0)[0]
             if len(canRead) > 0:
-                changed = self.client.fetch_idle()
                 self.idling = False
+                changed = self.client.fetch_idle()
                 self.mpdStatus = self.client.status()
                 if 'error' in self.mpdStatus:
                     from omg.gui.dialogs import warning
@@ -202,9 +202,10 @@ class MPDPlayerBackend(player.PlayerBackend):
                     self.client.send_idle()
                     self.idling = True
             elif not resumeIdle and self.idling:
-                self.client.noidle()
                 self.idling = False
+                self.client.noidle()
         except mpd.ConnectionError as e:
+            self.idling = False
             self.disconnectClient(True)
             return e
     
