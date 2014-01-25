@@ -36,8 +36,8 @@ if mpd_version < [0,4,4]:
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import application, filebackends, player, logging, profiles
-from omg.core import tags
+from omg import application, database as db, filebackends, player, logging, profiles
+from omg.core import levels, tags
 from omg.models import playlist
 from . import filebackend as mpdfilebackend
 
@@ -250,7 +250,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             # this happens only on initialization. Here we don't create an UndoCommand
             self.mpdPlaylist = [x["file"] for x in self.client.playlistinfo()]
             self.playlistVersion = newVersion
-            self.urls = [self.makeUrl(path) for path in self.mpdPlaylist]
+            self.urls = self.makeUrls(self.mpdPlaylist)
             self.playlist.initFromUrls(self.urls)
             return
         
@@ -282,7 +282,7 @@ class MPDPlayerBackend(player.PlayerBackend):
                 firstInserted = len(self.mpdPlaylist) - numShifted
                 paths = [ file for pos, file in changes[:numInserted] ]
                 self.mpdPlaylist[firstInserted:firstInserted] = paths
-                urls = [ self.makeUrl(path) for path in paths ]
+                urls = self.makeUrls(paths)
                 pos = changes[0][0]
                 self.urls[pos:pos] = urls
                 self.playlist.insertUrlsAtOffset(pos, urls, updateBackend='onundoredo')
@@ -301,7 +301,7 @@ class MPDPlayerBackend(player.PlayerBackend):
                 reallyChange = True
                 self.mpdPlaylist.append(file)
         if reallyChange: # this might not happen e.g. when a stream is updated
-            self.playlist.resetFromUrls([self.makeUrl(path) for path in self.mpdPlaylist],
+            self.playlist.resetFromUrls(self.makeUrls(self.mpdPlaylist),
                                         updateBackend='onundoredo')   
         
     
@@ -443,22 +443,27 @@ class MPDPlayerBackend(player.PlayerBackend):
                 client.update()
     
     
-    def makeUrl(self, path):
-        """Create an OMG URL for the given path reported by MPD.
+    def makeUrls(self, paths):
+        """Create an OMG URL for the given paths reported by MPD.
         
-        If the MPD path has the form of a non-default URL (i.e. proto://path), it is tried to load
+        If an MPD path has the form of a non-default URL (i.e. proto://path), it is tried to load
         an appropriate URL using BackendURL.fromString().
         Otherwise, if *path* refers to a normal file in MPDs database, an MPDURL is created.
         If the file is also found on the local filesystem, then a normal FileURL is returned.
         """
-        if re.match("[a-zA-Z]{2,5}://", path) is not None:
-            try:
-                return filebackends.BackendURL.fromString(path)
-            except KeyError:
-                logger.warning("Unsupported MPD URL type: {}".format(path))
-        mpdurl = mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path)
-        # this will convert the URL to a local file URL if it exists
-        return mpdurl.getBackendFile().url
+        urls = []
+        for path in paths:
+            if re.match("[a-zA-Z]{2,5}://", path) is not None:
+                try:
+                    urls.append(filebackends.BackendURL.fromString(path))
+                except KeyError:
+                    logger.warning("Unsupported MPD URL type: {}".format(path))
+            else:
+                if len(db.query("SELECT element_id FROM {p}files WHERE url=?", 'file:///' + path)):
+                    urls.append(filebackends.BackendURL.fromString("file:///" + path))
+                else:
+                    urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
+        return urls
     
                     
     def treeActions(self):
