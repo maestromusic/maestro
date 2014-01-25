@@ -71,27 +71,41 @@ class PhononPlayerBackend(player.PlayerBackend):
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
             
-        # Initialize Phonon       
-        self.mediaObject = phonon.MediaObject()
-        self.mediaObject.finished.connect(self._handleFinished)
-        self.mediaObject.currentSourceChanged.connect(self._handleSourceChanged)
-        self.mediaObject.setTickInterval(200)
-        self.mediaObject.tick.connect(self._handleTick)
-        self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
-        phonon.createPath(self.mediaObject,self.audioOutput) 
-        
         if state is None:
             state = {}
-        if 'playlist' in state:
-            if self.playlist.initFromWrapperString(state['playlist']):
-                self.setCurrent(state.get('current', None), play=False)
-        self._flags = state.get('flags', 0)
-        self.setVolume(state.get('volume', 100))
-        if self.getRandom() != player.RANDOM_OFF:
-            self._createRandomList()
-
-        self._nextSource = None # used in self._handleSourceChanged
-        self.connectionState = player.CONNECTED
+        self._initState = state
+        self._numFrontends = 0
+        self.connectionState = player.DISCONNECTED
+        
+    
+    def registerFrontend(self, frontend):
+        self._numFrontends += 1
+        if self._numFrontends == 1 and hasattr(self, "_initState"):
+            # Initialize Phonon
+            state = self._initState
+            del self._initState
+            self.mediaObject = phonon.MediaObject()
+            self.mediaObject.finished.connect(self._handleFinished)
+            self.mediaObject.currentSourceChanged.connect(self._handleSourceChanged)
+            self.mediaObject.setTickInterval(200)
+            self.mediaObject.tick.connect(self._handleTick)
+            self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
+            self.phononPath = phonon.createPath(self.mediaObject,self.audioOutput) 
+            if 'playlist' in state:
+                if self.playlist.initFromWrapperString(state['playlist']):
+                    self.setCurrent(state.get('current', None), play=False)
+            self._flags = state.get('flags', 0)
+            self.setVolume(state.get('volume', 100))
+            if self.getRandom() != player.RANDOM_OFF:
+                self._createRandomList()
+            self._nextSource = None # used in self._handleSourceChanged
+            self.connectionState = player.CONNECTED
+            self.connectionStateChanged.emit(player.CONNECTED)
+    
+    
+    def unregisterFrontend(self, frontend):
+        self._numFrontends -= 1
+    
     
     # Insert etc. are handled by the PlaylistModel.
     # We only have to change the state and random list if necessary.
