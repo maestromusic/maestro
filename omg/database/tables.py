@@ -52,7 +52,9 @@ class SQLTable:
         """Create this table by executing its createQuery."""
         if self.exists():
             raise DBException("Table '{}' does already exist.".format(self.name))
+        print("Creating", self.name)
         for query in self.createQueries:
+            print(query)
             db.query(query)
     
     def reset(self):
@@ -82,7 +84,7 @@ CREATE TABLE {}elements (
     id          MEDIUMINT UNSIGNED  NOT NULL,
     file        BOOLEAN             NOT NULL,
     type        TINYINT   UNSIGNED  NOT NULL DEFAULT 0,
-    elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0
+    elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,
     PRIMARY KEY(id)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
 """.format(db.prefix))

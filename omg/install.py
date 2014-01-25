@@ -257,6 +257,7 @@ class GeneralSettingsWidget(SettingsWidget):
         formLayout.addRow(self.tr("Database type"),dbChooserLayout)
         
         audioBackendLayout = QtGui.QVBoxLayout()
+        audioBackendGroup = QtGui.QButtonGroup()
         audioBackendFound = False
         try:
             from PyQt4.phonon import Phonon
@@ -266,6 +267,7 @@ class GeneralSettingsWidget(SettingsWidget):
         except ImportError:
             self.phononBox = QtGui.QRadioButton(self.tr("Phonon (cannot find PyQt4.phonon)"))
             self.phononBox.setEnabled(False)
+        audioBackendGroup.addButton(self.phononBox)
         audioBackendLayout.addWidget(self.phononBox)
         try:
             import mpd
@@ -275,9 +277,12 @@ class GeneralSettingsWidget(SettingsWidget):
         except ImportError:
             self.mpdBox = QtGui.QRadioButton(self.tr("MPD (cannot find python-mpd2)"))
             self.mpdBox.setEnabled(False)
+        audioBackendGroup.addButton(self.mpdBox)
         audioBackendLayout.addWidget(self.mpdBox)
         if not audioBackendFound:
             noBackendBox = QtGui.QRadioButton(self.tr("No backend (to choose a backend later, enable the corresponding plugin)."))
+            noBackendBox.setChecked(True)
+            audioBackendGroup.addButton(noBackendBox)
             audioBackendLayout.addWidget(noBackendBox)
         formLayout.addRow(self.tr("Audio backend"),audioBackendLayout)
         

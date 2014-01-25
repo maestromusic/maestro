@@ -128,7 +128,7 @@ def connect(**kwargs):
         if _nextId is None:
             try:
                 _nextId = query("SELECT MAX(id) FROM {}elements".format(prefix)).getSingle()
-                if _nextId is None: # this happens when elements is empty
+                if isNull(_nextId): # this happens when elements is empty
                     _nextId = 1
                 else: _nextId += 1    
             except sql.DBException: # table does not exist yet (in the install tool, test scripts...)
@@ -160,7 +160,7 @@ def nextId():
     """Reserve the next free element id and return it."""
     return nextIds(1)[0]
 
-    
+
 def nextIds(count):
     """Reserve the next *count* free element ids and return a generator containing them."""
     with _nextIdLock:
@@ -177,8 +177,8 @@ def listTables():
     if type == 'mysql':
         return list(query("SHOW TABLES").getSingleColumn())
     else: return list(query("SELECT name FROM sqlite_master WHERE type = 'table'").getSingleColumn())
-    
-    
+
+
 def resetDatabase():
     """Drop all tables and create them without data again. All table rows will be lost!"""
     from . import tables

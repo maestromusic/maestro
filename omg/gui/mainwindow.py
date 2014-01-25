@@ -493,7 +493,7 @@ class MainWindow(QtGui.QMainWindow):
             data = WidgetData.fromId(id)
             self.addCentralWidget(data)
         self.centralWidget().setCurrentIndex(1)
-        for id in 'browser', 'filesystembrowser', 'tageditor', 'playback':
+        for id in 'playback', 'browser', 'tageditor', 'filesystembrowser':
             data = WidgetData.fromId(id)
             self.addDockWidget(data)
 
