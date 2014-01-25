@@ -66,7 +66,7 @@ class PhononPlayerBackend(player.PlayerBackend):
         
         # Phonon backends are created when the application starts (profiles!).
         # To increase performance the mediaObject is not created until it is needed.
-        self.mediaObject = None
+        self.mediaObject = None #TODO: ??? it is created 5 lines below ...
         
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)

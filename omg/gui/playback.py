@@ -57,8 +57,9 @@ class PlaybackWidget(dockwidget.DockWidget):
         
         topLayout = QtGui.QHBoxLayout()    
         self.titleLabel = QtGui.QLabel(self)
-        self.titleLabel.setTextFormat(Qt.PlainText)
+        self.titleLabel.setTextFormat(Qt.AutoText)
         self.titleLabel.setSizePolicy(QtGui.QSizePolicy.Ignored, QtGui.QSizePolicy.Ignored)
+        self.titleLabel.linkActivated.connect(lambda: self.backend.connectBackend())
         topLayout.addWidget(self.titleLabel)   
         
         self.skipBackwardButton = QtGui.QToolButton()
@@ -95,9 +96,10 @@ class PlaybackWidget(dockwidget.DockWidget):
     
     def updateSeekLabel(self, value):
         """Display elapsed and total time on the seek label."""
-        if self.current is None:
+        current = self.backend.current()
+        if current is None:
             text = ""
-        elif self.current.element.length > 0:
+        elif current.element.length > 0:
             text = "{} - {}".format(strutils.formatLength(value),
                                   strutils.formatLength(self.seekSlider.maximum()))
         else:
@@ -105,7 +107,7 @@ class PlaybackWidget(dockwidget.DockWidget):
             self.seekSlider.setEnabled(False)
         self.seekLabel.setText(text)
         
-    def updateSlider(self, current):
+    def updateSlider(self, elapsed):
         """Update the slider when the elapsed time has changed."""
         if not self.seekSlider.isSliderDown():
             if self.backend.current() is not None:
@@ -114,26 +116,23 @@ class PlaybackWidget(dockwidget.DockWidget):
                 total = 0
             if self.seekSlider.maximum() != total:
                 self.seekSlider.setRange(0, int(total))
-            self.seekSlider.setValue(current)
-        self.updateSeekLabel(current)
+            self.seekSlider.setValue(elapsed)
+        self.updateSeekLabel(elapsed)
     
     def updateTitleLabel(self):
         """Display the title of the currently playing song."""
-        if self.backend.connectionState == player.DISCONNECTED:
-            return self.tr("No connection")
-        elif self.backend.connectionState == player.CONNECTING:
-            return self.tr("Connecting...")
-        self.current = self.backend.current()
-        if self.current is not None:
-            self.titleLabel.setText(self.current.getTitle())
-        else: self.titleLabel.setText('')
+        if self.backend.connectionState == player.CONNECTED:
+            current = self.backend.current()
+            if current is not None:
+                self.titleLabel.setText(current.getTitle())
+            else: self.titleLabel.setText('')
+    
     
     def handleStateChange(self, state):
         """Update labels, buttons etc. when the playback state has changed."""
         self.ppButton.setPlaying(state == player.PLAY)
         if state == player.STOP:
-            self.seekSlider.setValue(0)
-            self.seekLabel.setText("")
+            self.updateSlider(0)
             self.seekSlider.setEnabled(False)
         else:
             self.seekSlider.setEnabled(True)
@@ -146,9 +145,10 @@ class PlaybackWidget(dockwidget.DockWidget):
         if state == player.CONNECTING:
             self.titleLabel.setText(self.tr("connecting..."))
         elif state == player.DISCONNECTED:
-            self.titleLabel.setText(self.tr("unable to connect"))
+            self.titleLabel.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
         else:
             self.updateTitleLabel()
+            self.updateSlider(self.backend.elapsed())
             self.handleStateChange(self.backend.state())
             self.volumeButton.setVolume(self.backend.volume())
     
@@ -159,8 +159,8 @@ class PlaybackWidget(dockwidget.DockWidget):
         
     def handleLevelChange(self, event):
         """Handle changes of the real-level."""
-        self.current = self.backend.current()
-        if self.current is not None and self.current.element.id in event.dataIds:
+        current = self.backend.current()
+        if current is not None and current.element.id in event.dataIds:
             self.updateTitleLabel() # title may have changed
             
     def handlePlaylistChange(self, *args):

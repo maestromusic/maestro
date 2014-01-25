@@ -16,7 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import re, contextlib, socket, threading, time
+import re, time
+import select
+import contextlib
 
 try:
     import mpd
@@ -34,10 +36,9 @@ if mpd_version < [0,4,4]:
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import application, filebackends, player, logging, profiles
-from ...filebackends.filesystem import FileURL
-from ...core import tags
-from ...models import playlist
+from omg import application, filebackends, player, logging, profiles
+from omg.core import tags
+from omg.models import playlist
 from . import filebackend as mpdfilebackend
 
 translate = QtCore.QCoreApplication.translate
@@ -47,23 +48,18 @@ logger = logging.getLogger(__name__)
 def enable():
     player.profileCategory.addType(profiles.ProfileType(
                 'mpd', translate('MPDPlayerBackend','MPD'), MPDPlayerBackend))
-    from omg import filebackends
     filebackends.urlTypes["mpd"] = mpdfilebackend.MPDURL
 
 
 def disable():
     player.profileCategory.removeType('mpd')
-    from omg import filebackends
     del filebackends.urlTypes["mpd"]
+
+MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
 
             
 class MPDPlayerBackend(player.PlayerBackend):
     """Player backend to control an MPD server.
-    
-    The MPD backend currently uses two connections: A "commander", running in the event thread,
-    sets off commands issued by user interaction (playback control, playlist manipulation, ...).
-    The "idler", running in a seperate thread, listens for changes reported by OMG, such as
-    state changes, playlist changes done with other programs, etc.
     """
     
     def __init__(self, name, type, state):
@@ -74,17 +70,11 @@ class MPDPlayerBackend(player.PlayerBackend):
 
         if state is None:
             state = {}
-        host = state.get('host', 'localhost')
-        port = state.get('port', 6600)
-        password = state.get('password', '')
+        self.host = state.get('host', 'localhost')
+        self.port = state.get('port', 6600)
+        self.password = state.get('password', '')
 
-        from .thread import MPDThread
-        self.mpdthread = MPDThread(self, host, port, password)
-        self.mpdthread.changeFromMPD.connect(self._handleMPDChange, Qt.QueuedConnection)
         self._numFrontends = 0
-        self._flags = 0
-        
-        self.commander = mpd.MPDClient()
         
         # actions
         self.separator = QtGui.QAction("MPD", self)
@@ -95,6 +85,8 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.configOutputsAction.triggered.connect(self.showOutputDialog)
         
         self.stateChanged.connect(self.checkElapsedTimer)
+        # we do not read the elapsed time from MPD but calculate it instead,
+        # to save bandwidth and avoid lags
         self.elapsedTimer = QtCore.QTimer(self)
         self.elapsedTimer.setInterval(100)
         self.elapsedTimer.timeout.connect(self.updateElapsed)
@@ -104,100 +96,335 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.seekTimer.setInterval(25)
         self.seekTimer.timeout.connect(self._seek)
         
-        # this lock is used when the main thread changes the playlist information of the idler,
-        # which is done when the user manipulates the playlist in order to avoid that the idler
-        # reports that same change.
-        self.playlistLock = threading.RLock()
-        self.mpdthread.playlistLock = self.playlistLock
+        self.idleTimer = QtCore.QTimer(self)
+        self.idleTimer.setInterval(50)
+        self.idleTimer.timeout.connect(self.checkIdle)
+        self.idling = False
+        
+        self.playlistVersion = None
+        self._state = None
+        self._current = None
+        self._currentLength = None
+        self._volume = None
+        self._flags = player.RANDOM_OFF
+        self.seekRequest = None
+        self.outputs = None
+        self.client = None
+
     
     def save(self):
-        return {'host': self.mpdthread.host,
-                'port': self.mpdthread.port,
-                'password': self.mpdthread.password
+        return {'host': self.host,
+                'port': self.port,
+                'password': self.password
                 }
     
+    
     def setConnectionParameters(self, host, port, password):
-        #TODO reconnect
-        self.mpdthread.host = host
-        self.mpdthread.port = port
-        self.mpdthread.password = password
-        if self.commander._sock is not None:
-            self.commander.disconnect()
-            with self.prepareCommander():
-                pass
-            self.mpdthread.shouldConnect.clear()
-            self.mpdthread.disconnect()
-            self.mpdthread.shouldConnect.set()
-            
+        self.host = host
+        self.port = port
+        self.password = password
+        self.disconnectClient()
+        self.connectBackend()
         player.profileCategory.profileChanged.emit(self)
-        
-    @contextlib.contextmanager
-    def prepareCommander(self):
-        """Context manager to ensure that the commander is connected."""
-        if self.commander._sock is None:
-            self.commander.connect(self.mpdthread.host, self.mpdthread.port)
+    
+    
+    def connectBackend(self):
+        assert self.client is None
+        client = mpd.MPDClient()
+        client.timeout = 5
+        client.idletimeout = None
         try:
-            yield
-        except (mpd.ConnectionError, socket.error):
-            self.commander.connect(self.mpdthread.host, self.mpdthread.port)
+            client.connect(self.host, self.port)
+        except ConnectionRefusedError as e:
+            return
+        if self.password:
+            client.password(self.password)
+        self.mpdStatus = client.status()
+        self.client = client
+        self.updateMixer()
+        self.updatePlaylist()
+        self.updatePlayer()
+        self.updateOutputs()
+        self.updateFlags()
+        self.connectionState = player.CONNECTED
+        self.connectionStateChanged.emit(player.CONNECTED)
+        self.client.send_idle()
+        self.idling = True
+        self.idleTimer.start()
+    
+    
+    def disconnectClient(self, skipSocket=False):
+        if self.idleTimer.isActive():
+            self.idleTimer.stop()
+        self.idling = False
+        if not skipSocket:
+            self.checkIdle(False)
+            self.client.close()
+            self.client.disconnect()
+        self.client = None
+        self.connectionState = player.DISCONNECTED
+        self.connectionStateChanged.emit(player.DISCONNECTED)
+        application.stack.resetSubstack(self.stack)
+       
+    
+    def checkIdle(self, resumeIdle=True):
+        try:
+            canRead = select.select([self.client._sock], [], [], 0)[0]
+            if len(canRead) > 0:
+                changed = self.client.fetch_idle()
+                self.idling = False
+                self.mpdStatus = self.client.status()
+                if 'error' in self.mpdStatus:
+                    from omg.gui.dialogs import warning
+                    warning('MPD error',
+                            self.tr('MPD reported an error:\n{}').format(self.mpdStatus['error']))
+                    self.client.clearerror()
+                if 'mixer' in changed:
+                    self.updateMixer()
+                    changed.remove('mixer')
+                if 'playlist' in changed:
+                    self.updatePlaylist()
+                    changed.remove('playlist')
+                if 'player' in changed:
+                    self.updatePlayer()
+                    changed.remove('player')
+                if 'update' in changed:
+                    changed.remove('update')
+                if 'output' in changed:
+                    self.updateOutputs()
+                    changed.remove('output')
+                if 'options' in changed:
+                    self.updateFlags()
+                    changed.remove('options')
+                if len(changed) > 0:
+                    logger.warning('unhandled MPD changes: {}'.format(changed))
+                if resumeIdle:
+                    self.client.send_idle()
+                    self.idling = True
+            elif not resumeIdle and self.idling:
+                self.client.noidle()
+                self.idling = False
+        except mpd.ConnectionError as e:
+            self.disconnectClient(True)
+            return e
+    
+    
+    @contextlib.contextmanager
+    def getClient(self):
+        if self.idling:
+            self.idleTimer.stop()
+            error = self.checkIdle(resumeIdle=False)
+            if error:
+                raise error 
+            yield self.client
+            self.client.send_idle()
+            self.idling = True
+            self.idleTimer.start()
+        else:
+            yield self.client
+    
+    
+    def updateMixer(self):
+        volume = int(self.mpdStatus['volume'])
+        if volume != self._volume:
+            self._volume = volume
+            self.volumeChanged.emit(self._volume)
+    
+    
+    def updatePlaylist(self):
+        """Update the playlist when it has changed on the server.
         
+        Currently, two special cases are detected: Insertion of consecutive songs,
+        and removal of consecutive songs.
+        
+        In any other case, a complete playlist change is calculated.
+        """
+        newVersion = int(self.mpdStatus["playlist"])
+        if newVersion == self.playlistVersion:
+            return
+        oldVersion = self.playlistVersion
+        logger.debug("detected new plVersion: {}-->{}".format(oldVersion, newVersion))
+        
+        if oldVersion is None:
+            # this happens only on initialization. Here we don't create an UndoCommand
+            self.mpdPlaylist = [x["file"] for x in self.client.playlistinfo()]
+            self.playlistVersion = newVersion
+            self.urls = [self.makeUrl(path) for path in self.mpdPlaylist]
+            self.playlist.initFromUrls(self.urls)
+            return
+        
+        changes = [(int(a["pos"]),a["file"]) for a in self.client.plchanges(oldVersion)]
+        self.playlistVersion = newVersion
+        newLength = int(self.mpdStatus["playlistlength"])
+        # first special case: find out if only consecutive songs were removed 
+        if newLength < len(self.mpdPlaylist):
+            numRemoved = len(self.mpdPlaylist) - newLength
+            newSongsThere = list(zip(*changes))[1] if len(changes) > 0 else []
+            oldSongsThere = self.mpdPlaylist[-len(changes):] if len(changes) > 0 else []
+            if all( a == b for (a, b) in zip(newSongsThere, oldSongsThere)):
+                firstRemoved = newLength - len(changes)
+                del self.mpdPlaylist[firstRemoved:firstRemoved+numRemoved]
+                self.playlist.removeByOffset(firstRemoved, numRemoved, updateBackend='onundoredo')
+                del self.urls[firstRemoved:firstRemoved+numRemoved]
+                return
+        # second special case: find out if a number of consecutive songs were inserted
+        if newLength > len(self.mpdPlaylist):
+            numInserted = newLength - len(self.mpdPlaylist)
+            numShifted = len(changes) - numInserted
+            if numShifted == 0:
+                newSongsThere = []
+                oldSongsThere = []
+            else:
+                newSongsThere = list(zip(*changes[-numShifted:]))[1]
+                oldSongsThere = self.mpdPlaylist[-numShifted:]
+            if all (a == b for (a, b) in zip(newSongsThere, oldSongsThere)):
+                firstInserted = len(self.mpdPlaylist) - numShifted
+                paths = [ file for pos, file in changes[:numInserted] ]
+                self.mpdPlaylist[firstInserted:firstInserted] = paths
+                urls = [ self.makeUrl(path) for path in paths ]
+                pos = changes[0][0]
+                self.urls[pos:pos] = urls
+                self.playlist.insertUrlsAtOffset(pos, urls, updateBackend='onundoredo')
+                return
+        if len(changes) == 0:
+            logger.warning('no changes???')
+            return
+        # other cases: update self.mpdPlaylist and perform a general playlist change
+        reallyChange = False
+        for pos, file in sorted(changes):
+            if pos < len(self.mpdPlaylist):
+                if self.mpdPlaylist[pos] != file:
+                    reallyChange = True
+                self.mpdPlaylist[pos] = file
+            else:
+                reallyChange = True
+                self.mpdPlaylist.append(file)
+        if reallyChange: # this might not happen e.g. when a stream is updated
+            self.playlist.resetFromUrls([self.makeUrl(path) for path in self.mpdPlaylist],
+                                        updateBackend='onundoredo')   
+        
+    
+    def updatePlayer(self):
+        # check if current song has changed. If so, update length of current song
+        if "song" in self.mpdStatus:
+            current = int(self.mpdStatus["song"])
+        else:
+            current = None
+        if current != self.playlist.current:
+            if current is None:
+                self._currentLength = 0 # no current song
+            else:
+                mpdCurrent = self.client.currentsong()
+                if "time" in mpdCurrent:
+                    self._currentLength = int(mpdCurrent["time"])
+                else:
+                    self._currentLength = -1
+            self.playlist.setCurrent(current)
+            self.currentChanged.emit(current)
+        
+        if "elapsed" in self.mpdStatus:
+            elapsed = float(self.mpdStatus["elapsed"])
+            self._currentStart = time.time() - elapsed
+            self.elapsedChanged.emit(self.elapsed())
+             
+        # check for a change of playing state
+        state = MPD_STATES[self.mpdStatus["state"]]
+        if state != self._state:
+            self._state = state
+            self.stateChanged.emit(state)
+            if state == player.STOP:
+                self._currentLength = 0
+                self.playlist.setCurrent(None)
+                self.currentChanged.emit(None)
+        self._state = state
+
+
+    def updateOutputs(self):
+        outputs = self.client.outputs()
+        if outputs != self.outputs:
+            self.outputs = outputs
+    
+    
+    def updateFlags(self):
+        flags = player.FLAG_REPEATING & (self.mpdStatus['repeat'] == '1')
+        if flags != self._flags:
+            self._flags = flags
+            self.flagsChanged.emit(flags)
+    
+    
     def state(self):
         return self._state
     
+    
     def setState(self, state):
-        with self.prepareCommander():
+        with self.getClient() as client:
             if state is player.PLAY:
-                self.commander.play()
+                client.play()
             elif state is player.PAUSE:
-                self.commander.pause(1)
+                client.pause(1)
             elif state is player.STOP:
-                self.commander.stop()
+                client.stop()
+    
     
     def volume(self):
         return self._volume
     
+    
     def setVolume(self, volume):
-        with self.prepareCommander():
+        with self.getClient() as client:
             try:
-                self.commander.setvol(volume)
+                client.setvol(volume)
             except mpd.CommandError:
                 logger.error("Problems setting volume. Maybe MPD does not allow setting the volume.")
-    
+
+
     def current(self):
         return self.playlist.current
 
+    
     def setCurrent(self, index):
-        with self.prepareCommander():
-            self.commander.play(index if index is not None else -1)
+        with self.getClient() as client:
+            client.play(index if index is not None else -1)
+    
     
     def skipForward(self):
-        with self.prepareCommander():
-            self.commander.next()
+        with self.getClient() as client:
+            client.next()
         
+    
     def skipBackward(self):
-        with self.prepareCommander():
-            self.commander.previous()
+        with self.getClient() as client:
+            client.previous()
+    
     
     def currentOffset(self):
         if self._current < 0:
             return None
         else: return self._current
         
+    
     def elapsed(self):
+        if self._state == player.STOP:
+            return 0
         return time.time() - self._currentStart
+    
     
     def setElapsed(self, elapsed):
         self.seekRequest = elapsed
-        self.seekTimer.start(20)
+        self.seekTimer.start()
+    
     
     def _seek(self):
         if self.seekRequest is not None:
-            with self.prepareCommander():
-                self.commander.seek(self._current, self.seekRequest)
+            with self.getClient() as client:
+                client.seekcur(self.seekRequest)
         self.seekRequest = None
     
+    
     def updateElapsed(self):
-        self.elapsedChanged.emit(self.elapsed())
+        if not self.seekTimer.isActive():
+            self.elapsedChanged.emit(self.elapsed())
+    
     
     def checkElapsedTimer(self, newState):
         if newState is player.PLAY:
@@ -205,13 +432,15 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             self.elapsedTimer.stop()
 
+    
     def updateDB(self, path=None):
         """Update MPD's database. An optional *path* can be given to only update that file/dir."""
-        with self.prepareCommander():
+        with self.getClient() as client:
             if path:
-                self.commander.update(path)
+                client.update(path)
             else:
-                self.commander.update()
+                client.update()
+    
     
     def makeUrl(self, path):
         """Create an OMG URL for the given path reported by MPD.
@@ -230,92 +459,32 @@ class MPDPlayerBackend(player.PlayerBackend):
         # this will convert the URL to a local file URL if it exists
         return mpdurl.getBackendFile().url
     
-    @QtCore.pyqtSlot(str, object)
-    def _handleMPDChange(self, what, how):
-        """React on changes reported by the idler thread."""
-        if what == 'connect':
-            paths, self._current, self._currentLength, self._currentStart, \
-                self._state, self._volume, self._outputs = how
-            self.urls = [self.makeUrl(path) for path in paths]
-            self.playlist.initFromUrls(self.urls)
-            self.playlist.setCurrent(self._current)
-            self.connectionState = player.CONNECTED
-            self.connectionStateChanged.emit(player.CONNECTED)
-            if self._state is not player.STOP:
-                self.stateChanged.emit(self._state)
-        elif what == 'disconnect':
-            self.connectionState = player.DISCONNECTED
-            self._state = player.STOP
-            self.stateChanged.emit(player.STOP)
-            if self.commander._sock is not None:
-                self.commander.disconnect()
-            application.stack.resetSubstack(self.stack)
-            self.connectionStateChanged.emit(player.DISCONNECTED)
-        elif what == 'elapsed':
-            self._currentStart = how
-            self.elapsedChanged.emit(self.elapsed())    
-        elif what == 'state':
-            self._state = how
-            self.stateChanged.emit(how)
-        elif what == 'current':
-            self._current, self._currentLength = how
-            self.playlist.setCurrent(self._current)
-            self.currentChanged.emit(self._current)
-        elif what == 'volume':
-            self._volume = how
-            self.volumeChanged.emit(how)
-        elif what == 'remove':
-            self.playlist.removeByOffset(how[0][0],
-                                         len(how),
-                                         updateBackend='onundoredo')
-            for pos, url in reversed(how):
-                del self.urls[pos]
-        elif what == 'insert':
-            pos = how[0][0]
-            urlified = [ (pos,self.makeUrl(path)) for pos,path in how ]
-            self.playlist.insertUrlsAtOffset(how[0][0],
-                                             [tup[1] for tup in urlified],
-                                             updateBackend='onundoredo')
-            for pos, url in urlified:
-                self.urls[pos:pos] = [ url ]
-        elif what == 'playlist':
-            self.playlist.resetFromUrls([self.makeUrl(path) for path in how],
-                                        updateBackend='onundoredo')
-        elif what == 'outputs':
-            self._outputs = how
-        elif what == 'flags':
-            self._flags = how
-            self.flagsChanged.emit(how)
-        else:
-            raise ValueError("Unknown change message from idler thread: {}".format(what))
                     
     def treeActions(self):
         yield self.separator
         yield self.updateDBAction
         yield self.configOutputsAction
     
+
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:
-            self.mpdthread.shouldConnect.set()
-            self.mpdthread.start()
+            self.connectBackend()
+
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
         if self._numFrontends == 0:
-            self.mpdthread.shouldConnect.clear()
-            self.mpdthread.disconnect()
-            if self.commander._sock is not None:
-                self.commander.disconnect()
-            application.stack.resetSubstack(self.stack)
+            self.disconnectClient()
+    
     
     def setPlaylist(self, urls):
-        with self.prepareCommander():
-            with self.playlistLock:
-                self.commander.clear()
-                self.mpdthread.playlistVersion += 1
-                self.mpdthread.mpd_playlist = []
-                self.insertIntoPlaylist(0, urls)
+        with self.getClient() as client:
+            client.clear()
+            self.playlistVersion += 1
+            self.mpdPlaylist = []
+            self.insertIntoPlaylist(0, urls)
+    
     
     def insertIntoPlaylist(self, pos, urls):
         """Insert *urls* into the MPD playlist at position *pos*.
@@ -324,40 +493,38 @@ class MPDPlayerBackend(player.PlayerBackend):
         playlist, which happens if the URL is not known to MPD. The list of URls successfully
         inserted is contained in the error object's *successfulURLs* attribute.
         """
-        with self.prepareCommander():
+        with self.getClient() as client:
             inserted = []
             try:
-                with self.playlistLock:
-                    isEnd = (pos == len(self.mpdthread.mpd_playlist))
-                    for position, url in enumerate(urls, start=pos):
-                        if isEnd:
-                            self.commander.add(url.path)
-                            self.mpdthread.playlistVersion += 1
-                        else:
-                            self.commander.addid(url.path, position)
-                            self.mpdthread.playlistVersion += 2
-                        self.mpdthread.mpd_playlist[position:position] = [url.path]
-                        inserted.append(url)
+                isEnd = (pos == len(self.mpdPlaylist))
+                for position, url in enumerate(urls, start=pos):
+                    if isEnd:
+                        client.add(url.path)
+                        self.playlistVersion += 1
+                    else:
+                        client.addid(url.path, position)
+                        self.playlistVersion += 2
+                    self.mpdPlaylist[position:position] = [url.path]
+                    inserted.append(url)
             except mpd.CommandError:
                 raise player.InsertError('Could not insert all files', inserted)
     
+    
     def removeFromPlaylist(self, begin, end):
-        with self.prepareCommander():
-            with self.playlistLock:
-                del self.mpdthread.mpd_playlist[begin:end]
-                self.commander.delete("{}:{}".format(begin,end))
-                self.mpdthread.playlistVersion += 1
+        with self.getClient() as client:
+            del self.mpdPlaylist[begin:end]
+            client.delete("{}:{}".format(begin,end))
+            self.playlistVersion += 1
+    
         
     def move(self, fromOffset, toOffset):
-        
         if fromOffset == toOffset:
             return
-        with self.prepareCommander():
-            with self.playlistLock:
-                path = self.mpdthread.mpd_playlist.pop(fromOffset)
-                self.mpdthread.mpd_playlist.insert(toOffset, path)
-                self.commander.move(fromOffset, toOffset)
-                self.mpdthread.playlistVersion += 1
+        with self.getClient() as client:
+            path = self.mpdPlaylist.pop(fromOffset)
+            self.mpdPlaylist.insert(toOffset, path)
+            client.move(fromOffset, toOffset)
+            self.playlistVersion += 1
     
     def configurationWidget(self, parent):
         """Return a config widget, initialized with the data of the given *profile*."""
@@ -368,8 +535,8 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         Since MPD connection is delegated to a subthread, this method might be slow.
         """
-        with self.prepareCommander():
-            info = self.commander.listallinfo(path)[0]
+        with self.getClient() as client:
+            info = client.listallinfo(path)[0]
             storage = tags.Storage()
             length = None
             for key, values in info.items():
@@ -390,7 +557,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         layout = QtGui.QVBoxLayout()
         layout.addWidget(QtGui.QLabel(self.tr("Choose which audio outputs to use:")))
         checkboxes = []
-        for output in sorted(self._outputs, key=lambda out:out["outputid"]):
+        for output in sorted(self.outputs, key=lambda out:out["outputid"]):
             checkbox = QtGui.QCheckBox(output["outputname"])
             checkbox.setChecked(output["outputenabled"] == "1")
             checkboxes.append(checkbox)
@@ -401,13 +568,13 @@ class MPDPlayerBackend(player.PlayerBackend):
         dbb.rejected.connect(dialog.reject)
         dialog.setLayout(layout)
         if dialog.exec_() == QtGui.QDialog.Accepted:
-            for checkbox, output in zip(checkboxes, self._outputs):
+            for checkbox, output in zip(checkboxes, self.outputs):
                 if output["outputenabled"] == "0" and checkbox.isChecked():
-                    with self.prepareCommander():
-                        self.commander.enableoutput(output["outputid"])
+                    with self.getClient() as client:
+                        client.enableoutput(output["outputid"])
                 elif output["outputenabled"] == "1" and not checkbox.isChecked():
-                    with self.prepareCommander():
-                        self.commander.disableoutput(output["outputid"])
+                    with self.getClient() as client:
+                        client.disableoutput(output["outputid"])
         
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
@@ -417,8 +584,8 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def setFlags(self, flags):
         if flags != self._flags:
-            with self.prepareCommander():
-                self.commander.repeat(flags & player.FLAG_REPEATING)
+            with self.getClient() as client:
+                client.repeat(flags & player.FLAG_REPEATING)
             # self._flags will be updated when a change in MPD's status is detected
     
 

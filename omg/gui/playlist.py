@@ -154,6 +154,7 @@ class PlaylistWidget(dockwidget.DockWidget):
         layout.addWidget(self.treeview)
         self.errorLabel = QtGui.QLabel()
         self.errorLabel.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
+        self.errorLabel.linkActivated.connect(lambda: self.backend.connectBackend())
         self.mainLayout = layout
         self.mainWidgetIndex = layout.indexOf(self.treeview)
         
@@ -180,6 +181,7 @@ class PlaylistWidget(dockwidget.DockWidget):
         self.backend = backend
         self.treeview.setBackend(self.backend)
     
+      
     def setActiveWidgetByState(self, state):
         current = self.mainLayout.itemAt(self.mainWidgetIndex).widget()
         self.mainLayout.removeWidget(current)
@@ -188,7 +190,7 @@ class PlaylistWidget(dockwidget.DockWidget):
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.treeview)
             self.treeview.show()
         else:
-            self.errorLabel.setText(self.tr("No connection"))
+            self.errorLabel.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.errorLabel)
             self.errorLabel.show()
             

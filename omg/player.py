@@ -169,6 +169,9 @@ class PlayerBackend(profiles.Profile):
         it anymore."""
         pass
     
+    def connectBackend(self):
+        pass
+    
     def flags(self):
         """Return a bitwise-OR of the currently set flags (see the FLAG_*-constants defined in this module).
         """
