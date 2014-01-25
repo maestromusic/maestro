@@ -336,6 +336,9 @@ class PhononPlayerBackend(player.PlayerBackend):
         raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))
     
     def save(self):
+        if hasattr(self, "_initState"):
+            # phonon was never activated -> return previous state
+            return self._initState
         result = {}
         playlist = self.playlist.wrapperString()
         if len(playlist):
