@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -79,6 +79,10 @@ class MBTagStorage(dict):
             self[key] = [value]
             
     def asOMGTags(self, mapping=None):
+        """Convert the MBTagStorage to an omg.tags.Storage object.
+        
+        *mapping* may be a dict mapping strings to OMG tag types.
+        """
         ret = tags.Storage()
         for key, values in self.items():
             if mapping and key in mapping:
@@ -88,7 +92,7 @@ class MBTagStorage(dict):
                     tag = mapping[key]
             else:
                 tag = tags.get(key)
-            ret[tag] = [ str(v) if isinstance(v, AliasEntity) else v for v in values ]
+            ret[tag] = [ str(v) for v in values ] # converts AliasEntities to strings
         return ret
 
 
@@ -273,6 +277,7 @@ class MBTreeItem:
         return omgTags
         
     def collectAliasEntities(self):
+        """Returns a set of all AliasEntity tag values of this item and all of its descendants."""
         entities = set()
         import itertools
         for item in self.walk():
@@ -500,7 +505,7 @@ class Work(MBTreeItem):
                 self.parentWork = Work(parentWorkId)
                 self.parentWork.tags["title"] = [relation.findtext('work/title')]
             else:
-                logger.debug("unknown work-work relation {} in {}".format(relation.get("type"), self.mbid))
+                logger.warning("unknown work-work relation {} in {}".format(relation.get("type"), self.mbid))
 
 
 class UnknownDiscException(Exception):
@@ -554,6 +559,8 @@ def findReleasesForDiscid(discid):
             mbit.tags.add('album', title)
             mbit.tags.add('musicbrainz_albumid', mbit.mbid)
         releases.append(mbit)
+    if len(releases) == 0:
+        raise UnknownDiscException("No release for disc ID {}".format(discid))
     return releases
 
     

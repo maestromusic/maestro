@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -98,9 +98,11 @@ class ImportAudioCDAction(treeactions.TreeAction):
                     self.ripper.start()
             stack.close()
         except xmlapi.UnknownDiscException:
-            dialogs.warning(self.tr("Disc not found"),
-                            self.tr("The disc was not found in the MusicBrainz database. "
-                                    "You need to tag the album yourself."))
+            ans = dialogs.question(self.tr("Disc not found"),
+                    self.tr("The disc was not found in the MusicBrainz database. "
+                            "You need to tag the album yourself. Proceed?"))
+            if not ans:
+                return False
             from .plugin import simpleDiscContainer
             if not config.options.audiocd.earlyrip:
                 self.ripper.start()
@@ -332,7 +334,11 @@ class NewTagsWidget(QtGui.QTableWidget):
 
 
 class ImportAudioCDDialog(QtGui.QDialog):
+    """The main dialog of this plugin, which is used for adding audioCDs to the editor.
     
+    Shows the container structure obtained from musicbrainz and allows to configure alias handling
+    and some other options.
+    """
     def __init__(self, level, release, container):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
@@ -351,7 +357,6 @@ class ImportAudioCDDialog(QtGui.QDialog):
         
         self.aliasWidget = AliasWidget(container.mbItem.collectAliasEntities())
         self.aliasWidget.aliasChanged.connect(self.updateTags)
-        
         
         self.newTagWidget = NewTagsWidget(container.mbItem.collectExternalTags())
         self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
