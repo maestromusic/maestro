@@ -22,7 +22,7 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from . import leveltreemodel
-from ..core import levels, tags
+from ..core import elements, levels, tags
 from ..core.elements import Element
 from .. import application, config, constants, logging
 
@@ -107,14 +107,15 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             i += 1
             if elid in checked or elid not in self.level:
                 continue
-            element = self.level[id]
-            if not any(id in rootIds for id in self._getAncestors(element)):
+            element = self.level[elid]
+            if not any(id in rootIds for id in self._getAncestorsInEditorLevel(element)):
                 elementsToRemove.append(element)
-                toCheck.extend(element.contents) # check contents recursively
+                if element.isContainer():
+                    toCheck.extend(element.contents) # check contents recursively
             checked.add(elid)
         
         if len(elementsToRemove) > 0:
-            empty = elements.ContentsList()
+            empty = elements.ContentList()
             contentsDict = {element: empty for element in elementsToRemove if element.isContainer()}
             self.level.changeContents(contentsDict)
             self.level.removeElements(elementsToRemove)
