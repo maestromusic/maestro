@@ -220,7 +220,7 @@ data = mainwindow.WidgetData(id="playback",
                              icon=utils.getIcon('widgets/playback.png'),
                              theClass=PlaybackWidget,
                              central=False,
-                             preferredDockArea=Qt.TopDockWidgetArea)
+                             preferredDockArea=Qt.LeftDockWidgetArea)
 mainwindow.addWidgetData(data)
 
 
