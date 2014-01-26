@@ -60,20 +60,25 @@ class ConfigItem(QtGui.QTableWidgetItem):
     def __init__(self, widget, option):
         super().__init__()
         self.option = option
+        
+        if option.type is bool:
+            self.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            self.setCheckState(Qt.Checked if option.getValue() else Qt.Unchecked)
         self.setText(option.export())
         if option.getValue() != option.default:
             f = self.font()
             f.setBold(True)
             self.setFont(f)
         self.dirty = False
-
         self.widget = widget
         
-    def data(self, role = Qt.DisplayRole):
+    def data(self, role=Qt.DisplayRole):
         if role == Qt.ToolTipRole:
             if self.option.getValue() == self.option.default:
                 return translate("ConfigEditor", 'Default value')
             else: return translate("ConfigEditor", 'Value differs from default')
+        if role == Qt.DisplayRole and self.option.type is bool:
+            return self.checkState() == Qt.Checked
         return super().data(role)
     
     def setData(self, role, value):
@@ -87,10 +92,9 @@ class ConfigItem(QtGui.QTableWidgetItem):
                 return
             self.dirty = True
             self.widget.dirty = True
-            if (self.option.getValue() != self.option.default):
-                f = self.font()
-                f.setBold(True)
-                self.setFont(f)
+            f = self.font()
+            f.setBold(self.option.getValue() != self.option.default)
+            self.setFont(f)
         super().setData(role, value)
     
     def resetToDefault(self):
