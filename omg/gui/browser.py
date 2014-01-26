@@ -335,6 +335,7 @@ class BrowserTreeView(treeview.TreeView):
     must be the browser-widget of this view. The *layers*-parameter determines how elements are grouped in
     this browser, see BrowserModel. *delegateProfile* is the profile passed to the BrowserDelegate instance.
     """
+    
     actionConfig = treeview.TreeActionConfiguration()
     sect = translate("BrowserTreeView", "browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
@@ -344,9 +345,8 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
                                      text=translate("BrowserTreeView", "Delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
-    actionConfig.addActionDefinition(((sect, 'elementType'),), treeactions.ChangeElementTypeAction)
-    actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
-    actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
+    treeactions.SetElementTypeAction.addSubmenu(actionConfig, sect)
+    treeactions.ChangePositionAction.addSubmenu(actionConfig, sect) 
     
     def __init__(self, browser, layers, delegateProfile):
         super().__init__(levels.real)
