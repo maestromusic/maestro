@@ -105,10 +105,6 @@ class PlayerBackend(profiles.Profile):
         """Return the current song as wrapper."""
         raise NotImplementedError()
     
-    def currentOffset(self):
-        """Return the offset of the current song."""
-        raise NotImplementedError()
-    
     def setCurrent(self, offset):
         """Set the song at offset *offset* as active and start playing it."""
         raise NotImplementedError()
