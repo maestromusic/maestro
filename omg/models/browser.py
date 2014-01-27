@@ -217,7 +217,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
             # first contents to node (this happens thanks to the directload shortcut), we must not call
             # those methods as Qt will then try to access the contents...resulting in _startLoading.
-            contentsWereNone = False
             self.beginRemoveRows(self.getIndex(node), 0, len(node.contents)-1)
             node.setContents([])
             self.endRemoveRows()
@@ -297,7 +296,7 @@ class TagLayer:
         
     def load(self, model, node, elementSource):
         # Get all tag values that should appear in TagNodes 
-        
+
         if elementSource.table is not None:
             table = elementSource.table
         else: table = db.prefix+'elements'
@@ -305,7 +304,6 @@ class TagLayer:
             idFilter = 'res.id IN ({}) '.format(db.csList(elementSource.extendedToplevel))
         else: idFilter = '1' # for use in AND-clauses
         tagFilter = db.csIdList(self.tagList)
-        
         if db.type == 'sqlite':
             collate = 'COLLATE NOCASE'
         else: collate = ''
@@ -317,7 +315,7 @@ class TagLayer:
             WHERE t.tag_id IN ({2}) AND {3}
             ORDER BY COALESCE(v.sort_value, v.value) {4}
         """.format(db.prefix, table, tagFilter, idFilter, collate))
-    
+
         nodes = []
         hiddenNodes = []
         values = set()
@@ -326,7 +324,7 @@ class TagLayer:
             tagId, valueId, value, hide, sortValue = row
             if db.isNull(sortValue):
                 sortValue = None
-                
+
             if not hide or self.showHiddenValues:
                 theList = nodes
             else: theList = hiddenNodes
@@ -341,24 +339,20 @@ class TagLayer:
                     if value in aNode.values:
                         aNode.tagPairs.append((tagId, valueId))
                         break
-    
+
         # If there are not too many nodes, combine nodes with the same contents.
         if 2 <= len(nodes) <= 10 and 1 <= len(elementSource.extendedToplevel) <= 250:
-            valuePart = ' OR '.join('(tag_id={} AND value_id={})'
-                                    .format(*node.tagPairs[0]) for node in nodes)
+            valuePart = ' OR '.join('(tag_id={} AND value_id={})'.format(*tagPair)
+                                    for node in nodes for tagPair in node.tagPairs)
             result = db.query("""
                         SELECT element_id, tag_id, value_id
                         FROM {}tags
                         WHERE element_id IN ({}) AND ({})
                         """.format(db.prefix, db.csList(elementSource.extendedToplevel), valuePart))
-            elementDict = {}
-            for node in nodes:
-                theSet = set() # use the same set for each tagPair of one node
-                for tagId, valueId in node.tagPairs:
-                    elementDict[(tagId, valueId)] = theSet
+            elementDict = collections.defaultdict(set)
             for elid, tid, vid in result:
-                elementDict[(tid, vid)].add(elid)   
-            
+                elementDict[(tid, vid)].add(elid)
+
             # EXPERIMENTAL: If there are only a few composers, use them as tag nodes (no artists etc.)
             composerTag = tags.get("composer")
             if composerTag.isInDb():
@@ -369,18 +363,20 @@ class TagLayer:
                         for node in nodes[:]:
                             if not any(pair[0] == composerTag.id for pair in node.tagPairs):
                                 nodes.remove(node)
-                              
+
             # Combine nodes with the same contents.
             hashs = {}
             for node in nodes[:]:
-                elementSet = elementDict[node.tagPairs[0]]
+                elementSet = set()
+                for id in node.tagPairs:
+                    elementSet.update(elementDict[id])
                 h = hash(frozenset(elementSet))
                 if h not in hashs:
                     hashs[h] = node
                 else:
                     hashs[h].addValues(node)
                     nodes.remove(node)
-                
+
         # Check whether a VariousNode is necessary
         result = db.query("""
             SELECT res.id
@@ -597,7 +593,7 @@ class TagNode(CriterionNode):
         value-ids in the corresponding tag. *value* is the value of the value-ids (which should be the same
         for all tags) and will be displayed on the node.
         """
-        CriterionNode.__init__(self, parent)
+        super().__init__(parent)
         self.tagPairs = tagPairs
         self.values = [value]
         self.sortValues = [sortValue if sortValue is not None else value]
@@ -627,7 +623,7 @@ class VariousNode(CriterionNode):
     def __init__(self, parent, tagSet):
         """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's
         tagset *tagSet*."""
-        CriterionNode.__init__(self, parent)
+        super().__init__(parent)
         self.tagSet = tagSet
 
     def getCriterion(self):
