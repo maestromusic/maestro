@@ -22,8 +22,8 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
 from .. import application, config, database as db, logging, utils, search as searchmodule
-from ..core import tags, flags, levels
-from ..core.elements import Element, Container
+from ..core import flags, levels
+from ..core.elements import Element
 from ..search import criteria
 from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget, search as searchgui
 from .delegates import browser as browserdelegate
@@ -291,6 +291,7 @@ class Browser(dockwidget.DockWidget):
             self.searchRequest = None
             # Whether the view should restore expanded nodes after the search is stored in request.data.
             restore = request.data
+            #TODO: "restore" is not used
             for view in self.views:
                 view.expander = VisibleLevelsExpander(view)
                 view.resetToTable(self.table)

@@ -218,7 +218,9 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     
     def checkMPDChanges(self, changed):
-        """Check for changes in the MPD subsystems listed in "changed" (as returned from idle)."""
+        """Check for changes in the MPD subsystems listed in "changed" (as returned from idle).
+        
+        All changes will be handled accordingly. If """
         self.mpdStatus = self.client.status()
         if 'error' in self.mpdStatus:
             from omg.gui.dialogs import warning
