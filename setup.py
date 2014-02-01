@@ -118,7 +118,7 @@ setup(name='omg',
       packages=find_packages(),
       include_package_data=True,
       install_requires=["pytaglib>=0.3.0", "pyparsing"],
-      extras_require={ 'mpd': ["python-mpd2>=0.4.6"] },
+      extras_require={ 'mpd': ["python-mpd2>=0.5.3"] },
       entry_points={
           'gui_scripts': ['omg = omg.application:run',
                            'omgsetup = omg.install:run',
