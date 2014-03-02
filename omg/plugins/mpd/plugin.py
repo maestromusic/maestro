@@ -280,57 +280,54 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         In any other case, a complete playlist change is issued.
         """
-        #TODO: i am sure this can be written a little more compact
         newVersion = int(self.mpdStatus["playlist"])
         if newVersion == self.playlistVersion:
             return
-        oldVersion = self.playlistVersion
-        logger.debug("detected new plVersion: {}-->{}".format(oldVersion, newVersion))
+        logger.debug("detected new plVersion: {}-->{}".format(self.playlistVersion, newVersion))
         
-        if oldVersion is None:
-            # this happens only on initialization. Here we don't create an UndoCommand
+        if self.playlistVersion is None:
+            # this happens only on initialization.
             self.mpdPlaylist = [x["file"] for x in self.client.playlistinfo()]
             self.playlistVersion = newVersion
             self.playlist.initFromUrls(self.makeUrls(self.mpdPlaylist))
             return
-        
-        changes = [(int(a["pos"]),a["file"]) for a in self.client.plchanges(oldVersion)]
+        plChanges = self.client.plchanges(self.playlistVersion)
+        changedFiles = [ a["file"] for a in plChanges ]
         self.playlistVersion = newVersion
         newLength = int(self.mpdStatus["playlistlength"])
         # first special case: find out if only consecutive songs were removed 
         if newLength < len(self.mpdPlaylist):
             numRemoved = len(self.mpdPlaylist) - newLength
-            newSongsThere = list(zip(*changes))[1] if len(changes) > 0 else []
-            oldSongsThere = self.mpdPlaylist[-len(changes):] if len(changes) > 0 else []
-            if all( a == b for (a, b) in zip(newSongsThere, oldSongsThere)):
-                firstRemoved = newLength - len(changes)
+            oldSongsThere = self.mpdPlaylist[-len(plChanges):] if len(plChanges) > 0 else []
+            if changedFiles == oldSongsThere:
+                firstRemoved = newLength - len(plChanges)
                 del self.mpdPlaylist[firstRemoved:firstRemoved+numRemoved]
                 self.playlist.removeByOffset(firstRemoved, numRemoved, updateBackend='onundoredo')
                 return
         # second special case: find out if a number of consecutive songs were inserted
-        if newLength > len(self.mpdPlaylist):
+        elif newLength > len(self.mpdPlaylist):
             numInserted = newLength - len(self.mpdPlaylist)
-            numShifted = len(changes) - numInserted
+            numShifted = len(plChanges) - numInserted
             if numShifted == 0:
                 newSongsThere = []
                 oldSongsThere = []
             else:
-                newSongsThere = list(zip(*changes[-numShifted:]))[1]
+                newSongsThere = plChanges
                 oldSongsThere = self.mpdPlaylist[-numShifted:]
-            if all (a == b for (a, b) in zip(newSongsThere, oldSongsThere)):
+            if newSongsThere == oldSongsThere:
                 firstInserted = len(self.mpdPlaylist) - numShifted
-                paths = [ file for pos, file in changes[:numInserted] ]
+                paths = changedFiles[:numInserted]
                 self.mpdPlaylist[firstInserted:firstInserted] = paths
                 urls = self.makeUrls(paths)
-                pos = changes[0][0]
+                pos = int(plChanges[0]["pos"])
                 self.playlist.insertUrlsAtOffset(pos, urls, updateBackend='onundoredo')
                 return
-        if len(changes) == 0:
+        if len(plChanges) == 0:
             logger.warning('no changes???')
             return
         # other cases: update self.mpdPlaylist and perform a general playlist change
         reallyChange = False
-        for pos, file in sorted(changes):
+        for pos, file in sorted((int(a["pos"]),a["file"]) for a in plChanges):
             if pos < len(self.mpdPlaylist):
                 if self.mpdPlaylist[pos] != file:
                     reallyChange = True
@@ -524,7 +521,7 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
-        if self._numFrontends == 0:
+        if self._numFrontends == 0 and self.connectionState == player.CONNECTED:
             self.disconnectClient()
     
     
