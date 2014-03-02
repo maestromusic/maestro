@@ -410,7 +410,7 @@ class Wrapper(Node):
         If *recursive* is True, load the contents of all children in the same way.
         """
         if self.element.isContainer():
-            if self.contents is None:
+            if self.contents is None or len(self.contents) == 0:
                 self.setContents([Wrapper(self.element.level.collect(id), position=pos)
                                   for pos, id in self.element.contents.items()])
             if recursive:
