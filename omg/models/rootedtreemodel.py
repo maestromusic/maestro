@@ -16,8 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
@@ -43,7 +41,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     The hasContents-method allows to implement nodes that don't calculate the number of children until the
     node is expanded the first time.
     """
-    def __init__(self, root = None):
+    def __init__(self, root=None):
         super().__init__()
         self.root = RootNode(self) if root is None else root
     
@@ -161,7 +159,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
     def columnCount(self,parent):
         return 1
     
-    def parent(self,index):
+    def parent(self, index):
         if not index.isValid():
             return QtCore.QModelIndex()
         child = index.internalPointer()

@@ -89,7 +89,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
     vMargin = 2  # vertical margin at the top and bottom of the content
     state = None # whether we are processing paint or sizeHint. Used for error detection 
             
-    def __init__(self,view,profile):
+    def __init__(self, view, profile):
         super().__init__(view)
         self.view = view
         self.model = view.model()
@@ -140,7 +140,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         if profile == self.profile:
             self.view.scheduleDelayedItemsLayout()
                     
-    def layout(self,index):
+    def layout(self, index, width):
         """Layout the node with the given index. This method is called by paint and sizeHint and must be
         implemented in subclasses."""
         raise NotImplementedError()
@@ -162,7 +162,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         
         # Collect items
         self.left,self.right,self.center = [],[],[]
-        self.layout(index,totalWidth)
+        self.layout(index, totalWidth)
                        
         leftWidth,leftMaxHeight = self._rowDimensions(self.left)
         rightWidth,rightMaxHeight = self._rowDimensions(self.right)
@@ -303,6 +303,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
         self.painter.setFont(self.font)
+        self.painter.setPen(style.color)
         return QtGui.QFontMetrics(self.font)
  
 
@@ -350,8 +351,6 @@ class TextItem(DelegateItem):
         else: flags |= Qt.AlignLeft
         # Enable elided text
         #text = delegate.painter.fontMetrics().elidedText(self.text,Qt.ElideRight,rect.width())
-        if self.style is not None:
-            delegate.painter.setPen(self.style.color)
         bRect = delegate.painter.drawText(rect,flags,self.text)
         return bRect.width(),max(bRect.height(),self.minHeight)
     

@@ -53,7 +53,8 @@ def initSearchEngine():
     
 class BrowserModel(rootedtreemodel.RootedTreeModel):
     """ItemModel for the BrowserTreeViews (a browser may have several views and hence several models). The
-    model will group its contents according to the parameter *layers*. TODO improve comment
+    model will group its contents according to the parameter *layers*.
+    TODO: improve comment
     """
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)

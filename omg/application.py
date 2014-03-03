@@ -26,7 +26,7 @@ import sys, os, fcntl, getopt
 from PyQt4 import QtCore, QtGui, QtNetwork
 from PyQt4.QtCore import Qt
 
-from . import config, logging, constants
+from omg import config, logging, constants
 
 logger = None # Will be set when logging is initialized
         

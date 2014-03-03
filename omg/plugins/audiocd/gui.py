@@ -20,14 +20,17 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
-from omg import config
+from omg import config, logging
 from omg.core import levels, tags
 from omg.gui import dialogs, delegates, mainwindow, treeactions, treeview
 from omg.gui.delegates.abstractdelegate import *
-from omg.models import leveltreemodel
-from omg.plugins.musicbrainz import plugin as mbplugin, xmlapi
+from omg.models import leveltreemodel, rootedtreemodel
+from omg.plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
+from omg.plugins.musicbrainz.delegate import MusicBrainzDelegate
 
 translate = QtCore.QCoreApplication.translate
+logger = logging.getLogger(__name__)
+
 
 def askForDiscId():
     import discid
@@ -86,11 +89,12 @@ class ImportAudioCDAction(treeactions.TreeAction):
                 progress.setText(self.tr("Fetching data from:\n{}").format(url))
                 QtGui.qApp.processEvents()
             xmlapi.queryCallback = callback 
-            container = xmlapi.makeReleaseContainer(release, theDiscid, level)
+            xmlapi.fillReleaseForDisc(release, theDiscid)
             progress.close()
             xmlapi.queryCallback = None
             QtGui.qApp.processEvents()
-            dialog = ImportAudioCDDialog(level, release, container)
+            dialog = ImportAudioCDDialog(level, release)
+            logger.debug("yeah")
             if dialog.exec_():
                 model = self.parent().model()
                 model.insertElements(model.root, len(model.root.contents), [dialog.container])
@@ -339,29 +343,36 @@ class ImportAudioCDDialog(QtGui.QDialog):
     Shows the container structure obtained from musicbrainz and allows to configure alias handling
     and some other options.
     """
-    def __init__(self, level, release, container):
+    def __init__(self, level, release):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
         self.level = level
-        level.stack.beginMacro(self.tr("Create Elements from Audio CD"))
         
-        self.container = container
+        self.mbNode = elements.MBNode(release)
         self.release = release
-        self.model = leveltreemodel.LevelTreeModel(level, [container])
-        level.stack.endMacro()
         
-        self.view = treeview.TreeView(level, affectGlobalSelection=False)
-        self.view.setModel(self.model)
-        self.view.setItemDelegate(CDROMDelegate(self.view))
-        self.view.expandAll()
+        self.mbModel = rootedtreemodel.RootedTreeModel()
+        self.mbModel.root.setContents([self.mbNode])
+        self.mbView = treeview.TreeView(level=None, affectGlobalSelection=False)
+        self.mbView.setModel(self.mbModel)
+        self.mbView.setItemDelegate(MusicBrainzDelegate(self.mbView))
         
-        self.aliasWidget = AliasWidget(container.mbItem.collectAliasEntities())
-        self.aliasWidget.aliasChanged.connect(self.updateTags)
+        self.omgModel = leveltreemodel.LevelTreeModel(level) #, [container])
+        self.omgView = treeview.TreeView(level, affectGlobalSelection=False)
+        self.omgView.setModel(self.omgModel)
+        #self.omgView.setItemDelegate(CDROMDelegate(self.omgView))
+        self.omgView.expandAll()
         
-        self.newTagWidget = NewTagsWidget(container.mbItem.collectExternalTags())
-        self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
-        self.newTagWidget.tagConfigChanged.connect(self.updateTags)
+        #self.aliasWidget = AliasWidget(container.mbItem.collectAliasEntities())
+        #self.aliasWidget.aliasChanged.connect(self.updateTags)
         
+        #self.newTagWidget = NewTagsWidget(container.mbItem.collectExternalTags())
+        #self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
+        #self.newTagWidget.tagConfigChanged.connect(self.updateTags)
+        
+        makeElementsButton = QtGui.QPushButton(
+            QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_ArrowRight), "")
+        makeElementsButton.clicked.connect(self.makeElements)
         self.includeParentTagsBox = QtGui.QCheckBox(self.tr("Include tags of parent containers"))
         self.includeParentTagsBox.setChecked(True)
         self.includeParentTagsBox.stateChanged.connect(self.updateTags)
@@ -371,15 +382,24 @@ class ImportAudioCDDialog(QtGui.QDialog):
         btbx.rejected.connect(self.reject)
         
         lay = QtGui.QVBoxLayout()
-        lay.addWidget(self.view, 2)
-        lay.addWidget(QtGui.QLabel(self.tr("Alias handling:")))
-        lay.addWidget(self.aliasWidget, 1)
-        lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
-        lay.addWidget(self.newTagWidget, 1)
-        lay.addWidget(self.includeParentTagsBox, 1)
-        lay.addWidget(btbx, 1)
+        
+        viewLayout = QtGui.QHBoxLayout()
+        viewLayout.addWidget(self.mbView)
+        viewLayout.addWidget(makeElementsButton)
+        viewLayout.addWidget(self.omgView)
+        lay.addLayout(viewLayout)
+        #lay.addWidget(QtGui.QLabel(self.tr("Alias handling:")))
+        #lay.addWidget(self.aliasWidget, 1)
+        #lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
+        #lay.addWidget(self.newTagWidget, 1)
+        lay.addWidget(self.includeParentTagsBox)
+        lay.addWidget(btbx)
         self.setLayout(lay)
-        self.resize(mainwindow.mainWindow.width()*0.8, mainwindow.mainWindow.height()*0.8)
+        
+        self.resize(mainwindow.mainWindow.size()*0.8)
+    
+    def makeElements(self):
+        pass
     
     def finalize(self):
         mbplugin.updateDBAliases(self.aliasWidget.activeEntities())

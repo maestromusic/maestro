@@ -109,7 +109,6 @@ class RenameDialog(QtGui.QDialog):
         mainLayout = QtGui.QVBoxLayout()
         
         profile = plugin.profileCategory.getFromStorage(config.storage.renamer.current_profile)
-        logger.debug("Renamer profile: {}".format(profile))
         self.configDisplay = GrammarConfigurationWidget(temporary=True, profile=profile)
         mainLayout.addWidget(self.configDisplay, 1)
         self.configDisplay.temporaryChanged.connect(self._handleTemporaryChanged)
