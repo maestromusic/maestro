@@ -153,8 +153,7 @@ class ReleaseSelectionDialog(QtGui.QDialog):
 
 class CDROMDelegate(delegates.StandardDelegate):
 
-    def __init__(self, view): 
-        # Because it should not be configurable, this profile is not contained in the profile category
+    def __init__(self, view):
         self.profile = delegates.profiles.DelegateProfile("cdrom")
         self.profile.options['appendRemainingTags'] = True
         self.profile.options['showPaths'] = True
@@ -181,7 +180,8 @@ class AliasComboDelegate(QtGui.QStyledItemDelegate):
             option.font.setBold(True)
         super().paint(painter, option, index)
         option.font.setBold(False)
-        
+
+
 class AliasComboBox(QtGui.QComboBox):
     
     aliasChanged = QtCore.pyqtSignal(object)
@@ -285,7 +285,8 @@ class AliasWidget(QtGui.QTableWidget):
             return
         self.entities[row].sortName = self.item(row, col).text()
 
-class NewTagsWidget(QtGui.QTableWidget):
+
+class TagMapWidget(QtGui.QTableWidget):
     
     tagConfigChanged = QtCore.pyqtSignal(dict)
     
@@ -297,15 +298,19 @@ class NewTagsWidget(QtGui.QTableWidget):
         self.setHorizontalHeaderLabels(self.columns)
         self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.setRowCount(len(newtags))
-        self.tagMapping = mbplugin.tagMap
+        self.tagMapping = mbplugin.tagMap.copy()
         from omg.gui.tagwidgets import TagTypeBox
-        for row, tag in enumerate(newtags):
-            self.tagMapping[tag.name] = tag
+        for row, tagname in enumerate(newtags):
+            tag = tags.get(tagname)
+            self.tagMapping[tagname] = tag
             checkbox = QtGui.QTableWidgetItem()
-            checkbox.setCheckState(Qt.Checked)
+            if tagname in self.tagMapping and self.tagMapping[tagname] is None:
+                checkbox.setCheckState(Qt.Unchecked)
+            else:
+                checkbox.setCheckState(Qt.Checked)
             self.setItem(row, 0, checkbox)
             
-            mbname = QtGui.QTableWidgetItem(tag.name)
+            mbname = QtGui.QTableWidgetItem(tagname)
             mbname.setFlags(Qt.ItemIsEnabled)
             self.setItem(row, 1, mbname)
             
@@ -326,8 +331,8 @@ class NewTagsWidget(QtGui.QTableWidget):
         else:
             item.setFlags(item.flags() ^ Qt.ItemIsEnabled)
             self.tagMapping[item.text()] = None
-        self.cellWidget(row, 2).setEnabled(state)           
-        self.tagConfigChanged.emit(self.tagMapping)
+        self.cellWidget(row, 2).setEnabled(state)
+        self.tagConfigChanged.emit(self.tagMapping)           
             
     def _handleTagTypeChanged(self, tag):
         for row in range(self.rowCount()):
@@ -357,71 +362,57 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.mbView.setModel(self.mbModel)
         self.mbView.setItemDelegate(MusicBrainzDelegate(self.mbView))
         
-        self.omgModel = leveltreemodel.LevelTreeModel(level) #, [container])
+        self.omgModel = leveltreemodel.LevelTreeModel(level)
         self.omgView = treeview.TreeView(level, affectGlobalSelection=False)
         self.omgView.setModel(self.omgModel)
-        #self.omgView.setItemDelegate(CDROMDelegate(self.omgView))
         self.omgView.expandAll()
+        self.omgView.setItemDelegate(CDROMDelegate(self.omgView))
         
-        #self.aliasWidget = AliasWidget(container.mbItem.collectAliasEntities())
-        #self.aliasWidget.aliasChanged.connect(self.updateTags)
+        # collect alias entities in this release
+        entities = set()
+        for item in release.walk():
+            if not item.ignore:
+                entities.update(val for val in itertools.chain.from_iterable(item.tags.values())
+                                    if isinstance(val, xmlapi.AliasEntity))
+        self.aliasWidget = AliasWidget(entities)
+        self.aliasWidget.aliasChanged.connect(self.mbModel.layoutChanged)
         
-        #self.newTagWidget = NewTagsWidget(container.mbItem.collectExternalTags())
-        #self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
-        #self.newTagWidget.tagConfigChanged.connect(self.updateTags)
+        self.newTagWidget = TagMapWidget(release.collectExternalTags())
+        self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
         
         makeElementsButton = QtGui.QPushButton(
             QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_ArrowRight), "")
         makeElementsButton.clicked.connect(self.makeElements)
-        self.includeParentTagsBox = QtGui.QCheckBox(self.tr("Include tags of parent containers"))
-        self.includeParentTagsBox.setChecked(True)
-        self.includeParentTagsBox.stateChanged.connect(self.updateTags)
-        
+
         btbx = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btbx.accepted.connect(self.finalize)
         btbx.rejected.connect(self.reject)
         
         lay = QtGui.QVBoxLayout()
-        
         viewLayout = QtGui.QHBoxLayout()
         viewLayout.addWidget(self.mbView)
         viewLayout.addWidget(makeElementsButton)
         viewLayout.addWidget(self.omgView)
-        lay.addLayout(viewLayout)
-        #lay.addWidget(QtGui.QLabel(self.tr("Alias handling:")))
-        #lay.addWidget(self.aliasWidget, 1)
-        #lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
-        #lay.addWidget(self.newTagWidget, 1)
-        lay.addWidget(self.includeParentTagsBox)
-        lay.addWidget(btbx)
+        lay.addLayout(viewLayout, stretch=1)
+        lay.addWidget(QtGui.QLabel(self.tr("Alias handling:")))
+        lay.addWidget(self.aliasWidget, stretch=0)
+        lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
+        lay.addWidget(self.newTagWidget, stretch=0)
+        lay.addWidget(btbx, stretch=0)
         self.setLayout(lay)
         
         self.resize(mainwindow.mainWindow.size()*0.8)
     
     def makeElements(self):
-        pass
+        self.omgModel.clear()
+        self.level.removeElements(list(self.level.elements.values()))
+        self.container = self.release.makeElements(self.level, self.newTagWidget.tagMapping)
+        self.omgModel.insertElements(self.omgModel.root, 0, [self.container])
     
     def finalize(self):
         mbplugin.updateDBAliases(self.aliasWidget.activeEntities())
         for mbname, omgtag in self.newTagWidget.tagMapping.items():
             config.storage.musicbrainz.tagmap[mbname] = omgtag.name if omgtag else None
-        for item in self.release.walk():
-            del item.element.mbItem
         self.level.commit()
         self.accept()
-    
-    def updateTags(self):
-        changes = {}
-        for item in self.release.walk():
-            elemTags = item.makeOMGTags(self.newTagWidget.tagMapping,
-                                 self.includeParentTagsBox.isChecked())
-            if elemTags != item.element.tags:
-                changes[item.element] = tags.TagStorageDifference(item.element.tags, elemTags)
-        if len(changes):
-            self.level.changeTags(changes)
-            
-class RipMissingTracksDialog(QtGui.QDialog):
-    
-    def __init__(self):
-        super().__init__(mainwindow.mainWindow)
-        
+                

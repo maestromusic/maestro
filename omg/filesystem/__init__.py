@@ -428,7 +428,9 @@ class FileSystemSynchronizer(QtCore.QThread):
         dir = Directory(path, parent)
         self.directories[path] = dir
         if storeNew:
+            db.transaction()
             self.storeDirectories(new + [dir])
+            db.commit()
         return dir, new + [dir]
         
     def checkTrack(self, track):

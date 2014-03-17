@@ -21,8 +21,7 @@ from functools import reduce
 from omg.core import elements, nodes, tags
 from omg import logging
 
-from .xmlapi import AliasEntity, Alias, MBTagStorage, query
-from . import plugin as mbplugin
+from .xmlapi import AliasEntity, MBTagStorage, query
 
 logger = logging.getLogger("musicbrainz.elements")
 
@@ -47,7 +46,7 @@ class MBNode(nodes.Node):
         if "title" in self.element.tags:
             return posText + ", ".join(map(str, self.element.tags.get("title")))
         return posText + "<no title>"
-
+    
     def __str__(self):
         return ("<{}>({})".format(self.element.__class__, self.element.tags.get("title")))
         
@@ -100,6 +99,23 @@ class MBTreeElement:
                 yield subchild
             #yield from child.walk() py3.3 version
     
+    def makeElements(self, level, tagMap):
+        """Creates a tree of OMG elements in *level* matching this MusicBrainz item."""
+        elTags = self.tags.asOMGTags(tagMap)
+        elTags.add(*self.idTag())
+        if isinstance(self, Recording):
+            elem = level.collect(self.backendUrl)
+            diff = tags.TagStorageDifference(None, elTags)
+            level.changeTags({elem: diff})
+        else:
+            contents = elements.ContentList()
+            for pos, child in self.children.items():
+                if not child.ignore:
+                    elem = child.makeElements(level, tagMap)            
+                    contents.insert(pos, elem.id)
+            elem = level.createContainer(tags=elTags, contents=contents,
+                                         type=self.containerType)
+        return elem
     
     def assignCommonTags(self):
         """Add tags that are common in all children to the own tags."""
@@ -120,54 +136,17 @@ class MBTreeElement:
                 if tag not in self.tags or val not in self.tags[tag]:
                     self.tags.add(tag, val)
 
-
-    def makeElements(self, level, includeParentTags=True):
-        """Creates a tree of OMG elements in *level* matching this MusicBrainz item."""
-        elTags = self.makeOMGTags(mbplugin.tagMap, includeParentTags)
-        if isinstance(self, Recording):
-            elem = level.collect(self.backendUrl)
-            diff = tags.TagStorageDifference(None, elTags)
-            level.changeTags({elem: diff})
-        else:
-            contents = elements.ContentList()
-            for pos, child in self.children.items():
-                elem = child.makeElements(level)            
-                contents.insert(pos, elem.id)
-            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType)            
-        elem.mbItem = self
-        self.element = elem
-        return elem
-    
-    
-    def makeOMGTags(self, mapping, includeParents=True):
-        omgTags = self.tags.asOMGTags(mapping)
-        if includeParents:
-            element = self
-            while element.parent is not None:
-                element = element.parent
-                parentTags = element.tags.asOMGTags(mapping)
-                for tag, values in parentTags.items():
-                    if tag is not tags.TITLE:
-                        omgTags.addUnique(tag, *values)
-        return omgTags
-        
-    def collectAliasEntities(self):
-        """Returns a set of all AliasEntity tag values of this item and all of its descendants."""
-        entities = set()
-        import itertools
-        for item in self.walk():
-            for val in itertools.chain.from_iterable(item.tags.values()):
-                if isinstance(val, AliasEntity):
-                    entities.add(val)
-        return entities
-
     def collectExternalTags(self):
         etags = set()
         for item in self.walk():
-            for tag in item.element.tags:
-                if not tag.isInDb():
+            for tag in item.tags:
+                if not tags.isInDb(tag):
                     etags.add(tag)
         return etags
+    
+        
+    def idTag(self):
+        return self.idTagName, self.mbid
     
     def passTags(self, excludes):
         for tag, vals in self.tags.items():
@@ -186,19 +165,22 @@ class Release(MBTreeElement):
     """
     
     containerType = elements.TYPE_ALBUM
+    idTagName = 'musicbrainz_albumid'
     
     def mediumForDiscid(self, discid):
-        """Return the position of the medium in this release with given *discid*, if such exists.
+        """Find the medium in this release hat has id `discid`, and return a tuple consisting of
+        the medium's position and the medium itself. 
         """
         for pos, child in self.children.items():
             if discid in child.discids:
-                return pos
+                return pos, child
 
 
 class Medium(MBTreeElement):
     """A medium inside a release. Usually has one or more discids associated to it."""
     
     containerType = elements.TYPE_CONTAINER
+    idTagName = 'musicbrainz_discid'
     
     def __init__(self, pos, release, discids, title=None):
         """Create the medium with associated *discids* as position *position* in *release*.
@@ -214,6 +196,12 @@ class Medium(MBTreeElement):
             title = "Disc {}".format(pos)
         self.tags.add("title", title)
         self.discids = set(discids)
+    
+    def idTag(self):
+        try:
+            return self.idTagName, self.currentDiscid
+        except AttributeError:
+            return self.idTagName, next(iter(self.discids))
     
     def insertWorks(self):
         """Inserts superworks as intermediate level between the medium and its recording.
@@ -252,6 +240,8 @@ class Recording(MBTreeElement):
     Every track on a CD is associated to exactly one recording. Since we don't care about tracks,
     we immediately insert Recordings as children of media.
     """
+    
+    idTagName = 'musicbrainz_trackid'
     
     def __init__(self, recordingid, pos, parent, tracknumber):
         """Create recording with the given id and insert it at *position* under *parent*.
@@ -348,6 +338,8 @@ class Recording(MBTreeElement):
 class Work(MBTreeElement):
     
     containerType = elements.TYPE_WORK
+    
+    idTagName = 'musicbrainz_workid'
     
     def __init__(self, workid):
         super().__init__(workid)

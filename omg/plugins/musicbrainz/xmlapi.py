@@ -182,6 +182,7 @@ class AliasEntity:
 
     def isDefault(self):
         return self.name == self.aliases[0].name and self.sortName == self.aliases[0].sortName
+    
     def __str__(self):
         return self.name
 
@@ -261,9 +262,10 @@ def fillReleaseForDisc(MBrelease, discid):
     """
     release = query("release", MBrelease.mbid, ("recordings",)).find("release")
     
-    pos = MBrelease.mediumForDiscid(discid)
-    MBmedium = MBrelease.children[pos]
+    pos, MBmedium = MBrelease.mediumForDiscid(discid)
+    MBmedium.currentDiscid = discid
     from .elements import Recording, Medium
+    # find the medium in the xml tree
     for medium in release.iterfind('medium-list/medium'):
         if int(medium.findtext('position')) == pos:
             break
