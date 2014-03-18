@@ -36,9 +36,43 @@ logger = logging.getLogger(__name__)
 finishedTracks = []
 activeRipper = None
 
-fromToRegex = re.compile(r'from sector\s+(?P<from>[0-9]+).*\n.*to sector\s+(?P<to>[0-9]+)')
-wroteRegex = re.compile(r'\[wrote\]\s@\s([0-9]+)')
+fromToRe = re.compile(r'from sector\s+(?P<fromSec>[0-9]+).*track\s+(?P<fromTrack>[0-9]+)\s'
+                          '.*\n.*to sector\s+(?P<toSec>[0-9]+).*track\sb(?P<toTrack>[0-9]+)')
+wroteRe = re.compile(r'\[wrote\]\s@\s([0-9]+)')
+currentRe = re.compile(r'outputting\sto\strack([0-9]+)\.')
 
+class RipperStatusWidget(QtGui.QWidget):
+    
+    def __init__(self):
+        super().__init__()
+        self.progress = QtGui.QProgressBar()
+        closeButton = QtGui.QToolButton()
+        closeButton.setIcon(self.style().standardIcon(QtGui.QStyle.SP_BrowserStop))
+        layout = QtGui.QHBoxLayout()
+        layout.addWidget(self.progress, 0)
+        layout.addWidget(closeButton)
+        self.setLayout(layout)
+        self.fromSector = self.toSector = self.currentTrack = None
+        self.progress.setFormat(self.tr('starting ripper...'))
+    
+    def setSectorRange(self, fromSector, toSector):
+        self.fromSector, self.toSector = fromSector, toSector
+        self.progress.setRange(fromSector, toSector)
+        format = self.tr('ripping disc: %p%')
+    
+    def setCurrentTrack(self, track):
+        self.currentTrack = track
+        self.progress.setFormat(self.tr('ripping track {} (%p%)').format(self.currentTrack))
+        
+    def setTrackRange(self, fromTrack, toTrack):
+        self.fromTrack = fromTrack
+        self.toTrack = toTrack
+    
+    def setByte(self, byte):
+        self.progress.setValue(int((byte+1)/2352*2) + 1)
+         
+        
+    
 class Ripper(QtCore.QObject):
     
     trackFinished = QtCore.pyqtSignal(str, int, str)
@@ -70,26 +104,22 @@ class Ripper(QtCore.QObject):
         self.ripProcess.finished.connect(self._handleRipperFinished)
         self.ripProcess.start('cdparanoia',
                               ['-B', '-e', '-d', self.device, self.trackArg])
-        self.progressLabel = QtGui.QLabel(self.tr('Ripping Audio CD'))
-        self.progressBar = QtGui.QProgressBar()
-        mainwindow.mainWindow.statusBar().addWidget(self.progressLabel)
-            
-        self.fromSector = self.toSector = None
+        self.statusWidget = RipperStatusWidget()
+        mainwindow.mainWindow.statusBar().addWidget(self.statusWidget)
         
     def handleReadyRead(self):
-        x = self.ripProcess.readAll().data().decode()
-        if self.fromSector is None:
-            found = fromToRegex.search(x)
+        procOut = self.ripProcess.readAll().data().decode()
+        if self.statusWidget.fromSector is None:
+            found = fromToRe.search(procOut)
             if found:
-                self.fromSector = int(found.group('from'))
-                self.toSector = int(found.group('to'))
-                self.progressBar.setRange(self.fromSector, self.toSector)
-                mainwindow.mainWindow.statusBar().addWidget(self.progressBar)
-                return
-        found = wroteRegex.search(x)
+                self.statusWidget.setSectorRange(*map(int, found.group('fromSec', 'toSec')))
+                self.statusWidget.setTrackRange(*map(int, found.group('fromTrack', 'toTrack')))
+        found = wroteRe.search(procOut)
         if found:
-            currentSector = int((int(found.group(1))+1)/2352*2) + 1
-            self.progressBar.setValue(currentSector)
+            self.statusWidget.setByte(int(found.group(1)))
+        found = currentRe.search(procOut)
+        if found:
+            self.statusWidget.setCurrentTrack(int(found.group(1)))
             
     def _handleDirChanged(self, dir):
         wavs = glob(join(self.tmpdir, "track*.wav"))
@@ -101,8 +131,7 @@ class Ripper(QtCore.QObject):
         regex = re.compile("track([0-9]+)\\.cdda\\.wav")
         self.tracksToEncode = [(int(regex.findall(track)[0]), track) for track in tracks]
         self.lastEncoded = None
-        mainwindow.mainWindow.statusBar().removeWidget(self.progressLabel)
-        mainwindow.mainWindow.statusBar().removeWidget(self.progressBar)
+        mainwindow.mainWindow.statusBar().removeWidget(self.statusWidget)
         self.encode()
     
     def encode(self):
