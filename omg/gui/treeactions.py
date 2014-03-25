@@ -496,3 +496,24 @@ class TagValueAction(TreeAction):
         else:
             tagName, valueId = self.tagPairs[0]
         TagValuePropertiesWidget.showDialog(tags.get(tagName), valueId)
+
+
+class ExpandOrCollapseAllAction(TreeAction):
+    """Expand or collapse (depending on second parameter) all selected nodes that have contents."""
+    def __init__(self, parent, expand):
+        super().__init__(parent)
+        self.expand = expand
+        if expand:
+            self.setText(self.tr("Expand all"))
+        else: self.setText(self.tr("Collapse all"))
+        
+    def initialize(self, selection):
+        self.setEnabled(any(node.hasContents() for node in selection.nodes()))
+
+    def doAction(self):
+        view = self.parent()
+        method = view.expand if self.expand else view.collapse
+        for node in view.selection.nodes():
+            if node.hasContents():
+                method(view.model().getIndex(node))
+            

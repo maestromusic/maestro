@@ -35,6 +35,32 @@ logger = logging.getLogger(__name__)
 defaultBrowser = None
 
 
+class CompleteContainerAction(treeactions.TreeAction):
+    """This action replaces the contents of a container wrapper by all contents of the corresponding element.
+    """ 
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setText(self.tr("Complete container"))
+    
+    def initialize(self, selection):
+        self.setEnabled(any(w.isContainer()
+                                and (w.contents is None or len(w.contents) < len(w.element.contents))
+                            for w in selection.wrappers()))
+    
+    def doAction(self):
+        treeView = self.parent()
+        model = treeView.model()
+        for wrapper in treeView.selection.wrappers():
+            if wrapper.isContainer() and (wrapper.contents is None 
+                                            or len(wrapper.contents) < len(wrapper.element.contents)):
+                model.beginRemoveRows(model.getIndex(wrapper), 0, len(wrapper.contents)-1)
+                wrapper.setContents([])
+                model.endRemoveRows()
+                model.beginInsertRows(model.getIndex(wrapper), 0, len(wrapper.element.contents)-1)
+                wrapper.loadContents(recursive=True)
+                model.endInsertRows()
+
+
 class Browser(dockwidget.DockWidget):
     """Browser to search the music collection. The browser contains a searchbox, a button to open the
     configuration-dialog and one or more views. Depending on whether a search value is entered and/or a
@@ -316,6 +342,13 @@ class BrowserTreeView(treeview.TreeView):
     positionSect = translate("BrowserTreeView", "Position")
     actionConfig.addActionDefinition(((sect, positionSect), (positionSect, 'position+')), treeactions.ChangePositionAction, mode="+1")
     actionConfig.addActionDefinition(((sect, positionSect), (positionSect, 'position-')), treeactions.ChangePositionAction, mode="-1")
+    viewSect = translate("BrowserTreeView", "View")
+    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'loadContainer'),), CompleteContainerAction)
+    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'collapseAll')), treeactions.ExpandOrCollapseAllAction, expand=False)
+    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'expandAll')), treeactions.ExpandOrCollapseAllAction, expand=True)
+    
+    
+    
     
     def __init__(self, browser, layers, filter, delegateProfile):
         super().__init__(levels.real)
