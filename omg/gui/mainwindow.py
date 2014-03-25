@@ -206,12 +206,6 @@ class MainWindow(QtGui.QMainWindow):
         return any(w.widgetData == data for w in itertools.chain(self.centralWidgets(),
                                                                  self.dockWidgets()))
 
-    def close(self):
-        self.savePerspective()
-        config.binary["mainwindow_maximized"] = self.isMaximized()
-        config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
-        super().close()
-
     def initMenus(self):
         """Initialize menus except the view menu which cannot be initialized before all widgets have been
         loaded."""
@@ -568,16 +562,30 @@ class MainWindow(QtGui.QMainWindow):
                         if widget.widgetData.id == id]
 
     def closeEvent(self,event):
-        # If this widget.okToClose opens a dialog, we will get a new change event. Use this list to
-        # avoid calling okToClose on the same widget twice.
+        # When the window is closed in a usual way this method is first called when the close icon is
+        # clicked and a second time when the main shutdown code in application.py calls mainWindow.close.
+        if hasattr(self, "_closed"):
+            return
+        # If widget.okToClose opens a dialog, we will get a new close event when the dialog is finished.
+        # Use this list to avoid calling okToClose on the same widget twice.
         if not hasattr(self,'_okClosed'):
             self._okClosed = []
         for widget in itertools.chain(self.centralWidgets(),self.dockWidgets()):
-            if hasattr(widget,"okToClose") and widget not in self._okClosed and not widget.okToClose():
+            if hasattr(widget, "okToClose") and widget not in self._okClosed and not widget.okToClose():
                 event.ignore()
+                self._okClosed = [] # do call okToClose again when the user closes the next time
                 return
             else: self._okClosed.append(widget)
+        
+        self._closed = True    
         event.accept()
+        self.savePerspective()
+        for widget in self.centralWidgets():
+            widget.close()
+        for widget in self.dockWidgets():
+            widget.close()
+        config.binary["mainwindow_maximized"] = self.isMaximized()
+        config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
 
 
 class CentralTabWidget(QtGui.QTabWidget):
@@ -621,7 +629,10 @@ class CentralTabWidget(QtGui.QTabWidget):
 
     def _handleCloseButton(self):
         """React to the corner widget's close button: Close the current tab."""
-        self.removeTab(self.currentIndex())
+        widget = self.currentWidget()
+        if hasattr(widget,"okToClose") and widget.okToClose():
+            self.removeTab(self.currentIndex())
+            widget.close()
 
     def clear(self):
         for i in range(self.count()):
