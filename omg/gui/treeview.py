@@ -67,7 +67,7 @@ class TreeActionConfiguration(QtCore.QObject):
     def addActionDefinition(self, path, callable, *args, **kwargs):
         section, name = path[0]
         if section not in self.sections:
-                self.sections[section] = OrderedDict()
+            self.sections[section] = OrderedDict()
         if len(path) > 1:
             if name not in self.sections[section]:
                 self.sections[section][name] = TreeActionConfiguration(False)
@@ -136,7 +136,7 @@ class TreeView(QtGui.QTreeView):
     
     *level* is the level that contains all elements in the tree (never mix wrappers from different levels!)
     *affectGlobalSelection* determines whether the treeview will change the global selection whenever nodes
-    in the it are selected. This should be set to False for treeviews in dialogs.
+    in it are selected. This should be set to False for treeviews in dialogs.
     """
     
     actionConfig = TreeActionConfiguration()
@@ -163,7 +163,6 @@ class TreeView(QtGui.QTreeView):
         self.actionConfig.actionDefinitionRemoved.connect(self._removeTreeAction)
         self.localActions = []
         
-        
     def _addTreeAction(self, path):
         callable, args, kwargs = self.actionConfig.getDefinition(path)
         if callable is not None:
@@ -176,8 +175,7 @@ class TreeView(QtGui.QTreeView):
         del self.treeActions[name]
     
     def addLocalAction(self, action):
-        """Used add an action to this treeview instance only, without the global actionConfig.
-        
+        """Add an action to this treeview instance only, without the global actionConfig.
         The action will be appended to the end of the context menu.
         """
         self.addAction(action)

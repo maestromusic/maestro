@@ -304,17 +304,18 @@ class BrowserTreeView(treeview.TreeView):
     this browser, see BrowserModel. *delegateProfile* is the profile passed to the BrowserDelegate instance.
     """
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate("BrowserTreeView", "browser")
+    sect = translate("BrowserTreeView", "Browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
-    sect = translate("BrowserTreeView", "elements")
+    sect = translate("BrowserTreeView", "Elements")
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
     actionConfig.addActionDefinition(((sect, 'changeFileUrls'),), treeactions.ChangeFileUrlsAction)
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
                                      text=translate("BrowserTreeView", "Delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     actionConfig.addActionDefinition(((sect, 'elementType'),), treeactions.ChangeElementTypeAction)
-    actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
-    actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1") 
+    positionSect = translate("BrowserTreeView", "Position")
+    actionConfig.addActionDefinition(((sect, positionSect), (positionSect, 'position+')), treeactions.ChangePositionAction, mode="+1")
+    actionConfig.addActionDefinition(((sect, positionSect), (positionSect, 'position-')), treeactions.ChangePositionAction, mode="-1")
     
     def __init__(self, browser, layers, filter, delegateProfile):
         super().__init__(levels.real)
