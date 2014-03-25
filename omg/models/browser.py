@@ -221,7 +221,7 @@ class TagLayer:
         - Elements that don't have a value in any of the tags used in a taglayer are stuffed into a
           VariousNode (if a container has no artist-tag the reason is most likely that its children have
           different artists).
-          """
+    """
     def __init__(self, tagList=None, state=None):
         if tagList is None:
             assert state is not None
