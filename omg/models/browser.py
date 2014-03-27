@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,7 +42,10 @@ def addLayerClass(name, title, theClass):
 
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
-    #TODO write a comment
+    """ItemModel for the BrowserTreeViews (a browser may have several views and hence several models). The
+    model will group its contents according to the parameter *layers*.
+    TODO: improve comment
+    """
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)
     
@@ -216,13 +219,13 @@ class LoadTask:
     def process(self):
         if self.criterion is not None:
             elids = search.search(self.criterion, abortSwitch=self.checkWorkerState)
-            logger.debug("Found {} elements.".format(len(elids)))
+            #logger.debug("Found {} elements.".format(len(elids)))
         else: elids = None
         import time
         #time.sleep(1)
-        logger.debug("Start building contents...")
+        #logger.debug("Start building contents...")
         self.contents = self.layer.build(elids, abortSwitch=self.checkWorkerState)
-        logger.debug("Build contents. Toplevel: {}".format(len(self.contents)))
+        #logger.debug("Build contents. Toplevel: {}".format(len(self.contents)))
     
     def __repr__(self):
         return "<TASK:{},{}>".format(self.node,self.criterion)
@@ -652,8 +655,7 @@ class BrowserMimeData(selection.MimeData):
         be loaded, block until the search is finished. If *node* is an element return ''[node]''.
         """
         if isinstance(node, Wrapper):
-            if node.isContainer() and node.contents is None:
-                node.loadContents(recursive=True) 
+            node.loadContents(recursive=True) 
             return [node]
         if isinstance(node, CriterionNode):
             if node.contents is None:

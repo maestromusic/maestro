@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from functools import reduce
 import urllib.request
 import urllib.error
 
@@ -32,7 +31,7 @@ from . import plugin as mbplugin
 
 logger = logging.getLogger("musicbrainz.xmlapi")
 
-wsURL = "http://musicbrainz.org/ws/2"
+wsURL = "http://musicbrainz.org/ws/2" # the base URL for MusicBrainz' web service
 
 queryCallback = None
 
@@ -64,7 +63,9 @@ def query(resource, mbid, includes=[]):
 
 
 class MBTagStorage(dict):
-    """A basic tag storage. In contrast to tags.Storage it allows AliasEntity values."""
+    """A basic storage for MusicBrainz tags.
+    
+    In contrast to tags.Storage it allows AliasEntity values."""
     
     def __setitem__(self, key, value):        
         if isinstance(value, str) or isinstance(value, AliasEntity):
@@ -79,6 +80,10 @@ class MBTagStorage(dict):
             self[key] = [value]
             
     def asOMGTags(self, mapping=None):
+        """Convert the MBTagStorage to an omg.tags.Storage object.
+        
+        *mapping* may be a dict mapping strings to OMG tag types.
+        """
         ret = tags.Storage()
         for key, values in self.items():
             if mapping and key in mapping:
@@ -88,18 +93,18 @@ class MBTagStorage(dict):
                     tag = mapping[key]
             else:
                 tag = tags.get(key)
-            ret[tag] = [ str(v) if isinstance(v, AliasEntity) else v for v in values ]
+            ret[tag] = [ str(v) for v in values ] # converts AliasEntities to strings
         return ret
 
 
 class Alias:
     """An alias for a MusicBrainz entry.
     
-    Has the following attributes:
-    - name: the actual alias
-    - sortName: value used for sorting; may be None
-    - primary: either True or False; at most one primary alias per locale
-    - locale: describes the locale for which the alias is valid
+    Attributes:
+        name (str): the actual alias
+        sortName (str): value used for sorting; may be None
+        primary (bool): either True or False; at most one primary alias per locale
+        locale: describes the locale for which the alias is valid
     """
     
     def __init__(self, name, sortName, primary=False, locale=None):
@@ -177,6 +182,7 @@ class AliasEntity:
 
     def isDefault(self):
         return self.name == self.aliases[0].name and self.sortName == self.aliases[0].sortName
+    
     def __str__(self):
         return self.name
 
@@ -194,314 +200,6 @@ class AliasEntity:
     def url(self):
         return "http://www.musicbrainz.org/{}/{}".format(self.type, self.mbid)
     
-
-
-class MBTreeItem:
-    
-    def __init__(self, mbid):
-        self.mbid = mbid
-        self.tags = MBTagStorage()
-        self.children = {}
-        self.parent = None
-        self.pos = None
-        
-    def insertChild(self, pos, child):
-        if pos is None:
-            if len(self.children) == 0:
-                pos = 1
-            else:
-                pos = max(self.children.keys()) + 1
-        self.children[pos] = child
-        child.pos = pos
-        child.parent = self
-    
-    def __eq__(self, other):
-        return self.mbid == other.mbid
-    
-    def walk(self, includeSelf=True):
-        if includeSelf:
-            yield self
-        for child in self.children.values():
-            for subchild in child.walk():
-                yield subchild
-            #yield from child.walk() py3.3 version
-    
-    def assignCommonTags(self):
-        children = self.children.values()
-        commonTags = set(reduce(lambda x,y: x & y, [set(child.tags.keys()) for child in children]))
-        commonTagValues = {}
-        differentTags=set()
-        for child in children:
-            t = child.tags
-            for tag in commonTags:
-                if tag not in commonTagValues:
-                    commonTagValues[tag] = t[tag]
-                elif commonTagValues[tag] != t[tag]:
-                    differentTags.add(tag)
-        sameTags = commonTags - differentTags
-        for tag in sameTags:
-            for val in commonTagValues[tag]:
-                if tag not in self.tags or val not in self.tags[tag]:
-                    self.tags.add(tag, val)
-
-    def makeElements(self, level, includeParentTags=True):
-        elTags = self.makeOMGTags(mbplugin.tagMap, includeParentTags)
-        if isinstance(self, Recording):
-            elem = level.collect(self.backendUrl)
-            diff = tags.TagStorageDifference(None, elTags)
-            level.changeTags({elem: diff})
-        else:
-            contents = elements.ContentList()
-            for pos, child in self.children.items():
-                elem = child.makeElements(level)            
-                contents.insert(pos, elem.id)
-            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType)            
-        elem.mbItem = self
-        self.element = elem
-        return elem
-    
-    def makeOMGTags(self, mapping, includeParents=True):
-        omgTags = self.tags.asOMGTags(mapping)
-        if includeParents:
-            element = self
-            while element.parent is not None:
-                element = element.parent
-                parentTags = element.tags.asOMGTags(mapping)
-                for tag, values in parentTags.items():
-                    if tag is not tags.TITLE:
-                        omgTags.addUnique(tag, *values)
-        return omgTags
-        
-    def collectAliasEntities(self):
-        entities = set()
-        import itertools
-        for item in self.walk():
-            for val in itertools.chain.from_iterable(item.tags.values()):
-                if isinstance(val, AliasEntity):
-                    entities.add(val)
-        return entities
-
-    def collectExternalTags(self):
-        etags = set()
-        for item in self.walk():
-            for tag in item.element.tags:
-                if not tag.isInDb():
-                    etags.add(tag)
-        return etags
-    
-    def passTags(self, excludes):
-        for tag, vals in self.tags.items():
-            if tag in excludes:
-                continue
-            for child in self.walk(False):
-                if tag not in child.tags:
-                    child.tags[tag] = vals
-
-
-class Release(MBTreeItem):
-    """A release is the top-level container structure in MusicBrainz that we care about.
-    """
-    
-    containerType = elements.TYPE_ALBUM
-    
-    def mediumForDiscid(self, discid):
-        """Return the position of the medium in this release with given *discid*, if such exists.
-        """
-        for pos, child in self.children.items():
-            if discid in child.discids:
-                return pos
-
-
-class Medium(MBTreeItem):
-    """A medium inside a release. Usually has one or more discids associated to it."""
-    
-    containerType = elements.TYPE_CONTAINER
-    
-    def __init__(self, pos, release, discids, title=None):
-        """Create the medium with associated *discids* as position *pos* in *release*.
-        
-        It will be inserted into *release* at the given position. *discids* is a list of disc
-        IDs associated to that medium.
-        If the medium has a title, that may be given as will. It will be inserted into the
-        medium's tags as "title".
-        """
-        super().__init__(mbid=None)
-        release.insertChild(pos, self)
-        if not title:
-            title = "Disc {}".format(pos)
-        self.tags.add("title", title)
-        self.discids = set(discids)
-    
-    def insertWorks(self):
-        """Inserts superworks as intermediate level between the medium and its recording.
-        
-        This method assumes that all childs of *self* are Recording instances.
-        """
-        newChildren = []
-        posOffset = 0
-        for pos, child in sorted(self.children.items()):
-            if child.parentWork:
-                if len(newChildren) and newChildren[-1][1] == child.parentWork:
-                    newChildren[-1][1].insertChild(None, child)
-                    
-                    posOffset -= 1
-                else:
-                    newChildren.append((child.pos + posOffset, child.parentWork))
-                    child.parentWork.insertChild(None, child)
-                    child.parentWork.lookupInfo(False)
-                child.parentWork = None
-            else:
-                newChildren.append((child.pos + posOffset, child))
-        self.children.clear()
-        for pos, child in newChildren:
-            self.insertChild(pos, child)
-            if isinstance(child, Work):
-                child.passTags(("title", "musicbrainz_workid"))
-                child.assignCommonTags()
-    
-    def __eq__(self, other):
-        return self is other
-
-
-class Recording(MBTreeItem):
-    """A recording is a unique piece of recorded audio.
-    
-    Every track on a CD is associated to exactly one recording. Since we don't care about tracks,
-    we immediately insert Recordings as children of media.
-    """
-    
-    def __init__(self, recordingid, pos, parent, tracknumber):
-        """Create recording with the given id and insert it at *pos* under *parent*.
-        
-        Since the MusicBrainz position could theoretically be different from the tracknumber, the
-        latter is needed as well.
-        """
-        super().__init__(recordingid)
-        parent.insertChild(pos, self)
-        self.tags.add("musicbrainz_recordingid", self.mbid)
-        self.tracknumber = tracknumber
-        self.parentWork = self.workid = None
-        
-    def lookupInfo(self):
-        """Queries MusicBrainz for tag information and potential related works."""
-        recording = query("recording",
-                          self.mbid,
-                          ("artist-rels", "work-rels", "artists")
-                         ).find("recording")
-        for artistcredit in recording.iterfind("artist-credit"):
-            for child in artistcredit:
-                if child.tag == "name-credit":
-                    ent = AliasEntity.get(child.find("artist"))
-                    ent.asTag.add("artist")
-                    self.tags.add("artist", ent)
-                else:
-                    logger.warning("unknown artist-credit {} in recording {}"
-                                   .format(child.tag, self.mbid))
-        
-        for relation in recording.iterfind('relation-list[@target-type="artist"]/relation'):
-            artist = AliasEntity.get(relation.find("artist"))
-            reltype = relation.get("type")
-            simpleTags = {"conductor" : "conductor",
-                          "performing orchestra" : "performer:orchestra",
-                          "arranger" : "arranger",
-                          "chorus master" : "chorusmaster",
-                          "performer" : "performer",
-                          "engineer" : "engineer",
-                          "producer" : "producer",
-                          "editor" : "editor",
-                          "mix" : "mixer",
-                          "mastering" : "mastering"}
-            
-            if reltype == "instrument":
-                instrument = relation.findtext("attribute-list/attribute")
-                tag = "performer:"+instrument
-            elif reltype in simpleTags:
-                tag = simpleTags[reltype]
-            elif reltype == "vocal":
-                voice = relation.findtext("attribute-list/attribute")
-                if voice is None:
-                    tag = "vocals"
-                else:
-                    for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
-                        if voice.startswith(vtype):
-                            tag = "performer:" + vtype
-                            continue
-                    if voice == "choir vocals":
-                        tag = "performer:choir"
-                    else:
-                        logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
-            else:
-                logger.warning("unknown artist relation '{}' in recording '{}'"
-                               .format(relation.get("type"), self.mbid))
-                continue
-            self.tags.add(tag, artist)
-            artist.asTag.add(tag)
-        for i, relation in enumerate(recording.iterfind('relation-list[@target-type="work"]/relation')):
-            if i > 0:
-                logger.warning("more than one work relation in recording {}".format(self.mbid))
-                break
-            if relation.get("type") == "performance":
-                workid = relation.findtext("target")
-                work = Work(workid)
-                work.lookupInfo()
-                self.mergeWork(work)
-            else:
-                logger.warning("unknown work relation '{}' in recording '{}'"
-                               .format(relation.get("type"), self.mbid))
-        
-    def mergeWork(self, work):
-        logger.debug("merging work {} into recording {}".format(work.mbid, self.mbid))
-        self.workid = work.mbid
-        for tag, values in work.tags.items():
-            if tag in self.tags:
-                if tag == "title":
-                    self.tags[tag] = values[:]
-                else:
-                    self.tags[tag].extend(values)
-            else:
-                self.tags[tag] = values
-        self.parentWork = work.parentWork
-        
-
-class Work(MBTreeItem):
-    
-    containerType = elements.TYPE_WORK
-    
-    def __init__(self, workid):
-        super().__init__(workid)
-        self.parentWork = None
-        self.tags.add("musicbrainz_workid", self.mbid)
-
-    def lookupInfo(self, works=True):
-        incs =  ["artist-rels"] + (["work-rels"] if works else [])
-        work = query("work", self.mbid, incs).find("work")
-        ent = AliasEntity.get(work)
-        ent.asTag.add("title")
-        self.tags.add("title", ent)
-        for relation in work.iterfind('relation-list[@target-type="artist"]/relation'):
-            easyRelations = { "composer" : "composer",
-                              "lyricist" : "lyricist",
-                              "orchestrator" : "orchestrator"
-                            }
-            reltype = relation.get("type")
-            artist = AliasEntity.get(relation.find('artist'))
-            if reltype in easyRelations:
-                artist.asTag.add(easyRelations[reltype])
-                self.tags.add(easyRelations[reltype], artist)
-            else:
-                logger.warning("unknown work-artist relation {} in work {}"
-                               .format(reltype, self.mbid))
-        
-        for relation in work.iterfind('relation-list[@target-type="work"]/relation'):
-            if relation.get("type") == "parts":
-                assert relation.findtext("direction") == "backward"
-                assert self.parentWork is None
-                parentWorkId = relation.find('work').get('id')
-                self.parentWork = Work(parentWorkId)
-                self.parentWork.tags["title"] = [relation.findtext('work/title')]
-            else:
-                logger.debug("unknown work-work relation {} in {}".format(relation.get("type"), self.mbid))
-
 
 class UnknownDiscException(Exception):
     pass
@@ -521,6 +219,7 @@ def findReleasesForDiscid(discid):
             raise e
         
     releases = []
+    from .elements import Release, Medium
     for release in root.iter("release"):
         mbit = Release(release.get("id"))
         title = release.findtext('title')
@@ -549,20 +248,24 @@ def findReleasesForDiscid(discid):
             for medium in mbit.children.values():
                 medium.containerType = elements.TYPE_ALBUM
                 medium.tags.add('album', medium.tags['title'][0])
-                mbit.tags.add('musicbrainz_albumid', mbit.mbid)
         else:
             mbit.tags.add('album', title)
-            mbit.tags.add('musicbrainz_albumid', mbit.mbid)
         releases.append(mbit)
+    if len(releases) == 0:
+        raise UnknownDiscException("No release for disc ID {}".format(discid))
     return releases
 
     
-def makeReleaseContainer(MBrelease, discid, level):
+def fillReleaseForDisc(MBrelease, discid):
+    """Given a stub Release object *MBrelease* (as created by findReleasesForDiscid) and a disc id,
+    creates recordings, works etc. for the given disc.
+    """
     release = query("release", MBrelease.mbid, ("recordings",)).find("release")
     
-    pos = MBrelease.mediumForDiscid(discid)
-    MBmedium = MBrelease.children[pos]
-    
+    pos, MBmedium = MBrelease.mediumForDiscid(discid)
+    MBmedium.currentDiscid = discid
+    from .elements import Recording, Medium
+    # find the medium in the xml tree
     for medium in release.iterfind('medium-list/medium'):
         if int(medium.findtext('position')) == pos:
             break
@@ -578,11 +281,12 @@ def makeReleaseContainer(MBrelease, discid, level):
     MBmedium.insertWorks()
     
     if len(MBrelease.children) == 1:
+        logger.debug("single child release -> removing release container")
         del MBrelease.children[pos]
         for p, child in MBmedium.children.items():
             MBrelease.insertChild(p, child)
     for p in list(MBrelease.children.keys()):
         if isinstance(MBrelease.children[p], Medium) and MBrelease.children[p] != MBmedium:
-            del MBrelease.children[p]
-    return MBrelease.makeElements(level)
+            logger.debug("ignoring other child {}".format(MBrelease.children[p]))
+            MBrelease.children[p].ignore = True
             

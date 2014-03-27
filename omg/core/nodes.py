@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -351,8 +351,8 @@ class Wrapper(Node):
                     in which case the wrapper will be initialized with an empty list.
         *position*: the position of this wrapper. May be None.
         *parent*: the parent (usually another wrapper or a rootnode)
-        
     """
+    
     def __init__(self, element, *, contents=None, position=None, parent=None):
         self.element = element
         self.position = position
@@ -365,6 +365,7 @@ class Wrapper(Node):
             if contents is not None:
                 raise ValueError("contents must be None for a File-wrapper")
             self.contents = None
+        
         
     def copy(self, contents=None, level=None):
         """Return a copy of this wrapper. Because a flat copy of the contents is not possible (parent
@@ -382,30 +383,40 @@ class Wrapper(Node):
             else: copy.setContents(contents)
         return copy
     
+    
     def isFile(self):
         return self.element.isFile()
+    
     
     def isContainer(self):
         return self.element.isContainer()
     
+    
     def hasContents(self):
         return self.element.isContainer() and len(self.contents) > 0
+    
     
     def getContentsCount(self):
         return len(self.contents) if self.element.isContainer() else 0
     
+    
     def getContents(self):
         return self.contents if self.element.isContainer() else []
     
+    
     def loadContents(self, recursive):
-        """Fill this wrapper with exactly the contents of the underlying element. If *recursive* is True,
-        load the contents of all children in the same way."""
+        """Ensure that this wrapper has exactly the contents of the underlying element.
+        
+        If *recursive* is True, load the contents of all children in the same way.
+        """
         if self.element.isContainer():
-            self.setContents([Wrapper(self.element.level.collect(id), position=pos)
-                                    for pos, id in self.element.contents.items()])
+            if self.contents is None or len(self.contents) == 0:
+                self.setContents([Wrapper(self.element.level.collect(id), position=pos)
+                                  for pos, id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:
                     child.loadContents(recursive)
+    
     
     def getTitle(self, prependPosition=False, usePath=True):
         """Return the title of the wrapped element. If *prependPosition* is True and this wrapper has a
@@ -415,7 +426,8 @@ class Wrapper(Node):
         if prependPosition and self.position is not None:
             return "{} - {}".format(self.position, title)
         else: return title
-        
+    
+    
     def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents. Return None if
         length can not be computed because not all contents have been loaded."""
@@ -426,7 +438,8 @@ class Wrapper(Node):
             if None not in lengths:
                 return sum(lengths)
         return None
-    
+
+
     def getExtension(self):
         """Return the extension of all files in this container. Return None if they have different extension
         or at least one of them does not have an extension."""
@@ -443,7 +456,8 @@ class Wrapper(Node):
                 elif extension != ext:
                     return None
             return extension
-    
+
+
     def __repr__(self):
         return "<W: {}>".format(self.getTitle()) 
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,8 +19,7 @@
 """This module is in charge of the actual ripping process of the audiocd plugin.
 """
 
-import tempfile
-import os, shutil
+import os, shutil, re, tempfile
 from glob import glob
 from os.path import dirname, exists,join
 
@@ -36,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 finishedTracks = []
 activeRipper = None
+
+fromToRegex = re.compile(r'from sector\s+(?P<from>[0-9]+).*\n.*to sector\s+(?P<to>[0-9]+)')
+wroteRegex = re.compile(r'\[wrote\]\s@\s([0-9]+)')
 
 class Ripper(QtCore.QObject):
     
@@ -63,12 +65,32 @@ class Ripper(QtCore.QObject):
         self.watcher.directoryChanged.connect(self._handleDirChanged)
         self.ripProcess = QtCore.QProcess()
         self.ripProcess.setWorkingDirectory(self.tmpdir)
+        self.ripProcess.setReadChannelMode(QtCore.QProcess.MergedChannels)
+        self.ripProcess.readyRead.connect(self.handleReadyRead)
         self.ripProcess.finished.connect(self._handleRipperFinished)
-        self.ripProcess.start("cdparanoia",
-                              ["-q", "-B", "-d", self.device, self.trackArg])
-        mainwindow.mainWindow.statusBar().addWidget(
-            QtGui.QLabel("ripping disc in drive {} ...".format(self.device)))
+        self.ripProcess.start('cdparanoia',
+                              ['-B', '-e', '-d', self.device, self.trackArg])
+        self.progressLabel = QtGui.QLabel(self.tr('Ripping Audio CD'))
+        self.progressBar = QtGui.QProgressBar()
+        mainwindow.mainWindow.statusBar().addWidget(self.progressLabel)
+            
+        self.fromSector = self.toSector = None
         
+    def handleReadyRead(self):
+        x = self.ripProcess.readAll().data().decode()
+        if self.fromSector is None:
+            found = fromToRegex.search(x)
+            if found:
+                self.fromSector = int(found.group('from'))
+                self.toSector = int(found.group('to'))
+                self.progressBar.setRange(self.fromSector, self.toSector)
+                mainwindow.mainWindow.statusBar().addWidget(self.progressBar)
+                return
+        found = wroteRegex.search(x)
+        if found:
+            currentSector = int((int(found.group(1))+1)/2352*2) + 1
+            self.progressBar.setValue(currentSector)
+            
     def _handleDirChanged(self, dir):
         wavs = glob(join(self.tmpdir, "track*.wav"))
 
@@ -79,6 +101,8 @@ class Ripper(QtCore.QObject):
         regex = re.compile("track([0-9]+)\\.cdda\\.wav")
         self.tracksToEncode = [(int(regex.findall(track)[0]), track) for track in tracks]
         self.lastEncoded = None
+        mainwindow.mainWindow.statusBar().removeWidget(self.progressLabel)
+        mainwindow.mainWindow.statusBar().removeWidget(self.progressBar)
         self.encode()
     
     def encode(self):

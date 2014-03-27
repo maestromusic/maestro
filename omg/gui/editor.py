@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -38,9 +38,8 @@ class EditorTreeView(treeview.DraggingTreeView):
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
     actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
-    actionConfig.addActionDefinition(((sect, 'change type'),), treeactions.ChangeElementTypeAction)
-    actionConfig.addActionDefinition(((sect, 'position+'),), treeactions.ChangePositionAction, mode="+1")
-    actionConfig.addActionDefinition(((sect, 'position-'),), treeactions.ChangePositionAction, mode="-1")
+    treeactions.SetElementTypeAction.addSubmenu(actionConfig, sect)
+    treeactions.ChangePositionAction.addSubmenu(actionConfig, sect)
     sect = translate("EditorTreeView", "editor")
     
     actionConfig.addActionDefinition(((sect, 'clearEditor'),), treeactions.ClearTreeAction)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -52,8 +52,7 @@ def init():
         db.query("CREATE INDEX {0}_idx ON {0} (value_id, tag_id)".format(TT_HELP))
 
 
-def search(searchCriterion, abortSwitch=None):  
-    print("PROCESSING", searchCriterion)      
+def search(searchCriterion, abortSwitch=None):
     for criterion in searchCriterion.getCriteriaDepthFirst():
         #logger.debug("Processing criterion: ".format(criterion))
         if not isinstance(criterion, criteria.MultiCriterion):

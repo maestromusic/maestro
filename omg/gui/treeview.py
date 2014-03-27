@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -55,11 +55,10 @@ class TreeActionConfiguration(QtCore.QObject):
     """Objects of this class define an action configuration for a treeview."""
     #TODO: comment
     
-    globalUndoRedo = True # specifies whether or not to add global undo/redo actions to context menu
     actionDefinitionAdded = QtCore.pyqtSignal(object)
     actionDefinitionRemoved = QtCore.pyqtSignal(str)
     
-    def __init__(self, toplevel = True):
+    def __init__(self, toplevel=True):
         super().__init__()
         self.toplevel = toplevel
         self.sections = OrderedDict()
@@ -76,7 +75,8 @@ class TreeActionConfiguration(QtCore.QObject):
             self.sections[section][name] = (callable, args, kwargs)
         if self.toplevel:
             self.actionDefinitionAdded.emit(path)
-            
+    
+    
     def removeActionDefinition(self, path):
         section, name = path[0]
         if len(path) > 1:
@@ -105,7 +105,7 @@ class TreeActionConfiguration(QtCore.QObject):
 
     def actionIterator(self):
         """Iterates over the actions and subactions in this configuration in the defined order."""
-        for section, actions in self.sections.items():
+        for _, actions in self.sections.items():
             for name, definition in actions.items():
                 if isinstance(definition, TreeActionConfiguration):
                     for a in definition:
@@ -115,6 +115,7 @@ class TreeActionConfiguration(QtCore.QObject):
             
     def createMenu(self, parent, treeActions):
         menu = QtGui.QMenu(parent)
+        anythingEnabled = False
         for section, actions in self.sections.items():
             sep = menu.addSeparator()
             sep.setText(section)
@@ -123,9 +124,15 @@ class TreeActionConfiguration(QtCore.QObject):
                 if isinstance(definition, TreeActionConfiguration):
                     subMenu = definition.createMenu(menu, treeActions)
                     subMenu.setTitle(name)
+                    if subMenu.isEnabled():
+                        anythingEnabled = True
                     menu.addMenu(subMenu)
                 else:
                     menu.addAction(treeActions[name])
+                    if treeActions[name].isEnabled():
+                        anythingEnabled = True
+        if not anythingEnabled:
+            menu.setEnabled(False)
         return menu
 
 
@@ -141,7 +148,7 @@ class TreeView(QtGui.QTreeView):
     
     actionConfig = TreeActionConfiguration()
     
-    def __init__(self,level, parent=None, affectGlobalSelection=True):
+    def __init__(self, level, parent=None, affectGlobalSelection=True):
         super().__init__(parent)
         self.level = level
         self.affectGlobalSelection = affectGlobalSelection
@@ -199,7 +206,8 @@ class TreeView(QtGui.QTreeView):
         if selectionModel is not None: # happens if the view is empty
             self.selection = Selection(self.level, selectionModel)
             for action in self.treeActions.values():
-                if isinstance(action, treeactions.TreeAction):
+                if isinstance(action, treeactions.TreeAction) or \
+                   isinstance(action, TreeActionConfiguration):
                     action.initialize(self.selection)
         
     def contextMenuEvent(self, event):

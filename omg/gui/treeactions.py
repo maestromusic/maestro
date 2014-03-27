@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ import os.path
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, utils, filebackends, config, strutils
+from .. import application, utils, filebackends, config
 from ..core import levels, tags, elements
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
@@ -348,7 +348,7 @@ class FlattenAction(TreeAction):
 
 class ChangePositionAction(TreeAction):
     
-    def __init__(self, parent, mode = "free", *args, **kwargs):
+    def __init__(self, parent, mode="free", *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.mode = mode
         if mode == "free":
@@ -360,21 +360,33 @@ class ChangePositionAction(TreeAction):
         else:
             raise ValueError("{0} is not a valid ChangePositionAction mode".format(mode))
     
+    
     def initialize(self, selection):
         if self.mode == "free":
             self.setEnabled(False)
         else:
             self.setEnabled(selection.singleParent(True))
         
+        
     def doAction(self):
-        from ..gui.dialogs import warning
         selection = self.parent().selection
         positions = [wrap.position for wrap in selection.wrappers()]
         parent = selection.wrappers()[0].parent.element
         try:
             self.level().shiftPositions(parent, positions, 1 if self.mode == "+1" else -1)
         except levels.ConsistencyError as e:
+            from omg.gui.dialogs import warning
             warning(self.tr('error'), str(e))
+
+
+    @staticmethod
+    def addSubmenu(actionConfig, section):
+        """Create a submenu in the given action configuration with entries for each type.""" 
+        typeSection = translate("TreeActions", "change position ...")
+        for mode in "+1", "-1", "free":
+            actionConfig.addActionDefinition(((section, typeSection), 
+                                              (typeSection, "changePos{}".format(mode))),
+                                             ChangePositionAction, mode=mode)
 
 
 class MatchTagsFromFilenamesAction(TreeAction):
@@ -397,46 +409,35 @@ class MatchTagsFromFilenamesAction(TreeAction):
         dialog.exec_()
 
 
-class ChangeElementTypeAction(TreeAction):
-    """This action allows to change the element type."""
-    def __init__(self, parent):
+class SetElementTypeAction(TreeAction):
+    """Action to set the element type of one or more elements."""
+    
+    def __init__(self, parent, type):
+        """Constructor. *type* is one of elements.CONTAINER_TYPES."""
         super().__init__(parent)
-        self.setText(self.tr("Change type"))
+        self.type = type
+        self.setText(elements.getTypeTitle(type))
         
+    
     def initialize(self, selection):
         self.selection = selection
-        self.setEnabled(selection.hasContainers())
+        allMyType = all(c.type == self.type for c in selection.containers())
+        self.setEnabled(selection.hasContainers() and not allMyType)
+        self.setCheckable(selection.hasContainers() and allMyType)
+        self.setChecked(selection.hasContainers() and allMyType)
     
     def doAction(self):
-        ChangeTypeDialog(self.level(), list(self.selection.containers())).exec_()
-        
+        self.level().setTypes({container: self.type for container in self.selection.containers()})
 
-class ChangeTypeDialog(QtGui.QDialog):
-    """Small dialog to change the element type of the given containers on *level*."""
-    def __init__(self, level, containers):
-        super().__init__()
-        self.level = level
-        self.containers = containers
-        layout = QtGui.QVBoxLayout(self)
-        layout.addWidget(QtGui.QLabel(self.tr("Choose the type for %n container(s):", '',
-                                              len(containers))))
-        currentType = containers[0].type
-        if any(container.type != currentType for container in containers):
-            currentType = None
-            
-        self.typeBox = widgets.ContainerTypeBox(currentType)
-        layout.addWidget(self.typeBox)
-        
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
-        buttonBox.accepted.connect(self._handleOk)
-        buttonBox.rejected.connect(self.close)
-        layout.addWidget(buttonBox)
-    
-    def _handleOk(self):
-        """Save the chosen type and close the dialog."""
-        type = self.typeBox.currentType()
-        self.level.setTypes({container: type for container in self.containers})
-        self.close()
+    @staticmethod
+    def addSubmenu(actionConfig, section):
+        """Create a submenu in the given action configuration with entries for each type.""" 
+        typeSection = translate("TreeActions", "set element type ...")
+        for type in elements.CONTAINER_TYPES:
+            actionConfig.addActionDefinition(((section, typeSection), 
+                                              (typeSection, "setType{}".format(type))),
+                                             SetElementTypeAction, type)
+
 
 
 class RemoveFromPlaylistAction(TreeAction):

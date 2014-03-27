@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2009-2013 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -109,7 +109,6 @@ class RenameDialog(QtGui.QDialog):
         mainLayout = QtGui.QVBoxLayout()
         
         profile = plugin.profileCategory.getFromStorage(config.storage.renamer.current_profile)
-        logger.debug("Renamer profile: {}".format(profile))
         self.configDisplay = GrammarConfigurationWidget(temporary=True, profile=profile)
         mainLayout.addWidget(self.configDisplay, 1)
         self.configDisplay.temporaryChanged.connect(self._handleTemporaryChanged)
