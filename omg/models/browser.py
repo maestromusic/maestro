@@ -159,15 +159,23 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             criteria.extend(p.getCriterion() for p in node.getParents(includeSelf=True)
                                              if isinstance(p, CriterionNode))
             criterion = search.criteria.combine('AND', criteria)
-        self.worker.submit(LoadTask(node, layer, criterion))
+        task = LoadTask(node, layer, criterion)
+        self.worker.submit(task)
         if block:
             self.worker.join()
+            self._loaded(task)
     
     def _loaded(self, task):
         """This is called (in the main thread) when a task has been processed. It will insert the loaded
         contents into the node."""
-        node = task.node
+        # If _startLoading is called with block=True, _loaded is called twice for the corresponding task.
+        # After the first time we set .node to None.
+        if task.node is None:
+            return
         contents = task.contents
+        node = task.node
+        task.node = None
+        
         if node is self.root:
             hadContents = node.contents is not None and len(node.contents) > 0 \
                             and not isinstance(node.contents[0], TextNode)
@@ -218,13 +226,13 @@ class LoadTask:
     
     def process(self):
         if self.criterion is not None:
-            elids = search.search(self.criterion, abortSwitch=self.checkWorkerState)
+            elids = search.search(self.criterion, abortSwitch=self.checkWorkerState) # see worker.py
             #logger.debug("Found {} elements.".format(len(elids)))
         else: elids = None
         import time
         #time.sleep(1)
         #logger.debug("Start building contents...")
-        self.contents = self.layer.build(elids, abortSwitch=self.checkWorkerState)
+        self.contents = self.layer.build(elids)
         #logger.debug("Build contents. Toplevel: {}".format(len(self.contents)))
     
     def __repr__(self):
@@ -264,7 +272,7 @@ class TagLayer:
     def __repr__(self):
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
-    def build(self, elids, abortSwitch=None):
+    def build(self, elids):
         # Get all tag values that should appear in TagNodes 
         if elids is None:
             # Search all elements
@@ -367,11 +375,9 @@ addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 
 class ContainerLayer:
-    def build(self, elids, abortSwitch=None):
-        """Load the contents of *node* into a container-layer, using toplevel elements from *table*. Note that
-        this creates all children of *node* and not only the next level of the tree-structure as _loadTagLayer
-        does.
-        """
+    """A Container layer organizes nodes in their natural tree structure."""
+    def build(self, elids):
+        """Build a container structure containing the elements with ids in *elids*."""
         if elids is None:
             toplevel = list(db.query(
                     "SELECT id FROM {p}elements WHERE id NOT IN (SELECT element_id FROM {p}contents)")
@@ -429,17 +435,12 @@ class ContainerLayer:
             """Create a wrapper to be inserted in the browser. If the wrapper should contain all of its
             element's contents, create a BrowserWrapper, that will load the contents """
             element = levels.real[id]
-            if id in cDict:
+            if id in cDict: # wrapper should contain only a part of its element's contents
                 wrapper = Wrapper(element)
                 wrapper.setContents([createWrapper(cid) for cid in cDict[id]])
                 return wrapper
             elif element.isFile() or len(element.contents) == 0:
                 return Wrapper(element)
-            #TODO
-            #elif recursive:
-            #    w = Wrapper(element)
-            #    w.loadContents(recursive=True)
-            #    return w
             else:
                 return BrowserWrapper(element) # a wrapper that will load all its contents when needed
         
@@ -449,6 +450,7 @@ class ContainerLayer:
         return contents
     
     def sortFunction(self, wrapper):
+        """Intelligent sort: sort albums by their date, everything else by name."""
         element = wrapper.element
         date = 0
         if element.isContainer() and element.type == elements.TYPE_ALBUM:
@@ -516,6 +518,7 @@ class CriterionNode(Node):
                 # The contents will be added in BrowserModel.searchFinished
             else:
                 model._startLoading(self, block=True)
+                    
 
 
 class TagNode(CriterionNode):
@@ -646,10 +649,23 @@ class BrowserMimeData(selection.MimeData):
             # self.nodes() may contain CriterionNodes or (unlikely) LoadingNodes.
             self._wrappers = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
                                                                 for node in self.nodes(onlyToplevel=True)))
-            #assert self._wrappers[0].contents is not None
             self._wrappersLoaded = True
         return self._wrappers
-                                          
+
+    def _loadContents(self, node):
+        """Block until all contents have been recursively loaded."""
+        if isinstance(node, CriterionNode):
+            if not node.hasLoaded():
+                node.loadContents(block=True)
+                if node.contents is None: # should never be the case
+                    raise RuntimeError("Could not load contents of node instantly: {}".format(node))
+        else:
+            if node.contents is None:
+                node.loadContents(recursive=True)
+        for n in node.getContents():
+            if n.hasContents():
+                self._loadContents(n)
+        
     def _getElementsInstantly(self, node):
         """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
         be loaded, block until the search is finished. If *node* is an element return ''[node]''.
@@ -657,12 +673,12 @@ class BrowserMimeData(selection.MimeData):
         if isinstance(node, Wrapper):
             node.loadContents(recursive=True) 
             return [node]
-        if isinstance(node, CriterionNode):
-            if node.contents is None:
-                node.loadContents(block=True)
-                if node.contents is None: # should never be the case
-                    logger.debug("Could not load contents of node instantly: {}".format(node))
-                    return []
+        elif isinstance(node, (CriterionNode, HiddenValuesNode)):
+            try:
+                self._loadContents(node)
+            except RuntimeError as e:
+                logger.debug(str(e))
+                return []
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
                                                  for child in node.contents)
         else: return [] # Should be a LoadingNode

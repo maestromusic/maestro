@@ -53,6 +53,9 @@ def init():
 
 
 def search(searchCriterion, abortSwitch=None):
+    """Process the given search criterion. Store the results in the attribute 'result' of the criterion.
+    If *abortSwitch* is given, it is called during the algorithm. By throwing an exception in abortSwitch,
+    this provides a way to abort a running search."""
     for criterion in searchCriterion.getCriteriaDepthFirst():
         #logger.debug("Processing criterion: ".format(criterion))
         if not isinstance(criterion, criteria.MultiCriterion):
@@ -79,7 +82,5 @@ def search(searchCriterion, abortSwitch=None):
             if abortSwitch is not None:
                 abortSwitch()
 
-    #logger.debug("Request finished")
     assert searchCriterion.result is not None
     return searchCriterion.result
-        
