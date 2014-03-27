@@ -42,13 +42,13 @@ def addLayerClass(name, title, theClass):
 
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
+    #TODO write a comment
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)
     
     def __init__(self, layers, filter):
         super().__init__()
-        self.table = None
-        self.level = levels.real
+        self.level = levels.real # this is used by the selection-module
         self.layers = layers
         self.containerLayer = ContainerLayer()
         self.filter = filter
@@ -57,30 +57,37 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self._startLoading(self.root)
     
     def shutdown(self):
+        """Stop the internal worker thread."""
         self.worker.quit()
                 
     def getLayer(self, index):
+        """Return the layer at the given index."""
         assert index >= 0
         if index < len(self.layers):
             return self.layers[index]
         else: return self.containerLayer
         
     def setLayers(self, layers):
+        """Set all layers of this model at once."""
         self.layers = layers
         self.reset()
         
     def addLayer(self, layer):
+        """Add a layer to the model, after all existing layers."""
         self.insertLayer(len(self.layers), layer)
     
     def insertLayer(self, index, layer):
+        """Insert a layer at the given index."""
         self.layers.insert(index, layer)
         self.reset()
     
     def changeLayer(self, layer, newLayer):
+        """Replace a layer without changing its position."""
         self.layers[self.layers.index(layer)] = newLayer
         self.reset()
         
     def moveLayer(self, fromIndex, toIndex):
+        """Move a layer. *toIndex* must pertain to the list after *fromIndex* has been deleted."""
         if toIndex in (fromIndex, fromIndex+1):
             return # no change
         layer = self.layers[fromIndex]
@@ -89,10 +96,12 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.reset()
         
     def removeLayer(self, index):
+        """Remove the layer specified by *index*."""
         del self.layers[index]
         self.reset()
     
     def setFilter(self, filter):
+        """Define a search Criterion. The model will only display elements matching the filter."""
         self.filter = filter
         self.reset()
         
@@ -124,6 +133,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         return super().createWrapperToolTip(wrapper, showFileNumber=showFileNumber, **kwargs)
                 
     def _getLayerIndex(self, node):
+        """Return the index of the layer to which the given node belongs. Return -1 for the root node."""
         if isinstance(node, Wrapper): 
             return len(self.layers) # always use containerLayer
         elif node is self.root:
@@ -133,9 +143,9 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         else: return self._getLayerIndex(node.parent) + 1
         
     def _startLoading(self, node, block=False):
-        """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
-        containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search for
-        the contents. The actual loading will be done in the searchFinished event. Only the rootnode is
+        """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents
+        of containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search
+        for the contents. The actual loading will be done in the searchFinished event. Only the root node is
         loaded directly. If *block* is True this method will block until the node is loaded. 
         """
         layer = self.getLayer(self._getLayerIndex(node) + 1)
@@ -151,6 +161,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.worker.join()
     
     def _loaded(self, task):
+        """This is called (in the main thread) when a task has been processed. It will insert the loaded
+        contents into the node."""
         node = task.node
         contents = task.contents
         if node is self.root:
@@ -186,8 +198,12 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
 
     
 class LoadTask:
+    """When a node (either root node or CriterionNode) must load its contents, the browser submits a LoadTask
+    to its worker thread. *layer* is the layer to which the node's contents belong. *criterion* is the
+    filter that specifies which elements to load as contents.
+    """ 
     def __init__(self, node, layer, criterion):
-        # Note: If layer and criterion were not immutable,
+        # Note to self: If layer and criterion were not immutable,
         # they should be copied here to avoid concurrent access.
         self.node = node
         self.layer = layer
@@ -214,15 +230,18 @@ class LoadTask:
             
 class TagLayer:
     """
-        More features:
+    A TagLayer groups elements by their tag values in a predefined set of tags (e.g. artist & composer).
+    
+    More features:
     
         - Hidden values: Values from values_varchar with the hidden flag are stuffed into HiddenValueNodes
-          (unless the showHiddenValues option is set to True).
+          (unless the browser's showHiddenValues option is set to True).
         - Elements that don't have a value in any of the tags used in a taglayer are stuffed into a
           VariousNode (if a container has no artist-tag the reason is most likely that its children have
           different artists).
     """
-    def __init__(self, tagList=None, state=None):
+    def __init__(self, browser, tagList=None, state=None):
+        self.browser = browser
         if tagList is None:
             assert state is not None
             tagList = [tags.get(name) for name in state]
@@ -230,13 +249,13 @@ class TagLayer:
             logger.warning("Only tags of type varchar are permitted in the browser's layers.")
             tagList = {tag for tag in tagList if tag.type == tags.TYPE_VARCHAR}
         self.tagList = tagList
-        self.showHiddenValues = False
         
     def text(self):
         return '{}: {}'.format(translate("BrowserModel", "Tag layer"),
                                ', '.join(tag.title for tag in self.tagList))
     
     def state(self):
+        """Return something that can be used to persistently store the configuration of this layer."""
         return [tag.name for tag in self.tagList]
     
     def __repr__(self):
@@ -272,7 +291,7 @@ class TagLayer:
             if db.isNull(sortValue):
                 sortValue = None
 
-            if not hide or self.showHiddenValues:
+            if not hide or self.browser.showHiddenValues:
                 theList = nodes
             else: theList = hiddenNodes
             
@@ -285,45 +304,10 @@ class TagLayer:
                 for aNode in theList:
                     if value in aNode.values:
                         aNode.tagPairs.append((tagId, valueId))
+                        if sortValue is not None and sortValue not in aNode.sortValues:
+                            aNode.sortValues.append(sortValue)
+                            aNode.sortValues.sort()
                         break
-
-        # If there are not too many nodes, combine nodes with the same contents.
-        #TODO enable again
-        if False and 2 <= len(nodes) <= 10 and 1 <= len(elementSource.extendedToplevel) <= 250:
-            valuePart = ' OR '.join('(tag_id={} AND value_id={})'.format(*tagPair)
-                                    for node in nodes for tagPair in node.tagPairs)
-            result = db.query("""
-                        SELECT element_id, tag_id, value_id
-                        FROM {}tags
-                        WHERE element_id IN ({}) AND ({})
-                        """.format(db.prefix, db.csList(elementSource.extendedToplevel), valuePart))
-            elementDict = collections.defaultdict(set)
-            for elid, tid, vid in result:
-                elementDict[(tid, vid)].add(elid)
-
-            # EXPERIMENTAL: If there are only a few composers, use them as tag nodes (no artists etc.)
-            composerTag = tags.get("composer")
-            if composerTag.isInDb():
-                composers = [pair for pair in elementDict.keys() if pair[0] == composerTag.id]
-                if len(composers) <= 3:
-                    inComposers = set().union(*[elementDict[c] for c in composers])
-                    if len(inComposers) == len(elementSource.extendedToplevel):
-                        for node in nodes[:]:
-                            if not any(pair[0] == composerTag.id for pair in node.tagPairs):
-                                nodes.remove(node)
-
-            # Combine nodes with the same contents.
-            hashs = {}
-            for node in nodes[:]:
-                elementSet = set()
-                for id in node.tagPairs:
-                    elementSet.update(elementDict[id])
-                h = hash(frozenset(elementSet))
-                if h not in hashs:
-                    hashs[h] = node
-                else:
-                    hashs[h].addValues(node)
-                    nodes.remove(node)
 
         # Check whether a VariousNode is necessary
         result = db.query("""
@@ -349,11 +333,13 @@ class TagLayer:
     
     @staticmethod
     def defaultTagList():
+        """Return the default list of tags in a TagLayer."""
         tagList = [tags.get(name) for name in ('artist', 'composer', 'performer')]
         return [tag for tag in tagList if tag.isInDb() and tag.type == tags.TYPE_VARCHAR]
     
     @staticmethod
     def openDialog(parent, layer=None):
+        """Open a dialog to configure a new or existing TagLayer."""
         from PyQt4 import QtGui
         tagList = layer.tagList if layer is not None else TagLayer.defaultTagList()
         text, ok = QtGui.QInputDialog.getText(parent, translate("TagLayer", "Configure tag layer"),
@@ -530,16 +516,16 @@ class CriterionNode(Node):
 
 
 class TagNode(CriterionNode):
-    """A TagNode groups elements which have the same tag-value in one or more tags. Not that only the value
-    must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews
-    display e.g. all artists and all composers in one tag-layer.
+    """A TagNode groups elements which have the same value in one or more tags. Not that only the value
+    must coincide, the tags need not be the same.
+        - *value* is the common value (a string)
+        - *tagPairs* is a dict mapping tag-ids to value-ids. A TagNode will contain all elements that
+          have at least one of the pairs in their tags. Having the ids speeds up the search compared to
+          searching for value as string.
+        - *sortValue* is the sortValue belonging to *value*. The delegate might want to display it instead
+          of *value*.
     """
     def __init__(self, value, tagPairs, sortValue):
-        """Initialize this ValueNode with the parent-node *parent* and the given model. *valueIds* is a dict
-        mapping tag-ids to value-ids of the tag. This node will contain elements having at least one of the
-        value-ids in the corresponding tag. *value* is the value of the value-ids (which should be the same
-        for all tags) and will be displayed on the node.
-        """
         super().__init__()
         self.tagPairs = tagPairs
         self.values = [value]
@@ -599,6 +585,8 @@ class HiddenValuesNode(Node):
                
 
 class BrowserWrapper(Wrapper):
+    """For performance reasons the browser does not load contents of Wrappers directly. Instead it uses
+    BrowserWrappers which will load their contents when they are requested for the first time."""
     def __init__(self, element, position=None):
         assert element.isContainer() and len(element.contents) > 0
         self.element = element
@@ -676,4 +664,3 @@ class BrowserMimeData(selection.MimeData):
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
                                                  for child in node.contents)
         else: return [] # Should be a LoadingNode
-

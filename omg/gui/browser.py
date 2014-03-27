@@ -62,10 +62,11 @@ class CompleteContainerAction(treeactions.TreeAction):
 
 
 class Browser(dockwidget.DockWidget):
-    """Browser to search the music collection. The browser contains a searchbox, a button to open the
-    configuration-dialog and one or more views. Depending on whether a search value is entered and/or a
-    filterCriterion is set or not, the browser displays results from its search result table or from
-    'elements' (the table currently used is stored in self.table).
+    """Browser to search the music collection. The browser contains a searchbox and one or more views.
+    The browser displays all elements or a subset defined by three different criteria (combined with AND):
+        - the search criterion entered in the search box ('searchCriterion'),
+        - the selected flags in the configuration dialog ('flagCriterion'),
+        - and the criterion specified in the configuration dialog ('filterCriterion').
     Each view has a list of layers that decide how to group the contents of the table. Typically each layer
     generates one level in the final tree structure. The contents of each node on this layer will then be
     grouped by the next layer. The last layer is always a ContainerLayer, that displays nodes in their tree
@@ -139,8 +140,8 @@ class Browser(dockwidget.DockWidget):
         if state is not None and isinstance(state, dict):
             if 'instant' in state:
                 self.searchBox.instant = bool(state['instant'])
-#            if 'showHiddenValues' in state:
-#                self.showHiddenValues = state['showHiddenValues']
+            if 'showHiddenValues' in state:
+                self.showHiddenValues = state['showHiddenValues']
             if 'views' in state:
                 layersForViews = []
                 for layersConfig in state['views']:
@@ -151,11 +152,10 @@ class Browser(dockwidget.DockWidget):
                             className, layerState = layerConfig
                             if className in browsermodel.layerClasses:
                                 theClass = browsermodel.layerClasses[className][1]
-                                layer = theClass(state=layerState)
+                                layer = theClass(self, state=layerState)
                                 layers.append(layer)
                         except Exception as e:
                             logger.warning("Could not parse a layer of the browser: {}".format(e))
-                    viewsToRestore = state['views'] # TODO: unused variable?
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
@@ -181,7 +181,7 @@ class Browser(dockwidget.DockWidget):
     def saveState(self):
         state = {
             'instant': self.searchBox.instant,
-            #'showHiddenValues': self.showHiddenValues,
+            'showHiddenValues': self.showHiddenValues,
         }
         if len(self.views) > 0:
             state['views'] = [[(layer.className, layer.state()) for layer in view.model().layers]
@@ -233,17 +233,14 @@ class Browser(dockwidget.DockWidget):
         del self.views[fromIndex]
         self.views.insert(toIndex, movingView)
         self.splitter.insertWidget(toIndex, movingView) # will be removed from old position automatically
-
-    def closeEvent(self, event):
-        for view in self.views:
-            view.model().shutdown()
-        return super().closeEvent(event)
             
     def reload(self):
+        """Clear everything and rebuilt it from the database."""
         for view in self.views:
             view.model().reset()
             
     def updateFilter(self):
+        """Update the filter in all views and reload."""
         for view in self.views:
             view.expander = VisibleLevelsExpander(view)
             view.model().setFilter(self.getFilter())
@@ -257,6 +254,10 @@ class Browser(dockwidget.DockWidget):
         self.updateFilter()
     
     def getFilter(self):
+        """Return the complete filter that is currently active (either a Criterion or None).
+        The filter consists of the search criterion entered by the user, the selected flags and the static
+        filter set in the configuration dialog.
+        """ 
         return search.criteria.combine('AND', 
             [c for c in [self.searchCriterion, self.flagCriterion, self.filterCriterion] if c is not None])
 
@@ -286,8 +287,7 @@ class Browser(dockwidget.DockWidget):
     def setShowHiddenValues(self,showHiddenValues):
         """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
         self.showHiddenValues = showHiddenValues
-        for view in self.views:
-            view.model().setShowHiddenValues(showHiddenValues)
+        self.reload()
                 
     def _handleChangeEvent(self, event):
         """Handle a change event from the application's dispatcher or the real level."""
@@ -299,20 +299,26 @@ class Browser(dockwidget.DockWidget):
         self.reload()
     
     def createOptionDialog(self, parent):
+        """Open the configuration popup."""
         return browserdialog.BrowserDialog(parent, self)
     
     def _handleHideTitleBarAction(self, checked):
+        """React to the 'Hide title bar' action in the view menu."""
         super()._handleHideTitleBarAction(checked)
         if hasattr(self, 'optionButton'): # false during construction
             self.optionButton.setVisible(checked)
               
-    @staticmethod
-    def defaultLayers():
+    def defaultLayers(self):
         """Return the default list of layers for a view."""
         tagList = browsermodel.TagLayer.defaultTagList()
         if len(tagList) > 0:
-            return [browsermodel.TagLayer(tagList)]
+            return [browsermodel.TagLayer(self, tagList)]
         else: return []
+
+    def closeEvent(self, event):
+        for view in self.views:
+            view.model().shutdown()
+        return super().closeEvent(event)
 
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -346,9 +352,6 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'loadContainer'),), CompleteContainerAction)
     actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'collapseAll')), treeactions.ExpandOrCollapseAllAction, expand=False)
     actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'expandAll')), treeactions.ExpandOrCollapseAllAction, expand=True)
-    
-    
-    
     
     def __init__(self, browser, layers, filter, delegateProfile):
         super().__init__(levels.real)
