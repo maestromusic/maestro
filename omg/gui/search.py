@@ -36,7 +36,7 @@ class SearchBox(IconLineEdit):
     def __init__(self, text=''):
         super().__init__(utils.getIcon("clear.png"))
         self.setText(text)
-        self.button.clicked.connect(self.clear)
+        self.button.clicked.connect(self._handleButton)
         self.textChanged.connect(self._handleTextChanged)
         self.instant = True
         self._criterion = None
@@ -50,16 +50,25 @@ class SearchBox(IconLineEdit):
         toggled-signal of checkboxes."""
         self.instant = instant
 
+    def _handleButton(self):
+        self.clear()
+        if not self.instant: # otherwise it happened already in _handleTextChanged
+            self._updateCriterion()
+            
     def _handleTextChanged(self, text):
         if self.instant:
-            try:
-                criterion = criteria.parse(self.text())
-            except criteria.ParseException as e:
-                # No logger message as this appears normally while a long query is entered.
-                return
-            if criterion != self._criterion:
-                self._criterion = criterion
-                self.criterionChanged.emit()
+            self._updateCriterion()
+            
+    def _updateCriterion(self):
+        """Parse the criterion and emit criterionChanged if appropriate."""
+        try:
+            criterion = criteria.parse(self.text())
+        except criteria.ParseException as e:
+            # No logger message as this appears normally while a long query is entered.
+            return
+        if criterion != self._criterion:
+            self._criterion = criterion
+            self.criterionChanged.emit()
                 
     def keyPressEvent(self, event):
         QtGui.QLineEdit.keyPressEvent(self, event)
@@ -72,6 +81,10 @@ class SearchBox(IconLineEdit):
             if criterion != self._criterion:
                 self._criterion = criterion
                 self.criterionChanged.emit()
+            
+    def focusOutEvent(self, event):
+        self._updateCriterion()
+        super().focusOutEvent(event)
 
 
 class CriterionLineEdit(IconLineEdit):
