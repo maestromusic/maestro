@@ -103,7 +103,11 @@ class LevelChangedEvent(application.ChangeEvent):
                 setattr(self, attr, ids)
         if len(self.removedIds) > 0:
             self._clearIds(self.removedIds)
-            
+        
+    def affects(self, element):
+        """Return whether the given element is affected by this event."""
+        return any(element.id in getattr(self, idAttribute) for idAttribute in self._idAttributes)
+    
     def __getattr__(self, attr):
         if attr in self._idAttributes:
             return set()

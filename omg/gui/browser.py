@@ -266,6 +266,8 @@ class Browser(dockwidget.DockWidget):
         """Search for the value in the searchbox. If it is empty, display all values. If *searchString*
         is given, write it into the searchbox and search for it.
         """
+        if searchString is not None:
+            self.searchBox.setText(searchString)
         #TODO: restoreExpanded if new criteria are narrower than the old ones?
         self.searchCriterion = self.searchBox.criterion
         self.activateFilter()

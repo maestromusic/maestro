@@ -71,6 +71,19 @@ def formatLength(lengthInSeconds):
                                int(hours/24)) + ' ' + timeString
 
 
+def formatSize(size):
+    """Return a human-readable representation of the given amount of bytes."""
+    if not isinstance(size, int):
+        size = int(size)
+    units = ['Bytes', 'kB', 'MB', 'GB', 'TB']
+    unitIndex = 0
+    # Note that we use decimal prefixes
+    while size >= 1000:
+        size /= 1000
+        unitIndex += 1
+    return "{:.1f} {}".format(size, units[unitIndex])
+
+
 def commonPrefix(strings, separated=False):
     """Given a list of string or something that can be converted to one, return the longest common prefix.
     If *separated* is True, shorten the prefix so that it ends with whitespace/punctuation (exception: do
