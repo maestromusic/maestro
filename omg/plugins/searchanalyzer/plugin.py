@@ -25,75 +25,40 @@ from PyQt4.QtCore import Qt
 from ...core import tags
 from ... import search, config, application, database as db, constants, utils
 from ...search import criteria
-from ...gui import mainwindow, dialogs, search as searchgui
+from ...gui import mainwindow, dialogs, search as searchgui, dockwidget
 from . import resources
 
 
-_action = None # the action that is inserted into the Extras menu
-_widget = None # the dialog widget must be stored in a variable or it will vanish immediately
-
-
 def enable():
-    global _action
-    _action = QtGui.QAction(application.mainWindow)
-    _action.setText(QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"))
-    _action.triggered.connect(_openDialog)
     mainwindow.addWidgetData(mainwindow.WidgetData(
         id = "searchanalyzer",
-        name = QtGui.QApplication.translate("SearchAnalyzer","Search Analyzer"),
+        name = QtGui.QApplication.translate("SearchAnalyzer", "Search Analyzer"),
         icon = QtGui.QIcon(":/omg/plugins/searchanalyzer/searchanalyzer.png"),
         theClass = SearchAnalyzer))
 
 
-def mainWindowInit():
-    application.mainWindow.menus['extras'].addAction(_action)
-
-
 def disable():
-    application.mainWindow.menus['extras'].removeAction(_action)
     mainwindow.removeWidgetData("searchanalyzer")
 
 
-def defaultStorage():
-    return {"SECTION:searchanalyzer": {
-            "size": (800,600),
-            "pos": None # Position of the window as tuple or None to center the window
-        }}
-
-
-def _openDialog():
-    """Open the SearchAnalyzer as a dialog."""
-    global _widget # store the widget in a variable or it will immediately destroyed
-    _widget = SearchAnalyzer(dialog=True)
-    _widget.setWindowTitle("OMG version {} – Search Analyzer".format(constants.VERSION))
-
-    # TODO: use restoreGeometry
-    screen = QtGui.QDesktopWidget().screenGeometry()
-    size = QtCore.QSize(*config.storage.searchanalyzer.size)
-    _widget.resize(size)
-    pos = config.storage.searchanalyzer.pos
-    if pos is None:
-        _widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    else: _widget.move(*pos)
-    _widget.show()
-
-
-class SearchAnalyzer(QtGui.QDialog):
+class SearchAnalyzer(dockwidget.DockWidget):
     """Display search result tables and allow the user to search the database."""
     searchRequest = None
-    
-    def __init__(self, parent=None, dialog=False):
-        QtGui.QDialog.__init__(self,parent)
+
+    def __init__(self, parent=None, **args):
+        super().__init__(parent, **args)
 
         self.engine = search.SearchEngine()
         self.engine.searchFinished.connect(self._handleSearchFinished)
-        
+
         self.flagFilter = []
-        
+
         # Initialize GUI
-        self.setLayout(QtGui.QVBoxLayout())
+        widget = QtGui.QWidget()
+        self.setWidget(widget)
+        layout = QtGui.QVBoxLayout(widget)
         topLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(topLayout)
+        layout.addLayout(topLayout)
 
         self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self._handleCriterionChanged)
@@ -103,7 +68,7 @@ class SearchAnalyzer(QtGui.QDialog):
         self.optionButton.setIcon(utils.getIcon("options.png"))
         self.optionButton.clicked.connect(self._handleOptionButton)
         topLayout.addWidget(self.optionButton)
-        
+
         self.instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
         self.instantSearchBox.setChecked(True)
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
@@ -111,17 +76,9 @@ class SearchAnalyzer(QtGui.QDialog):
         topLayout.addStretch(1)
 
         self.table = QtGui.QTableWidget()
-        self.layout().addWidget(self.table)
+        layout.addWidget(self.table)
 
-        if dialog:
-            buttonLayout = QtGui.QHBoxLayout()
-            self.layout().addLayout(buttonLayout)
-            buttonLayout.addStretch(1)
-            closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
-            closeButton.clicked.connect(self.close)
-            buttonLayout.addWidget(closeButton,0)
-        
-    def _handleSearchFinished(self,searchRequest):
+    def _handleSearchFinished(self, searchRequest):
         """If the search was successful, update the result list."""
         if searchRequest is self.searchRequest and not searchRequest.stopped:
             self.updateTable()
@@ -148,7 +105,7 @@ class SearchAnalyzer(QtGui.QDialog):
         for i, row in enumerate(result):
             if i == 0:
                 self.table.setColumnCount(len(row))
-            for j,data in enumerate(row):
+            for j, data in enumerate(row):
                 if db.isNull(data):
                     data = None
                 item = QtGui.QTableWidgetItem(str(data))
@@ -156,7 +113,7 @@ class SearchAnalyzer(QtGui.QDialog):
                 self.table.setItem(i, j, item)
         self.table.resizeColumnsToContents()
         self.table.setEnabled(True)
-            
+
     def _handleCriterionChanged(self):
         """Reload search criterion. If there is a search criterion, then start search. Otherwise clear the
         result table."""
@@ -166,35 +123,34 @@ class SearchAnalyzer(QtGui.QDialog):
             self.table.setRowCount(0)
             self.table.setColumnCount(0)
             self.table.setEnabled(True)
-        
+
         self.table.setEnabled(False)
         if self.searchBox.criterion is not None:
             self.searchRequest = self.engine.search("{}elements".format(db.prefix), self.searchBox.criterion)
         else:
             self.searchRequest = None
             self.updateTable()
-    
-    def setFlags(self,flagTypes):
+
+    def setFlags(self, flagTypes):
         """Set the flag filter. Only elements that have all flags in *flagTypes* will be displayed as search
         results."""
         if set(flagTypes) != set(self.flagFilter):
             self.flagFilter = list(flagTypes)
             self._handleCriterionChanged()
-        
+
     def _handleOptionButton(self):
         """Open the option popup."""
-        dialog = OptionPopup(self,self.optionButton)
+        dialog = OptionPopup(self, self.optionButton)
         dialog.show()
 
 
 class OptionPopup(dialogs.FancyTabbedPopup):
     """Small popup which currently only allows to set a list of flags. Only elements with all of these flags
     will be displayed in the search results."""
-    def __init__(self,searchAnalyzer,parent):
-        dialogs.FancyTabbedPopup.__init__(self,parent,300,200)
-        
+    def __init__(self, searchAnalyzer, parent):
+        dialogs.FancyTabbedPopup.__init__(self, parent, 300, 200)
+
         from ...gui import browserdialog
         self.flagView = browserdialog.FlagView(searchAnalyzer.flagFilter)
         self.flagView.selectionChanged.connect(lambda: searchAnalyzer.setFlags(self.flagView.selectedFlagTypes))
-        self.tabWidget.addTab(self.flagView,"Flags")
-        
+        self.tabWidget.addTab(self.flagView, "Flags")

@@ -21,10 +21,9 @@ import functools
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, config, database as db, logging, utils, search as searchmodule
-from ..core import flags, levels
-from ..core.elements import Element
-from ..search import criteria
+from .. import application, config, database as db, logging, utils, search
+from ..core import tags, flags, levels
+from ..core.elements import Element, Container
 from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget, search as searchgui
 from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
@@ -36,11 +35,38 @@ logger = logging.getLogger(__name__)
 defaultBrowser = None
 
 
+class CompleteContainerAction(treeactions.TreeAction):
+    """This action replaces the contents of a container wrapper by all contents of the corresponding element.
+    """ 
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setText(self.tr("Complete container"))
+    
+    def initialize(self, selection):
+        self.setEnabled(any(w.isContainer()
+                                and (w.contents is None or len(w.contents) < len(w.element.contents))
+                            for w in selection.wrappers()))
+    
+    def doAction(self):
+        treeView = self.parent()
+        model = treeView.model()
+        for wrapper in treeView.selection.wrappers():
+            if wrapper.isContainer() and (wrapper.contents is None 
+                                            or len(wrapper.contents) < len(wrapper.element.contents)):
+                model.beginRemoveRows(model.getIndex(wrapper), 0, len(wrapper.contents)-1)
+                wrapper.setContents([])
+                model.endRemoveRows()
+                model.beginInsertRows(model.getIndex(wrapper), 0, len(wrapper.element.contents)-1)
+                wrapper.loadContents(recursive=True)
+                model.endInsertRows()
+
+
 class Browser(dockwidget.DockWidget):
-    """Browser to search the music collection. The browser contains a searchbox, a button to open the
-    configuration-dialog and one or more views. Depending on whether a search value is entered and/or a
-    filterCriterion is set or not, the browser displays results from its search result table or from
-    'elements' (the table currently used is stored in self.table).
+    """Browser to search the music collection. The browser contains a searchbox and one or more views.
+    The browser displays all elements or a subset defined by three different criteria (combined with AND):
+        - the search criterion entered in the search box ('searchCriterion'),
+        - the selected flags in the configuration dialog ('flagCriterion'),
+        - and the criterion specified in the configuration dialog ('filterCriterion').
     Each view has a list of layers that decide how to group the contents of the table. Typically each layer
     generates one level in the final tree structure. The contents of each node on this layer will then be
     grouped by the next layer. The last layer is always a ContainerLayer, that displays nodes in their tree
@@ -85,16 +111,7 @@ class Browser(dockwidget.DockWidget):
         self.filterCriterion = None  # Used by the 'filter'-line edit in the option dialog 
         self.flagCriterion = None    # Used by the flags filter in the option dialog
         self.searchCriterion = None  # Used by the search box
-                
-        if browsermodel.searchEngine is None:
-            browsermodel.initSearchEngine()
-        
-        # If one of above criteria is not None, this table contains the elements that should be displayed
-        # and is used instead of 'elements'.
-        self.resultTable = browsermodel.searchEngine.createResultTable('browser')
-            
-        browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
-        
+
         # Layout
         layout = QtGui.QVBoxLayout(widget)
         layout.setSpacing(0)
@@ -111,9 +128,14 @@ class Browser(dockwidget.DockWidget):
         self.optionButton.clicked.connect(functools.partial(self.toggleOptionDialog, self.optionButton))
         controlLineLayout.addWidget(self.optionButton)
         self.optionButton.setVisible(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
+        
+        self.filterButton = FilterButton()
+        controlLineLayout.addWidget(self.filterButton)
+        self.filterButton.clicked.connect(self._handleFilterButton)
+        
         layout.addLayout(controlLineLayout)
                
-        self.splitter = QtGui.QSplitter(Qt.Vertical,self)
+        self.splitter = QtGui.QSplitter(Qt.Vertical, self)
         layout.addWidget(self.splitter)
         
         # Restore state
@@ -123,8 +145,8 @@ class Browser(dockwidget.DockWidget):
         if state is not None and isinstance(state, dict):
             if 'instant' in state:
                 self.searchBox.instant = bool(state['instant'])
-#            if 'showHiddenValues' in state:
-#                self.showHiddenValues = state['showHiddenValues']
+            if 'showHiddenValues' in state:
+                self.showHiddenValues = state['showHiddenValues']
             if 'views' in state:
                 layersForViews = []
                 for layersConfig in state['views']:
@@ -135,19 +157,18 @@ class Browser(dockwidget.DockWidget):
                             className, layerState = layerConfig
                             if className in browsermodel.layerClasses:
                                 theClass = browsermodel.layerClasses[className][1]
-                                layer = theClass(state=layerState)
+                                layer = theClass(self, state=layerState)
                                 layers.append(layer)
                         except Exception as e:
                             logger.warning("Could not parse a layer of the browser: {}".format(e))
-                    viewsToRestore = state['views'] # TODO: unused variable?
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
-                    self.flagCriterion = criteria.FlagCriterion(flagList)
+                    self.flagCriterion = search.criteria.FlagCriterion(flagList)
             if 'filter' in state:
                 try:
-                    self.filterCriterion = criteria.parse(state['filter'])
-                except criteria.ParseException as e:
+                    self.filterCriterion = search.criteria.parse(state['filter'])
+                except search.criteria.ParseException as e:
                     logger.warning("Could not parse the browser's filter criterion: {}".format(e))
             if 'delegate' in state:
                 self.delegateProfile = delegates.profiles.category.getFromStorage(
@@ -158,7 +179,6 @@ class Browser(dockwidget.DockWidget):
         levels.real.connect(self._handleChangeEvent)
 
         self.createViews(layersForViews)
-        self.load()
         
         global defaultBrowser
         defaultBrowser = self
@@ -166,7 +186,7 @@ class Browser(dockwidget.DockWidget):
     def saveState(self):
         state = {
             'instant': self.searchBox.instant,
-            #'showHiddenValues': self.showHiddenValues,
+            'showHiddenValues': self.showHiddenValues,
         }
         if len(self.views) > 0:
             state['views'] = [[(layer.className, layer.state()) for layer in view.model().layers]
@@ -197,7 +217,7 @@ class Browser(dockwidget.DockWidget):
     
     def insertView(self, index, layers, reset=True):
         """Insert a view with the given layers at position *index*."""
-        newView = BrowserTreeView(self, layers, self.delegateProfile)
+        newView = BrowserTreeView(self, layers, self.getFilter(), self.delegateProfile)
         self.views.insert(index, newView)
         newView.selectionModel().selectionChanged.connect(
                                 functools.partial(self.selectionChanged.emit, newView.selectionModel()))
@@ -218,61 +238,63 @@ class Browser(dockwidget.DockWidget):
         del self.views[fromIndex]
         self.views.insert(toIndex, movingView)
         self.splitter.insertWidget(toIndex, movingView) # will be removed from old position automatically
-        
-    def load(self):
-        """Load contents into the browser, based on the current filterCriterion, flagCriterion and
-        searchCriterion. If a search is necessary this will only start a search and actual loading will
-        be done in _handleSearchFinished.
-        """
-        if self.searchRequest is not None:
-            self.searchRequest.stop()
-            self.searchRequest = None
             
-        # Combine returns None if all input criteria are None
-        criterion = criteria.combine('AND',
-                            [c for c in (self.filterCriterion, self.flagCriterion, self.searchBox.criterion)
-                             if c is not None])
-
-        if criterion is not None:
-            self.table = self.resultTable
-            self.searchRequest = browsermodel.searchEngine.search(
-                                                  fromTable = db.prefix+"elements",
-                                                  resultTable = self.resultTable,
-                                                  postProcessing = [searchmodule.findExtendedToplevel],
-                                                  criterion = criterion)
-            # view.resetToTable will be called when the search is finished
-        else:
-            self.table = db.prefix + "elements"
-            for view in self.views:
-                view.resetToTable(self.table)
-
+    def reload(self):
+        """Clear everything and rebuilt it from the database."""
+        for view in self.views:
+            view.model().reset()
+            
+    def activateFilter(self):
+        """Activate and update filter in all views and reload."""
+        self.updateFilter(activate=True)
+        
+    def updateFilter(self, activate=False):
+        """Update the filter in all views and reload."""
+        filter = self.getFilter()
+        self.filterButton.setEnabled(filter is not None)
+        if filter is not None:
+            if activate:
+                self.filterButton.setActive(True)
+            elif not self.filterButton.active:
+                filter = None
+        
+        for view in self.views:
+            view.expander = VisibleLevelsExpander(view)
+            view.model().setFilter(filter)
+        
     def search(self, searchString=None):
         """Search for the value in the searchbox. If it is empty, display all values. If *searchString*
         is given, write it into the searchbox and search for it.
         """
         #TODO: restoreExpanded if new criteria are narrower than the old ones?
-        if searchString is not None:
-            self.searchBox.setText(searchString)
         self.searchCriterion = self.searchBox.criterion
-        self.load()
-        
+        self.activateFilter()
+    
+    def getFilter(self):
+        """Return the complete filter that is currently active (either a Criterion or None).
+        The filter consists of the search criterion entered by the user, the selected flags and the static
+        filter set in the configuration dialog.
+        """ 
+        return search.criteria.combine('AND', 
+            [c for c in [self.searchCriterion, self.flagCriterion, self.filterCriterion] if c is not None])
+
     def setFlagFilter(self, flags):
         """Set the browser's flag filter to the given list of flags."""
         if len(flags) == 0:
             if self.flagCriterion is not None:
                 self.flagCriterion = None
-                self.load()
+                self.activateFilter()
         else:
             if self.flagCriterion is None or self.flagCriterion.flags != flags:
-                self.flagCriterion = criteria.FlagCriterion(flags)
-                self.load()
+                self.flagCriterion = search.criteria.FlagCriterion(flags)
+                self.activateFilter()
         
     def setFilterCriterion(self, criterion):
         """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
         and thus form a permanent filter."""
         if criterion != self.filterCriterion:
             self.filterCriterion = criterion
-            self.load()
+            self.activateFilter()
 
     def getShowHiddenValues(self):
         """Return whether this browser should display ValueNodes where the hidden-flag in values_varchar is
@@ -282,19 +304,7 @@ class Browser(dockwidget.DockWidget):
     def setShowHiddenValues(self,showHiddenValues):
         """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
         self.showHiddenValues = showHiddenValues
-        for view in self.views:
-            view.model().setShowHiddenValues(showHiddenValues)
-        
-    def _handleSearchFinished(self,request):
-        """React to searchFinished signals: Set the table to self.resultTable and reset the model."""
-        if request is self.searchRequest:
-            self.searchRequest = None
-            # Whether the view should restore expanded nodes after the search is stored in request.data.
-            restore = request.data
-            #TODO: "restore" is not used
-            for view in self.views:
-                view.expander = VisibleLevelsExpander(view)
-                view.resetToTable(self.table)
+        self.reload()
                 
     def _handleChangeEvent(self, event):
         """Handle a change event from the application's dispatcher or the real level."""
@@ -303,23 +313,35 @@ class Browser(dockwidget.DockWidget):
             return
         for view in self.views:
             view.expander = RestoreExpander(view)
-        self.load()
+        self.reload()
     
     def createOptionDialog(self, parent):
+        """Open the configuration popup."""
         return browserdialog.BrowserDialog(parent, self)
     
     def _handleHideTitleBarAction(self, checked):
+        """React to the 'Hide title bar' action in the view menu."""
         super()._handleHideTitleBarAction(checked)
         if hasattr(self, 'optionButton'): # false during construction
             self.optionButton.setVisible(checked)
+            
+    def _handleFilterButton(self):
+        """React to the filter button: Activate/deactive filter."""
+        if self.getFilter() is not None:
+            self.filterButton.setActive(not self.filterButton.active)
+            self.updateFilter()
               
-    @staticmethod
-    def defaultLayers():
+    def defaultLayers(self):
         """Return the default list of layers for a view."""
         tagList = browsermodel.TagLayer.defaultTagList()
         if len(tagList) > 0:
-            return [browsermodel.TagLayer(tagList)]
+            return [browsermodel.TagLayer(self, tagList)]
         else: return []
+
+    def closeEvent(self, event):
+        for view in self.views:
+            view.model().shutdown()
+        return super().closeEvent(event)
 
 
 mainwindow.addWidgetData(mainwindow.WidgetData(
@@ -338,21 +360,25 @@ class BrowserTreeView(treeview.TreeView):
     """
     
     actionConfig = treeview.TreeActionConfiguration()
-    sect = translate("BrowserTreeView", "browser")
+    sect = translate("BrowserTreeView", "Browser")
     actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
-    sect = translate("BrowserTreeView", "elements")
+    sect = translate("BrowserTreeView", "Elements")
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
     actionConfig.addActionDefinition(((sect, 'changeFileUrls'),), treeactions.ChangeFileUrlsAction)
     actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
                                      text=translate("BrowserTreeView", "Delete from OMG"))
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
     treeactions.SetElementTypeAction.addSubmenu(actionConfig, sect)
-    treeactions.ChangePositionAction.addSubmenu(actionConfig, sect) 
+    treeactions.ChangePositionAction.addSubmenu(actionConfig, sect)
+    viewSect = translate("BrowserTreeView", "View")
+    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'loadContainer'),), CompleteContainerAction)
+    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'collapseAll')), treeactions.ExpandOrCollapseAllAction, expand=False)
+    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'expandAll')), treeactions.ExpandOrCollapseAllAction, expand=True)
     
-    def __init__(self, browser, layers, delegateProfile):
+    def __init__(self, browser, layers, filter, delegateProfile):
         super().__init__(levels.real)
         self.browser = browser
-        self.setModel(browsermodel.BrowserModel(self, layers))
+        self.setModel(browsermodel.BrowserModel(layers, filter))
         self.header().sectionResized.connect(self.model().layoutChanged)
         
         # If there are no contents, the browser model contains a help message (e.g. "no search results"),
@@ -368,7 +394,7 @@ class BrowserTreeView(treeview.TreeView):
         # The expander will decide which nodes to load/expand after the view is reset. Because each loading
         # might perform a search, Expanders work asynchronously.
         self.expander = None
-        
+
     def focusInEvent(self, event):
         global defaultBrowser
         defaultBrowser = self.browser
@@ -384,8 +410,8 @@ class BrowserTreeView(treeview.TreeView):
         if self.expander is not None:
             if not self.expander.next():
                 self.expander = None
-        # Always expand nodes with a single children (except RestoreExpander is active)
-        if node.getContentsCount() == 1 and not isinstance(self.expander, RestoreExpander):
+        # Always expand nodes with a single children (unless an expander is/was in charge)
+        elif node.getContentsCount() == 1:
             self.expand(self.model().getIndex(node.contents[0]))
     
     def mouseDoubleClickEvent(self, event):
@@ -427,8 +453,8 @@ class RestoreExpander:
         """Expand the next node and return True, or return False if all nodes have already been expanded."""
         try:
             next(self.generator)
-            # Reaching this point means a node was expanded, that had not already loaded its contents.
-            # Thus we have to wait until the search finishes and the signal is emitted again.
+            # Reaching this point means a node was expanded that had not already loaded its contents.
+            # Thus we have to wait until the search finishes and this function is called again
             return True
         except StopIteration:
             return False
@@ -448,23 +474,22 @@ class RestoreExpander:
     def expandedNodesGenerator(self):
         """Based on self.expanded, yield nodes that should be expanded."""
         model = self.view.model()
-        #TODO: wtf is going on here
-        listOfDicts = [self.expanded] # No need to copy although this will be modified below.
-        listOfNodes = [model.getRoot()]
-        while len(listOfDicts):
-            currentDict = listOfDicts[-1]
-            currentNode = listOfNodes[-1]
+        # toExpand contains tuples of a node and a dict storing which child nodes should be expanded.
+        # For each child node that should be expanded the dict maps a key generated by getKey to a new dict
+        # storing (recursively) the next level of nodes to expand. 
+        toExpand = [(model.getRoot(), self.expanded)]
+        while len(toExpand):
+            # In each iteration one node is expanded
+            currentNode, currentDict = toExpand[-1]
             if len(currentDict) == 0:
-                listOfDicts.pop()
-                listOfNodes.pop()
+                toExpand.pop()
                 continue
             key, expanded = currentDict.popitem()
             for child in currentNode.getContents():
                 if key == self.getKey(child):
                     if len(expanded) > 0:
                         # After expanding this node, process expanded nodes below this one
-                        listOfDicts.append(expanded)
-                        listOfNodes.append(child)
+                        toExpand.append((child, expanded))
                     # If this is a CriterionNode expanding the node will start a search and we have to wait.
                     mustSearch = isinstance(child, browsermodel.CriterionNode) and not child.hasLoaded()
                     self.view.expand(model.getIndex(child))
@@ -548,3 +573,33 @@ class VisibleLevelsExpander:
                 self.view.expand(self.view.model().getIndex(node))
                 if depth > 1:
                     self.expandToDepth(depth-1, parent=node)
+
+
+class FilterButton(QtGui.QPushButton):
+    """Small button next to the browser's search bar that indicates whether a filter is set or not and
+    allows to deactivate filters.
+    """
+    def __init__(self):
+        super().__init__()
+        self.setIconSize(QtCore.QSize(16, 16))
+        self.setContentsMargins(0,0,0,0)
+        self.setFlat(True)
+        self.setEnabled(False)
+        
+    def setEnabled(self, enabled):
+        if enabled != self.isEnabled():
+            super().setEnabled(enabled)
+            if enabled:
+                self.setActive(True)
+            else:
+                self.active = False
+                self.setIcon(utils.getIcon('search_disabled.png'))
+         
+    def setActive(self, active):
+        """Change the icon of the button to indicate whether the filter is active or inactive."""
+        if active != self.active:
+            self.active = active
+            if active:
+                self.setIcon(utils.getIcon('search_active.png'))
+            else: self.setIcon(utils.getIcon('search_inactive.png'))
+                             

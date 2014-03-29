@@ -22,7 +22,7 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from . import rootedtreemodel
-from .. import config, search, database as db, logging, utils, search as searchmodule
+from .. import config, search, database as db, logging, utils, search, worker
 from ..core import tags, levels, elements
 from ..core.elements import Element
 from ..core.nodes import Node, RootNode, Wrapper, TextNode
@@ -30,8 +30,6 @@ from ..gui import selection
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
-
-searchEngine = None # The search engine used by all browsers
 
 # Registered layer classes. Maps names -> (title, class)
 layerClasses = collections.OrderedDict()
@@ -41,16 +39,8 @@ def addLayerClass(name, title, theClass):
     """Register a class that can be used for the browser's layers under the given name."""
     theClass.className = name
     layerClasses[name] = (title, theClass)
-    
 
-def initSearchEngine():
-    """Initialize the single search engine used by all browsers. This is called automatically, when the first
-    browser is created."""
-    global searchEngine
-    if searchEngine is None:
-        searchEngine = search.SearchEngine()
-                
-    
+
 class BrowserModel(rootedtreemodel.RootedTreeModel):
     """ItemModel for the BrowserTreeViews (a browser may have several views and hence several models). The
     model will group its contents according to the parameter *layers*.
@@ -59,41 +49,48 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)
     
-    def __init__(self, view, layers):
+    def __init__(self, layers, filter):
         super().__init__()
-        self.table = None
-        self.level = levels.real
+        self.level = levels.real # this is used by the selection-module
         self.layers = layers
-        self.view = view
         self.containerLayer = ContainerLayer()
-        self._searchRequests = []
-        
-        if searchEngine is None:
-            initSearchEngine()
-        searchEngine.searchFinished.connect(self._handleSearchFinished)
+        self.filter = filter
+        self.worker = worker.Worker(self._loaded, dbConnection=True)
+        self.worker.start()
+        self._startLoading(self.root)
     
+    def shutdown(self):
+        """Stop the internal worker thread."""
+        self.worker.quit()
+                
     def getLayer(self, index):
+        """Return the layer at the given index."""
         assert index >= 0
         if index < len(self.layers):
             return self.layers[index]
         else: return self.containerLayer
         
     def setLayers(self, layers):
+        """Set all layers of this model at once."""
         self.layers = layers
         self.reset()
         
     def addLayer(self, layer):
+        """Add a layer to the model, after all existing layers."""
         self.insertLayer(len(self.layers), layer)
     
     def insertLayer(self, index, layer):
+        """Insert a layer at the given index."""
         self.layers.insert(index, layer)
         self.reset()
     
     def changeLayer(self, layer, newLayer):
+        """Replace a layer without changing its position."""
         self.layers[self.layers.index(layer)] = newLayer
         self.reset()
         
     def moveLayer(self, fromIndex, toIndex):
+        """Move a layer. *toIndex* must pertain to the list after *fromIndex* has been deleted."""
         if toIndex in (fromIndex, fromIndex+1):
             return # no change
         layer = self.layers[fromIndex]
@@ -102,7 +99,13 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.reset()
         
     def removeLayer(self, index):
+        """Remove the layer specified by *index*."""
         del self.layers[index]
+        self.reset()
+    
+    def setFilter(self, filter):
+        """Define a search Criterion. The model will only display elements matching the filter."""
+        self.filter = filter
         self.reset()
         
     def hasContents(self):
@@ -110,29 +113,10 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         # A textnode is only used in empty models to display e.g. "no search results"
         return len(self.root.contents) >= 1 and not (isinstance(self.root.contents[0], TextNode))
     
-    def reset(self, table=None):
-        """Reset the model reloading all data from self.table. If *table* is given, first set self.table to
-        *table*."""
-        for request in self._searchRequests:
-            request.stop()
-        self._searchRequests = []
-        
-        if table is not None:
-            self.table = table
-        if self.table is not None:
-            self._startLoading(self.root)
-            super().reset()
-    
-    def setShowHiddenValues(self, showHiddenValues):
-        """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
-        reset = False
-        for layer in self.layers:
-            if isinstance(layer, TagLayer):
-                if layer.showHiddenValues != showHiddenValues:
-                    reset = True
-                layer.showHiddenValues = showHiddenValues
-        if reset:
-            self.reset()
+    def reset(self):
+        self.worker.reset()
+        super().reset()
+        self._startLoading(self.root)
             
     def flags(self,index):
         defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
@@ -147,78 +131,68 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         return BrowserMimeData.fromIndexes(self, indexes)
 
     def createWrapperToolTip(self, wrapper, showFileNumber=False, **kwargs):
-        # disable filenumbers because containers in the browser often do not contain all of their element's
-        # contents. Also BrowserWrappers might not have loaded their contents yet.
+        # disable filenumbers by default because containers in the browser often do not contain all of their
+        # element's contents. Also BrowserWrappers might not have loaded their contents yet.
         return super().createWrapperToolTip(wrapper, showFileNumber=showFileNumber, **kwargs)
+                
+    def _getLayerIndex(self, node):
+        """Return the index of the layer to which the given node belongs. Return -1 for the root node."""
+        if isinstance(node, Wrapper): 
+            return len(self.layers) # always use containerLayer
+        elif node is self.root:
+            return -1
+        elif hasattr(node, 'layer'):
+            return self.layers.index(getattr(node, 'layer'))
+        else: return self._getLayerIndex(node.parent) + 1
         
     def _startLoading(self, node, block=False):
-        """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents of
-        containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search for
-        the contents. The actual loading will be done in the searchFinished event. Only the rootnode is
+        """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents
+        of containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search
+        for the contents. The actual loading will be done in the searchFinished event. Only the root node is
         loaded directly. If *block* is True this method will block until the node is loaded. 
         """
-        if node == self.root:
-            oldHasContents = self.hasContents()
-            # No need to search...load directly
-            layer = self.getLayer(0)
-            self.load(layer, node, ElementSource(table=self.table))
-            if len(self.root.contents) == 0:
-                if self.table == 'elements':
+        layer = self.getLayer(self._getLayerIndex(node) + 1)
+        if node is self.root:
+            criterion = self.filter
+        else:
+            criteria = [self.filter] if self.filter is not None else []
+            criteria.extend(p.getCriterion() for p in node.getParents(includeSelf=True)
+                                             if isinstance(p, CriterionNode))
+            criterion = search.criteria.combine('AND', criteria)
+        task = LoadTask(node, layer, criterion)
+        self.worker.submit(task)
+        if block:
+            self.worker.join()
+            self._loaded(task)
+    
+    def _loaded(self, task):
+        """This is called (in the main thread) when a task has been processed. It will insert the loaded
+        contents into the node."""
+        # If _startLoading is called with block=True, _loaded is called twice for the corresponding task.
+        # After the first time we set .node to None.
+        if task.node is None:
+            return
+        contents = task.contents
+        node = task.node
+        task.node = None
+        
+        if node is self.root:
+            hadContents = node.contents is not None and len(node.contents) > 0 \
+                            and not isinstance(node.contents[0], TextNode)
+            hasContents = len(contents) > 0
+            if len(contents) == 0: 
+                if self.filter is None:
                     text = self.tr("Your database is empty."
                                    " Drag files from the filesystembrowser into the editor,"
                                    " modify them and click 'Commit'.")
                 else:
                     text = self.tr("No elements found.")
-                self.beginInsertRows(QtCore.QModelIndex(), 0, 0)
-                self.root.setContents([TextNode(text, wordWrap=True)])
-                self.endInsertRows()
-            if self.hasContents() != oldHasContents:
-                self.hasContentsChanged.emit(self.hasContents())
-        else:
-            layer = self.getLayer(self._getLayerIndex(node) + 1)
-            criteria = [p.getCriterion() for p in node.getParents(includeSelf=True)
-                        if isinstance(p, CriterionNode)]
-            method = searchEngine.search if not block else searchEngine.searchAndBlock
-            searchRequest = method(self.table, criteria, data=(layer, node),
-                                   postProcessing=[searchmodule.findExtendedToplevel])
-            if not block:
-                self._searchRequests.append(searchRequest)
-                # further loading is done when the search is finished
-            else:
-                # Load directly
-                layer, node = searchRequest.data
-                self.load(layer, node, ElementSource(request=searchRequest), _loadContainersRecursively=True)
-                for child in node.getContents():
-                    if isinstance(child, CriterionNode):
-                        self._startLoading(child, block=True)
-                
-    def _getLayerIndex(self, node):
-        if isinstance(node, Wrapper): 
-            return len(self.layers) # always use containerLayer
-        elif node.parent is self.root:
-            return 0
-        elif hasattr(node, 'layer'):
-            return self.layers.index(getattr(node, 'layer'))
-        else: return self._getLayerIndex(node.parent) + 1
-                            
-    def _handleSearchFinished(self, searchRequest):
-        """Handle the searchFinished-event for *searchRequest*: Load the contents of the node
-        ''searchRequest.data'' and emit a nodeLoaded signal.
-        """
-        if searchRequest in self._searchRequests:
-            layer, node = searchRequest.data
-            self._searchRequests.remove(searchRequest)
-            self.load(layer, node, ElementSource(request=searchRequest))
-    
-    def load(self, layer, node, elementSource, _loadContainersRecursively=False):
-        if isinstance(layer, ContainerLayer):
-            contents = layer.load(self, node, elementSource, recursive=_loadContainersRecursively)
-        else: contents = layer.load(self, node, elementSource)
+                contents = [TextNode(text, wordWrap=True)]
+        
         if node.contents is not None:
-            # Only use beginRemoveRows and friends if there are already contents. If we are going to add the
-            # first contents to node (this happens thanks to the directload shortcut), we must not call
-            # those methods as Qt will then try to access the contents...resulting in _startLoading.
-            contentsWereNone = False
+            # Only use beginRemoveRows and friends if there are already contents. If we add contents for
+            # the first time, we must not call those methods or Qt will try to access the contents...
+            # resulting in _startLoading.
             self.beginRemoveRows(self.getIndex(node), 0, len(node.contents)-1)
             node.setContents([])
             self.endRemoveRows()
@@ -229,54 +203,56 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node.setContents(contents)
         
         self.nodeLoaded.emit(node)
-
-
-class ElementSource:
-    def __init__(self, table=None, request=None):
-        assert table is not None or request is not None
-        if table is not None:
-            self.table = table
-            self.ids = None
-            if self.table == db.prefix + 'elements':
-                majorContainers = db.query("SELECT id FROM {}elements WHERE file = 0 AND type IN ({})"
-                                           .format(db.prefix, db.csList(elements.MAJOR_TYPES)))\
-                                           .getSingleColumn()
-            else:
-                majorContainers = db.query("""
-                            SELECT el.id
-                            FROM {}elements AS el JOIN {} AS res ON el.id = res.id
-                            WHERE el.file = 0 AND el.type IN ({})
-                            """.format(db.prefix, table, db.csList(elements.MAJOR_TYPES))).getSingleColumn()
-            descendantsOfMajor = db.csList(db.contents(majorContainers, recursive=True))
-            if len(descendantsOfMajor) > 0:
-                self.extendedToplevel = set(db.query("SELECT id FROM {} WHERE id NOT IN  ({})"
-                                                     .format(table, descendantsOfMajor)).getSingleColumn())
-            else:
-                self.extendedToplevel = set(db.query("SELECT id FROM {}".format(table)).getSingleColumn())
-        else:
-            self.table = None
-            self.ids = request.result
-            self.extendedToplevel = request.extendedToplevel
-            
-    def computeToplevel(self):
-        self.toplevel = set(db.query("""
-                    SELECT res.id
-                    FROM {} AS res LEFT JOIN {}contents AS c ON res.id = c.element_id
-                    WHERE c.element_id IS NULL 
-                    """.format(self.table, db.prefix)).getSingleColumn())
         
+        if node is self.root and hasContents != hadContents:
+            self.hasContentsChanged.emit(hasContents)
 
+    
+class LoadTask:
+    """When a node (either root node or CriterionNode) must load its contents, the browser submits a LoadTask
+    to its worker thread. *layer* is the layer to which the node's contents belong. *criterion* is the
+    filter that specifies which elements to load as contents.
+    """ 
+    def __init__(self, node, layer, criterion):
+        # Note to self: If layer and criterion were not immutable,
+        # they should be copied here to avoid concurrent access.
+        self.node = node
+        self.layer = layer
+        self.criterion = criterion
+        self.contents = None
+        
+    def merge(self, node):
+        return node == self.node
+    
+    def process(self):
+        if self.criterion is not None:
+            elids = search.search(self.criterion, abortSwitch=self.checkWorkerState) # see worker.py
+            #logger.debug("Found {} elements.".format(len(elids)))
+        else: elids = None
+        import time
+        #time.sleep(1)
+        #logger.debug("Start building contents...")
+        self.contents = self.layer.build(elids)
+        #logger.debug("Build contents. Toplevel: {}".format(len(self.contents)))
+    
+    def __repr__(self):
+        return "<TASK:{},{}>".format(self.node,self.criterion)
+
+            
 class TagLayer:
     """
-        More features:
+    A TagLayer groups elements by their tag values in a predefined set of tags (e.g. artist & composer).
+    
+    More features:
     
         - Hidden values: Values from values_varchar with the hidden flag are stuffed into HiddenValueNodes
-          (unless the showHiddenValues option is set to True).
+          (unless the browser's showHiddenValues option is set to True).
         - Elements that don't have a value in any of the tags used in a taglayer are stuffed into a
           VariousNode (if a container has no artist-tag the reason is most likely that its children have
           different artists).
-          """
-    def __init__(self, tagList=None, state=None):
+    """
+    def __init__(self, browser, tagList=None, state=None):
+        self.browser = browser
         if tagList is None:
             assert state is not None
             tagList = [tags.get(name) for name in state]
@@ -284,41 +260,39 @@ class TagLayer:
             logger.warning("Only tags of type varchar are permitted in the browser's layers.")
             tagList = {tag for tag in tagList if tag.type == tags.TYPE_VARCHAR}
         self.tagList = tagList
-        self.showHiddenValues = False
         
     def text(self):
         return '{}: {}'.format(translate("BrowserModel", "Tag layer"),
                                ', '.join(tag.title for tag in self.tagList))
     
     def state(self):
+        """Return something that can be used to persistently store the configuration of this layer."""
         return [tag.name for tag in self.tagList]
     
     def __repr__(self):
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
-    def load(self, model, node, elementSource):
+    def build(self, elids):
         # Get all tag values that should appear in TagNodes 
-        
-        if elementSource.table is not None:
-            table = elementSource.table
-        else: table = db.prefix+'elements'
-        if len(elementSource.extendedToplevel) > 0:
-            idFilter = 'res.id IN ({}) '.format(db.csList(elementSource.extendedToplevel))
-        else: idFilter = '1' # for use in AND-clauses
+        if elids is None:
+            # Search all elements
+            idFilter = "1" # for use in WHERE clause
+        elif len(elids) == 0:
+            return []
+        else: idFilter = "res.id IN ({})".format(db.csList(elids))
+       
         tagFilter = db.csIdList(self.tagList)
-        
         if db.type == 'sqlite':
             collate = 'COLLATE NOCASE'
         else: collate = ''
-
         result = db.query("""
             SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value
-            FROM {1} AS res JOIN {0}tags AS t ON +res.id = t.element_id
+            FROM {0}elements AS res JOIN {0}tags AS t ON res.id = t.element_id
                      JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
-            WHERE t.tag_id IN ({2}) AND {3}
-            ORDER BY COALESCE(v.sort_value, v.value) {4}
-        """.format(db.prefix, table, tagFilter, idFilter, collate))
-    
+            WHERE t.tag_id IN ({1}) AND {2}
+            ORDER BY COALESCE(v.sort_value, v.value) {3}
+        """.format(db.prefix, tagFilter, idFilter, collate))
+
         nodes = []
         hiddenNodes = []
         values = set()
@@ -327,13 +301,13 @@ class TagLayer:
             tagId, valueId, value, hide, sortValue = row
             if db.isNull(sortValue):
                 sortValue = None
-                
-            if not hide or self.showHiddenValues:
+
+            if not hide or self.browser.showHiddenValues:
                 theList = nodes
             else: theList = hiddenNodes
             
             if value not in values:
-                theList.append(TagNode(node, value, [(tagId, valueId)], sortValue))
+                theList.append(TagNode(value, [(tagId, valueId)], sortValue))
                 values.add(value)
             else:
                 # If there is already a value node with this value,
@@ -341,58 +315,22 @@ class TagLayer:
                 for aNode in theList:
                     if value in aNode.values:
                         aNode.tagPairs.append((tagId, valueId))
+                        if sortValue is not None and sortValue not in aNode.sortValues:
+                            aNode.sortValues.append(sortValue)
+                            aNode.sortValues.sort()
                         break
-    
-        # If there are not too many nodes, combine nodes with the same contents.
-        if 2 <= len(nodes) <= 10 and 1 <= len(elementSource.extendedToplevel) <= 250:
-            valuePart = ' OR '.join('(tag_id={} AND value_id={})'
-                                    .format(*node.tagPairs[0]) for node in nodes)
-            result = db.query("""
-                        SELECT element_id, tag_id, value_id
-                        FROM {}tags
-                        WHERE element_id IN ({}) AND ({})
-                        """.format(db.prefix, db.csList(elementSource.extendedToplevel), valuePart))
-            elementDict = {}
-            for node in nodes:
-                theSet = set() # use the same set for each tagPair of one node
-                for tagId, valueId in node.tagPairs:
-                    elementDict[(tagId, valueId)] = theSet
-            for elid, tid, vid in result:
-                elementDict[(tid, vid)].add(elid)   
-            
-            # EXPERIMENTAL: If there are only a few composers, use them as tag nodes (no artists etc.)
-            composerTag = tags.get("composer")
-            if composerTag.isInDb():
-                composers = [pair for pair in elementDict.keys() if pair[0] == composerTag.id]
-                if len(composers) <= 3:
-                    inComposers = set().union(*[elementDict[c] for c in composers])
-                    if len(inComposers) == len(elementSource.extendedToplevel):
-                        for node in nodes[:]:
-                            if not any(pair[0] == composerTag.id for pair in node.tagPairs):
-                                nodes.remove(node)
-                              
-            # Combine nodes with the same contents.
-            hashs = {}
-            for node in nodes[:]:
-                elementSet = elementDict[node.tagPairs[0]]
-                h = hash(frozenset(elementSet))
-                if h not in hashs:
-                    hashs[h] = node
-                else:
-                    hashs[h].addValues(node)
-                    nodes.remove(node)
-                
+
         # Check whether a VariousNode is necessary
         result = db.query("""
             SELECT res.id
-            FROM {1} AS res LEFT JOIN {0}tags AS t
-                                ON res.id = t.element_id AND t.tag_id IN ({2})
-            WHERE {3} AND t.value_id IS NULL
+            FROM {0}elements AS res LEFT JOIN {0}tags AS t
+                                ON res.id = t.element_id AND t.tag_id IN ({1})
+            WHERE {2} AND t.value_id IS NULL
             LIMIT 1
-            """.format(db.prefix, table, tagFilter, idFilter))
+            """.format(db.prefix, tagFilter, idFilter))
 
         if len(result) > 0:
-            nodes.append(VariousNode(node, self.tagList))
+            nodes.append(VariousNode(self.tagList))
             
         if len(hiddenNodes) > 0:
             # If hidden nodes are present this layer needs two actual levels in the tree structure
@@ -400,17 +338,19 @@ class TagLayer:
             # that layer index. See BrowserModel._getLayerIndex
             for node in hiddenNodes:
                 node.layer = self
-            nodes.append(HiddenValuesNode(node, hiddenNodes))
+            nodes.append(HiddenValuesNode(hiddenNodes))
         
         return nodes
     
     @staticmethod
     def defaultTagList():
+        """Return the default list of tags in a TagLayer."""
         tagList = [tags.get(name) for name in ('artist', 'composer', 'performer')]
         return [tag for tag in tagList if tag.isInDb() and tag.type == tags.TYPE_VARCHAR]
     
     @staticmethod
     def openDialog(parent, layer=None):
+        """Open a dialog to configure a new or existing TagLayer."""
         from PyQt4 import QtGui
         tagList = layer.tagList if layer is not None else TagLayer.defaultTagList()
         text, ok = QtGui.QInputDialog.getText(parent, translate("TagLayer", "Configure tag layer"),
@@ -435,23 +375,19 @@ addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 
 class ContainerLayer:
-    def load(self, model, node, elementSource, recursive=False):
-        """Load the contents of *node* into a container-layer, using toplevel elements from *table*. Note that
-        this creates all children of *node* and not only the next level of the tree-structure as _loadTagLayer
-        does.
-        """
-        if elementSource.table is None:
-            allIds = elementSource.ids
-            if len(allIds) == 0:
-                toplevel = []
-            else:
-                toplevel = elementSource.extendedToplevel.difference(
-                             db.query("SELECT element_id FROM {}contents WHERE container_id IN ({})"
-                                      .format(db.prefix, db.csList(allIds))).getSingleColumn())
+    """A Container layer organizes nodes in their natural tree structure."""
+    def build(self, elids):
+        """Build a container structure containing the elements with ids in *elids*."""
+        if elids is None:
+            toplevel = list(db.query(
+                    "SELECT id FROM {p}elements WHERE id NOT IN (SELECT element_id FROM {p}contents)")
+                    .getSingleColumn())
         else:
-            elementSource.computeToplevel()
-            toplevel = elementSource.toplevel
-
+            toplevel = set(elids)
+            toplevel.difference_update(db.query(
+                     "SELECT element_id FROM {}contents WHERE container_id IN ({})"
+                    .format(db.prefix, db.csList(elids))).getSingleColumn())
+            
         # Load all toplevel elements and all of their ancestors
         newIds = toplevel
         while len(newIds) > 0:
@@ -478,7 +414,7 @@ class ContainerLayer:
                     result = True
                     cDict[pid].append(id)
                     toplevel.discard(id)
-                elif pid in allIds: # This parent belongs to the direct search result
+                elif elids is None or pid in elids: # This parent belongs to the direct search result
                     result = True
                     toplevel.discard(id)
                 elif processNode(pid): # We must add this parent, because it has a major ancestor.
@@ -499,16 +435,12 @@ class ContainerLayer:
             """Create a wrapper to be inserted in the browser. If the wrapper should contain all of its
             element's contents, create a BrowserWrapper, that will load the contents """
             element = levels.real[id]
-            if id in cDict:
+            if id in cDict: # wrapper should contain only a part of its element's contents
                 wrapper = Wrapper(element)
                 wrapper.setContents([createWrapper(cid) for cid in cDict[id]])
                 return wrapper
             elif element.isFile() or len(element.contents) == 0:
                 return Wrapper(element)
-            elif recursive:
-                w = Wrapper(element)
-                w.loadContents(recursive=True)
-                return w
             else:
                 return BrowserWrapper(element) # a wrapper that will load all its contents when needed
         
@@ -518,6 +450,7 @@ class ContainerLayer:
         return contents
     
     def sortFunction(self, wrapper):
+        """Intelligent sort: sort albums by their date, everything else by name."""
         element = wrapper.element
         date = 0
         if element.isContainer() and element.type == elements.TYPE_ALBUM:
@@ -531,9 +464,9 @@ class CriterionNode(Node):
     """CriterionNode is the base class for nodes used to group elements according to a criterion (confer 
     search.criteria) in a BrowserModel. The level below this node will contain all elements of this level
     that match the criterion."""
-    def __init__(self, parent):
+    def __init__(self):
         """Initialize this CriterionNode with the parent-node <parent> and the given model and criterion."""
-        self.parent = parent
+        self.parent = None
         self.contents = None
 
     def getCriterion(self):
@@ -585,20 +518,21 @@ class CriterionNode(Node):
                 # The contents will be added in BrowserModel.searchFinished
             else:
                 model._startLoading(self, block=True)
+                    
 
 
 class TagNode(CriterionNode):
-    """A TagNode groups elements which have the same tag-value in one or more tags. Not that only the value
-    must coincide, the tags need not be the same, but they must be in a given list. This enables BrowserViews
-    display e.g. all artists and all composers in one tag-layer.
+    """A TagNode groups elements which have the same value in one or more tags. Not that only the value
+    must coincide, the tags need not be the same.
+        - *value* is the common value (a string)
+        - *tagPairs* is a dict mapping tag-ids to value-ids. A TagNode will contain all elements that
+          have at least one of the pairs in their tags. Having the ids speeds up the search compared to
+          searching for value as string.
+        - *sortValue* is the sortValue belonging to *value*. The delegate might want to display it instead
+          of *value*.
     """
-    def __init__(self, parent, value, tagPairs, sortValue):
-        """Initialize this ValueNode with the parent-node *parent* and the given model. *valueIds* is a dict
-        mapping tag-ids to value-ids of the tag. This node will contain elements having at least one of the
-        value-ids in the corresponding tag. *value* is the value of the value-ids (which should be the same
-        for all tags) and will be displayed on the node.
-        """
-        CriterionNode.__init__(self, parent)
+    def __init__(self, value, tagPairs, sortValue):
+        super().__init__()
         self.tagPairs = tagPairs
         self.values = [value]
         self.sortValues = [sortValue if sortValue is not None else value]
@@ -625,10 +559,10 @@ class TagNode(CriterionNode):
 class VariousNode(CriterionNode):
     """A VariousNode groups elements in a tag-layer which have no tag in any of the tags in the tag-layer's
     tagset."""
-    def __init__(self, parent, tagSet):
+    def __init__(self, tagSet):
         """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's
         tagset *tagSet*."""
-        CriterionNode.__init__(self, parent)
+        super().__init__()
         self.tagSet = tagSet
 
     def getCriterion(self):
@@ -645,8 +579,8 @@ class VariousNode(CriterionNode):
 
 class HiddenValuesNode(Node):
     """A node that contains hidden value nodes."""
-    def __init__(self, parent, nodes):
-        self.parent = parent
+    def __init__(self, nodes):
+        super().__init__()
         self.setContents(nodes)
         
     def __repr__(self):
@@ -657,6 +591,8 @@ class HiddenValuesNode(Node):
                
 
 class BrowserWrapper(Wrapper):
+    """For performance reasons the browser does not load contents of Wrappers directly. Instead it uses
+    BrowserWrappers which will load their contents when they are requested for the first time."""
     def __init__(self, element, position=None):
         assert element.isContainer() and len(element.contents) > 0
         self.element = element
@@ -678,13 +614,14 @@ class BrowserWrapper(Wrapper):
         return self.contents
     
     def loadContents(self, recursive):
-        # Contrary to the parent implementation use BrowserWrapper for non-empty containers in the contents
         if recursive:
             super().loadContents(recursive=True)
-            return
-        elements = levels.real.collectMany(self.element.contents)
-        self.setContents([(BrowserWrapper if el.isContainer() and len(el.contents) > 0 else Wrapper)
-                          (el, position=pos)
+        else:
+            # Contrary to the parent implementation use BrowserWrapper-instances
+            # for non-empty containers in the contents
+            elements = levels.real.collectMany(self.element.contents)
+            self.setContents([(BrowserWrapper if el.isContainer() and len(el.contents) > 0 else Wrapper)
+                              (el, position=pos)
                           for el, pos in zip(elements, self.element.contents.positions)])
     
         
@@ -712,10 +649,23 @@ class BrowserMimeData(selection.MimeData):
             # self.nodes() may contain CriterionNodes or (unlikely) LoadingNodes.
             self._wrappers = list(itertools.chain.from_iterable(self._getElementsInstantly(node)
                                                                 for node in self.nodes(onlyToplevel=True)))
-            #assert self._wrappers[0].contents is not None
             self._wrappersLoaded = True
         return self._wrappers
-                                          
+
+    def _loadContents(self, node):
+        """Block until all contents have been recursively loaded."""
+        if isinstance(node, CriterionNode):
+            if not node.hasLoaded():
+                node.loadContents(block=True)
+                if node.contents is None: # should never be the case
+                    raise RuntimeError("Could not load contents of node instantly: {}".format(node))
+        else:
+            if node.contents is None:
+                node.loadContents(recursive=True)
+        for n in node.getContents():
+            if n.hasContents():
+                self._loadContents(n)
+        
     def _getElementsInstantly(self, node):
         """If *node* is a CriterionNode return all (toplevel) elements contained in it. If contents have to
         be loaded, block until the search is finished. If *node* is an element return ''[node]''.
@@ -723,12 +673,12 @@ class BrowserMimeData(selection.MimeData):
         if isinstance(node, Wrapper):
             node.loadContents(recursive=True) 
             return [node]
-        if isinstance(node, CriterionNode):
-            if node.contents is None:
-                node.loadContents(block=True)
-                if node.contents is None: # should never be the case
-                    logger.debug("Could not load contents of node instantly: {}".format(node))
-                    return []
+        elif isinstance(node, (CriterionNode, HiddenValuesNode)):
+            try:
+                self._loadContents(node)
+            except RuntimeError as e:
+                logger.debug(str(e))
+                return []
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
                                                  for child in node.contents)
         else: return [] # Should be a LoadingNode

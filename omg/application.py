@@ -299,7 +299,6 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
     # Close operations
     logger.debug('main application quit')
     filesystem.shutdown()
-    search.shutdown()
     mainWindow.close()
     plugins.shutdown()
     covers.shutdown()
