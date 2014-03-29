@@ -128,9 +128,14 @@ class Browser(dockwidget.DockWidget):
         self.optionButton.clicked.connect(functools.partial(self.toggleOptionDialog, self.optionButton))
         controlLineLayout.addWidget(self.optionButton)
         self.optionButton.setVisible(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
+        
+        self.filterButton = FilterButton()
+        controlLineLayout.addWidget(self.filterButton)
+        self.filterButton.clicked.connect(self._handleFilterButton)
+        
         layout.addLayout(controlLineLayout)
                
-        self.splitter = QtGui.QSplitter(Qt.Vertical,self)
+        self.splitter = QtGui.QSplitter(Qt.Vertical, self)
         layout.addWidget(self.splitter)
         
         # Restore state
@@ -239,11 +244,23 @@ class Browser(dockwidget.DockWidget):
         for view in self.views:
             view.model().reset()
             
-    def updateFilter(self):
+    def activateFilter(self):
+        """Activate and update filter in all views and reload."""
+        self.updateFilter(activate=True)
+        
+    def updateFilter(self, activate=False):
         """Update the filter in all views and reload."""
+        filter = self.getFilter()
+        self.filterButton.setEnabled(filter is not None)
+        if filter is not None:
+            if activate:
+                self.filterButton.setActive(True)
+            elif not self.filterButton.active:
+                filter = None
+        
         for view in self.views:
             view.expander = VisibleLevelsExpander(view)
-            view.model().setFilter(self.getFilter())
+            view.model().setFilter(filter)
         
     def search(self, searchString=None):
         """Search for the value in the searchbox. If it is empty, display all values. If *searchString*
@@ -251,7 +268,7 @@ class Browser(dockwidget.DockWidget):
         """
         #TODO: restoreExpanded if new criteria are narrower than the old ones?
         self.searchCriterion = self.searchBox.criterion
-        self.updateFilter()
+        self.activateFilter()
     
     def getFilter(self):
         """Return the complete filter that is currently active (either a Criterion or None).
@@ -266,18 +283,18 @@ class Browser(dockwidget.DockWidget):
         if len(flags) == 0:
             if self.flagCriterion is not None:
                 self.flagCriterion = None
-                self.updateFilter()
+                self.activateFilter()
         else:
             if self.flagCriterion is None or self.flagCriterion.flags != flags:
                 self.flagCriterion = search.criteria.FlagCriterion(flags)
-                self.updateFilter()
+                self.activateFilter()
         
     def setFilterCriterion(self, criterion):
         """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
         and thus form a permanent filter."""
         if criterion != self.filterCriterion:
             self.filterCriterion = criterion
-            self.updateFilter()
+            self.activateFilter()
 
     def getShowHiddenValues(self):
         """Return whether this browser should display ValueNodes where the hidden-flag in values_varchar is
@@ -288,7 +305,6 @@ class Browser(dockwidget.DockWidget):
         """Show or hide ValueNodes where the hidden-flag in values_varchar is set."""
         self.showHiddenValues = showHiddenValues
         self.reload()
-
                 
     def _handleChangeEvent(self, event):
         """Handle a change event from the application's dispatcher or the real level."""
@@ -308,6 +324,12 @@ class Browser(dockwidget.DockWidget):
         super()._handleHideTitleBarAction(checked)
         if hasattr(self, 'optionButton'): # false during construction
             self.optionButton.setVisible(checked)
+            
+    def _handleFilterButton(self):
+        """React to the filter button: Activate/deactive filter."""
+        if self.getFilter() is not None:
+            self.filterButton.setActive(not self.filterButton.active)
+            self.updateFilter()
               
     def defaultLayers(self):
         """Return the default list of layers for a view."""
@@ -551,3 +573,33 @@ class VisibleLevelsExpander:
                 self.view.expand(self.view.model().getIndex(node))
                 if depth > 1:
                     self.expandToDepth(depth-1, parent=node)
+
+
+class FilterButton(QtGui.QPushButton):
+    """Small button next to the browser's search bar that indicates whether a filter is set or not and
+    allows to deactivate filters.
+    """
+    def __init__(self):
+        super().__init__()
+        self.setIconSize(QtCore.QSize(16, 16))
+        self.setContentsMargins(0,0,0,0)
+        self.setFlat(True)
+        self.setEnabled(False)
+        
+    def setEnabled(self, enabled):
+        if enabled != self.isEnabled():
+            super().setEnabled(enabled)
+            if enabled:
+                self.setActive(True)
+            else:
+                self.active = False
+                self.setIcon(utils.getIcon('search_disabled.png'))
+         
+    def setActive(self, active):
+        """Change the icon of the button to indicate whether the filter is active or inactive."""
+        if active != self.active:
+            self.active = active
+            if active:
+                self.setIcon(utils.getIcon('search_active.png'))
+            else: self.setIcon(utils.getIcon('search_inactive.png'))
+                             
