@@ -145,7 +145,6 @@ def getHTML(path, size=None, attributes=''):
         pixmap = pixmap.scaled(size, size, transformMode=Qt.SmoothTransformation)
 
     buffer = QtCore.QBuffer()
-    buffer.open(QtCore.QIODevice.WriteOnly)
     pixmap.save(buffer, "PNG")
     string = bytes(buffer.buffer().toBase64()).decode('ascii')
     buffer.close()
