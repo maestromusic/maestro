@@ -630,9 +630,8 @@ class CentralTabWidget(QtGui.QTabWidget):
     def _handleCloseButton(self):
         """React to the corner widget's close button: Close the current tab."""
         widget = self.currentWidget()
-        if hasattr(widget,"okToClose") and widget.okToClose():
+        if not hasattr(widget,"okToClose") or widget.okToClose():
             self.removeTab(self.currentIndex())
-            widget.close()
 
     def clear(self):
         for i in range(self.count()):
