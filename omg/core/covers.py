@@ -18,11 +18,11 @@
 
 import os.path, hashlib, re, time, weakref
 
-from PyQt4 import  QtGui, QtCore
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import config, logging
+from .. import config, logging, worker
 from . import tags
 from .elements import Element
 
@@ -46,10 +46,6 @@ providerClasses = []
 # Whenever a cover is requested in one of the sizes in this list, it will be cached in the corresponding
 # cache_<size>-folder. Use addCacheSize to modify this list.
 cacheSizes = []
-
-# When images are loaded asynchronously and should be cached this dict stores the cachePath until the image
-# is loaded.
-_imagesToCache = {}
 
 
 def init():
@@ -153,35 +149,6 @@ def getHTML(path, size=None, attributes=''):
     return makeImgTag("data:image/png;base64, "+string)
 
 
-def getAsync(imageLoader, path, size=None):
-    """Load a cover asynchronously using the given ImageLoader. Return a imageloader.FutureImage instance.
-    *path* and *size* are used as in 'get'."""
-    cacheImage = False
-    if size in cacheSizes:
-        cachePath = _cachePath(path, size)
-        if os.path.exists(cachePath):
-            path = cachePath
-        else:
-            cacheImage = True
-    if not os.path.isabs(path):
-        path = os.path.join(COVER_DIR, path)
-                
-    futureImage = imageLoader.loadImage(path, QtCore.QSize(size, size))
-    if cacheImage:
-        imageLoader.loaded.connect(_handleImageLoader, Qt.UniqueConnection)
-        _imagesToCache[futureImage] = cachePath
-        
-    return futureImage
-
-
-def _handleImageLoader(image):
-    """If necessary, cache images loaded by the image loader."""
-    if image in _imagesToCache:
-        cachePath = _imagesToCache[image]
-        storeInCache(image.pixmap, cachePath)
-        del _imagesToCache[image]
-
-
 def storeInCache(pixmap, cachePath):
     """Store the *pixmap* at *cachePath*."""
     os.makedirs(os.path.dirname(cachePath), exist_ok=True)
@@ -214,7 +181,28 @@ def removeUnusedCovers():
                     if os.path.exists(os.path.join(COVER_DIR, folder, cacheFile)):
                         os.remove(os.path.join(COVER_DIR, folder, cacheFile))
     
+
+class LoadCoverTask(worker.LoadImageTask):
+    """A task to load a cover asynchronously using a worker.Worker. *path* and *size* are used as in 'get'.
+    """
+    def __init__(self, path, size=None):
+        super().__init__(path, QtCore.QSize(size, size) if size is not None else None)
+        self.cacheImage = False
+        if size in cacheSizes:
+            self.cachePath = _cachePath(path, size)
+            if os.path.exists(self.cachePath):
+                self.path = self.cachePath
+            else:
+                self.cacheImage = True
+        if not os.path.isabs(self.path):
+            self.path = os.path.join(COVER_DIR, self.path)
         
+    def process(self):
+        super().process()
+        if self.cacheImage and not self._image.isNull():
+            storeInCache(self._image, self.cachePath)
+    
+
 class AbstractCoverProvider(QtCore.QObject):
     """Abstract base class for cover providers. A cover provider fetches covers for elements, typically from
     a webservice. It may process several elements at the same time and may return more than one cover for

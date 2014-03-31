@@ -18,29 +18,20 @@
 
 import threading, functools
 
-from PyQt4 import QtCore
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 # Internal states that are used to manage the worker thread
 STATE_INIT, STATE_RUNNING, STATE_QUIT = 1,2,3
-
 
 class ResetException(Exception):
     """This exception is used to abort tasks when the worker thread has been resetted or quitted."""
     pass
 
 
-class Dispatcher(QtCore.QObject):
-    """Internal dispatcher used to signal finished tasks."""
-    finished = QtCore.pyqtSignal(object)
-
-
 class Task:
     """A unit of work that can be given to a worker thread. The worker will call *callable* with the given
     arguments. It is also possible to subclass Task and implement custom behaviour in the process-method.
-    
-    A subclass can implement the method 'merge' which should take another Task as argument. It should try
-    to merge the other task into itself and return whether this was possible.
     """ 
     def __init__(self, callable, *args, **kwargs):
         self.callable = callable
@@ -50,6 +41,11 @@ class Task:
     def process(self):
         """Called from the worker thread to get this task done."""
         self.callable(*self.args, **self.kwargs)
+        
+    def merge(self, other):
+        """Try to merge the task *other* in this task and return whether it was successful. The worker queue
+        will try to merge new tasks into older tasks instead of putting them into the queue."""
+        return False
        
     
 class Queue:
@@ -92,24 +88,30 @@ class Queue:
             self._tasks.clear()
             self._fullEvent.clear()
     
-    
-class Worker(threading.Thread):
+
+class Worker(QtCore.QObject):
     """A worker thread that processes tasks. Tasks should be added with the 'submit' method. When a task
-    is finished *callable* is called with the task as argument. This call is done in the thread that created
-    the Worker, not in the worker thread. If *dbConnection* is True, the worker thread will establish a
-    database connection so that Tasks can use database.query and the like.
+    is finished, the done-signal is emitted with the task as argument. The signal is emitted from the 
+    thread, that created the worker, so it is usually not necessary to use a queued connection.
+    If *dbConnection* is True, the worker thread will establish a database connection so that Tasks can use
+    database.query and the like.
     """
-    def __init__(self, callable, dbConnection=False):
+    done = QtCore.pyqtSignal(Task)
+    _done = QtCore.pyqtSignal(Task)
+    
+    def __init__(self, dbConnection=False):
         super().__init__()
-        self.daemon = True
         self.state = STATE_INIT
-        self.callable = callable
         self.dbConnection = dbConnection
         self._resetCount = 0
-        self._dispatcher = Dispatcher()
-        self._dispatcher.finished.connect(self._handleFinished, Qt.QueuedConnection)
+        self._done.connect(self._handleDone, Qt.QueuedConnection)
         self._queue = Queue()
         self._emptyEvent = threading.Event()
+        self._thread = threading.Thread(target=self.run)
+        self._thread.daemon = True
+    
+    def start(self):
+        self._thread.start()
     
     def submit(self, task):
         """Submit a task to be processed in the worker thread."""
@@ -117,7 +119,12 @@ class Worker(threading.Thread):
             self._emptyEvent.clear()
             task._resetCount = self._resetCount
             self._queue.put(task)
-        
+    
+    def submitMany(self, tasks):
+        """Submit a list of tasks to be processed in the worker thread."""
+        for task in tasks:
+            self.submit(task)
+            
     def reset(self):
         """Reset the worker thread, i.e. stop and remove all submitted tasks."""
         if self.state != STATE_QUIT:
@@ -144,10 +151,6 @@ class Worker(threading.Thread):
         """
         if task._resetCount != self._resetCount:
             raise ResetException()
-    
-    def _handleFinished(self, task):
-        if task._resetCount == self._resetCount:
-            self.callable(task)
             
     def runInit(self):
         """Called at the beginning of the worker thread. Subclasses might reimplement it."""
@@ -175,7 +178,7 @@ class Worker(threading.Thread):
                     self.checkWorkerState(task)
                     task.checkWorkerState = functools.partial(self.checkWorkerState, task)
                     task.process()
-                    self._dispatcher.finished.emit(task)
+                    self._done.emit(task)
                 except ResetException:
                     if self.state == STATE_QUIT:
                         break
@@ -183,3 +186,63 @@ class Worker(threading.Thread):
             self.state = STATE_QUIT # don't accept new tasks (if execution stopped due to an exception)
             self._emptyEvent.set() # don't forget to unblock threads waiting for this event
             self.runShutdown()
+    
+    def _handleDone(self, task):
+        """Before emitting the real 'done'-signal, filter tasks out that were added before the last reset."""
+        if task._resetCount == self._resetCount:
+            self.done.emit(task)
+    
+    def loadImage(self, path, size=None):
+        """Start loading the image from *path* and return a FutureImage-instance for it.
+        If *size* is given, scale the image after loading to *size* (a QSize)."""
+        task = LoadImageTask(path, size)
+        self.submit(task)
+        return tasks
+    
+    def loadImages(self, paths, size=None):
+        """Start loading images from *paths* and return a list of LoadImageTask-instances for them.
+        If *size* is given, scale all images after loading to *size* (a QSize)."""
+        tasks = [LoadImageTasks(path, size) for path in paths]
+        self.submitMany(tasks)
+        return tasks
+
+
+class LoadImageTask(Task):
+    """A task that loads an image from *path* and optionally resizes it to *size* (a QSize). When the 
+    image has been loaded, the attribute 'loaded' will be set to True and 'pixmap' can be used to retrieve
+    it.
+    """
+    def __init__(self, path, size=None):
+        self.path = path
+        self.size = size
+        # QPixmap may only be used in the GUI thread. Thus we have to use QImage first.
+        self._image = None
+        self._pixmap = None
+
+    @property
+    def loaded(self):
+        """True when the image has been loaded."""
+        return self._pixmap is not None or self._image is not None
+    
+    @property
+    def pixmap(self):
+        """Get the pixmap inside this wrapper or None if it has not been loaded yet."""
+        if self._pixmap is not None:
+            return self._pixmap
+        elif self._image is not None:
+            self._pixmap = QtGui.QPixmap.fromImage(self._image)
+            self._image = None # save memory
+            return self._pixmap
+        else: None
+        
+    def process(self):
+        # QPixmap may only be used in the GUI thread. Thus we have to load the images as QImage and
+        # transform them later in the GUI thread (see FutureImage.pixmap).
+        image = QtGui.QImage(self.path)
+        if not image.isNull() and self.size is not None and image.size() != self.size:
+            image = image.scaled(self.size, transformMode=Qt.SmoothTransformation)
+        self._image = image
+
+    def merge(self, other):
+        return self.path == other.path and self.size == other.size
+    

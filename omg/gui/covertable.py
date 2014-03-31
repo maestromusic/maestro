@@ -23,17 +23,17 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import coverbrowser, selection
-from .. import imageloader
 from ..core import nodes, covers, levels, elements, tags
 
 
 class CoverTable(coverbrowser.AbstractCoverWidget):
     """Standard display class for coverbrowser.CoverBrowser. It uses a QGraphicsView to draw covers in a
     table layout."""
-    def __init__(self, state, parent=None):
-        super().__init__(parent)
+    def __init__(self, state, coverBrowser):
+        super().__init__(coverBrowser)
         layout = QtGui.QHBoxLayout(self)
-        self.view = QtGui.QGraphicsView(CoverTableScene(state.get('size') if state is not None else 80))
+        self.view = QtGui.QGraphicsView(CoverTableScene(coverBrowser.worker,
+                                                        state.get('size') if state is not None else 80))
         self.view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.view.setDragMode(QtGui.QGraphicsView.ScrollHandDrag)
         self.view.scene().selectionChanged.connect(self.selectionChanged)
@@ -88,8 +88,9 @@ class CoverTableScene(QtGui.QGraphicsScene):
     shadowFactor = 1./15. # fraction of coverSize that is used for shadows
     outerSpace = 15 # constant outer space
     
-    def __init__(self, size):
+    def __init__(self, worker, size):
         super().__init__()
+        self.worker = worker
         self.columnCount = 0
         
         self.coverItems = {}
@@ -103,8 +104,6 @@ class CoverTableScene(QtGui.QGraphicsScene):
         self.reloadCoverTimer.setSingleShot(True)
         self.reloadCoverTimer.setInterval(1000)
         self.reloadCoverTimer.timeout.connect(self._handleReloadCoverTimer)
-        
-        self.imageLoader = imageloader.ImageLoader()
 
     def setCovers(self, ids, coverPaths):
         """Set the covers that are displayed. *ids* is a list of elements-ids (which can be used to fetch
@@ -252,7 +251,8 @@ class CoverItem(QtGui.QGraphicsItem):
         self.path = path
         if self.cover is not None and self.cover.loaded:
             self._oldCover = self.cover
-        self.cover = covers.getAsync(self.scene.imageLoader, path, self.scene.coverSize)
+        self.cover = covers.LoadCoverTask(path, self.scene.coverSize)
+        self.scene.worker.submit(self.cover)
         if not self.cover.loaded:
             self.scene.loadingTimer.timeout.connect(self._handleTimer)
         else: self._addShadow()

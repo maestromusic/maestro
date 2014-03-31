@@ -25,7 +25,7 @@ translate = QtCore.QCoreApplication.translate
 from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui, browser
 from .misc import busyindicator
 from ..models import browser as browsermodel
-from .. import database as db, utils, imageloader, config, worker, search, logging
+from .. import database as db, utils, config, worker, search, logging
 from ..core import covers, levels, nodes, tags, elements
 from ..search import criteria
 
@@ -91,6 +91,9 @@ class CoverBrowser(dockwidget.DockWidget):
                     self.filterCriterion = search.criteria.parse(state['filter'])
                 except search.criteria.ParseException as e:
                     logger.warning("Could not parse the cover browser's filter criterion: {}".format(e))
+        
+        self.worker = worker.Worker()
+        self.worker.start()
                     
         widget = QtGui.QWidget()
         self.setWidget(widget)
@@ -129,10 +132,10 @@ class CoverBrowser(dockwidget.DockWidget):
         if state is not None and 'display' in state and state['display'] in _displayClasses:
             self.setDisplayKey(state['display'])
         else: self.setDisplayKey('table')
-        
-        #self.worker = worker.Worker(self._loaded, dbConnection=True)
-        #self.worker.start()
-        #self.reload()
+    
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self.worker.quit()
         
     def saveState(self):
         state = {'display': self._display,

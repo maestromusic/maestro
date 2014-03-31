@@ -55,7 +55,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.layers = layers
         self.containerLayer = ContainerLayer()
         self.filter = filter
-        self.worker = worker.Worker(self._loaded, dbConnection=True)
+        self.worker = worker.Worker(dbConnection=True)
+        self.worker.done.connect(self._loaded)
         self.worker.start()
         self._startLoading(self.root)
     
@@ -208,7 +209,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             self.hasContentsChanged.emit(hasContents)
 
     
-class LoadTask:
+class LoadTask(worker.Task):
     """When a node (either root node or CriterionNode) must load its contents, the browser submits a LoadTask
     to its worker thread. *layer* is the layer to which the node's contents belong. *criterion* is the
     filter that specifies which elements to load as contents.
