@@ -84,12 +84,16 @@ class DetailsView(dockwidget.DockWidget):
         painter = QtGui.QPainter(self.minusSign)
         self.style().drawPrimitive(QtGui.QStyle.PE_IndicatorBranch, option, painter)
         
+        self._handleGlobalSelection(selection.getGlobalSelection())
+        
     def _handleGlobalSelection(self, selection):
         """Switch element when global selection changes."""
-        elements = list(selection.elements())
-        if len(elements) == 1:
-            self.setElement(elements[0])
-        else: self.setElement(None)
+        if selection is not None:
+            elements = list(selection.elements())
+            if len(elements) == 1:
+                self.setElement(elements[0])
+                return
+        self.setElement(None)
         
     def _handleLevelChanged(self, event):
         """React to the real level's event dispatcher."""
@@ -146,7 +150,9 @@ class DetailsView(dockwidget.DockWidget):
         # Cover and title
         text.append('<tr><td>')
         if el.hasCover():
-            text.append(link("cover", pixmap(el.getCover(60))))
+            cover = el.getCover(60)
+            if cover is not None:
+                text.append(link("cover", pixmap(cover)))
         text.append('</td><td>')    
         text.append('<h2>{}</h2>'.format(Qt.escape(el.getTitle())))
         text.append('</td></tr>')

@@ -17,7 +17,7 @@
 #
 import math, functools
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore, QtGui, QtSvg
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
@@ -76,7 +76,7 @@ class Cover:
         if self._cache is None:
             self._createCache(options)
         return self._cache
-      
+        
     def _createCache(self, options):
         """Create the cached version of this cover using the specified options (from CoverFlow.options).
         The cache version contains the resized cover together with its reflection."""
@@ -88,7 +88,16 @@ class Cover:
         self._cache = QtGui.QPixmap(w, h + hRefl)
         painter = QtGui.QPainter(self._cache)
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
-        painter.drawPixmap(QtCore.QRect(0, 0, w, h), self.pixmap)
+        rect = QtCore.QRect(0, 0, w, h)
+        if self.pixmap is not None:
+            painter.drawPixmap(rect, self.pixmap)
+        else:
+            painter.drawPixmap(rect, QtGui.QPixmap(':omg/cover_missing.png'))
+            # I'd like to use the SVG-version, but Qt is not able to draw it correctly
+            #if not hasattr(self, '_imageMissingRenderer'):
+            #    self._imageMissingRenderer = QtSvg.QSvgRenderer('cover_missing.svg')
+            #painter.fillRect(rect, Qt.black)
+            #self._imageMissingRenderer.render(painter, QtCore.QRectF(rect))
         
         if options['reflection']:
             painter.setTransform(QtGui.QTransform(1, 0, 0, -1, 0, 0)) # draw reflection upside down
@@ -232,9 +241,11 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
     def setCovers(self, ids, coverPaths):
         self.animator.stop()
         self.covers = [Cover(id, coverPaths[id]) for id in ids]
-        self._pos = min(len(self.covers)//2, self._o['coversPerSide'])
-        self.triggerRender()
-        
+        self._pos = None
+        if len(ids) > 0:
+            self.setPosition(min(len(self.covers)//2, self._o['coversPerSide']))
+        else: self.triggerRender()
+         
     def clear(self):
         """Remove all covers from display."""
         self.setCovers([], None)
@@ -259,6 +270,7 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         if position != self._pos:
             self.animator.start(position)
         else: self.animator.stop()
+        # do not change global selection here, because that would slow down the flow.
         
     def setPosition(self, position):
         """Move directly to the cover at *position*, i.e. without animation.
@@ -268,6 +280,8 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
         if position != self._pos:
             self._pos = position
             self.triggerRender()
+            element = levels.real.collect(self.covers[position].elid)
+            selection.setGlobalSelection(selection.Selection.fromElements(levels.real, [element]))
         
     def paintEvent(self, event):
         self.renderer.paint()
@@ -532,6 +546,8 @@ class Renderer:
         cover = self.widget.covers[index]
         pixmap = cover.cache(self._o)
         rect = self.coverRect(index, translate=False)
+        if pixmap.isNull():
+            return QtCore.QRect(0,0,0,0)
         painter.drawPixmap(rect, pixmap, QtCore.QRectF(pixmap.rect()))
 
         if o['fadeOut']:
@@ -587,7 +603,9 @@ class Animator:
         """Called by the timer: Move animated covers to the next position."""
         t = self._target
         if self.widget._pos == t:
+            element = levels.real.collect(self.widget.covers[t].elid)
             self.stop()
+            selection.setGlobalSelection(selection.Selection.fromElements(levels.real, [element]))
             return
         dist = abs(t - self.widget._pos)
         self._v = min(self._v + self._a, math.sqrt(2*self._a*dist))

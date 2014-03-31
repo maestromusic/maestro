@@ -22,13 +22,14 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui
+from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui, browser
 from .misc import busyindicator
 from ..models import browser as browsermodel
-from .. import database as db, utils, imageloader, config
+from .. import database as db, utils, imageloader, config, worker, search, logging
 from ..core import covers, levels, nodes, tags, elements
 from ..search import criteria
 
+logger = logging.getLogger(__name__)
 
 _displayClasses = {}
 _coverBrowsers = weakref.WeakSet()
@@ -76,6 +77,21 @@ class CoverBrowser(dockwidget.DockWidget):
     def __init__(self, parent=None, state=None, **args):
         super().__init__(parent, **args)
         _coverBrowsers.add(self)
+        
+        self.flagCriterion = None
+        self.filterCriterion = None
+        self.searchCriterion = None
+        if state is not None:
+            if 'flags' in state:
+                flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
+                if len(flagList) > 0:
+                    self.flagCriterion = search.criteria.FlagCriterion(flagList)
+            if 'filter' in state:
+                try:
+                    self.filterCriterion = search.criteria.parse(state['filter'])
+                except search.criteria.ParseException as e:
+                    logger.warning("Could not parse the cover browser's filter criterion: {}".format(e))
+                    
         widget = QtGui.QWidget()
         self.setWidget(widget)
         
@@ -85,6 +101,11 @@ class CoverBrowser(dockwidget.DockWidget):
         self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox, 1)
+        
+        self.filterButton = browser.FilterButton()
+        self.filterButton.setEnabled(self.getFilter() is not None)
+        controlLineLayout.addWidget(self.filterButton)
+        self.filterButton.clicked.connect(self._handleFilterButton)
         
         self._display = None
         self._displayWidgets = {}
@@ -109,28 +130,27 @@ class CoverBrowser(dockwidget.DockWidget):
             self.setDisplayKey(state['display'])
         else: self.setDisplayKey('table')
         
-        self.flagCriterion = None
-        self.filterCriterion = None
-        self.searchCriterion = None
-        self.searchRequest = None
-        
-        if browsermodel.searchEngine is None:
-            browsermodel.initSearchEngine()
-        browsermodel.searchEngine.searchFinished.connect(self._handleSearchFinished)
-        self.resultTable = browsermodel.searchEngine.createResultTable("coverbrowser")
-
-        self.load()
+        #self.worker = worker.Worker(self._loaded, dbConnection=True)
+        #self.worker.start()
+        #self.reload()
         
     def saveState(self):
-        config = {}
+        state = {'display': self._display,
+                 'config': {}}
+        if self.filterCriterion is not None:
+            state['filter'] = repr(self.filterCriterion)
+        if self.flagCriterion is not None:
+            state['flags'] = [flag.name for flag in self.flagCriterion.flags]
+            
+        # Save configuration of display classes
         for key, widget in self._displayWidgets.items():
-            config[key] = widget.state()
+            state['config'][key] = widget.state()
         # Keep state of widgets which have not been used this time.
         # Except there is no class anymore (e.g. because a plugin has been disabled).
         for key, c in self._displayConfig.items():
-            if key not in config and key in _displayClasses:
-                config[key] = c
-        return {'display': self._display, 'config': config}
+            if key not in state['config'] and key in _displayClasses:
+                state['config'][key] = c
+        return state
     
     def display(self):
         """Return the current display widget (instance of the current display class)."""
@@ -162,70 +182,64 @@ class CoverBrowser(dockwidget.DockWidget):
             raise ValueError("Invalid display key '{}'".format(key))
             
         self.displayChooser.setCurrentIndex(self.displayChooser.findData(key))
-        if hasattr(self, 'table'): # otherwise this is called during the constructor which will call load
-            self.reset()
+        self.reload()
+        
+    def getFilter(self):
+        """Return the complete filter that is currently active (either a Criterion or None).
+        The filter consists of the search criterion entered by the user, the selected flags and the static
+        filter set in the configuration dialog.
+        """ 
+        return search.criteria.combine('AND', 
+            [c for c in [self.searchCriterion, self.flagCriterion, self.filterCriterion] if c is not None])
+        
+    def activateFilter(self):
+        """Activate and update filter in all views and reload."""
+        filter = self.getFilter()
+        self.filterButton.setEnabled(filter is not None)
+        self.reload()
+
+    def search(self):
+        """Start a search."""
+        self.searchCriterion = self.searchBox.criterion
+        self.activateFilter()
         
     def setFlagFilter(self, flags):
         """Set the browser's flag filter to the given list of flags."""
         if len(flags) == 0:
             if self.flagCriterion is not None:
                 self.flagCriterion = None
-                self.load()
+                self.activateFilter()
         else:
             if self.flagCriterion is None or self.flagCriterion.flags != flags:
-                self.flagCriterion = criteria.FlagCriterion(flags)
-                self.load()
+                self.flagCriterion = search.criteria.FlagCriterion(flags)
+                self.activateFilter()
         
     def setFilterCriterion(self, criterion):
         """Set a single criterion that will be added to all other criteria from the searchbox (using AND)
         and thus form a permanent filter."""
         if criterion != self.filterCriterion:
             self.filterCriterion = criterion
-            self.load()
+            self.activateFilter()
             
-    def search(self):
-        """Start a search."""
-        self.searchCriterion = self.searchBox.criterion
-        self.load()
-        
-    def load(self):
-        """Load contents into the cover browser, based on the current filterCriterion, flagCriterion and
-        searchCriterion. If a search is necessary this will only start a search and actual loading will
-        be done in _handleSearchFinished.
-        """
-        if self.searchRequest is not None:
-            self.searchRequest.stop()
-            self.searchRequest = None
-            
-        # Combine returns None if all input criteria are None
-        criterion = criteria.combine('AND',
-                            [c for c in (self.filterCriterion, self.flagCriterion, self.searchBox.criterion)
-                             if c is not None])
-
-        if criterion is not None:
-            self.table = self.resultTable
-            self.searchRequest = browsermodel.searchEngine.search(
-                                                  fromTable = db.prefix+"elements",
-                                                  resultTable = self.resultTable,
-                                                  criterion = criterion)
+    def reload(self):
+        """Clear everything and rebuilt it from the database."""
+        filter = self.getFilter()
+        if filter is None or not self.filterButton.active:
+            filterClause = ''
         else:
-            self.table = db.prefix + "elements"
-            self.reset()
-            
-    def _handleSearchFinished(self,request):
-        """React to searchFinished signals."""
-        if request is self.searchRequest:
-            self.searchRequest = None
-            self.reset()
-            
-    def reset(self):
+            elids = search.search(filter)
+            if len(elids):
+                filterClause = " AND el.id IN ({})".format(db.csList(elids))
+            else:
+                self.display().setCovers([], {})
+                return
+    
         result = db.query("""
             SELECT el.id, st.data
-            FROM {1} AS el
+            FROM {0}elements AS el
                 JOIN {0}stickers AS st ON el.id = st.element_id
-            WHERE st.type = 'COVER'
-            """.format(db.prefix, self.table))
-        
+            WHERE st.type = 'COVER' {1}
+            """.format(db.prefix, filterClause))
         coverPaths = {id: path for id, path in result}
         ids = list(coverPaths.keys())
         levels.real.collectMany(ids)
@@ -249,6 +263,12 @@ class CoverBrowser(dockwidget.DockWidget):
         
     def createOptionDialog(self, parent):
         return BrowserDialog(parent, self)
+            
+    def _handleFilterButton(self):
+        """React to the filter button: Activate/deactive filter."""
+        if self.getFilter() is not None:
+            self.filterButton.setActive(not self.filterButton.active)
+            self.reload()
     
     def _handleHideTitleBarAction(self, checked):
         super()._handleHideTitleBarAction(checked)
@@ -268,7 +288,7 @@ class CoverBrowser(dockwidget.DockWidget):
         self.displayChooser.setVisible(len(values) > 1)
         self.displayChooser.currentIndexChanged.connect(self._handleDisplayChooser)
         if self._display is not None and self._display not in [v[1] for v in values]:
-            self.reset()
+            self.reload()
                 
     def _handleDisplayChooser(self, i):
         """Handle the combobox which lets the user choose a display class."""

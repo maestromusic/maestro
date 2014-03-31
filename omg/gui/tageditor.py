@@ -55,6 +55,7 @@ class TagEditorDock(dockwidget.DockWidget):
         
         from . import selection
         selection.changed.connect(self._handleSelectionChanged)
+        self._handleSelectionChanged(selection.getGlobalSelection())
         
     def saveState(self):
         return {'includeContents': self.editorWidget.includeContents}
@@ -67,11 +68,10 @@ class TagEditorDock(dockwidget.DockWidget):
     def _handleSelectionChanged(self, selection):
         """React to changes to the global selection: Load the elements of the selected wrappers
         into the TagEditorWidget."""
-        if not selection.hasElements():
-            return
-        self.editorWidget.setElements(selection.level,
-                                      list(selection.elements(recursive=False)),
-                                      list(selection.elements(recursive=True)))
+        if selection is not None and selection.hasElements():
+            self.editorWidget.setElements(selection.level,
+                                          list(selection.elements(recursive=False)),
+                                          list(selection.elements(recursive=True)))
         
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():

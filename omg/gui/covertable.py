@@ -287,7 +287,10 @@ class CoverItem(QtGui.QGraphicsItem):
     
     def paint(self, painter, option, widget):
         if self.cover.loaded:
-            painter.drawPixmap(1, 1, self.scene.coverSize, self.scene.coverSize, self.cover.pixmap)
+            if not self.cover.pixmap.isNull():
+                pixmap = self.cover.pixmap
+            else: pixmap = QtGui.QPixmap(':omg/cover_missing.png')
+            painter.drawPixmap(1, 1, self.scene.coverSize, self.scene.coverSize, pixmap)
         elif self._oldCover is not None:
             painter.drawPixmap(1, 1, self.scene.coverSize, self.scene.coverSize, self._oldCover.pixmap)
         else:
