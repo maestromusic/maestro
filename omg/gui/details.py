@@ -32,8 +32,9 @@ logger = logging.getLogger(__name__)
 class DetailsView(dockwidget.DockWidget):
     """A widget that lists all known information about a single element."""
     def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)
+        super().__init__(parent, **args)        
         
+        self.element = None
         self.tagsVisible = True
         self.contentsVisible = True
         self.stickersVisible = True
@@ -62,12 +63,11 @@ class DetailsView(dockwidget.DockWidget):
         self.label = QtGui.QLabel()
         self.label.setTextFormat(Qt.RichText)
         self.label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        #self.label.setStyleSheet('QLabel {background-color: white}')
         self.label.linkActivated.connect(self._handleLink)
-        self.element = None
         scrollArea.setWidget(self.label)
         selection.changed.connect(self._handleGlobalSelection)
         levels.real.connect(self._handleLevelChanged)
+        levels.editor.connect(self._handleLevelChanged)
         
         # Load expand/collapse icons from style
         self.plusSign = QtGui.QPixmap(16, 12)
@@ -96,7 +96,9 @@ class DetailsView(dockwidget.DockWidget):
         self.setElement(None)
         
     def _handleLevelChanged(self, event):
-        """React to the real level's event dispatcher."""
+        """React to the events from real or editor level."""
+        #TODO: Depending on the level, the event might not actually affect self.element.
+        # However, a change on real can affect the parents of an element on editor level.
         if self.element is not None and event.affects(self.element):
             self._update() 
             
@@ -110,7 +112,7 @@ class DetailsView(dockwidget.DockWidget):
         """React to the user clicking links."""
         try:
             id = int(href)
-            self.setElement(levels.real.collect(id))
+            self.setElement(self.element.level.fetch(id))
         except ValueError:
             pass #TODO handle other hrefs
         if href == "tags":
@@ -187,7 +189,7 @@ class DetailsView(dockwidget.DockWidget):
         # Parents
         if len(el.parents) > 0:
             text.append('<tr><td>'+self.tr("Parents: ")+'</td><td>')
-            parents = levels.real.collectMany(el.parents)
+            parents = el.level.fetchMany(el.parents)
             text.append('<br />'.join(link(p.id, Qt.escape(p.getTitle())) for p in parents))
             text.append('</td></tr>')
             
@@ -237,7 +239,7 @@ class DetailsView(dockwidget.DockWidget):
             ln = link("contents", pixmap(self.minusSign if self.contentsVisible else self.plusSign))
             text.append('<tr><td>' + ln + self.tr("Contents: ") + '</td><td>')
             if self.contentsVisible:
-                contents = levels.real.collectMany(el.contents)
+                contents = el.level.fetchMany(el.contents)
                 contents = ["{} - {}".format(pos, link(id, Qt.escape(c.getTitle())))
                             for (pos, id), c in zip(el.contents.items(), contents)]
                 text.append('<br />'.join(contents))
