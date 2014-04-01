@@ -87,7 +87,7 @@ class ChangeEventDispatcher(QtCore.QObject):
         """Connect a function to this dispatcher."""
         self._signal.connect(handler, type)
         
-    def disconnect(self,handler):
+    def disconnect(self, handler):
         """Disconnect a function from this dispatcher."""
         self._signal.disconnect(handler)
         
@@ -114,7 +114,7 @@ class Splash(QtGui.QSplashScreen):
         painter.drawText(QtCore.QPoint(20, 70), self.message)
         
     
-def run(cmdConfig=[],type='gui',exitPoint=None):
+def run(cmdConfig=[], type='gui', exitPoint=None):
     """This is the entry point of OMG. With the default arguments OMG will start the GUI. Use init if you
     only want to initialize the framework without starting the GUI.
     
@@ -152,7 +152,7 @@ def run(cmdConfig=[],type='gui',exitPoint=None):
         app.processEvents()
         
     # Initialize config and logging
-    config.init(cmdConfig, testMode=type=='test')
+    config.init(cmdConfig, testMode=(type == 'test'))
     
     # Initialize logging as early as possible -- but after the config variables have been read.
     logging.init()

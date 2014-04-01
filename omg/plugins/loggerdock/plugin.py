@@ -44,10 +44,18 @@ def disable():
 
 
 class StreamSignaller(QtCore.QObject):
+    def __init__(self):
+        super().__init__()
+        self.doSignalling = True
+        QtGui.qApp.aboutToQuit.connect(self.stopSignalling)
     textReceived = QtCore.pyqtSignal(str)
-    
+
+    def stopSignalling(self):
+        self.doSignalling = False
+
     def write(self, msg):
-        self.textReceived.emit(msg)
+        if self.doSignalling:
+            self.textReceived.emit(msg)
         
     def flush(self):
         pass
@@ -58,7 +66,7 @@ class LoggerDock(dockwidget.DockWidget):
         super().__init__(parent, **args)
         
         layout = QtGui.QVBoxLayout()
-        area = QtGui.QTextBrowser(self)
+        self.area = QtGui.QTextBrowser(self)
         dropdown = QtGui.QComboBox()
         dropdown.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
         self.handler = logging.StreamHandler(_signaller)
@@ -69,11 +77,14 @@ class LoggerDock(dockwidget.DockWidget):
                                 lambda levelStr : self.handler.setLevel(getattr(logging, levelStr.upper())))
         self.handler.setLevel(logging.DEBUG)
         layout.addWidget(dropdown)
-        layout.addWidget(area)
-        _signaller.textReceived.connect(area.insertPlainText)
-        _signaller.textReceived.connect(lambda x : area.ensureCursorVisible())
+        layout.addWidget(self.area)
+        _signaller.textReceived.connect(self.updateArea)
         widget = QtGui.QWidget()
         widget.setLayout(layout)
         self.setWidget(widget)
-        
+
+    def updateArea(self, newText):
+        self.area.insertPlainText(newText)
+        self.area.ensureCursorVisible()
+
         
