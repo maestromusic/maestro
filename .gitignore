@@ -3,6 +3,7 @@
 .project
 .settings
 .pydevproject
+.idea
 omg.egg-info/
 dist
 resources.py

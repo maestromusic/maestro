@@ -45,11 +45,11 @@ def init():
             """.format(TT_HELP))
     else:
         db.query("""
-            CREATE TEMPORARY TABLE IF NOT EXISTS {} (
+            CREATE TABLE IF NOT EXISTS {} (
                 value_id  MEDIUMINT UNSIGNED NOT NULL,
                 tag_id MEDIUMINT UNSIGNED NULL)
             """.format(TT_HELP))
-        db.query("CREATE INDEX {0}_idx ON {0} (value_id, tag_id)".format(TT_HELP))
+        db.query("CREATE INDEX IF NOT EXISTS {0}_idx ON {0} (value_id, tag_id)".format(TT_HELP))
 
 
 def search(searchCriterion, abortSwitch=None):
