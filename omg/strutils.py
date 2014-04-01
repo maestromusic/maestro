@@ -131,13 +131,14 @@ def numberFromPrefix(string):
 
     # First try arabic numbers
     i = 0
-    while string[i].isdigit():
+    while i < len(string) and string[i].isdigit():
         i += 1
     if i > 0:
         number = int(string[:i])
     else:
-        # try roman numbers
-        while string[i].upper() in "IVX": # other characters will just raise the chance of false positives
+        # try roman numbers. Other characters than 'IVX' would just raise the chance of false positives
+        i = 0
+        while i < len(string) and string[i].upper() in "IVX":
             i += 1
         if i > 0:
             try:
@@ -146,11 +147,13 @@ def numberFromPrefix(string):
                 return (None, "") # just looks like a roman number...give up
         else: return (None, "") # no number found...give up
         
-    # Ok I found a prefix
+    # Ok I found a prefix that looks like a number
+    if i == len(string):
+        return (number, string)
     indexWhereNumberEnds = i
     if string[i] in '.:':
         i += 1
-    while (string[i].isspace()):
+    while i < len(string) and string[i].isspace():
         i += 1
     # Only detect a number if at least one whitespace or a period was found
     if indexWhereNumberEnds < i:
