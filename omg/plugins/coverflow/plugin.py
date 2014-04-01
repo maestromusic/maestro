@@ -241,7 +241,7 @@ class CoverFlowWidget(coverbrowser.AbstractCoverWidget if __name__ != "__main__"
     def setCovers(self, ids, coverPaths):
         self.animator.stop()
         self.covers = [Cover(id, coverPaths[id]) for id in ids]
-        self._pos = None
+        self._pos = 0
         if len(ids) > 0:
             self.setPosition(min(len(self.covers)//2, self._o['coversPerSide']))
         else: self.triggerRender()
