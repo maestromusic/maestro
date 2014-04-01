@@ -20,12 +20,13 @@ import os.path, hashlib, re, time, weakref
 
 from PyQt4 import  QtGui, QtCore
 from PyQt4.QtCore import Qt
-
 translate = QtCore.QCoreApplication.translate
 
-from .. import config
+from .. import config, logging
 from . import tags
 from .elements import Element
+
+logger = logging.getLogger(__name__)
 
 # Absolute path to the cover folder
 COVER_DIR = None
@@ -100,6 +101,7 @@ def get(path, size=None):
         path = os.path.join(COVER_DIR, path)
     pixmap = QtGui.QPixmap(path)
     if pixmap.isNull():
+        logger.warning("Could not load cover from path '{}'.".format(path))
         return None
     if size is not None and (pixmap.width() != size or pixmap.height() != size):
         pixmap = pixmap.scaled(size, size, transformMode=Qt.SmoothTransformation)
