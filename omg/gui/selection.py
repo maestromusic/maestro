@@ -255,5 +255,5 @@ class MimeData(QtCore.QMimeData):
     
     @classmethod
     def fromElements(cls, level, elements):
-        return cls(Selection.fromElements(elements))
+        return cls(Selection.fromElements(level, elements))
     
