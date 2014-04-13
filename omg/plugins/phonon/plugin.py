@@ -25,7 +25,7 @@ try:
 except ImportError as e:
     raise ImportError("PyQt4-phonon is not installed.")
 
-from ... import player, profiles, utils
+from ... import player, profiles
 from ...filebackends.filesystem import FileURL
 from ...filebackends.stream import HTTPStreamURL
 from ...models import playlist
@@ -330,7 +330,7 @@ class PhononPlayerBackend(player.PlayerBackend):
         """Return the absolute path of the file at the given offset."""
         url = self.playlist.root.fileAtOffset(offset).element.url
         if isinstance(url, FileURL):
-            return utils.absPath(url.path)
+            return url.absPath
         if isinstance(url, HTTPStreamURL):
             return url.toQUrl()
         raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))

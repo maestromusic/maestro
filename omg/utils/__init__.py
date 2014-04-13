@@ -21,11 +21,12 @@ from datetime import date, datetime, timezone
 from os.path import getmtime
 
 from PyQt4 import QtCore, QtGui
-translate = QtCore.QCoreApplication.translate
+
+from .. import config
 
 # include submodules so that 'import utils' suffices to support 'utils.strings. ...'
-from . import worker, strings
-from .. import config
+from . import files, strings, worker
+from .flexidate import FlexiDate
 
 
 def mapRecursively(f,aList):
@@ -43,16 +44,6 @@ def mapRecursively(f,aList):
         else: result.append(f(item))
     return result
 
-            
-def hasKnownExtension(file):
-    """Return True if the given path has a known extension (i.e., appears in options.main.extension).
-    Does **not** check whether the file actually exists, is readable, etc."""
-    s = file.rsplit(".", 1)
-    if len(s) == 1:
-        return False
-    else:
-        return s[1].lower() in config.options.main.extensions
-
 
 def parsePosition(string):
     """Parse a string like "7" or "2/5" to a (integer) position.
@@ -65,83 +56,6 @@ def parsePosition(string):
         return int(string.split('/')[0])
     else:
         return None
-
-
-def relPath(file):
-    """Return the relative path of a music file against the collection base path."""
-    if os.path.isabs(file):
-        return os.path.relpath(file, config.options.main.collection)
-    else:
-        return file
-
-
-def absPath(file):
-    """Return the absolute path of a music file inside the collection directory, if it is not absolute
-    already."""
-    if not os.path.isabs(file):
-        return os.path.join(config.options.main.collection, file)
-    else:
-        return file
-
-
-def mTimeStamp(url):
-    """Get the modification timestamp of a file given by *url* as UTC datetime."""
-    return datetime.fromtimestamp(getmtime(url.absPath), tz=timezone.utc).replace(microsecond=0)
-
-
-def collectFiles(urls):
-    """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
-    are received. Return a dict mapping directory to list of FileURLs within. Sort directories and files.
-    """
-    from ..filebackends.filesystem import FileURL
-    filePaths = collections.OrderedDict()
-    
-    def add(file, parent=None):
-        if not hasKnownExtension(file):
-            return
-        dir = parent or os.path.dirname(file)
-        if dir not in filePaths:
-            filePaths[dir] = []
-        filePaths[dir].append(FileURL(file))
-        
-    for url in urls:
-        path = url.path()
-        if os.path.isfile(path):
-            add(path)
-        else:
-            for parent, dirs, files in os.walk(path):
-                for f in files:
-                    add(os.path.join(parent, f), parent)
-                dirs.sort()
-        
-    def sortFunction(url):
-            dir, file = os.path.split(url.path)
-            i = 0
-            while file[i].isdigit():
-                i += 1
-            if i == 0:
-                return (dir, PointAtInfinity(), file)
-            else: return (dir, int(file[:i]), file[i:], file)
-                
-    for files in filePaths.values():
-        files.sort(key=sortFunction)
-
-    return filePaths
-
-
-def collectFilesAsList(urls):
-    """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
-    are received. Return a list of FileURLs. Sort files within each directory, but not the list as whole.
-    """
-    from ..filebackends.filesystem import FileURL
-    def checkUrl(url):
-        path = url.path()
-        if os.path.isfile(path):
-            if hasKnownExtension(path):
-                return [FileURL(path)]
-            else: return []
-        else: return itertools.chain.from_iterable(collectFiles([url]).values())
-    return itertools.chain.from_iterable(checkUrl(url) for url in urls)
 
 
 class InverseDifference:
@@ -170,204 +84,6 @@ def getIcon(name):
 def getPixmap(name):
     """Return a QPixmap for the icon with the given name."""
     return QtGui.QPixmap(":omg/icons/" + name)
-
-
-class FlexiDate:
-    """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or
-    of year, month and day. OMG uses this class to store tags of type date, where most users will only
-    specify a year, but some may give month and day, too.
-
-    Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither
-    datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason
-    FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and
-    :meth:`FlexiDate.fromSql`).
-
-    The parameters may be anything that can be converted to :func:`int`. *month* and *day* may also be
-    ``None``. If *month* or *day* are 0 or ``None`` they are regarded as unspecified. Note that you must not
-    give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueError` if 
-    conversion to :func:`int` fails or if the date is invalid (confer :class:`datetime.date`).
-    """
-    def __init__(self, year, month=None, day=None):
-        self.year = int(year)
-        
-        if month == 0 or month is None: # cannot pass None to int(), so we have to check for it here
-            self.month = None
-            if day is not None and day != 0:
-                raise ValueError("Cannot store a day if month is None.")
-        elif 1 <= int(month) <= 12:
-            self.month = int(month)
-        else: raise ValueError("Invalid month given.")
-        
-        if day == 0 or day is None:
-            self.day = None
-        else:
-            self.day = int(day)
-            date(self.year,self.month,self.day) # Check date
-    
-    @staticmethod
-    def _initFormat():
-        """Initialize the class attributes FlexiDate._dateFormat and FlexiDate._dateOrder. These attributes
-        depend on the locale and are used by strptime and strftime."""
-        if not hasattr(FlexiDate,'_dateFormat'):
-            format = locale.nl_langinfo(locale.D_FMT)
-            match = re.match('%[dmY]([.\-/])%[dmY]([.\-/])%[dmY]',format)
-            if match is not None:
-                sep1, sep2 = match.group(1), match.group(2)
-            else: sep1, sep2 = '//'
-            FlexiDate._sep1, FlexiDate._sep2 = sep1, sep2
-            if format.index('%d') < format.index('%m'):
-                FlexiDate._dateFormat = ('{Y:04d}',
-                                         '{m:02d}'+sep2+'{Y:04d}',
-                                         '{d:02d}'+sep1+'{m:02d}'+sep2+'{Y:04d}')
-                FlexiDate._dateOrder = (('year',),('month','year'),('day','month','year'))
-            else:
-                FlexiDate._dateFormat = ('{Y:04d}',
-                                         '{m:02d}'+sep2+'{Y:04d}',
-                                         '{m:02d}'+sep1+'{d:02d}'+sep2+'{Y:04d}')
-                FlexiDate._dateOrder = (('year',),('month','year'),('month','day','year'))
-    
-    @staticmethod
-    def getHumanReadableFormat():
-        """Return a format string for the format used by FlexiDate that is easily readable.
-        For example "mm/dd/YYYY"."""
-        FlexiDate._initFormat()
-        dateOrder = FlexiDate._dateOrder[2]
-        tr = {'day': translate("FlexiDate","dd"),
-              'month': translate("FlexiDate","mm"),
-              'year': translate("FlexiDate","YYYY")
-        }
-        return tr[dateOrder[0]] + FlexiDate._sep1 + tr[dateOrder[1]] + FlexiDate._sep2 + tr[dateOrder[2]]
-        
-    @staticmethod
-    def strptime(string,crop=False,logCropping=True):
-        """Parse FlexiDates from strings in a format depending on the locale. Raise a ValueError if that
-        fails.
-        If *crop* is True, the method is allowed to crop *string* to obtain a valid value. If *logCropping*
-        is True, cropping will print a logger warning.
-        """
-        assert isinstance(string, str)
-        
-        # check for the default file format yyyy-mm-dd first
-        # Chop of the time part of values of the form
-        # YYYY-MM-DD HH:MM:SS
-        # YYYY-MM-DD HH:MM
-        # YYYY-MM-DD HH
-        # These formats are allowed in the ID3 specification and used by Mutagen
-        if crop and re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string) is not None:
-            if logCropping:
-                from .. import logging
-                logging.getLogger(__name__).warning("dropping time of day in date string '{}'"
-                                                    .format(string))
-            string = string[:10]
-            
-        try:
-            y,m,d = map(lambda v: None if v is None else int(v),
-                        re.match("(\d{4})(?:-(\d{2})(?:\-(\d{2}))?)?", string).groups() )
-            return FlexiDate(y, m, d)
-        except AttributeError: # if no match, re.match returns None -> has no attr "groups"
-            pass
-        
-        # now use locale
-        string = strings.replace(string,{'/':'-','.':'-'}) # Recognize all kinds of separators
-        try:
-            numbers = [int(n) for n in string.split('-')]
-            if len(numbers) > 3:
-                raise ValueError()
-        except ValueError:
-            raise ValueError('Invalid date format: "{}"'.format(string))
-        FlexiDate._initFormat()
-        dateOrder = FlexiDate._dateOrder[len(numbers)-1]
-        return FlexiDate(**{key: numbers[i] for i,key in enumerate(dateOrder)})
-    
-    def strftime(self,format=None):
-        """Format the FlexiDate according to the given format. If *format* is None, choose a format based
-        on the locale. Otherwise, *format* must be a 3-tuple of format strings, where the first one is used
-        if only a year is specified, the second one is used if month and year are specified and the last
-        one is used if year, month and day are specified.
-        The format strings are python format strings, using the keys Y=year, m=month, d=day.
-        """
-        if self.month:
-            if self.day:
-                index = 2
-            else: index = 1
-        else: index = 0
-        
-        if format is None:
-            FlexiDate._initFormat()    
-            format = FlexiDate._dateFormat[index]
-        else:
-            format = format[index]
-        return format.format(Y=self.year, m=self.month, d=self.day)
-        
-    def toSql(self, maximum=False):
-        """Convert this FlexiDate to an int as used to store it in the database."""
-        result = 10000*self.year
-        if self.month is not None:
-            result += 100*self.month
-            if self.day is not None:
-                result += self.day
-        return result
-
-    def endOfYearSql(self):
-        """Return the last day of the year of this date as an integer as used in the database."""
-        return 10000*self.year + 100*12 + 31
-         
-    @staticmethod
-    def fromSql(value):
-        """Create a FlexiDate from an int as used to store FlexiDates in the database."""
-        from .. import database
-        if database.isNull(value):
-            return None
-        try:
-            value = int(value)
-            return FlexiDate(value // 10000,(value // 100) % 100,value % 100)
-        except ValueError as e:
-            raise ValueError("Cannot create a FlexiDate from value {}: {}".format(value,e))
-
-    def __str__(self):
-        return self.strftime()
-
-    def __repr__(self):
-        if self.month:
-            if self.day:
-                return "FlexiDate({},{},{})".format(self.year,self.month,self.day)
-            else: return "FlexiDate({},{})".format(self.year,self.month)
-        else: return "FlexiDate({})".format(self.year)
-        
-    def __lt__(self, other):
-        if not isinstance(other,FlexiDate):
-            return NotImplemented
-        for a,b in ((self.year,other.year),(self.month,other.month),(self.day,other.day)):
-            if a == b:
-                continue
-            if a is None:
-                return True
-            if b is None:
-                return False
-            return a < b
-        else: return False # Equality
-
-    def __gt__(self, other):
-        if not isinstance(other,FlexiDate):
-            return NotImplemented
-        return other.__lt__(self)
-    
-    def __le__(self, other):
-        return self == other or self.__lt__(other)
-    
-    def __ge__(self, other):
-        return self == other or self.__gt__(other)
-        
-    def __eq__(self, other):
-        return isinstance(other,FlexiDate) and\
-            self.year == other.year and self.month == other.month and self.day == other.day
-        
-    def __ne__(self,other):
-        return not isinstance(other,FlexiDate) or\
-            self.year != other.year or self.month != other.month or self.day != other.day
-
-    def __hash__(self):
-        return hash((self.year,self.month,self.day))
     
     
 class OrderedDict(dict):

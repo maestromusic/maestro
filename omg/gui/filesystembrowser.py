@@ -20,11 +20,11 @@ import os
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
-from omg import application, filebackends, filesystem, config
-from omg.gui import mainwindow, selection, dockwidget
-from omg.utils import relPath, getIcon, hasKnownExtension
-from omg.core import levels
+from .. import application, filebackends, filesystem, config, utils
+from . import mainwindow, selection, dockwidget
+from ..core import levels
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -32,7 +32,6 @@ considering the container structure in the database. It is meant to help buildin
 Folders which contain music files that are not yet present in the database are marked with a
 special icon."""
 
-translate = QtCore.QCoreApplication.translate
 
 class FileSystemBrowserModel(QtGui.QFileSystemModel):
     """Model class for the file system browser.
@@ -42,17 +41,17 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     """
     
     folderIcons = {
-        'unsynced' : getIcon("folder_unsynced.svg"),
-        'ok'       : getIcon("folder_ok.svg"),
-        'nomusic'  : getIcon("folder.svg"),
-        'unknown'  : getIcon("folder_unknown.svg"),
-        'problem'  : getIcon("folder_problem.svg") }
+        'unsynced' : utils.getIcon("folder_unsynced.svg"),
+        'ok'       : utils.getIcon("folder_ok.svg"),
+        'nomusic'  : utils.getIcon("folder.svg"),
+        'unknown'  : utils.getIcon("folder_unknown.svg"),
+        'problem'  : utils.getIcon("folder_problem.svg") }
     
     fileIcons = {
-        'unsynced' : getIcon("file_unsynced.svg"),
-        'ok'       : getIcon("file_ok.svg"),
-        'unknown'  : getIcon("file_unknown.svg"),
-        'problem'  : getIcon("file_problem.svg") }
+        'unsynced' : utils.getIcon("file_unsynced.svg"),
+        'ok'       : utils.getIcon("file_ok.svg"),
+        'unknown'  : utils.getIcon("file_unknown.svg"),
+        'problem'  : utils.getIcon("file_problem.svg") }
     
     descriptions = {
         'unsynced' : translate("FileSystemBrowserModel", "contains music which is not in OMG's database"),
@@ -78,7 +77,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         if role == Qt.DecorationRole or role == Qt.ToolTipRole:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
-                dir = relPath(info.absoluteFilePath())
+                dir = utils.files.relPath(info.absoluteFilePath())
                 if dir == '..':
                     return super().data(index, role)
                 status = filesystem.folderState(dir)
@@ -87,7 +86,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 else:
                     return dir + '\n' + self.descriptions[status]
             else:
-                path = relPath(info.absoluteFilePath())
+                path = utils.files.relPath(info.absoluteFilePath())
                 url = filebackends.BackendURL.fromString("file:///" + path)
                 status = filesystem.fileState(url)
                 if role == Qt.DecorationRole:
@@ -145,13 +144,13 @@ class FileSystemBrowser(QtGui.QTreeView):
             
     def _handleRescan(self):
         path = self.model().filePath(self.currentIndex())
-        self.rescanRequested.emit(relPath(path))
+        self.rescanRequested.emit(utils.files.relPath(path))
         
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
-        paths = [relPath(self.model().filePath(index)) for index in self.selectedIndexes()
-                        if not self.model().isDir(index)] # TODO: remove this restriction
-        s = FileSystemSelection([p for p in paths if hasKnownExtension(p)])
+        paths = [utils.files.relPath(self.model().filePath(index)) for index in self.selectedIndexes()
+                                     if not self.model().isDir(index)] # TODO: remove this restriction
+        s = FileSystemSelection([p for p in paths if utils.files.hasKnownExtension(p)])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
     
@@ -192,7 +191,7 @@ class FileSystemSelection(selection.Selection):
 # register this widget in the main application
 widgetData = mainwindow.WidgetData(id = "filesystembrowser",
                                    name = translate("FileSystemBrowser", "File System Browser"),
-                                   icon = getIcon('widgets/filesystembrowser.png'),
+                                   icon = utils.getIcon('widgets/filesystembrowser.png'),
                                    theClass = FileSystemBrowserDock,
                                    central = False,
                                    preferredDockArea = QtCore.Qt.RightDockWidgetArea)

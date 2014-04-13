@@ -196,7 +196,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 wrappers = [Wrapper(self.level.collect(wrapper.element.id))
                             for wrapper in mimeData.fileWrappers()]   
         else:
-            urls = utils.collectFilesAsList(mimeData.urls())
+            urls = utils.files.collectAsList(mimeData.urls())
             wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
         
         if len(wrappers) == 0:

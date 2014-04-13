@@ -20,12 +20,11 @@ import collections
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from .. import config, logging, utils
 from ..core import elements, levels, nodes, stack
 from ..models import rootedtreemodel
-
-translate = QtCore.QCoreApplication.translate
 
 
 class LevelTreeModel(rootedtreemodel.RootedTreeModel):
@@ -170,7 +169,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     
     def prepareURLs(self, urls, parent):
         """Prepare *urls* to be dropped under *parent*; returns a list of Elements."""
-        files = utils.collectFiles(urls)
+        files = utils.files.collect(urls)
         numFiles = sum(len(v) for v in files.values())
         progress = QtGui.QProgressDialog(self.tr("Importing {0} files...").format(numFiles),
                                          self.tr("Cancel"), 0, numFiles)

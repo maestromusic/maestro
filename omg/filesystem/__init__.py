@@ -22,6 +22,7 @@ from datetime import datetime, timezone, MINYEAR
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from .. import application, logging, config, utils, database as db
 from ..filebackends import BackendURL
@@ -29,7 +30,6 @@ from ..filebackends.filesystem import FileURL
 from ..core import levels, tags, stack
 
 logger = logging.getLogger(__name__)
-translate = QtCore.QCoreApplication.translate
 
 synchronizer = None
 enabled = False
@@ -153,7 +153,7 @@ class Directory:
     
     @property    
     def absPath(self):
-        return utils.absPath(self.path)
+        return utils.files.absPath(self.path)
     
     def addTrack(self, track):
         """Adds *track* to the list self.tracks and updates track.directory."""
@@ -442,7 +442,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         - if it's in the DB, additionally the tags are checked and compared against those in the
           database. If they differ, a tuple (dbTags, fileTags) is returned, in any other case None.
         """
-        modified = utils.mTimeStamp(track.url)
+        modified = utils.files.mTimeStamp(track.url)
         if modified <= track.verified:
             return None
         logger.debug('checking track {}...'.format(basename(track.url.path)))
@@ -486,7 +486,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         self.tracks[url] = track
         if computeHash:
             track.hash = self.idProvider(url)
-        track.verified = utils.mTimeStamp(url)
+        track.verified = utils.files.mTimeStamp(url)
         return track
     
     def storeDirectories(self, directories):
@@ -546,7 +546,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         for root, dirs, files in os.walk(config.options.main.collection, topdown=True):
             dirs.sort()
             newTracksInDir = 0
-            relPath = utils.relPath(root)
+            relPath = utils.files.relPath(root)
             if relPath == ".":
                 relPath = ""
             self.tableFolders[relPath] = True
@@ -555,7 +555,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             for file in files:
                 if self.shouldStop.is_set():
                     break
-                if not utils.hasKnownExtension(file):
+                if not utils.files.hasKnownExtension(file):
                     continue
                 url = FileURL(join(relPath, file))
                 if url in self.tracks:
@@ -690,7 +690,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             if url not in self.tracks:
                 continue
             track = self.tracks[url]
-            track.verified = utils.mTimeStamp(url)
+            track.verified = utils.files.mTimeStamp(url)
             if track.id is None:
                 db.query("UPDATE {p}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?", str(url))
             else:

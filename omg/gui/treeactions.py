@@ -170,8 +170,8 @@ class ChangeFileUrlsAction(TreeAction):
             return
         path = QtGui.QFileDialog.getExistingDirectory(None,
                                                       self.tr("Select new files directory"),
-                                                      utils.absPath(dir))
-        if self._checkFilePath(path, shouldExist=True, oldPath=utils.absPath(dir)):
+                                                      utils.files.absPath(dir))
+        if self._checkFilePath(path, shouldExist=True, oldPath=utils.files.absPath(dir)):
             from ..filebackends.filesystem import FileURL
             changes = {element: (element.url, FileURL(os.path.join(path, os.path.basename(element.url.path))))
                        for element in elements}
