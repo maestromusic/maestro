@@ -18,7 +18,7 @@
 
 import itertools
 
-from . import elements, levels, tags, flags
+from . import elements, levels, tags, flags, stack
 from .. import application, database as db, filebackends, logging
 from ..database import write
 
@@ -75,11 +75,11 @@ class RealLevel(levels.Level):
     
     def __init__(self):
         super().__init__('REAL', None)
-        self.filesystemDispatcher = application.ChangeEventDispatcher(self.stack)
+        self.filesystemDispatcher = application.ChangeEventDispatcher(stack.stack)
     
     def emitFilesystemEvent(self, **kwArgs):
         """Simple shortcut to emit a FileSystemEvent."""
-        self.stack.addEvent(self.filesystemDispatcher, RealFileEvent(**kwArgs))
+        stack.addEvent(self.filesystemDispatcher, RealFileEvent(**kwArgs))
         
     def collect(self, param):
         self._ensureLoaded([param])
@@ -283,7 +283,7 @@ class RealLevel(levels.Level):
         try:
             self.changeTags(fileTagChanges)
         except (filebackends.TagWriteError, OSError) as e:
-            self.stack.abortMacro()
+            stack.abortMacro()
             raise e
         self.addToDb(addToDbElements)
         self.changeTags(remainingTagChanges)
@@ -322,12 +322,9 @@ class RealLevel(levels.Level):
         """
         if len(elements):
             assert all(element.level is self for element in elements)
-            command = levels.GenericLevelCommand(redoMethod=self._addToDb,
-                                                 redoArgs={"elements": elements},
-                                                 undoMethod=self._removeFromDb,
-                                                 undoArgs={"elements": elements},
-                                                 text=self.tr("Add elements to database"))
-            self.stack.push(command)
+            stack.push(self.tr("Add elements to database"),
+                       stack.Call(self._addToDb, elements),
+                       stack.Call(self._removeFromDb, elements))
         
     def removeFromDb(self, elements):
         """Remove the given elements with all their tags etc. from the database. Containers are also
@@ -335,12 +332,9 @@ class RealLevel(levels.Level):
         is also in *elements*.
         """
         if len(elements):
-            command = levels.GenericLevelCommand(redoMethod=self._removeFromDb,
-                                                 redoArgs={"elements": elements},
-                                                 undoMethod=self._addToDb,
-                                                 undoArgs={"elements": elements},
-                                                 text=self.tr("Remove elements from database"))
-            self.stack.push(command)
+            stack.push(self.tr("Remove elements from database"),
+                       stack.Call(self._removeFromDb, elements),
+                       stack.Call(self._addToDb, elements))
     
     def _addToDb(self, elements):
         """Like addToDb but not undoable."""
@@ -420,7 +414,7 @@ class RealLevel(levels.Level):
         
     def deleteElements(self, elements, fromDisk=False):
         elements = list(elements)
-        self.stack.beginMacro("delete elements")
+        stack.beginMacro("delete elements")
         # 1st step: isolate the elements (remove contents & parents)
         for element in elements:
             if element.isContainer() and len(element.contents) > 0:
@@ -430,12 +424,12 @@ class RealLevel(levels.Level):
                     parent = self.collect(parentId)
                     self.removeContents(parent, parent.contents.positionsOf(id=element.id))
         self.removeFromDb([element for element in elements if element.isInDb()])
-        self.stack.endMacro()
+        stack.endMacro()
         if fromDisk and any(element.isFile() for element in elements):
             for element in elements:
                 if element.isFile():
                     element.url.getBackendFile().delete()
-            self.stack.clear()
+            stack.clear()
 
     def _changeTags(self, changes, dbOnly=False):
         if not dbOnly:

@@ -48,7 +48,8 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 QWIDGETSIZE_MAX = 16777215
 
-from .. import application,config,constants,logging,utils
+from .. import config,constants,logging,utils
+from ..core import stack
 from . import selection,dialogs
 
 # This will contain the single instance of MainWindow once it is initialized
@@ -213,8 +214,8 @@ class MainWindow(QtGui.QMainWindow):
 
         # EDIT
         self.menus['edit'] = self.menuBar().addMenu(self.tr("&Edit"))
-        self.menus['edit'].addAction(application.stack.createUndoAction())
-        self.menus['edit'].addAction(application.stack.createRedoAction())
+        self.menus['edit'].addAction(stack.createUndoAction())
+        self.menus['edit'].addAction(stack.createRedoAction())
 
         action = QtGui.QAction(utils.getIcon('preferences/preferences_small.png'),
                                self.tr("Preferences..."),

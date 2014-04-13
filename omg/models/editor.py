@@ -22,7 +22,7 @@ from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
 
 from . import leveltreemodel
-from ..core import elements, levels, tags
+from ..core import elements, levels, tags, stack
 from ..core.elements import Element
 from .. import application, config, constants, logging
 
@@ -90,7 +90,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
     def removeElements(self, parent, rows):
         """This reimplements LevelTreeModel.removeElements so that elements that have been removed from
         the tree are also removed from editor level (unless they still appear in some EditorModel)."""
-        application.stack.beginMacro(self.tr("Remove elements"))
+        stack.beginMacro(self.tr("Remove elements"))
         
         # All elements from toCheck that are nowhere present in the editor will be removed.
         if isinstance(parent, Element):
@@ -120,7 +120,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             self.level.changeContents(contentsDict)
             self.level.removeElements(elementsToRemove)
 
-        application.stack.endMacro()
+        stack.endMacro()
         
     def _getAncestorsInEditorLevel(self, element):
         yield element.id

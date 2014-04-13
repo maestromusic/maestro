@@ -19,7 +19,8 @@
 from PyQt4 import QtGui
 
 from .. import application, constants, database as db, logging, utils
-from ..constants import ADDED, DELETED, CHANGED, ADD, DELETE, CHANGE
+from . import stack
+from ..constants import ADDED, DELETED, CHANGED
 from ..application import ChangeEvent
 
 
@@ -36,11 +37,11 @@ FLAG_SEPARATOR = '|'
 
 def init():
     """Initialize the flag module loading flags from the database. You must call this method before methods
-    like get can be used."""
+    like 'get' can be used."""
     global _flagsById, _flagsByName
     _flagsById = {}
     _flagsByName = {}
-    for row in db.query("SELECT id, name, icon FROM {}flag_names".format(db.prefix)):
+    for row in db.query("SELECT id, name, icon FROM {p}flag_names"):
         id, name, iconPath = row
         if db.isNull(iconPath):
             iconPath = None
@@ -122,49 +123,36 @@ def allFlags():
 
 def addFlagType(name, **data):
     """Add a new flagtype with the given name to the database. *data* may be used to set attributes. 
-    Currently only 'iconPath' is supported."""
+    Currently only 'iconPath' is supported. Return the new flag type."""
     if exists(name):
         raise ValueError("There is already a flag with name '{}'.".format(name))
     if not isValidFlagname(name):
         raise ValueError("'{}' is not a valid flagname.".format(name))
-    command = FlagTypeUndoCommand(ADD, name=name, **data)
-    application.stack.push(command)
-    return command.flagType
+    flagType = Flag(name, **data)
+    stack.push(translate("Flags", "Add flag type"),
+               Call(_addFlagType, flagType),
+               Call(_deleteFlagType, flagType))
+    return flagType
     
     
-def _addFlagType(**data):
-    """Like addFlagType, but not undoable. The keyword arguments may contain either
-    
-        - a single argument 'flagType': In this case the given flagType is inserted into the database and
-          some internal lists. Use this to undo a flagType's deletion.
-        - a 'name' and optionally an 'iconPath'
-          
-    After creation the a FlagTypeChangedEvent is emitted.
+def _addFlagType(flagType):
+    """Add a flagType to database and some internal lists and emit a FlagTypeChanged-event. If *flagType*
+    doesn't have an id, choose an unused one.
     """
-    if 'flagType' in data:
-        flagType = data['flagType']
-        data = (flagType.id, flagType.name, flagType.iconPath)
-        db.query(
-            "INSERT INTO {}flag_names (id, name, icon) VALUES (?,?,?)"
-              .format(db.prefix), *data)
-    else:
-        # The difference to the if-part is that we have to get the id from the database
-        flagType = Flag(**data)
-        data = (flagType.name, flagType.iconPath)
-        flagType.id = db.query(
-            "INSERT INTO {}flag_names (name, icon) VALUES (?,?)"
-              .format(db.prefix), *data).insertId()
+    flagType.id = db.query("INSERT INTO {p}flag_names (name, icon) VALUES (?,?)",
+                           flagType.name, flagType.iconPath).insertId()
     logger.info("Added new flag '{}'".format(flagType.name))
     
     _flagsById[flagType.id] = flagType
     _flagsByName[flagType.name] = flagType
     application.dispatcher.emit(FlagTypeChangedEvent(ADDED, flagType))
-    return flagType
 
 
 def deleteFlagType(flagType):
     """Delete a flagtype from the database."""
-    application.stack.push(FlagTypeUndoCommand(DELETE, flagType))
+    stack.push(translate("Flags", "Delete flag type"),
+               Call(_deleteFlagType, flagType),
+               Call(_addFlagType, flagType))
     
     
 def _deleteFlagType(flagType):
@@ -173,7 +161,7 @@ def _deleteFlagType(flagType):
         raise ValueError("Cannot remove flagtype '{}' because it does not exist.".format(flagType))
     
     logger.info("Removing flag '{}'.".format(flagType))
-    db.query("DELETE FROM {}flag_names WHERE id = ?".format(db.prefix), flagType.id)
+    db.query("DELETE FROM {p}flag_names WHERE id = ?", flagType.id)
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
     application.dispatcher.emit(FlagTypeChangedEvent(DELETED, flagType))
@@ -182,11 +170,12 @@ def _deleteFlagType(flagType):
 def changeFlagType(flagType, **data):
     """Change a flagtype. The attributes that should be changed must be specified by keyword arguments.
     Supported are 'name' and 'iconPath':
-
         changeFlagType(flagType, name='Great', iconPath=None)
-    
     """
-    application.stack.push(FlagTypeUndoCommand(CHANGE, flagType, **data))
+    oldData = {'name': flagType.name, 'iconPath': flagType.iconPath}
+    stack.push(translate("Flags", "Change flag type"),
+               Call(_changeFlagType, flagType, **data),
+               Call(_changeFlagType, flagType, **oldData))
     
     
 def _changeFlagType(flagType, **data):
@@ -215,52 +204,8 @@ def _changeFlagType(flagType, **data):
     
     if len(assignments) > 0:
         params.append(flagType.id) # for the where clause
-        db.query("UPDATE {}flag_names SET {} WHERE id = ?".format(db.prefix, ','.join(assignments)), *params)
+        db.query("UPDATE {p}flag_names SET "+','.join(assignments)+" WHERE id = ?", *params)
         application.dispatcher.emit(FlagTypeChangedEvent(CHANGED, flagType))
-
-
-class FlagTypeUndoCommand:
-    """This command adds, changes or deletes a flagtype. Which keyword arguments are necessary depends on the
-    first argument *action*. Use the methods addFlagType, deleteFlagType and changeFlagType instead of
-    creating a command directly.
-    """
-    def __init__(self, action, flagType=None, **data):
-        self.text = {ADD:   translate("FlagTypeUndoCommand", "Add flagType"),
-                     DELETE: translate("FlagTypeUndoCommand", "Delete flagType"),
-                     CHANGE: translate("FlagTypeUndoCommand", "Change flagType")
-                    }[action]
-        self.action = action
-        if self.action == ADD:
-            self.addData = data
-            self.flagType = None
-        elif self.action == DELETE:
-            self.flagType = flagType
-        else:
-            self.flagType = flagType
-            self.oldData = {'name': flagType.name, 'iconPath': flagType.iconPath}
-            self.newData = data
-        
-    def redo(self):
-        if self.action == ADD:
-            if self.flagType is None: # This is the first time this command is redone
-                self.flagType = _addFlagType(**self.addData)
-                del self.addData
-            else:
-                # On subsequent redos ensure that the same object is recreated,
-                # because it might be used in many elements within the undohistory.
-                _addFlagType(flagType=self.flagType)
-        elif self.action == DELETE:
-            _deleteFlagType(self.flagType)
-        else: _changeFlagType(self.flagType, **self.newData)
-
-    def undo(self):
-        if self.action == ADD:
-            _deleteFlagType(self.flagType)
-        elif self.action == DELETE:
-            # Ensure that the same object is recreated, because it might be used in many elements
-            # within the undohistory.
-            _addFlagType(flagType=self.flagType)
-        else: _changeFlagType(self.flagType, **self.oldData)
 
 
 class FlagTypeChangedEvent(ChangeEvent):
@@ -327,4 +272,4 @@ class FlagListDifference(FlagDifference):
     
     def getRemovals(self):
         return [flag for flag in self.oldFlags if not flag in self.newFlags]
-        
+ 

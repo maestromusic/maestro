@@ -20,7 +20,7 @@ import weakref
 
 from PyQt4 import QtCore, QtGui
 
-from . import elements, tags, flags, stickers
+from . import elements, tags, flags, stickers, stack
 from .nodes import Wrapper
 from .. import application, filebackends, database as db, logging
 
@@ -168,22 +168,6 @@ class LevelChangedEvent(application.ChangeEvent):
                 formattedLists.append("{}:{}".format(abbreviations[attr],
                                                      ",".join(str(id) for id in getattr(self, attr))))
         return "<{}: {}>".format(type(self).__name__, "; ".join(formattedLists))
-
-
-class GenericLevelCommand:
-    """Generic UndoCommand that is used by all undoable methods of Level. It will call *redoMethod* with
-    *redoArgs* on redo an handle undos analogously. *text* is an optional text for the command.
-    """
-    def __init__(self, redoMethod, redoArgs, undoMethod, undoArgs, text=''):
-        self.text = text
-        self.redoMethod, self.redoArgs = redoMethod, redoArgs
-        self.undoMethod, self.undoArgs = undoMethod, undoArgs
-            
-    def redo(self):
-        self.redoMethod(**self.redoArgs)
-            
-    def undo(self):
-        self.undoMethod(**self.undoArgs)
         
 
 class Level(application.ChangeEventDispatcher):
@@ -202,11 +186,11 @@ class Level(application.ChangeEventDispatcher):
     
         - *name*: each level has a name for debugging purposes,
         - *parent*: the parent level,
-        - *stack*: the undostack which will be used by methods of this level (e.g. changeTags).
+        - *levelStack*: the undostack which will be used by methods of this level (e.g. changeTags).
           Only levels which are only used in a modal dialog may use their own stack.
           
     """ 
-    def __init__(self, name, parent, elements=None, stack=None):
+    def __init__(self, name, parent, elements=None, levelStack=None):
         super().__init__()
         allLevels.add(self)
         self.name = name
@@ -214,7 +198,7 @@ class Level(application.ChangeEventDispatcher):
         if elements is None:
             self.elements = {}
         else: self.elements = {element.id: element.copy(level=self) for element in elements}
-        self.stack = stack if stack is not None else application.stack
+        self.stack = levelStack if levelStack is not None else stack.stack
         
         # These are necessary to solve ticket #138
         self.lastInsertId = None      # last element into which something has been inserted
@@ -325,21 +309,15 @@ class Level(application.ChangeEventDispatcher):
     # ===========================================================================
     def addElements(self, elements):
         """Undoably add elements to this level."""
-        command = GenericLevelCommand(redoMethod=self._addElements,
-                                      redoArgs={"elements": elements},
-                                      undoMethod=self._removeElements,
-                                      undoArgs={"elements": elements},
-                                      text=self.tr("Add elements"))
-        self.stack.push(command)
+        self.stack.push(self.tr("Add elements"),
+                        stack.Call(self._addElements, elements=elements),
+                        stack.Call(self._removeElements, elements=elements))
         
     def removeElements(self, elements):
         """Undoably remove elements from this level."""
-        command = GenericLevelCommand(redoMethod=self._removeElements,
-                                      redoArgs={"elements": elements},
-                                      undoMethod=self._addElements,
-                                      undoArgs={"elements": elements},
-                                      text=self.tr("Remove elements"))
-        self.stack.push(command)
+        self.stack.push(self.tr("Remove elements"),
+                        stack.Call(self._removeElements, elements=elements),
+                        stack.Call(self._addElements, elements=elements))
 
     def createContainer(self, tags=None, flags=None, stickers=None, type=None, contents=None):
         """Create a new container with the given properties and load it into this level.
@@ -381,12 +359,7 @@ class Level(application.ChangeEventDispatcher):
         *method* with *changes* (or its inverse). *text* is used as text for the created undocommand."""
         if len(changes) > 0:
             inverseChanges = {elem: diff.inverse() for elem, diff in changes.items()}
-            command = GenericLevelCommand(redoMethod=method,
-                                          redoArgs={"changes" : changes},
-                                          undoMethod=method,
-                                          undoArgs={"changes": inverseChanges},
-                                          text=text)
-            self.stack.push(command)
+            self.stack.push(text, stack.Call(method, changes), stack.Call(method, inverseChanges))
     
     def setTypes(self, containerTypes):
         """Set the type of one or more containers. The action can be undone. *containerTypes* maps containers
@@ -394,12 +367,9 @@ class Level(application.ChangeEventDispatcher):
         """
         if len(containerTypes) > 0:
             oldTypes = {container: container.type for container in containerTypes}
-            command = GenericLevelCommand(redoMethod=self._setTypes,
-                                          redoArgs={"containerTypes" : containerTypes},
-                                          undoMethod=self._setTypes,
-                                          undoArgs={"containerTypes": oldTypes},
-                                          text=self.tr("Change container types"))
-            self.stack.push(command)
+            self.stack.push(self.tr("Change container types"),
+                            stack.Call(self._setTypes, containerTypes),
+                            stack.Call(self._setTypes, oldTypes))
             
     def setCovers(self, coverDict):
         """Set the covers for one or more elements.
@@ -414,40 +384,27 @@ class Level(application.ChangeEventDispatcher):
         """Set contents according to *contentDict* which maps parents to content lists."""
         if len(contentDict) > 0:
             inverseChanges = {parent: parent.contents for parent in contentDict}
-            command = GenericLevelCommand(redoMethod=self._changeContents,
-                                          redoArgs={"contentDict": contentDict},
-                                          undoMethod=self._changeContents,
-                                          undoArgs={"contentDict": inverseChanges},
-                                          text=self.tr("Change contents"))
-            self.stack.push(command)
+            self.stack.push(self.tr("Change contents"),
+                            stack.Call(self._changeContents, contentDict),
+                            stack.Call(self._changeContents, inverseChanges))
         
     def setContents(self, parent, contents):
         """Set the content list of *parent*."""
         if not isinstance(contents, elements.ContentList):
             contents = elements.ContentList.fromList(contents)
-        command = GenericLevelCommand(redoMethod=self._setContents,
-                                      redoArgs={"parent": parent,
-                                                "contents": contents},
-                                      undoMethod=self._setContents,
-                                      undoArgs={"parent": parent,
-                                                "contents": parent.contents},
-                                      text=self.tr("Set contents"))
-        self.stack.push(command)
-        
+        self.stack.push(self.tr("Set contents"),
+                        stack.Call(self._setContents, parent, contents),
+                        stack.Call(self._setContents, parent, parent.contents))
+
     def insertContents(self, parent, insertions):
         """Insert contents with predefined positions into a container.
         
         *insertions* is a list of (position, element) tuples.
         """
-        command = GenericLevelCommand(redoMethod=self._insertContents,
-                                      redoArgs={"parent" : parent,
-                                                "insertions" : insertions},
-                                      undoMethod=self._removeContents,
-                                      undoArgs={"parent" : parent,
-                                                "positions" : [pos for pos,_ in insertions]},
-                                      text=self.tr("Insert contents"))
-        self.stack.push(command)
-        
+        self.stack.push(self.tr("Insert contents"),
+                        stack.Call(self._insertContents, parent, insertions),
+                        stack.Call(self._removeContents, parent, positions=[pos for pos,_ in insertions]))
+
     def insertContentsAuto(self, parent, index, elements):
         """Undoably insert elements into a parent container.
         
@@ -469,14 +426,9 @@ class Level(application.ChangeEventDispatcher):
     def removeContents(self, parent, positions):
         """Undoably remove children with *positions* from *parent*."""
         undoInsertions = [(pos, self[parent.contents.at(pos)]) for pos in positions]
-        command = GenericLevelCommand(redoMethod=self._removeContents,
-                                      redoArgs={"parent" : parent,
-                                                "positions" : positions},
-                                      undoMethod=self._insertContents,
-                                      undoArgs={"parent" : parent,
-                                                "insertions" : undoInsertions},
-                                      text=self.tr("Remove contents"))
-        self.stack.push(command)
+        self.stack.push(self.tr("Remove contents"),
+                        stack.Call(self._removeContents, parent, positions),
+                        stack.Call(self._insertContents, parent, undoInsertions))
 
     def removeContentsAuto(self, parent, positions=None, indexes=None):
         """Undoably remove contents under the container *parent*.
@@ -520,15 +472,9 @@ class Level(application.ChangeEventDispatcher):
             raise ConsistencyError('Positions may not drop below one')
         if any(pos in untouched for pos in changes.values()):
             raise ConsistencyError('Position conflict: cannot perform change')
-        command = GenericLevelCommand(redoMethod=self._changePositions,
-                                      redoArgs={"parent" : parent,
-                                                "changes" : changes},
-                                      undoMethod=self._changePositions,
-                                      undoArgs={"parent" : parent,
-                                                "changes" : {b: a for a, b in changes.items()}
-                                                },
-                                      text=self.tr("Change positions"))
-        self.stack.push(command)
+        self.stack.push(self.tr("Change positions"),
+                        stack.Call(self._changePositions, parent, changes),
+                        stack.Call(self._changePositions, parent, {b: a for a, b in changes.items()}))
     
     def renameFiles(self, renamings):
         """Rename several files. *renamings* maps element to (oldUrl, newUrl) paths.
@@ -537,12 +483,9 @@ class Level(application.ChangeEventDispatcher):
         """
         if len(renamings):
             reversed =  {file:(newUrl, oldUrl) for  (file, (oldUrl, newUrl)) in renamings.items()}
-            command = GenericLevelCommand(redoMethod=self._renameFiles,
-                                          redoArgs={"renamings" : renamings},
-                                          undoMethod=self._renameFiles,
-                                          undoArgs={"renamings": reversed},
-                                          text=self.tr("Rename files"))
-            self.stack.push(command)
+            self.stack.push(self.tr("Rename files"),
+                            stack.Call(self._renameFiles, renamings),
+                            stack.Call(self._renameFiles, reversed))
     
     def commit(self, elements=None):
         """Undoably commit given *elements* (or everything, if not specified) into the parent level.

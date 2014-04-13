@@ -21,7 +21,7 @@ import collections, itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, constants, utils
+from .. import constants, utils
 from ..core import levels, tags
 
 translate = QtCore.QCoreApplication.translate
@@ -289,8 +289,8 @@ class TagEditorModel(QtCore.QObject):
     
         - level: the level that contains the elements
         - elements: a list of elements whose flags will be displayed and edited by this model.
-        - stack: An undo stack or None, in which case the global stack will be used (only use your own stacks
-          in modal dialogs)
+        - stack: An undo stack or None, in which case the global stack will be used (only use your own
+          stacks in modal dialogs)
     """
     resetted = QtCore.pyqtSignal()
     
@@ -306,7 +306,8 @@ class TagEditorModel(QtCore.QObject):
         self.recordChanged = self.records.recordChanged
         
         if stack is None:
-            self.stack = application.stack
+            from ..core import stack
+            self.stack = stack.stack
         else: self.stack = stack
         self.substack = self.stack.createSubstack()
         

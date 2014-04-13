@@ -20,9 +20,24 @@
 
 from PyQt4 import QtCore, QtGui
 
-from . import logging, database as db
+from .. import logging
 logger = logging.getLogger(__name__)
 
+stack = None
+# Note that it is possible to access all methods and attributes of stack directly via the module.
+# Use stack.push instead of stack.stack.push.
+
+
+def init():
+    global stack
+    stack = UndoStack()
+    # Redirect methods to the application stack
+    import sys
+    module = sys.modules[__name__]
+    for attr in UndoStack.__dict__:
+        if not attr.startswith('_') and not hasattr(module, attr):
+            setattr(module, attr, getattr(stack, attr))
+    
 
 class UndoStackError(RuntimeError):
     """This error is raised when methods of UndoStack are improperly used (e.g. call endMacro when no macro
@@ -93,25 +108,32 @@ class UndoStack(QtCore.QObject):
         # Macros are not added to their parent macro or to the stack unless they are finished.
         # (This makes abortMacro easier)
             
-    def push(self, command, *args, **kwargs):
-        """Add a command to the stack and call its redo-method. If other arguments are given, a macro around
-        the command is constructed and those arguments are passed to the constructor of macro.
+    def push(self, command, redoCall=None, undoCall=None):
+        """Add a command to the stack and call its redo-method. This method may be either invoked
+            - with a single command (something that has a 'text' attribute
+              and two methods 'redo' and 'undo'),
+            - or with a (translated) text and two Call-instances which will be executed on redo or undo,
+              respectively.
         """
         assert not isinstance(command, Macro) # will not work correctly
         if self._inUndoRedo:
             raise UndoStackError("Cannot push a command during undo/redo.")
-        if len(self._activeMacros) == 0 or len(args) > 0 or len(kwargs) > 0:
+        if isinstance(command, str):
+            assert redoCall is not None and undoCall is not None
+            command = GenericCommand(command, redoCall, undoCall)
+        newMacro = len(self._activeMacros) == 0
+        if newMacro:
             self.beginMacro(command.text, *args, **kwargs)
-            self.push(command)
+        
+        # Check whether argument 'firstRedo' should be used
+        code = command.redo.__code__
+        if code.co_varnames[:code.co_argcount] == ('self', 'firstRedo'):
+            assert command.redo.__defaults__ == (False,)
+            command.redo(firstRedo=True)
+        else: command.redo()
+        self._activeMacros[-1].add(command)
+        if newMacro:
             self.endMacro()
-        else:
-            # Check whether argument 'firstRedo' should be used
-            code = command.redo.__code__
-            if code.co_varnames[:code.co_argcount] == ('self', 'firstRedo'):
-                assert command.redo.__defaults__ == (False,)
-                command.redo(firstRedo=True)
-            else: command.redo()
-            self._activeMacros[-1].add(command)
         
     def endMacro(self, abortIfEmpty=False):
         """Ends composition of a macro command. If *abortIfEmpty* is True and no commands have been added
@@ -348,7 +370,30 @@ class UndoStack(QtCore.QObject):
                 self._storedIndex = None
         self._emitSignals()
                 
-    
+
+class Call:
+    def __init__(self, callable, *args, **kwargs):
+        self.callable = callable
+        self.args = args
+        self.kwargs = kwargs
+        
+    def execute(self):
+        self.callable(*self.args, **self.kwargs)
+        
+
+class GenericCommand:
+    def __init__(self, text, redoCall, undoCall):
+        self.text = text
+        self.redoCall = redoCall
+        self.undoCall = undoCall
+        
+    def redo(self):
+        self.redoCall.execute()
+        
+    def undo(self):
+        self.undoCall.execute()
+
+
 class Macro:
     """A macro stores a list of undocommands and acts like a command that executes all of them together.
     
@@ -377,7 +422,8 @@ class Macro:
     def begin(self):
         """Perform stuff before the commands of this macro are redone/undone."""
         if self.transaction:
-            db.transaction()
+            from .. import database
+            database.transaction()
         if self.preMethod is not None:
             self.preMethod()
             
@@ -386,7 +432,8 @@ class Macro:
         if self.postMethod is not None:
             self.postMethod()
         if self.transaction:
-            db.commit()
+            from .. import database
+            database.commit()
         self.finished = True # after first redo, the macro is finished
     
     def redo(self):
@@ -414,7 +461,8 @@ class Macro:
             command.undo()
         if self.transaction:
             #This assumes that this macro has not been finished
-            db.rollback()
+            from .. import database
+            database.rollback()
             
     def isEmpty(self):
         """Return whether this macro is empty, i.e. no command has been added to it."""

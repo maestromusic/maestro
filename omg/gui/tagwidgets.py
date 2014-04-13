@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from .. import application, utils, database as db
-from ..core import tags
+from ..core import tags, stack
 from .misc import lineedits
 
 translate = QtCore.QCoreApplication.translate
@@ -284,12 +284,12 @@ class TagTypeBox(QtGui.QStackedWidget):
             
             # If the user changes the tag in the dialog, setTag will change the tags in the tageditor.
             # Therefore we enclose both into one macro.
-            application.stack.beginMacro(translate("TagTypeUndoCommand", "Add tagtype to DB"))
+            stack.beginMacro(translate("TagTypeUndoCommand", "Add tagtype to DB"))
             tagType = AddTagTypeDialog.addTagType(self._tag)
             if tagType is not None:
                 self.setTag(tagType)
-                application.stack.endMacro()
-            else: application.stack.abortMacro()
+                stack.endMacro()
+            else: stack.abortMacro()
             self._ignoreChanges = False
         else:
             self._handleEditingFinished()
@@ -810,14 +810,14 @@ class TagValuePropertiesWidget(QtGui.QWidget):
             if self.sortEdit.text() != self.origSortValue:
                 command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.origSortValue,
                                                         self.sortEdit.text())
-                application.stack.push(command)
+                stack.push(command)
         elif self.origSortValue is not None:
             command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.origSortValue, None)
-            application.stack.push(command)
+            stack.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:
             command = tagcommands.HiddenAttributeCommand(self. tag, self.valueId,
                                                       self.hiddenCheckbox.isChecked())
-            application.stack.push(command)
+            stack.push(command)
     
     @staticmethod
     def showDialog(tag, valueId):

@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 translate = QtCore.QCoreApplication.translate
 
-from ...core import covers
+from ...core import covers, stack
 from ...core.elements import Element
 from ...gui import treeactions
 from ...gui.misc import busyindicator
@@ -398,7 +398,7 @@ class CoverDialog(QtGui.QDialog):
         self.model.startFetchingCovers()
         self._fillAvailableCovers()
         self._updateCoverLabel()
-        self.finished.connect(lambda _ : application.stack.closeSubstack(self.stack))
+        self.finished.connect(lambda _ : stack.closeSubstack(self.stack))
     
     def _fillAvailableCovers(self):
         """Fill the list of available covers with those of the current element."""

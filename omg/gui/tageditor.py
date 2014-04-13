@@ -21,8 +21,8 @@ import os.path, functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import strutils, utils, config, logging, application, filebackends
-from ..core import tags, levels
+from .. import strutils, utils, config, logging, filebackends
+from ..core import tags, levels, stack
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
 from .misc import widgetlist
@@ -117,7 +117,7 @@ class TagEditorDialog(QtGui.QDialog):
         QtGui.QDialog.__init__(self, parent)
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600, 450) #TODO: make this cleverer
-        self.stack = application.stack.createSubstack(modalDialog=True)
+        self.stack = stack.createSubstack(modalDialog=True)
         self.level = None
         if includeContents is None:
             includeContents = config.storage.gui.tag_editor_include_contents
@@ -185,8 +185,8 @@ class TagEditorDialog(QtGui.QDialog):
     def accept(self):
         try:
             self.stack.closeSubstack(self.stack)
-            # make sure that the commit is added via application.stack
-            self.level.stack = application.stack
+            # make sure that the commit is added via the application stack
+            self.level.stack = stack
             self.level.commit()
             super().accept()
             config.storage.gui.tag_editor_include_contents = self.tagedit.includeContentsButton.isChecked()
@@ -214,7 +214,7 @@ class TagEditorWidget(QtGui.QWidget):
         - vertical: Whether the tageditor should at the beginning be in vertical mode.
         - includeContents: Whether the "Include contents" button should be pressed down at the beginning.
         - flagEditorInTitleLine: Whether the FlagEditor should be put in the title (button) line.
-        - stack: The stack that should be used. If None, the applications's stack is used.
+        - theStack: The stack that should be used. If None, the applications's stack is used.
         
     """
     # This hack is necessary to ignore changes in the tagboxes while changing the tag programmatically
@@ -222,7 +222,7 @@ class TagEditorWidget(QtGui.QWidget):
     _ignoreHandleTagChangedByUser = False
     
     def __init__(self, vertical=False, includeContents=True, 
-                 flagEditorInTitleLine=True, stack=None):
+                 flagEditorInTitleLine=True, theStack=None):
         QtGui.QWidget.__init__(self)
         self.level = None
         self.elements = None
@@ -230,7 +230,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.vertical = None # will be set in setVertical below
         self.flagEditorInTitleLine = flagEditorInTitleLine
         
-        self.model = tageditormodel.TagEditorModel(stack=stack)
+        self.model = tageditormodel.TagEditorModel(stack=theStack)
         self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
         self.model.tagChanged.connect(self._handleTagChanged)

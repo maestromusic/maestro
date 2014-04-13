@@ -37,7 +37,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from omg import application, database as db, filebackends, player, logging, profiles
-from omg.core import tags
+from omg.core import tags, stack
 from omg.models import playlist
 from . import filebackend as mpdfilebackend
 
@@ -80,7 +80,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         made.
         """
         super().__init__(name, type, state)
-        self.stack = application.stack.createSubstack()
+        self.stack = stack.createSubstack()
         self.playlist = playlist.PlaylistModel(self, stack=self.stack)
 
         if state is None:
@@ -184,7 +184,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.client = None
         self.connectionState = player.DISCONNECTED
         self.connectionStateChanged.emit(player.DISCONNECTED)
-        application.stack.resetSubstack(self.stack)
+        stack.resetSubstack(self.stack)
        
     
     def checkIdle(self, resumeIdle=True):

@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import application, database as db, utils
-from ...core import tags
+from ...core import tags, stack
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
 
@@ -50,12 +50,12 @@ class TagManager(QtGui.QWidget):
         self.undoButton = QtGui.QToolButton()
         self.undoButton.setIcon(utils.getIcon("undo.png"))
         self.undoButton.setToolTip(self.tr("Undo"))
-        self.undoButton.clicked.connect(application.stack.undo)
+        self.undoButton.clicked.connect(stack.undo)
         buttonBar.addWidget(self.undoButton)
         self.redoButton = QtGui.QToolButton()
         self.redoButton.setIcon(utils.getIcon("redo.png"))
         self.redoButton.setToolTip(self.tr("Redo"))
-        self.redoButton.clicked.connect(application.stack.redo)
+        self.redoButton.clicked.connect(stack.redo)
         buttonBar.addWidget(self.redoButton)
         self.showInBrowserButton = QtGui.QToolButton()
         self.showInBrowserButton.setIcon(utils.getIcon("preferences/goto.png"))
@@ -75,7 +75,7 @@ class TagManager(QtGui.QWidget):
         self.table.itemSelectionChanged.connect(self._handleSelectionChanged)
         
         self._checkUndoRedoButtons()
-        application.stack.indexChanged.connect(self._checkUndoRedoButtons)
+        stack.indexChanged.connect(self._checkUndoRedoButtons)
     
     def _handleAddButton(self):
         """Open a NewTagTypeDialog and create a new tag."""
@@ -85,8 +85,8 @@ class TagManager(QtGui.QWidget):
 
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
-        self.undoButton.setEnabled(application.stack.canUndo())
-        self.redoButton.setEnabled(application.stack.canRedo())
+        self.undoButton.setEnabled(stack.canUndo())
+        self.redoButton.setEnabled(stack.canRedo())
         
     def _handleSelectionChanged(self):
         rows = self.table.selectionModel().selectedRows()
@@ -260,7 +260,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             index = tags.tagList.index(tag)
             # Because tag instances are unique, the tag module does not allow to change the name of a tag.
             # But we can add the new tag to the database and remove the old one.
-            application.stack.beginMacro(self.tr("Change tag name"))
+            stack.beginMacro(self.tr("Change tag name"))
             tags.removeTagType(tag)
             try:
                 tags.addTagType(newName, type=type, title=title, iconPath=iconPath,
@@ -270,9 +270,9 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                                 self.tr("The new tag name already appears in some elements with values that"
                                         " cannot be converted to the type of this tag."),
                                 self)
-                application.stack.abortMacro()
+                stack.abortMacro()
                 return
-            application.stack.endMacro()
+            stack.endMacro()
         
         elif item.column() == self._getColumnIndex('title'):
             tag = self.getTag(item.row())

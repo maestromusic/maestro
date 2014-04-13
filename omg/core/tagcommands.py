@@ -19,9 +19,7 @@
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from ..database import write as dbWrite
-from ..core.levels import real
-from ..core import tags
+from .core import tags, stack, levels
 from .. import application, database as db
 
 translate = QtGui.QApplication.translate
@@ -111,15 +109,15 @@ def renameTagValue(tag, oldValue, newValue):
                                 application.mainWindow)
     bar.setMinimumDuration(1000)
     bar.setWindowModality(Qt.WindowModal)
-    application.stack.beginMacro(translate("renameTagValue", "rename {} value").format(tag),
+    stack.beginMacro(translate("renameTagValue", "rename {} value").format(tag),
                                  transaction=True)
     onlyOldDiff = tags.SingleTagDifference(tag, replacements=[(oldValue, newValue)])
     bothDiff = tags.SingleTagDifference(tag, removals=[newValue])
     for i, elid in enumerate(onlyOld):
         bar.setValue(i)
-        real.changeTags({real.fetch(elid) : onlyOldDiff})
+        levels.real.changeTags({level.real.fetch(elid) : onlyOldDiff})
     for i, elid in enumerate(both, start=len(onlyOld)):
         bar.setValue(i)
-        real.changeTags({real.fetch(elid) : bothDiff})
+        levels.real.changeTags({level.real.fetch(elid) : bothDiff})
     bar.setValue(bar.value()+1)
-    application.stack.endMacro()
+    stack.endMacro()

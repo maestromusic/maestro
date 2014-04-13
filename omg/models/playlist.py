@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import wrappertreemodel, treebuilder
-from .. import application, config, logging, player, utils, filebackends
+from .. import config, logging, player, utils, filebackends
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
@@ -41,9 +41,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.backend = backend
         self.current = None
         if stack is None:
-            self.stack = application.stack
-        else:
-            self.stack = stack
+            from ..core import stack
+            self.stack = stack.stack
+        else: self.stack = stack
         # self.current and all of its parents. The delegate draws an arrow in front of these nodes
         self.currentlyPlayingNodes = []
         self.level.connect(self._handleLevelChanged)

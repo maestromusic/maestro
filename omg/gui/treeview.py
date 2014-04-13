@@ -21,7 +21,6 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application
 from . import selection, treeactions
 
 
@@ -271,7 +270,8 @@ class DraggingTreeView(TreeView):
     @property
     def stack(self):
         """Return the stack that is used for changes to this tree."""
-        return application.stack
+        from ..core import stack
+        return stack
     
     def startDrag(self, supportedActions):
         model = self.model()

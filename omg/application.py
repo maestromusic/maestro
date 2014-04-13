@@ -33,9 +33,6 @@ logger = None # Will be set when logging is initialized
 # The application's main window
 mainWindow = None
 
-# The application's undo stack
-stack = None
-
 # The application's QNetworkAccessManager
 network = None
 
@@ -69,9 +66,12 @@ class ChangeEventDispatcher(QtCore.QObject):
     queue events during macros and undo/redo.""" 
     _signal = QtCore.pyqtSignal(ChangeEvent)
     
-    def __init__(self, stack=stack):
+    def __init__(self, stack=None):
         super().__init__()
-        self.stack = stack
+        if stack is None:
+            from .core import stack
+            self.stack = stack.stack
+        else: self.stack = stack
         if config.options.misc.debug_events:
             def _debugAll(event):
                 logger.debug("EVENT: " + str(event))
@@ -186,7 +186,9 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     loadTranslators(app,logger)
     translate = QtCore.QCoreApplication.translate
     
-    # Initialize dispatcher
+    # Initialize undo/redo and event handling
+    from .core import stack
+    stack.init()
     global dispatcher
     dispatcher = ChangeEventDispatcher()
         
@@ -239,12 +241,6 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     if exitPoint == 'tags':
         return app
-    
-    # Initialize stack before levels are initialized    
-    from . import undostack
-    global stack
-    stack = undostack.UndoStack()
-    dispatcher.stack = stack
     
     # Load and initialize remaining modules
     from .core import levels

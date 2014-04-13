@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import application, database as db, utils
-from ...core import flags
+from ...core import flags, stack
 from .. import misc, dialogs
 from ..misc import iconbuttonbar
 
@@ -47,11 +47,11 @@ class FlagManager(QtGui.QWidget):
         buttonBar.addWidget(addButton)
         self.undoButton = QtGui.QToolButton()
         self.undoButton.setIcon(utils.getIcon("undo.png"))
-        self.undoButton.clicked.connect(application.stack.undo)
+        self.undoButton.clicked.connect(stack.undo)
         buttonBar.addWidget(self.undoButton)
         self.redoButton = QtGui.QToolButton()
         self.redoButton.setIcon(utils.getIcon("redo.png"))
-        self.redoButton.clicked.connect(application.stack.redo)
+        self.redoButton.clicked.connect(stack.redo)
         buttonBar.addWidget(self.redoButton)
         self.showInBrowserButton = QtGui.QToolButton()
         self.showInBrowserButton.setIcon(utils.getIcon("preferences/goto.png"))
@@ -88,9 +88,9 @@ class FlagManager(QtGui.QWidget):
         self._loadFlags()
         
         self._checkUndoRedoButtons()
-        application.stack.indexChanged.connect(self._checkUndoRedoButtons)
-        application.stack.undoTextChanged.connect(self._checkUndoRedoButtons)
-        application.stack.redoTextChanged.connect(self._checkUndoRedoButtons)
+        stack.indexChanged.connect(self._checkUndoRedoButtons)
+        stack.undoTextChanged.connect(self._checkUndoRedoButtons)
+        stack.redoTextChanged.connect(self._checkUndoRedoButtons)
         application.dispatcher.connect(self._handleDispatcher)
         
     def _handleDispatcher(self, event):
@@ -203,10 +203,10 @@ class FlagManager(QtGui.QWidget):
     
     def _checkUndoRedoButtons(self):
         """Enable or disable the undo and redo buttons depending on stack state."""
-        self.undoButton.setEnabled(application.stack.canUndo())
-        self.undoButton.setToolTip(self.tr("Undo: {}").format(application.stack.undoText()))
-        self.redoButton.setEnabled(application.stack.canRedo())
-        self.redoButton.setToolTip(self.tr("Redo: {}").format(application.stack.redoText()))
+        self.undoButton.setEnabled(stack.canUndo())
+        self.undoButton.setToolTip(self.tr("Undo: {}").format(stack.undoText()))
+        self.redoButton.setEnabled(stack.canRedo())
+        self.redoButton.setToolTip(self.tr("Redo: {}").format(stack.redoText()))
         
     def _handleSelectionChanged(self):
         rows = self.tableWidget.selectionModel().selectedRows()

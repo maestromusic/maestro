@@ -22,7 +22,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import rootedtreemodel
-from .. import application, config, utils
+from .. import config, utils
+from ..core import stack
 from ..core.nodes import Wrapper
 
 translate = QtCore.QCoreApplication.translate
@@ -63,7 +64,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
     def insert(self,parent,position,wrappers):
         """Insert *wrappers* at the given position into the wrapper *parent*.""" 
         command = InsertCommand(self,parent,position,wrappers)
-        application.stack.push(command)
+        stack.push(command)
     
     def removeWrappers(self,wrappers,*args,**kwargs):
         """Remove the given wrappers from the model. When possible its usually faster to use the range-based
@@ -98,7 +99,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         """
         if len(ranges) == 0:
             return
-        application.stack.push(RemoveCommand(self, ranges))
+        stack.push(RemoveCommand(self, ranges))
         
     def supportedDropActions(self):
         return Qt.CopyAction | Qt.MoveAction
@@ -142,14 +143,14 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         elif position < 0 or position > len(parent.contents):
             raise ValueError("Position {} is out of bounds".format(position))
         
-        application.stack.beginMacro(self.tr("Split node"))
+        stack.beginMacro(self.tr("Split node"))
         # Insert a copy of parent directly after parent
         copy = parent.copy(contents=[])
         self.insert(parent.parent,parent.parent.index(parent)+1,[copy])
         movingWrappers = parent.contents[position:]
         self.remove(parent,position,len(parent.contents)-1)
         self.insert(copy,0,movingWrappers)
-        application.stack.endMacro()
+        stack.endMacro()
                         
 
                     

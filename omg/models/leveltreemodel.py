@@ -21,8 +21,8 @@ import collections
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, config, logging, utils
-from ..core import elements, levels, nodes
+from .. import config, logging, utils
+from ..core import elements, levels, nodes, stack
 from ..models import rootedtreemodel
 
 translate = QtCore.QCoreApplication.translate
@@ -81,7 +81,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 row = 0
             else: row = parent.getContentsCount()
 
-        application.stack.beginMacro(self.tr("drop"))
+        stack.beginMacro(self.tr("drop"))
         
         # Get elements to insert
         if mimeData.hasFormat(config.options.gui.mime):
@@ -94,7 +94,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
             self.insertElements(parent, row, elements)
             self.rowsDropped.emit(self.getIndex(parent), row, row+len(elements)-1)
             
-        application.stack.endMacro()
+        stack.endMacro()
         return len(elements) != 0
     
     def startDrag(self):
@@ -142,7 +142,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         root, or updates the level otherwise.
         """
         if parent is self.root:
-            application.stack.push(InsertIntoRootCommand(self, row, [element.id for element in elements]))
+            stack.push(InsertIntoRootCommand(self, row, [element.id for element in elements]))
         else: self.level.insertContentsAuto(parent.element, row, elements)
     
     def removeElements(self, parent, rows):
@@ -151,19 +151,19 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         This convenience function either alters the RootNode, if parent is self.root, or updates
         the level.
         """
-        application.stack.beginMacro(self.tr('remove elements'))
+        stack.beginMacro(self.tr('remove elements'))
         if parent is self.root:
-            application.stack.push(RemoveFromRootCommand(self, rows))
+            stack.push(RemoveFromRootCommand(self, rows))
         else:
             element = parent if isinstance(parent, elements.Element) else parent.element
             self.level.removeContentsAuto(element, indexes=rows)
-        application.stack.endMacro()
+        stack.endMacro()
 
     def clear(self):
         """Remove everything below the root node."""
-        application.stack.beginMacro(self.tr('clear'))
+        stack.beginMacro(self.tr('clear'))
         self.removeElements(self.root, range(len(self.root.contents)))
-        application.stack.endMacro()
+        stack.endMacro()
         
     def loadFile(self, url):
         """Load a file into this model. The default implementation calls level.collect()."""

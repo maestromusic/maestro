@@ -21,8 +21,8 @@ import os.path
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, utils, filebackends, config
-from ..core import levels, tags, elements
+from .. import utils, filebackends, config
+from ..core import levels, tags, elements, stack
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
@@ -211,7 +211,7 @@ class RemoveFromParentAction(TreeAction):
         for parent, indexes in byParent.items():
             byParent[parent] = sorted(set(indexes))
         
-        application.stack.beginMacro("remove")
+        stack.beginMacro("remove")
         if isinstance(model, leveltreemodel.LevelTreeModel):
             for parent, indexes in byParent.items():
                 model.removeElements(parent, indexes)
@@ -220,7 +220,7 @@ class RemoveFromParentAction(TreeAction):
                 self.level().removeContentsAuto(parent.element, indexes=indexes)
         else:
             raise NotImplementedError()
-        application.stack.endMacro()
+        stack.endMacro()
 
 
 class DeleteAction(TreeAction):

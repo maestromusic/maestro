@@ -23,10 +23,10 @@ from datetime import datetime, timezone, MINYEAR
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from omg import application, logging, config, utils, database as db
-from omg.filebackends import BackendURL
-from omg.filebackends.filesystem import FileURL
-from omg.core import levels, tags
+from .. import application, logging, config, utils, database as db
+from ..filebackends import BackendURL
+from ..filebackends.filesystem import FileURL
+from ..core import levels, tags, stack
 
 logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
@@ -242,7 +242,7 @@ class SynchronizeHelper(QtCore.QObject):
         from . import dialogs
         dialog = dialogs.MissingFilesDialog([track.id for track in tracks])
         dialog.exec_()
-        application.stack.clear()
+        stack.clear()
         self._dialogResult = {"removed" : dialog.deleteAction.removedURLs,
                               "renamed" : dialog.setPathAction.setPaths } 
         self.dialogFinished.set()
@@ -263,7 +263,7 @@ class SynchronizeHelper(QtCore.QObject):
                     backendFile.tags = dbTags.withoutPrivateTags()
                     backendFile.saveTags()
                 else:
-                    application.stack.clear()
+                    stack.clear()
                     diff = tags.TagStorageDifference(dbTags.withoutPrivateTags(), fsTags)
                     levels.real._changeTags({levels.real.get(track.id) : diff }, dbOnly=True)
                 track.problem = False

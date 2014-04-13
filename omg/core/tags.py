@@ -20,16 +20,16 @@
 
 This module provides methods and structures
 
-    * to manage tagtypes: convert tag-ids to tagnames and vice versa, add tagtypes to the database and remove
-      them again, modify tagtypes (icon, title etc.)
+    * to manage tag types: convert tag ids to tag names and vice versa, add tag types to the database and
+      remove them again, modify tag types (icon, title etc.)
     * to store tags in elements (or elsewhere)
 
-There is one tagtype for each valid tagname. Some tagtypes are stored in the database and called 'internal'
+There is one tag type for each valid tag name. Some tag types are stored in the database and called 'internal'
 while the other ones are called 'external'. Internal tags have an id, a type and may have a title, an icon
 or be private (i.e. they will not be stored in files but only in the database).
 
-For each tagtype there can be only one instance of Tag which is created in the init-method for internal tags
-or when the get-method is invoked for the first time with the type's tagname. 
+For each tag type there can be only one instance of Tag which is created in the init-method for internal tags
+or when the get-method is invoked for the first time with the type's tag name. 
 
 Call init at program start to initialize the module using the information in the tagids-table and use one of 
 the following ways to get tags:
@@ -41,7 +41,7 @@ the following ways to get tags:
     * For some tags which have a special meaning to the program and cannot always be treated generically
       (e.g. the title-tag) there exist constants (e.g. TITLE). This allows to use tags.TITLE instead of
       tags.get(options.tags.title_tag). Do not use tags.get('title') as the user may decide to use another
-      tagname than 'title' for his titles.
+      tag name than 'title' for his titles.
     * To iterate over all internal tags in the user-defined order use the module variable tagList.
     
 \ """
@@ -51,7 +51,8 @@ from functools import reduce
 from PyQt4 import QtGui
 
 from .. import application, config, constants, logging, utils
-from ..constants import ADD, REMOVE, CHANGE, ADDED, REMOVED, CHANGED
+from ..constants import ADDED, REMOVED, CHANGED
+from . import stack
 from ..application import ChangeEvent
 
 translate = QtGui.QApplication.translate
@@ -65,7 +66,7 @@ logger = logging.getLogger(__name__)
 _tagsById = None
 _tagsByName = None
 
-# Dict mapping tagnames to their translation
+# Dict mapping tag names to their translation
 _translation = None
 
 # Local reference to the database, will be created in init
@@ -116,8 +117,7 @@ def loadTagTypesFromDB():
     tagList = []
     
     try:
-        result = db.query("SELECT id, tagname, tagtype, title, icon, private FROM {}tagids ORDER BY sort"
-                           .format(db.prefix))
+        result = db.query("SELECT id, tagname, tagtype, title, icon, private FROM {p}tagids ORDER BY sort")
     except db.sql.DBException:
         logger.error("Could not fetch tags from tagids table.")
         raise RuntimeError()
@@ -250,7 +250,7 @@ TYPES = [TYPE_VARCHAR, TYPE_TEXT, TYPE_DATE]
     
 class Tag:
     """
-        A tagtype like 'artist'. 'title', etc.. Public attributes of tags are
+        A tag type like 'artist'. 'title', etc.. Public attributes of tags are
         
             * id: The id of the tag. This is None for tags that are not in the database.
             * name: The name of the tag,
@@ -258,7 +258,7 @@ class Tag:
             * title: A nice title to be displayed to the user (usually a translation of the name),
             * rawTitle: The title as set in the database. If a tag does not have a title set in the
               database this will be None, while 'title' will be the name. rawTitles must be unique (or None).
-            * iconPath: Path to the tagtype's icon or None if if doesn't have an icon.
+            * iconPath: Path to the tag type's icon or None if if doesn't have an icon.
             * icon: A QIcon loaded from above path (read-only)
             * private: Whether the tag is private, i.e. stored only in the database and not in files.
 
@@ -298,11 +298,11 @@ class Tag:
             self.private = data['private']
     
     def _clearData(self):
-        """Clear some attributes. This happens when adding a tagtype to the database is undone."""
+        """Clear some attributes. This happens when adding a tag type to the database is undone."""
         self.id, self.type, self.rawTitle, self.iconPath, self.private = None, None, None, None, False
     
     def isInDb(self):
-        """Return whether this tagtype is internal, i.e. contained in the database."""
+        """Return whether this tag type is internal, i.e. contained in the database."""
         return self.id is not None
     
     @property
@@ -319,7 +319,7 @@ class Tag:
 
     @iconPath.setter
     def iconPath(self, iconPath):
-        """Set the tag's iconPath and load the icon."""
+        """Set the tag type's iconPath and load the icon."""
         assert iconPath is None or isinstance(iconPath, str)
         self._iconPath = iconPath
         if iconPath is not None:
@@ -335,7 +335,7 @@ class Tag:
         else: return True
 
     def convertValue(self, value, crop=False, logCropping=True):
-        """Convert a value to this tagtype. Raise a TagValueError if conversion is not possible.
+        """Convert a value to this tag type. Raise a TagValueError if conversion is not possible.
         If *crop* is True, this method may crop *value* to make it valid (e.g. if *value* is too long for
         a varchar). If *logCropping* is True, cropping will print a logger warning.
         """
@@ -366,7 +366,7 @@ class Tag:
         return self.type.sqlFormat(value)
 
     def __repr__(self):
-        return '"{0}"'.format(self.name)
+        return '"{}"'.format(self.name)
 
     def __str__(self):
         return self.title
@@ -442,10 +442,10 @@ def fromTitle(title):
 
     
 def addTagType(tagType, type, **data):
-    """Add a tagtype to the database. *tagType* can be a valid tagname or an external tagtype. Using keyword
-    arguments you can optionally set attributes of the tagtype which external tagtypes don't have
+    """Add a tag type to the database. *tagType* can be a valid tag name or an external tag type. Using
+    keyword arguments you can optionally set attributes of the tag type which external tag types don't have
     Allowed keys are
-        title, iconPath, private and index (the index of the tagtype within tags.tagList).
+        title, iconPath, private and index (the index of the tag type within tags.tagList).
         
     If the type cannot be added because an element contains a value which is invalid for the chosen type,
     a TagValueError is raised.
@@ -459,23 +459,25 @@ def addTagType(tagType, type, **data):
             raise ValueError("Cannot add tag '{}' with title '{}' because that title exists already."
                              .format(tagType, data['title']))
             
-    application.stack.beginMacro(translate("TagTypeUndoCommand", "Add tagtype to DB"))
+    stack.beginMacro(translate("Tags", "Add tag type to DB"))
     try:
+        # External tags may have every value. We need to make sure that all can be converted to the new type.
         _convertTagTypeOnLevels(tagType, type)
     except TagValueError as error:
-        application.stack.abortMacro()
+        stack.abortMacro()
         raise error
 
     data['type'] = type
-    application.stack.push(TagTypeUndoCommand(ADD, tagType, **data))
-    application.stack.endMacro()
-    
+    stack.push('', stack.Call(_addTagType, tagType, data), stack.Call(_removeTagType, tagType))
+    stack.endMacro()
     return tagType
         
     
-def _addTagType(tagType, **data):
-    """Similar to addTagType, but not undoable. *tagType* must be an external Tag instance. Its value-type
-    must be given as keyword-argument 'type'."""
+def _addTagType(tagType, data):
+    """Similar to addTagType, but not undoable. *tagType* must be an external Tag instance. *data* may
+    contain additional attributes, see Tag._setData. It must contain 'type'. When it does not contain 'id',
+    this method will choose an id and store it in data['id'].
+    """
     assert tagType.name in _tagsByName # if the tag was created with get, it is already contained there
     assert 'type' in data
     
@@ -483,58 +485,62 @@ def _addTagType(tagType, **data):
         index = data['index']
     else: index = len(tagList)   
     
-    db.query("UPDATE {}tagids SET sort=sort+1 WHERE sort >= ?".format(db.prefix), index)
+    db.query("UPDATE {p}tagids SET sort=sort+1 WHERE sort >= ?", index)
  
     tagType._setData(data)
     tagList.insert(index, tagType)
     
     if tagType.id is not None: # id has been set in _setData
-        data = (tagType.id, tagType.name, tagType.type.name, tagType.rawTitle,
+        dataTuple = (tagType.id, tagType.name, tagType.type.name, tagType.rawTitle,
                 tagType.iconPath, tagType.private, index)
-        db.query(
-            "INSERT INTO {}tagids (id, tagname, tagtype, title, icon, private, sort) VALUES (?,?,?,?,?,?,?)"
-              .format(db.prefix), *data)
+        db.query( "INSERT INTO {p}tagids (id, tagname, tagtype, title, icon, private, sort) "
+                  "VALUES (?,?,?,?,?,?,?)", *dataTuple)
     else:
         # The difference to the if-part is that we have to get the id from the database
-        data = (tagType.name, tagType.type.name, tagType.rawTitle, tagType.iconPath, tagType.private, index)
+        dataTuple = (tagType.name, tagType.type.name, tagType.rawTitle,
+                     tagType.iconPath, tagType.private, index)
         tagType.id = db.query(
-            "INSERT INTO {}tagids (tagname, tagtype, title, icon, private, sort) VALUES (?,?,?,?,?,?)"
-              .format(db.prefix), *data).insertId()
+            "INSERT INTO {p}tagids (tagname, tagtype, title, icon, private, sort) VALUES (?,?,?,?,?,?)",
+            *data).insertId()
+        # Store id so that when this tag is added to the database again (after undo),
+        # it will get the same id.
+        data['id'] = tagType.id
     logger.info("Added new tag '{}' of type '{}'.".format(tagType.name, tagType.type.name))
 
     _tagsById[tagType.id] = tagType
     application.dispatcher.emit(TagTypeChangedEvent(ADDED, tagType))
-    return tagType
     
 
 def removeTagType(tagType):
-    """Remove a tagtype from the database. The tagtype must not be contained in any internal elements!
+    """Remove a tag type from the database. The tag type must not be contained in any internal elements!
     """
     if not tagType.isInDb():
-        raise ValueError("Cannot remove external tagtype '{}' from DB.".format(tagType))
+        raise ValueError("Cannot remove external tag type '{}' from DB.".format(tagType))
     if tagType in (TITLE, ALBUM):
         raise ValueError("Cannot remove title or album tag.")
-    if db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?".format(db.prefix),
-                tagType.id).getSingle() > 0:
+    if db.query("SELECT COUNT(*) FROM {p}tags WHERE tag_id = ?", tagType.id).getSingle() > 0:
         raise ValueError("Cannot remove a tag that appears in internal elements.")
     
-    application.stack.beginMacro(translate("TagTypeUndoCommand", "Remove tagtype from DB"))
+    stack.beginMacro(translate("Tags", "Remove tag type from DB"))
     try:
         _convertTagTypeOnLevels(tagType, None)
     except TagValueError as error:
-        application.stack.abortMacro()
+        stack.abortMacro()
         raise error
-    application.stack.push(TagTypeUndoCommand(REMOVE, tagType))
-    application.stack.endMacro()
+
+    data = tagType._getData()
+    data['index'] = tagList.index(tagType)
+    stack.push('', stack.Call(_removeTagType, tagType), stack.Call(_addTagType, tagType, data))
+    stack.endMacro()
     
     
 def _removeTagType(tagType):
-    """Like removeTagType, but not undoable: Remove a tagtype from the database, including all its values
+    """Like removeTagType, but not undoable: Remove a tag type from the database, including all its values
     and relations. This will not touch any files though!
     """
-    logger.info("Removing tag '{}'.".format(tagType.name))
-    db.query("DELETE FROM {}tagids WHERE id=?".format(db.prefix), tagType.id)
-    db.query("UPDATE {}tagids SET sort=sort-1 WHERE sort > ?".format(db.prefix), tagList.index(tagType))
+    logger.info("Removing tag type '{}'.".format(tagType.name))
+    db.query("DELETE FROM {p}tagids WHERE id=?", tagType.id)
+    db.query("UPDATE {p}tagids SET sort=sort-1 WHERE sort > ?", tagList.index(tagType))
     del _tagsById[tagType.id]
     tagList.remove(tagType)
     tagType._clearData()
@@ -542,38 +548,36 @@ def _removeTagType(tagType):
     
 
 def changeTagType(tagType, **data):
-    """Change an internal tagtype. In particular update the single instance *tagType* and the database.
+    """Change an internal tag type. In particular update the single instance *tagType* and the database.
     The keyword arguments determine which properties should be changed::
 
         changeTagType(tagType, title='Artist', iconPath=None)
         
     Allowed keyword arguments are type, title, iconPath, private. If the type or private is changed,
-    the tagtype must not appear in any internal elements.
+    the tag type must not appear in any internal elements.
     If the type cannot be changed because an (external) element contains a value which is invalid for the new
     type, a TagValueError is raised.
     """
     if not tagType.isInDb():
-        raise ValueError("Cannot change an external tagtype '{}'.".format(tagType))
+        raise ValueError("Cannot change an external tag type '{}'.".format(tagType))
     if ('type' in data and data['type'] != tagType.type) \
             or ('private' in data and data['private'] != tagType.private):
-        count = db.query("SELECT COUNT(*) FROM {}tags WHERE tag_id = ?"
-                         .format(db.prefix), tagType.id).getSingle()
-        if count > 0:
+        if db.query("SELECT COUNT(*) FROM {p}tags WHERE tag_id = ?", tagType.id).getSingle() > 0:
             raise ValueError("Cannot change the type of a tag that appears in internal elements.")
     
-    application.stack.beginMacro(translate("TagTypeUndoCommand", "Change tagtype"))
+    stack.beginMacro(translate("Tags", "Change tag type"))
     if 'type' in data and data['type'] != tagType.type:
         try:
             _convertTagTypeOnLevels(tagType, data['type'])
         except TagValueError as error:
-            application.stack.abortMacro()
+            stack.abortMacro()
             raise error
         
-    application.stack.push(TagTypeUndoCommand(CHANGE, tagType, **data))
-    application.stack.endMacro()
+    stack.push('', stack.Call(tagType, data), stack.Call(tagType, tagType._getData()))
+    stack.endMacro()
     
     
-def _changeTagType(tagType, **data):
+def _changeTagType(tagType, ata):
     """Like changeTagType, but not undoable."""
     assert tagType.isInDb()
     
@@ -612,8 +616,7 @@ def _changeTagType(tagType, **data):
     
     if len(assignments) > 0:
         params.append(tagType.id) # for the WHERE clause
-        db.query("UPDATE {}tagids SET {} WHERE id = ?"
-                    .format(db.prefix, ','.join(assignments)), *params)
+        db.query("UPDATE {p}tagids SET "+','.join(assignments)+" WHERE id = ?", *params)
         application.dispatcher.emit(TagTypeChangedEvent(CHANGED, tagType))
 
 
@@ -626,7 +629,7 @@ def _convertTagTypeOnLevels(tagType, valueType):
     TagValueError is raised.
     """
     from . import levels
-    cmds = []
+    changes = []
     for level in levels.allLevels:
         diffs = {}
         for element in level.elements.values(): # only external elements possible => won't take too long
@@ -636,56 +639,17 @@ def _convertTagTypeOnLevels(tagType, valueType):
                 if oldValues != newValues:
                     diffs[element] = SingleTagDifference(tagType, 
                                                          replacements=list(zip(oldValues, newValues)))
-                    
         if len(diffs) > 0:
-            level.changeTags(diffs)
+            changes.append((level, diffs))
+            
     # Only start changing levels if all tag value conversions have been successful.
-    for command in cmds:
-        application.stack.push(command)
+    if len(changes):
+        for level, diffs in changes:
+            level.changeTags(diffs)
         
-        
-class TagTypeUndoCommand:
-    """This command adds, changes or removes a tagtype. Which keyword arguments are necessary depends on the
-    first parameter *action*. Use the methods addTagType, removeTagType and changeTagTyp instead of using
-    this command directly.
-    """
-    def __init__(self, action, tagType, **data):
-        self.text = {ADD:   translate("TagTypeUndoCommand", "Add tagtype to DB"),
-                     REMOVE: translate("TagTypeUndoCommand", "Remove tagtype from DB"),
-                     CHANGE: translate("TagTypeUndoCommand", "Change tagtype")
-                    }[action]
-        self.action = action
-        if self.action == ADD:
-            self.tagType = tagType
-            self.data = data
-        elif self.action == REMOVE:
-            self.tagType = tagType
-            self.data = tagType._getData()
-            self.data['index'] = tagList.index(tagType)
-        else:
-            self.tagType = tagType
-            self.oldData = tagType._getData()
-            self.newData = data
-        
-    def redo(self):
-        if self.action == ADD:
-            _addTagType(self.tagType, **self.data)
-        elif self.action == REMOVE:
-            _removeTagType(self.tagType)
-        else: _changeTagType(self.tagType, **self.newData)
-
-    def undo(self):
-        if self.action == ADD:
-            _removeTagType(self.tagType)
-        elif self.action == REMOVE:
-            # Ensure that the same object is recreated, because it might be used in many elements
-            # within the undohistory.
-            _addTagType(self.tagType, **self.data)
-        else: _changeTagType(self.tagType, **self.oldData)
-
 
 class TagTypeChangedEvent(ChangeEvent):
-    """TagTypeChangedEvents are used when a tagtype (like artist, composer...) is added, changed or removed.
+    """TagTypeChangedEvents are used when a tag type (like artist, composer...) is added, changed or removed.
     """
     def __init__(self, action, tagType):
         assert action in constants.CHANGE_TYPES
@@ -701,12 +665,14 @@ def moveTagType(tagType, newIndex):
     newList = tagList[:]
     del newList[index]
     newList.insert(newIndex, tagType)
-    application.stack.push(TagTypeOrderUndoCommand(newList))
+    moveTagTypes(newList)
     
     
 def moveTagTypes(newList):
-    """Replace tagList by *newList*. Both lists must contain the same tagtypes!."""
-    application.stack.push(TagTypeOrderUndoCommand(newList))
+    """Replace tagList by *newList*. Both lists must contain the same tag types!."""
+    stack.push(translate("Tags", "Move tag types"),
+                         stack.Call(_moveTagTypes, newList),
+                         stack.Call(_moveTagTypes, tagList))
 
 
 def _moveTagTypes(newList):
@@ -714,34 +680,13 @@ def _moveTagTypes(newList):
     global tagList
     if set(tagList) != set(newList):
         raise ValueError("*newList* must contain the same tags as tags.tagList")
-    db.multiQuery("UPDATE {}tagids SET sort = ? WHERE id = ?".format(db.prefix),
-                  enumerate([t.id for t in newList]))
+    db.multiQuery("UPDATE {p}tagids SET sort = ? WHERE id = ?", enumerate([t.id for t in newList]))
     tagList = newList
     application.dispatcher.emit(TagTypeOrderChangeEvent())
-    
-    
-class TagTypeOrderUndoCommand:
-    """Command that changes the order of the tagtypes. *newList* specifies the new order and will be used
-    as replacement for tags.tagList. *newList* must contain the same tagtypes as tags.tagList.
-    
-    Note that TagTypeOrderUndoCommand does not guarantee that the sort numbers in the database will be
-    restored exactly when the command is undone. They will be set to values such that the order of
-    tags.tagList is restored.
-    """ 
-    def __init__(self, newList):
-        self.text = translate("TagTypeOrderUndoCommand", "Change tagtype order")
-        self.oldList = tagList
-        self.newList = newList
-    
-    def redo(self):
-        _moveTagTypes(self.newList)
-    
-    def undo(self):
-        _moveTagTypes(self.oldList)
         
 
 class TagTypeOrderChangeEvent(ChangeEvent):
-    """This event is emitted when the order of tagtypes has changed. The order is always stored in
+    """This event is emitted when the order of tag types has changed. The order is always stored in
     tags.tagList."""
     pass
 
@@ -782,10 +727,9 @@ class Storage(dict):
     """
     def __init__(self, *args):
         if len(args) == 1 and type(args[0]) is dict:
-            dict.__init__(self)
+            super().__init__()
             self.merge(args[0])
-        else:
-            dict.__init__(self, *args)
+        else: super().__init__()
     
     def copy(self):
         """Return a copy of this storage-object containing copies of the original tag-value-lists."""
@@ -804,7 +748,7 @@ class Storage(dict):
             if key in self:
                 del self[key]
             else: pass # I won't save an empty list
-        else: dict.__setitem__(self, key, TagValueList(self, value))
+        else: super().__setitem__(key, TagValueList(self, value))
     
     def _removeList(self, list):
         """Remove the given list from the values of this dict. This is called by the lists itself, when
@@ -999,7 +943,7 @@ class TagDifference:
 
 
 class SingleTagDifference(TagDifference):
-    """Convenience class that stores changes to a single tagtype. *additions* and *removals* are simply
+    """Convenience class that stores changes to a single tag type. *additions* and *removals* are simply
     lists of values, *replacements* is a list of (oldValue, newValue) pairs.
     """
     def __init__(self, tagType, additions=None, removals=None, replacements=None):
