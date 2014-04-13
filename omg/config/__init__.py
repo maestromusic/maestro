@@ -76,8 +76,6 @@ storageObject = None
 # A dict which will be pickled and stored in a file
 binary = None
 
-logger = logging.getLogger("config")
-
 
 def init(cmdConfig = [],testMode=False):
     """Initialize the config-module: Read the config files and create the module variables. *cmdConfig* is a
@@ -97,10 +95,10 @@ def init(cmdConfig = [],testMode=False):
         try:
             os.makedirs(CONFDIR) # also create intermediate directories
         except OSError:
-            logger.exception("Could not create config directory '{}'.".format(CONFDIR))
+            logging.exception(__name__, "Could not create config directory '{}'.".format(CONFDIR))
             sys.exit(1)
     elif not os.path.isdir(CONFDIR):
-        logger.warning("Config directory '{}' is not a directory.".format(CONFDIR))
+        logging.warning(__name__, "Config directory '{}' is not a directory.".format(CONFDIR))
         sys.exit(1)
 
     # Initialize config and storage
@@ -120,7 +118,7 @@ def init(cmdConfig = [],testMode=False):
                 with open(path,'rb') as file:
                     binary = pickle.load(file)
             except:
-                logger.exception("Could not load binary configuration from '{}'.".format(path))
+                logging.exception(__name__, "Could not load binary configuration from '{}'.".format(path))
 
 
 def shutdown():
@@ -282,18 +280,22 @@ class Section:
                     name = name[len('SECTION:'):]
                 if name not in self.members:
                     if not allowUnknownSections:
-                        logger.warning("Error in config file '{}': Unknown section '{}' in section '{}'."
+                        logging.warning(__name__,
+                                        "Error in config file '{}': Unknown section '{}' in section '{}'."
                                         .format(path,name,self.name))
                 elif isinstance(self.members[name],Option):
-                    logger.warning("Error in config file '{}': '{}' is not a section in section '{}'."
+                    logging.warning(__name__,
+                                    "Error in config file '{}': '{}' is not a section in section '{}'."
                                     .format(path,name,self.name))
                 else: self.members[name].updateFromDict(member)
             else:
                 if name not in self.members:
-                    logger.warning("Error in config file '{}': Unknown option '{}' in section '{}'."
+                    logging.warning(__name__,
+                                    "Error in config file '{}': Unknown option '{}' in section '{}'."
                                     .format(path,name,self.name))
                 elif isinstance(self.members[name],Section):
-                    logger.warning("Error in config file '{}': '{}' is not an option in section '{}'."
+                    logging.warning(__name__,
+                                    "Error in config file '{}': '{}' is not an option in section '{}'."
                                     .format(path,name,self.name))
                 else:
                     option = self.members[name]
@@ -354,10 +356,10 @@ class MainSection(Section):
                 else: self._rawDict = configio.readConfig(self._path)
                 # Allow unknown sections on first level as they might be plugin configurations
                 self.updateFromDict(self._rawDict,allowUnknownSections=True)
-            except configio.ConfigError as e:
-                logger.critical(str(e))
-                logger.critical("There is an error in config file '{}'. Deleting the file should help "
-                                "(but also erase your configuration...).".format(self._path))
+            except configio.ConfigError:
+                logging.exception(__name__,
+                                  "There is an error in config file '{}'. Deleting the file should help "
+                                  "(but also erase your configuration...).".format(self._path))
                 sys.exit(1)
                 
         # Finally set temporary values from cmdConfig
@@ -372,9 +374,9 @@ class MainSection(Section):
                     option = section.members[keys[-1]]
                     option.tempValue = option.parseString(value)
                 except KeyError:
-                    logger.error("Unknown config option on command line '{}'.".format(line))
-                except Exception as e:
-                    logger.error("Invalid config option on command line '{}'.".format(line))
+                    logging.error(__name__, "Unknown config option on command line '{}'.".format(line))
+                except:
+                    logging.error(__name__, "Invalid config option on command line '{}'.".format(line))
     
     def loadPlugins(self,sections):
         """Load plugin configuration. *sections* stores the default configuration of the plugins. It is a
@@ -406,8 +408,8 @@ class MainSection(Section):
                 if self.storage:
                     configio.writeStorage(self._path,self)
                 else: configio.writeConfig(self._path,self)
-            except configio.ConfigError as e:
-                logger.error(e)
+            except configio.ConfigError:
+                logging.exception(__name__, "Exception when writing configuration file.")
         
     def pprint(self):
         """Debug method: Print this configuration."""

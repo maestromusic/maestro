@@ -19,9 +19,7 @@
 """Improved QUndoStack."""
 
 from PyQt4 import QtCore, QtGui
-
 from .. import logging
-logger = logging.getLogger(__name__)
 
 stack = None
 # Note that it is possible to access all methods and attributes of stack directly via the module.
@@ -123,7 +121,7 @@ class UndoStack(QtCore.QObject):
             command = GenericCommand(command, redoCall, undoCall)
         newMacro = len(self._activeMacros) == 0
         if newMacro:
-            self.beginMacro(command.text, *args, **kwargs)
+            self.beginMacro(command.text)
         
         # Check whether argument 'firstRedo' should be used
         code = command.redo.__code__
@@ -228,10 +226,10 @@ class UndoStack(QtCore.QObject):
         commandOrMacro = self._commands[self._index-1]
         try:
             commandOrMacro.undo()
-        except Exception as e:
-            logger.exception(e)
+        except Exception:
+            logging.exception(__name__, "Exception during undo.")
             self._clear()
-            logger.warning("Undostack cleared")
+            logging.warning(__name__, "Undostack cleared")
             return
         self._index -= 1
         self._emitQueuedEvents()
@@ -248,10 +246,10 @@ class UndoStack(QtCore.QObject):
         commandOrMacro = self._commands[self._index]
         try:
             commandOrMacro.redo()
-        except Exception as e:
-            logger.exception(e)
+        except Exception:
+            logging.exception(__name__, "Exception during redo.")
             self._clear()
-            logger.warning("Undostack cleared")
+            logging.warning(__name__, "Undostack cleared")
         self._index += 1
         self._emitQueuedEvents()
         self._inUndoRedo = False
@@ -274,9 +272,9 @@ class UndoStack(QtCore.QObject):
                     for command in self._commands[self._index:index]:
                         command.redo()
             except Exception as e:
-                logger.exception(e)
+                logging.exception(__name__, "Exception during undo/redo.")
                 self._clear()
-                logger.warning("Undostack cleared")
+                logging.warning(__name__, "Undostack cleared")
                 return
             self._index = index    
             self._emitQueuedEvents()

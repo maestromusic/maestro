@@ -18,14 +18,13 @@
 
 from PyQt4 import QtCore, QtGui, QtSvg
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, dialogs, dockwidget
 from .preferences import profiles as profilesgui
-from .. import player, utils, logging, strutils
+from .. import player, utils, strutils
 from ..core import levels
 
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
 
 ICON_SIZE = 16

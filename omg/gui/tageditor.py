@@ -20,16 +20,13 @@ import os.path, functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from .. import strutils, utils, config, logging, filebackends
 from ..core import tags, levels, stack
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
 from .misc import widgetlist
-
-
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class TagEditorDock(dockwidget.DockWidget):
@@ -88,7 +85,8 @@ class TagEditorDock(dockwidget.DockWidget):
                            if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile()))
             level = levels.real
         else:
-            logger.warning("Invalid drop event (supports only {})".format(", ".join(mimeData.formats())))
+            logging.warning(__name__, "Invalid drop event (supports only {})"
+                                      .format(", ".join(mimeData.formats())))
             return
         
         elements = []

@@ -22,11 +22,10 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import config, logging, profiles, utils
+from .. import config, profiles, utils
 from ..core import flags, tags
 from ..core.elements import ContentList, TYPE_ALBUM, TYPE_CONTAINER
 
-logger = logging.getLogger(__name__)
 translate = QtCore.QCoreApplication.translate
 
                 

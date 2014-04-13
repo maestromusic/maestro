@@ -18,97 +18,26 @@
 
 """
 This module wraps Python's :mod:`logging` module in a way so that logging works even if that module is not
-yet configured. Simply use ``logging.getLogger(name)`` to get a Logger and use it like the usual loggers::
+yet configured. To log messages use one of the methods debug, info, warning, error, critical, exception:
 
-    logger = logging.getLogger(__name__) # __name__ is the name of the current module
-    logger.debug("Test")
+    logging.debug(__name__, message)
+    
+The first argument should always be __name__ to include the module name into the log. For convenience
+it is possible to create a Logger that stores the name permanently:
 
+    logger = logging.getLogger(__name__)
+    logger.debug(message) # or info, warning, etc.
+    
 Before logging is configured everything will be printed to the console, so call :func:`init` as early as
 possible (but after the config module has been initialized).
 """
 
-import sys
+import sys, functools
 import logging, logging.config
 
 configured = False # Whether logging has been configured (i.e. init has been successfully called).
-loggers = set()
-
-class Logger:
-    """A logger prints log messages to ``stderr`` until logging is configured. Afterwards it wraps a usual
-    Python :class:`Logger <logging.Logger>` with the same name."""
-    def __init__(self,name):
-        self.name = name
-        if configured:
-            self._logger = logging.getLogger(self.name)
-        else: self._logger = None
-
-    def log(self,level,message):
-        """Log a message on the given level. *level* must be a string from
-        ``['DEBUG','INFO',WARNING','ERROR','CRITICAL']``."""
-        if not configured:
-            print(" - ".join([level,self.name,message]),file=sys.stderr)
-        else:
-            if self._logger is None:
-                self._logger = logging.getLogger(self.name)
-            # get the integer loglevel from the constants logging.DEBUG, logging.INFO etc.
-            self._logger.log(getattr(logging,level),message)
-        
-    def debug(self,message):
-        """Log a debug message."""
-        self.log("DEBUG",message)
-
-    def info(self,message):
-        """Log an info message."""
-        self.log("INFO",message)
-        
-    def warning(self,message):
-        """Log a warning message."""
-        self.log("WARNING",message)
-        
-    def error(self,message):
-        """Log an error message."""
-        self.log("ERROR",message)
-        
-    def critical(self,message):
-        """Log a critical error message."""
-        self.log("CRITICAL",message)
-
-    def exception(self, message):
-        """Log an exception message. Information about the exception will be fetched using :mod:`traceback`.
-        """
-        if not configured:
-            type, value, tb = sys.exc_info()
-            self.error(message + " Exception: {}".format(value))
-            import traceback
-            traceback.print_tb(tb)
-            del tb # confer sys.exc_info
-        else:
-            if self._logger is None:
-                self._logger = logging.getLogger(self.name)
-            self._logger.exception(message)
-        
-
-def addHandler(handler):
-    for logger in loggers:
-        if logger._logger is not None:
-            logger._logger.addHandler(handler)
 
 
-def removeHandler(handler):
-    for logger in loggers:
-        if logger._logger is not None:
-            logger._logger.removeHandler(handler)
-
-
-def getLogger(name=None):
-    """Return a logger with the given name. If *name* is ``None`` use ``"omg"``. Note that this method works
-    even if logging has not been initialized yet."""
-    if name is None:
-        name = "omg"
-    logger = Logger(name)
-    loggers.add(logger)
-    return logger
-    
 def init():
     """Initialize logging according to the config variable ``config.storage.main.logging``. Of course, you
     must initialize the config module first.
@@ -134,3 +63,71 @@ def shutdown():
     global configured
     logging.shutdown()
     configured = False
+
+    
+def log(name, level, message):
+    """Log a message on the logger called *name* using the given log level."""
+    if not configured:
+        print(" - ".join([level, self.name, message]), file=sys.stderr)
+    else:
+        # get the integer loglevel from the constants logging.DEBUG, logging.INFO etc.
+        logging.log(getattr(logging, level), "{} - {}".format(name, message))
+    
+def debug(name, message):
+    """Log a debug message on the logger called *name*."""
+    log(name, "DEBUG", message)
+
+def info(name, message):
+    """Log an info message on the logger called *name*."""
+    log(name, "INFO", message)
+    
+def warning(name, message):
+    """Log a warning on the logger called *name*."""
+    log(name, "WARNING", message)
+    
+def error(name, message):
+    """Log an error on the logger called *name*."""
+    log(name, "ERROR", message)
+    
+def critical(name, message):
+    """Log a critical error on the logger called *name*."""
+    log(name, "CRITICAL", message)
+    
+def exception(name, message):
+    """Log an exception together with a string *message* on the logger called *name*.
+    Information about the exception will be fetched using :mod:`traceback`."""
+    print("EXCEPTION", message)
+    return
+    if not configured:
+        type, value, tb = sys.exc_info()
+        error(name, message + " Exception: {}".format(value))
+        import traceback
+        traceback.print_tb(tb)
+        del tb # confer sys.exc_info
+    else:
+        logging.exception("{} - {}".format(name, message))
+
+
+class Logger:
+    """This object is initialized with a logger name once and then provides the usual logging methods
+    without that the name must be specified every time."""
+    def __init__(self, name):
+        self.name = name
+        # Add logging methods to Logger class
+        for method in [log, debug, info, warning, error, critical, exception]:
+            setattr(self, method.__name__, functools.partial(method, name))
+
+def getLogger(name):
+    """Create a Logger-instance with the given name."""
+    return Logger(name)
+        
+
+def addHandler(handler):
+    """See https://docs.python.org/3/library/logging.html#logging.Logger.addHandler"""
+    logging.getLogger().addHandler(handler)
+
+
+def removeHandler(handler):
+    """See https://docs.python.org/3/library/logging.html#logging.Logger.removeHandler"""
+    logging.getLogger().removeHandler(handler)
+    

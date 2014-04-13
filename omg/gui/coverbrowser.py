@@ -29,8 +29,6 @@ from .. import database as db, utils, config, worker, search, logging
 from ..core import covers, levels, nodes, tags, elements
 from ..search import criteria
 
-logger = logging.getLogger(__name__)
-
 _displayClasses = {}
 _coverBrowsers = weakref.WeakSet()
 
@@ -40,9 +38,7 @@ def addDisplayClass(key, theClass):
     browser will display a combobox where the user can choose his preferred display class.
     *class* should be a subclass of AbstractCoverWidget."""
     if key in _displayClasses:
-        from .. import logging
-        logger = logging.getLogger(__name__)
-        logger.error("There is already a cover browser display class with key '{}'.".format(key))
+        logging.error(__name__, "There is already a cover browser display class with key '{}'.".format(key))
         return
     
     _displayClasses[key] = theClass
@@ -89,8 +85,8 @@ class CoverBrowser(dockwidget.DockWidget):
             if 'filter' in state:
                 try:
                     self.filterCriterion = search.criteria.parse(state['filter'])
-                except search.criteria.ParseException as e:
-                    logger.warning("Could not parse the cover browser's filter criterion: {}".format(e))
+                except search.criteria.ParseException:
+                    logging.exception(__name__, "Could not parse the cover browser's filter criterion.")
         
         self.worker = worker.Worker()
         self.worker.start()

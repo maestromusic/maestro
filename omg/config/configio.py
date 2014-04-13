@@ -20,8 +20,6 @@ import re, collections, json, os
 
 from .. import logging
 
-logger = logging.getLogger(__name__)
-
 # Pattern to match section headers, normal lines and empty lines/comments in the config files
 sectionPattern = re.compile('\s*(\[+)([^\]]+)(\]+)\s*$')
 linePattern = re.compile('([^=]+)=(.*)$')
@@ -81,7 +79,8 @@ def readConfig(path):
             name = matchObj.group(1).strip()
             value = matchObj.group(2).strip()
             if name in currentSection:
-                logger.warning("Option '{}' appears twice (linenumber {})".format(name,lineNumber))
+                logging.warning(__name__, "Option '{}' appears twice (linenumber {})"
+                                          .format(name, lineNumber))
             currentSection[name] = value
             continue
             

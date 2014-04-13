@@ -19,11 +19,9 @@
 import collections, importlib
 
 from PyQt4 import QtCore
+translate = QtCore.QCoreApplication.translate
 
 from .. import logging, config, constants
-
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class Plugin(object):
@@ -57,7 +55,7 @@ class Plugin(object):
         if not self.loaded:
             self.load()
         if not self.enabled:
-            logger.info("Enabling plugin '{}'...".format(self.name))
+            logging.info(__name__, "Enabling plugin '{}'...".format(self.name))
             if hasattr(self.module,'defaultConfig'):
                 config.optionObject.loadPlugins(self.module.defaultConfig())
             if hasattr(self.module,'defaultStorage'):
@@ -70,9 +68,9 @@ class Plugin(object):
     def disable(self):
         """Disable the plugin with the given name."""
         if not self.enabled:
-            logger.warning("Tried to disable plugin '{}' that was not enabled.".format(self.name))
+            logging.warning(__name__, "Tried to disable plugin '{}' that was not enabled.".format(self.name))
         else:
-            logger.info("Disabling plugin '{}'...".format(self.name))
+            logging.info(__name__, "Disabling plugin '{}'...".format(self.name))
             self.module.disable()
             if hasattr(self.module,'defaultConfig'):
                 config.optionObject.removePlugins(list(self.module.defaultConfig().keys()))
@@ -112,7 +110,7 @@ def init():
         except ImportError:
             if plugindir != '__pycache__':
                 # Print an error and continue
-                logger.error('Could not load plugin {}'.format(plugindir))
+                logging.error(__name__, 'Could not load plugin {}'.format(plugindir))
                 import traceback
                 traceback.print_exc()
 
@@ -135,7 +133,8 @@ def enablePlugins():
                     warning(translate("plugins", "Error enabling plugin"),
                             translate("plugins", "Could not enable plugin {}:\n{}")
                             .format(pluginName, e))
-            else: logger.error("could not enable plugin {} since it does not exist – check your config!"
+            else: logging.error(__name__,
+                                "Could not enable plugin {} since it does not exist – check your config!"
                                 .format(pluginName))
 
 

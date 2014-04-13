@@ -23,9 +23,7 @@ managed by the ProfileManager."""
 
 from PyQt4 import QtCore
 
-from . import config, logging 
-
-logger = logging.getLogger(__name__)
+from . import config
 
 
 class Profile(QtCore.QObject):

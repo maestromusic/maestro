@@ -20,11 +20,10 @@ import os.path
 from collections import OrderedDict
 
 from PyQt4 import QtCore
+translate = QtCore.QCoreApplication.translate
 
 from .. import logging
 
-logger = logging.getLogger(__name__)
-translate = QtCore.QCoreApplication.translate
 
 urlTypes = {}
 """Maps scheme to implementing BackendURL subclass, e.g. "file"->RealFile."""
@@ -125,7 +124,7 @@ class BackendURL:
         except ValueError:
             raise ValueError("Invalid URL (no scheme?): {}".format(urlString)) 
         except KeyError:
-            logger.warning("unknown URL {}".format(urlString))
+            logging.warning(__name__, "Unknown URL {}".format(urlString))
             return UnknownURL(urlString)
             
 
@@ -221,7 +220,7 @@ def changeTags(changes):
         
         currentFileTags = backendFile.tags.copy()
         diff.apply(backendFile, withoutPrivateTags=True)
-        #logger.debug('changing tags of {}: {}'.format(backendFile.url, diff))
+        #logging.debug(__name__, 'changing tags of {}: {}'.format(backendFile.url, diff))
         problems = backendFile.saveTags()
         if problems:
             problemUrl = backendFile.url

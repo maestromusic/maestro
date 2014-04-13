@@ -20,11 +20,10 @@ import pyparsing
 from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums
 
 from PyQt4 import QtCore
+translate = QtCore.QCoreApplication.translate
 
 from ...core import tags
 from ... import config, profiles
-
-translate = QtCore.QCoreApplication.translate
 
     
 def defaultStorage():

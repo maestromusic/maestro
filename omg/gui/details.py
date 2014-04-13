@@ -26,8 +26,6 @@ from . import mainwindow, dockwidget, selection, browser
 from .. import logging, strutils, utils
 from ..core import levels, tags, elements
 
-logger = logging.getLogger(__name__)
-
 
 class DetailsView(dockwidget.DockWidget):
     """A widget that lists all known information about a single element."""
@@ -180,9 +178,8 @@ class DetailsView(dockwidget.DockWidget):
                 try:
                     size = os.stat(el.url.absPath).st_size
                     value += ', '+strutils.formatSize(size)
-                except Exception as e:
-                    logger.debug(str(e))
-                    pass
+                except Exception:
+                    logging.exception(__name__, "Could not read file size.")
             text.append(value)
             text.append('</td></tr>')
             

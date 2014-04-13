@@ -114,20 +114,19 @@ storage = OrderedDict((
     'logging': {
         "version": 1,
         "formatters": {
-            "consoleFormatter": {"format": "%(asctime)s: %(levelname)s - %(name)s - %(message)s"},
-            "fileFormatter": {"format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"},
+            "formatter": {"format": "%(asctime)s: %(levelname)s - %(message)s"},
         },
         "handlers": {
             "consoleHandler": {
                 "class": "logging.StreamHandler",
                 "level": "DEBUG",
-                "formatter": "consoleFormatter",
+                "formatter": "formatter",
                 "stream": "ext://sys.stdout",
             },
             "fileHandler": {
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": "DEBUG",
-                "formatter": "fileFormatter",
+                "formatter": "formatter",
                 "filename": os.path.join(os.path.expanduser("~"),".config", "omg","omg.log"),
                 "mode": 'a',
                 "maxBytes": 2000,

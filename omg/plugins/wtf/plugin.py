@@ -22,6 +22,7 @@ import functools, os, os.path, shutil, copy
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from ... import utils, profiles, config, application, database as db, search, logging
 from ...core import levels
@@ -30,7 +31,6 @@ from ...gui.misc import collapsiblepanel
 from ...gui.preferences import profiles as profilesgui
 from ...search import criteria
 
-translate = QtCore.QCoreApplication.translate
 
 _action = None # the action that is inserted into the Extras menu
 _widget = None # the dialog widget must be stored in a variable or it will vanish immediately
@@ -38,8 +38,6 @@ _widget = None # the dialog widget must be stored in a variable or it will vanis
 profileCategory = None
 
 STRUCTURE_KEEP, STRUCTURE_FLAT = range(2)
-
-logger = logging.getLogger("wtf")
 
 
 def enable():

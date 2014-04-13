@@ -157,7 +157,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     # Initialize logging as early as possible -- but after the config variables have been read.
     logging.init()
     global logger
-    logger = logging.getLogger("omg")
+    logger = logging.getLogger(__name__)
     
     # install a global exception handler so that exceptions are passed to the logging module
     def exceptionHandler(type, value, tb):

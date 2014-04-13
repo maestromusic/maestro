@@ -17,6 +17,7 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from ... import config, logging
 from ...gui import treeview, treeactions, delegates
@@ -25,9 +26,6 @@ from ...gui.preferences import profiles as profilesgui
 from ...models import leveltreemodel
 from ...core import levels
 from . import plugin
-
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class RenameFilesAction(treeactions.TreeAction):

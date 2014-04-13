@@ -20,12 +20,10 @@ import copy, collections
 
 from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from ... import config, profiles, logging
 from ...core import tags
-
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class DelegateProfileCategory(profiles.TypedProfileCategory):
@@ -163,8 +161,8 @@ class DelegateProfile(profiles.Profile):
                 for string in state[column]:
                     try:
                         aList.append(DataPiece.fromString(string))
-                    except ValueError as e:
-                        logger.exception(e)
+                    except ValueError:
+                        logging.exception(__name__, "Exception when updating profile.")
                         # continue anyway
                 setattr(self,'leftData' if column == 'left' else 'rightData',aList)
     
@@ -344,7 +342,7 @@ class DelegateOption:
             try:
                 return int(value)
             except ValueError:
-                logger.warning("Invalid int in delegate configuration in storage file.")
+                logging.warning(__name__, "Invalid int in delegate configuration in storage file.")
                 return None
         elif self.type == 'bool':
             return value == 'True'
@@ -358,7 +356,7 @@ class DelegateOption:
                 try:
                     return DataPiece.fromString(value)
                 except ValueError:
-                    logger.warning("Invalid datapiece in delegate configuration in storage file.")
+                    logging.warning(__name__, "Invalid datapiece in delegate configuration in storage file.")
                     return None
 
  

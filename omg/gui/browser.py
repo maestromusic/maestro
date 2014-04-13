@@ -20,6 +20,7 @@ import functools
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from .. import application, config, database as db, logging, utils, search
 from ..core import tags, flags, levels
@@ -28,9 +29,6 @@ from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockw
 from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
 
-
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 defaultBrowser = None
 
@@ -159,8 +157,8 @@ class Browser(dockwidget.DockWidget):
                                 theClass = browsermodel.layerClasses[className][1]
                                 layer = theClass(self, state=layerState)
                                 layers.append(layer)
-                        except Exception as e:
-                            logger.warning("Could not parse a layer of the browser: {}".format(e))
+                        except Exception:
+                            logging.exception(__name__, "Could not parse a layer of the browser.")
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
@@ -168,8 +166,8 @@ class Browser(dockwidget.DockWidget):
             if 'filter' in state:
                 try:
                     self.filterCriterion = search.criteria.parse(state['filter'])
-                except search.criteria.ParseException as e:
-                    logger.warning("Could not parse the browser's filter criterion: {}".format(e))
+                except search.criteria.ParseException:
+                    logging.exception(__name__, "Could not parse the browser's filter criterion.")
             if 'delegate' in state:
                 self.delegateProfile = delegates.profiles.category.getFromStorage(
                                                             state.get('delegate'),

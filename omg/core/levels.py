@@ -19,13 +19,11 @@
 import weakref
 
 from PyQt4 import QtCore, QtGui
+translate = QtCore.QCoreApplication.translate
 
 from . import elements, tags, flags, stickers, stack
 from .nodes import Wrapper
 from .. import application, filebackends, database as db, logging
-
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 allLevels = weakref.WeakSet()
@@ -729,8 +727,8 @@ class Level(application.ChangeEventDispatcher):
                         raise ValueError("Invalid wrapper string: {} is not contained in {}."
                                          .format(wrapper.element.id, currentWrapper.element.id))
                     currentList.append(wrapper)
-                except ElementGetError as e:
-                    logger.warning(str(e))
+                except ElementGetError:
+                    logging.exception(__name__, "Error reading a WrapperString")
                     continue
         return roots
     

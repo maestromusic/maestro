@@ -26,7 +26,6 @@ from ..core import elements, levels, tags, stack
 from ..core.elements import Element
 from .. import application, config, constants, logging
 
-logger = logging.getLogger(__name__)
 
 _processor = None # the single instance of AutoTagProcessor used by all EditorModels
 
@@ -258,23 +257,25 @@ class AutoTagProcessor:
         self.autoDeleteTags = []
         for tagName in config.options.tags.auto_delete:
             if not tags.isValidTagName(tagName):
-                logger.error("Found an invalid tagname '{}' in config option tags.auto_delete."
-                             .format(tagName))
+                logging.error(__name__, "Found an invalid tagname '{}' in config option tags.auto_delete."
+                                        .format(tagName))
             else: self.autoDeleteTags.append(tags.get(tagName))
             
         self.autoReplaceTags = {}
         try:
             pairs = self._parseAutoReplace()
         except ValueError:
-            logger.error("Invalid syntax in config option tags.auto_replace.")
+            logging.error(__name__, "Invalid syntax in config option tags.auto_replace.")
         else:
             for oldName,newName in pairs:
                 for tagName in [oldName,newName]:
                     if not tags.isValidTagName(tagName):
-                        logger.error("Found an invalid tagname '{}' in config option tags.auto_replace."
+                        logging.error(__name__,
+                                      "Found an invalid tagname '{}' in config option tags.auto_replace."
                                      .format(tagName))
                 if tags.get(oldName) in self.autoReplaceTags:
-                    logger.error("Tag '{}' appears twice in config option tags.auto_replace.".format(oldName))
+                    logging.error(__name__, "Tag '{}' appears twice in config option tags.auto_replace."
+                                            .format(oldName))
                 else: self.autoReplaceTags[tags.get(oldName)] = tags.get(newName)
                 
         self.processed = {}
@@ -319,8 +320,8 @@ class AutoTagProcessor:
                     try:
                         value = newTag.convertValue(string,crop=True)
                     except tags.TagValueError:
-                        logger.error("Invalid value for tag '{}' (replacing '{}') found: {}"
-                                     .format(newTag.name,tag.name,string))
+                        logging.error(__name__, "Invalid value for tag '{}' (replacing '{}') found: {}"
+                                                .format(newTag.name,tag.name,string))
                     else:
                         if newTag not in element.tags or value not in element.tags[newTag]:
                             newValues.append(value)

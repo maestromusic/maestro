@@ -16,13 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore
-
 from . import criteria
-from .. import database as db, config, logging
+from .. import database as db, config
 from ..core import tags
-
-logger = logging.getLogger(__name__)
 
 # Name of the temporary search table
 # The table is created in the search thread and temporary, so that it does not conflict with other threads.
@@ -57,7 +53,6 @@ def search(searchCriterion, abortSwitch=None):
     If *abortSwitch* is given, it is called during the algorithm. By throwing an exception in abortSwitch,
     this provides a way to abort a running search."""
     for criterion in searchCriterion.getCriteriaDepthFirst():
-        #logger.debug("Processing criterion: ".format(criterion))
         if not isinstance(criterion, criteria.MultiCriterion):
             for queryData in criterion.getQueries(db.prefix+"elements"):
                 #print(queryData)

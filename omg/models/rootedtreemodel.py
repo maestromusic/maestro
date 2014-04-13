@@ -20,12 +20,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ..gui import selection
-from .. import logging, config
+from .. import config
 from ..core.nodes import Node, RootNode, Wrapper
 from ..core import elements, levels, tags
-
-
-logger = logging.getLogger(__name__)
 
 
 class RootedTreeModel(QtCore.QAbstractItemModel):

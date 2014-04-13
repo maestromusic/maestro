@@ -26,7 +26,6 @@ from ..core import elements, levels, nodes, stack
 from ..models import rootedtreemodel
 
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class LevelTreeModel(rootedtreemodel.RootedTreeModel):
@@ -200,8 +199,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 self.guessProfile.guessAlbums(self.level, filesByFolder)
                 self.level.stack.endMacro()
                 return self.guessProfile.toplevels
-        except levels.ElementGetError as e:
-            logger.warning(str(e))
+        except levels.ElementGetError:
+            logging.exception(__name__, "Error while loading elements.")
             macro.abort()
             return []
         

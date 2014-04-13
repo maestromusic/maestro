@@ -49,15 +49,15 @@ class AcoustIDIdentifier:
     def __call__(self, url):
         try:
             data = subprocess.check_output(['fpcalc', url.absPath])
-        except OSError as e: # fpcalc not found, not executable etc.
+        except OSError: # fpcalc not found, not executable etc.
             global _logOSError
             if _logOSError:
                 _logOSError = False # This error will always occur  - don't print it again.
-                logger.warning(e)
+            logger.exception("Exception when computing audio fingerprint.")
             return self.fallbackHash(url)
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             # fpcalc returned non-zero exit status
-            logger.warning(e)
+            logger.exception("Exception when computing audio fingerprint.")
             return self.fallbackHash(url)
         data = data.decode(sys.getfilesystemencoding())
         if len(data) == 0:

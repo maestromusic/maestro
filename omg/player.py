@@ -17,11 +17,9 @@
 #
 
 from PyQt4 import QtCore
-
-from . import config, logging, profiles
-
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
+
+from . import config, profiles
 
 STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)

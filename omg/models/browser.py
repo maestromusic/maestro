@@ -20,6 +20,7 @@ import itertools, collections
 
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from . import rootedtreemodel
 from .. import config, search, database as db, logging, utils, search, worker
@@ -28,8 +29,6 @@ from ..core.elements import Element
 from ..core.nodes import Node, RootNode, Wrapper, TextNode
 from ..gui import selection
 
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 # Registered layer classes. Maps names -> (title, class)
 layerClasses = collections.OrderedDict()
@@ -228,13 +227,13 @@ class LoadTask(worker.Task):
     def process(self):
         if self.criterion is not None:
             elids = search.search(self.criterion, abortSwitch=self.checkWorkerState) # see worker.py
-            #logger.debug("Found {} elements.".format(len(elids)))
+            #logging.debug(__name__, "Found {} elements.".format(len(elids)))
         else: elids = None
         import time
         #time.sleep(1)
-        #logger.debug("Start building contents...")
+        #logging.debug(__name__, "Start building contents...")
         self.contents = self.layer.build(elids)
-        #logger.debug("Build contents. Toplevel: {}".format(len(self.contents)))
+        #logging.debug(__name__, "Build contents. Toplevel: {}".format(len(self.contents)))
     
     def __repr__(self):
         return "<TASK:{},{}>".format(self.node,self.criterion)
@@ -258,7 +257,7 @@ class TagLayer:
             assert state is not None
             tagList = [tags.get(name) for name in state]
         if any(tag.type != tags.TYPE_VARCHAR for tag in tagList):
-            logger.warning("Only tags of type varchar are permitted in the browser's layers.")
+            logging.warning(__name__, "Only tags of type varchar are permitted in the browser's layers.")
             tagList = {tag for tag in tagList if tag.type == tags.TYPE_VARCHAR}
         self.tagList = tagList
         
@@ -677,8 +676,8 @@ class BrowserMimeData(selection.MimeData):
         elif isinstance(node, (CriterionNode, HiddenValuesNode)):
             try:
                 self._loadContents(node)
-            except RuntimeError as e:
-                logger.debug(str(e))
+            except RuntimeError:
+                logging.exception(__name__, "Exception when loading elements instantly.")
                 return []
             return itertools.chain.from_iterable(self._getElementsInstantly(child)
                                                  for child in node.contents)

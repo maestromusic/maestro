@@ -56,7 +56,6 @@ from . import stack
 from ..application import ChangeEvent
 
 translate = QtGui.QApplication.translate
-logger = logging.getLogger(__name__)
 
 
 # Module variables - Will be initialized with the first call of init.
@@ -99,7 +98,7 @@ def init():
     from omg import database as db
     
     if db.prefix+'tagids' not in db.listTables():
-        logger.error("tagids-table is missing")
+        logging.error(__name__, "tagids-table is missing")
         raise RuntimeError()
     
     loadTagTypesFromDB()
@@ -119,7 +118,7 @@ def loadTagTypesFromDB():
     try:
         result = db.query("SELECT id, tagname, tagtype, title, icon, private FROM {p}tagids ORDER BY sort")
     except db.sql.DBException:
-        logger.error("Could not fetch tags from tagids table.")
+        logging.error(__name__, "Could not fetch tags from tagids table.")
         raise RuntimeError()
         
     for row in result:
@@ -179,7 +178,8 @@ class ValueType:
             if len(string.encode()) > constants.TAG_VARCHAR_LENGTH:
                 if crop:
                     if logCropping:
-                        logger.warning('Cropping a string that is too long for varchar tags: {}...'
+                        logging.warning(__name__,
+                                        'Cropping a string that is too long for varchar tags: {}...'
                                        .format(string[:30]))
                     # Of course this might split in the middle of a unicode character. But errors='ignore'
                     # will silently remove the fragments 
@@ -217,9 +217,10 @@ class ValueType:
         """Convert *value* into a string that can be inserted into database queries."""
         if self.name == 'varchar':
             if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
-                logger.error("Attempted to encode the following string for a varchar column although its "
-                             "encoded size exceeds constants.TAG_VARCHAR_LENGTH. The string will be "
-                             "truncated: '{}'.".format(value))
+                logging.error(__name__,
+                              "Attempted to encode the following string for a varchar column although its "
+                              "encoded size exceeds constants.TAG_VARCHAR_LENGTH. The string will be "
+                              "truncated: '{}'.".format(value))
             return value
         elif self.name == 'text':
             return value
@@ -505,7 +506,7 @@ def _addTagType(tagType, data):
         # Store id so that when this tag is added to the database again (after undo),
         # it will get the same id.
         data['id'] = tagType.id
-    logger.info("Added new tag '{}' of type '{}'.".format(tagType.name, tagType.type.name))
+    logging.info(__name__, "Added new tag '{}' of type '{}'.".format(tagType.name, tagType.type.name))
 
     _tagsById[tagType.id] = tagType
     application.dispatcher.emit(TagTypeChangedEvent(ADDED, tagType))
@@ -538,7 +539,7 @@ def _removeTagType(tagType):
     """Like removeTagType, but not undoable: Remove a tag type from the database, including all its values
     and relations. This will not touch any files though!
     """
-    logger.info("Removing tag type '{}'.".format(tagType.name))
+    logging.info(__name__, "Removing tag type '{}'.".format(tagType.name))
     db.query("DELETE FROM {p}tagids WHERE id=?", tagType.id)
     db.query("UPDATE {p}tagids SET sort=sort-1 WHERE sort > ?", tagList.index(tagType))
     del _tagsById[tagType.id]
@@ -590,8 +591,8 @@ def _changeTagType(tagType, ata):
         type = data['type']
         if not isinstance(type, ValueType):
             raise ValueError("'{}' is not a ValueType.".format(type))
-        logger.info("Changing type of tag '{}' from '{}' to '{}'."
-                    .format(tagType.name, tagType.type.name, type.name))
+        logging.info(__name__, "Changing type of tag '{}' from '{}' to '{}'."
+                               .format(tagType.name, tagType.type.name, type.name))
         assignments.append('tagtype = ?')
         params.append(type.name)
         tagType.type = type

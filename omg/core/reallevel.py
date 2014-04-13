@@ -19,10 +19,8 @@
 import itertools
 
 from . import elements, levels, tags, flags, stack
-from .. import application, database as db, filebackends, logging
+from .. import application, database as db, filebackends
 from ..database import write
-
-logger = logging.getLogger(__name__)
 
 
 # The ids of all elements that are in the database and have been loaded to some level 

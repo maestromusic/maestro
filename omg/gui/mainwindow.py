@@ -55,8 +55,6 @@ from . import selection,dialogs
 # This will contain the single instance of MainWindow once it is initialized
 mainWindow = None
 
-logger = logging.getLogger(__name__)
-
 # Data about the available widgets
 _widgetData = []
 
@@ -71,7 +69,7 @@ DEFAULT_PERSPECTIVE = ''
 def addWidgetData(data):
     """Add widget data to the list of registered widgets."""
     if data in _widgetData:
-        logger.warning("Attempt to add widget data twice: {}".format(data))
+        logging.warning(__name__, "Attempt to add widget data twice: {}".format(data))
     else: _widgetData.append(data)
     if mainWindow is not None:
         mainWindow._widgetDataAdded(data)
@@ -81,7 +79,7 @@ def removeWidgetData(id):
     """Remove the WidgetData instance with the given id from the list of registered widgets."""
     data = WidgetData.fromId(id)
     if data is None:
-        logger.warning("Attempt to remove nonexistent widget data: {}".format(id))
+        logging.warning(__name__, "Attempt to remove nonexistent widget data: {}".format(id))
     else: _widgetData.remove(data)
     if mainWindow is not None:
         mainWindow._widgetDataRemoved(data)
@@ -178,8 +176,8 @@ class MainWindow(QtGui.QMainWindow):
         if DEFAULT_PERSPECTIVE in config.storage.gui.perspectives:
             try:
                 self.restorePerspective()
-            except Exception as e:
-                logger.exception(e)
+            except Exception:
+                logging.exception(__name__, "Exception when restoring perspective.")
                 self.createDefaultWidgets()
         else: self.createDefaultWidgets()
         self.updateWidgetMenus()  # view menu can only be initialized after all widgets have been created
@@ -418,7 +416,7 @@ class MainWindow(QtGui.QMainWindow):
             # plugin has been removed since the last application shutdown). Simply do not load this widget
             if data is not None:
                 widget = self.addCentralWidget(data,state)
-            else: logger.info("Could not load central widget '{}'".format(data))
+            else: logging.info(__name__, "Could not load central widget '{}'".format(data))
         if perspective['centralTabIndex'] < self.centralWidget().count():
             self.centralWidget().setCurrentIndex(perspective['centralTabIndex'])
 
@@ -429,8 +427,8 @@ class MainWindow(QtGui.QMainWindow):
             if data is not None:  # As above it may happen that data is None.
                 widget = self._createDockWidget(data,DockLocation(*location),objectName,state)
                 dockWidgets.append(widget)
-            else: logger.info("Could not load dock widget '{}' with object name '{}'"
-                              .format(data,objectName))
+            else: logging.info(__name__, "Could not load dock widget '{}' with object name '{}'"
+                                         .format(data,objectName))
 
         self.hideTitleBarsAction.setChecked(perspective['hideTitleBars'])
 

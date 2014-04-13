@@ -24,8 +24,6 @@ from ..core import flags
 from ..search import criteria
 from .misc.lineedits import IconLineEdit
 
-logger = logging.getLogger(__name__)
-
 
 class SearchBox(IconLineEdit):
     """This is a lineedit that will parse the given text as a search criterion and will emit criterionChanged
@@ -76,7 +74,7 @@ class SearchBox(IconLineEdit):
             try:
                 criterion = criteria.parse(self.text())
             except criteria.ParseException as e:
-                logger.info(str(e))
+                logging.info(__name__, str(e))
                 return
             if criterion != self._criterion:
                 self._criterion = criterion

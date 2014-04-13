@@ -18,11 +18,10 @@
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from ... import utils, logging, config
 
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 # Toplevel panels. Map path to Panel instance
 panels = utils.OrderedDict()
@@ -77,11 +76,11 @@ class Panel:
                 module = importlib.import_module('.'+self._callable[0], 'omg')
                 self._callable = (getattr(module, self._callable[1]), ) + self._callable[2:]
             except ImportError:
-                logger.error("Cannot import module '{}'".format(self._callable[0]))
+                logging.exception(__name__, "Cannot import module '{}'".format(self._callable[0]))
                 self._callable = None
             except AttributeError:
-                logger.error("Module '{}' has no attribute '{}'"
-                             .format(self._callable[0], self._callable[1]))
+                logging.error(__name__, "Module '{}' has no attribute '{}'"
+                                        .format(self._callable[0], self._callable[1]))
                 self._callable = None
                 
         if self._callable is None:

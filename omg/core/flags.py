@@ -23,8 +23,6 @@ from . import stack
 from ..constants import ADDED, DELETED, CHANGED
 from ..application import ChangeEvent
 
-
-logger = logging.getLogger(__name__)
 translate = QtGui.QApplication.translate
 
 _flagsById = None
@@ -130,8 +128,8 @@ def addFlagType(name, **data):
         raise ValueError("'{}' is not a valid flagname.".format(name))
     flagType = Flag(name, **data)
     stack.push(translate("Flags", "Add flag type"),
-               Call(_addFlagType, flagType),
-               Call(_deleteFlagType, flagType))
+               stack.Call(_addFlagType, flagType),
+               stack.Call(_deleteFlagType, flagType))
     return flagType
     
     
@@ -141,7 +139,7 @@ def _addFlagType(flagType):
     """
     flagType.id = db.query("INSERT INTO {p}flag_names (name, icon) VALUES (?,?)",
                            flagType.name, flagType.iconPath).insertId()
-    logger.info("Added new flag '{}'".format(flagType.name))
+    logging.info(__name__, "Added new flag '{}'".format(flagType.name))
     
     _flagsById[flagType.id] = flagType
     _flagsByName[flagType.name] = flagType
@@ -151,8 +149,8 @@ def _addFlagType(flagType):
 def deleteFlagType(flagType):
     """Delete a flagtype from the database."""
     stack.push(translate("Flags", "Delete flag type"),
-               Call(_deleteFlagType, flagType),
-               Call(_addFlagType, flagType))
+               stack.Call(_deleteFlagType, flagType),
+               stack.Call(_addFlagType, flagType))
     
     
 def _deleteFlagType(flagType):
@@ -160,7 +158,7 @@ def _deleteFlagType(flagType):
     if not exists(flagType.name):
         raise ValueError("Cannot remove flagtype '{}' because it does not exist.".format(flagType))
     
-    logger.info("Removing flag '{}'.".format(flagType))
+    logging.info(__name__, "Removing flag '{}'.".format(flagType))
     db.query("DELETE FROM {p}flag_names WHERE id = ?", flagType.id)
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
@@ -174,8 +172,8 @@ def changeFlagType(flagType, **data):
     """
     oldData = {'name': flagType.name, 'iconPath': flagType.iconPath}
     stack.push(translate("Flags", "Change flag type"),
-               Call(_changeFlagType, flagType, **data),
-               Call(_changeFlagType, flagType, **oldData))
+               stack.Call(_changeFlagType, flagType, **data),
+               stack.Call(_changeFlagType, flagType, **oldData))
     
     
 def _changeFlagType(flagType, **data):
@@ -190,7 +188,7 @@ def _changeFlagType(flagType, **data):
         if name != flagType.name:
             if exists(name):
                 raise ValueError("There is already a flag named '{}'.".format(name))
-            logger.info("Changing flag name '{}' to '{}'.".format(flagType.name, name))
+            logging.info(__name__, "Changing flag name '{}' to '{}'.".format(flagType.name, name))
             assignments.append('name = ?')
             params.append(name)
             del _flagsByName[flagType.name]

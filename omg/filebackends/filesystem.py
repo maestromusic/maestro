@@ -19,18 +19,15 @@
 """This module implements the BackendFile and BackendURL for files on the local filesystem."""
 
 from collections import OrderedDict
-import os.path
+import os.path, taglib
 
 from PyQt4 import QtCore
-
-import taglib
+translate = QtCore.QCoreApplication.translate
 
 from . import BackendFile, BackendURL, urlTypes
 from .. import logging, utils
 from ..core import tags
 
-logger = logging.getLogger(__name__)
-translate = QtCore.QCoreApplication.translate
 
 def init():
     # register the file:// URL scheme
@@ -73,11 +70,12 @@ class RealFile(BackendFile):
                     try:
                         validValues.append(tag.convertValue(string, crop=True))
                     except tags.TagValueError:
-                        logger.error("Invalid value for tag '{}' found: {}".format(tag.name, string))
+                        logging.error(__name__,
+                                      "Invalid value for tag '{}' found: {}".format(tag.name, string))
                 if len(validValues) > 0:
                     self.tags.add(tag, *validValues)
             else:
-                logger.error("Invalid tag name '{}' found : {}".format(key, self.url))
+                logging.error(__name__, "Invalid tag name '{}' found : {}".format(key, self.url))
         
     @property
     def length(self):

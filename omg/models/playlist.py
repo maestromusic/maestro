@@ -26,8 +26,6 @@ from .. import config, logging, player, utils, filebackends
 from ..core import levels
 from ..core.nodes import RootNode, Wrapper
 
-logger = logging.getLogger(__name__)
-
  
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     """Model for Playlists of a player backend."""
@@ -486,8 +484,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             return Wrapper(element, parent=parent)
         try:
             wrappers = self.level.createWrappers(wrapperString, createFunc=_createFunc)
-        except ValueError as e:
-            logger.warning(str(e))
+        except ValueError:
+            logging.exception(__name__, "Error reading a WrapperString")
             return False
         self._setRootContents(wrappers)
         return True
