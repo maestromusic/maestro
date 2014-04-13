@@ -22,7 +22,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 
 from .abstractdelegate import *
-from ... import config, strutils, database as db, utils
+from ... import config, database as db, utils
 from ...core import tags, levels, elements
 from ...core.nodes import RootNode, Wrapper, TextNode
 from ...models import browser as browsermodel
@@ -252,7 +252,7 @@ class StandardDelegate(AbstractDelegate):
             elif dataPiece.data == "length":
                 length = wrapper.getLength()
                 if length is not None:
-                    return strutils.formatLength(length)
+                    return utils.strings.formatLength(length)
                 else: return ''
             elif dataPiece.data == "filecount":
                 if wrapper.isFile():

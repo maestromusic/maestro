@@ -23,7 +23,7 @@ import re, string, unicodedata
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import constants
+from .. import constants
 
 
 def replace(text, dict):

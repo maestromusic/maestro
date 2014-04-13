@@ -18,7 +18,7 @@
 
 from PyQt4 import QtCore
 
-from ... import config, database as db, strutils
+from ... import config, database as db, utils
 from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
@@ -364,7 +364,7 @@ class SearchValuesCheck(Check):
         for id, value, searchValue in result:
             if db.isNull(searchValue):
                 searchValue = None
-            correct = strutils.removeDiacritics(value)
+            correct = utils.strings.removeDiacritics(value)
             if correct == value:
                 correct = None
             if correct != searchValue:

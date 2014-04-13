@@ -21,10 +21,12 @@ from datetime import date, datetime, timezone
 from os.path import getmtime
 
 from PyQt4 import QtCore, QtGui
-
-from . import config, strutils
-
 translate = QtCore.QCoreApplication.translate
+
+# include submodules so that 'import utils' suffices to support 'utils.strings. ...'
+from . import worker, strings
+from .. import config
+
 
 def mapRecursively(f,aList):
     """Take *aList* which may contain (recursively) further lists and apply *f* to each element in these
@@ -91,7 +93,7 @@ def collectFiles(urls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
     are received. Return a dict mapping directory to list of FileURLs within. Sort directories and files.
     """
-    from .filebackends.filesystem import FileURL
+    from ..filebackends.filesystem import FileURL
     filePaths = collections.OrderedDict()
     
     def add(file, parent=None):
@@ -131,7 +133,7 @@ def collectFilesAsList(urls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
     are received. Return a list of FileURLs. Sort files within each directory, but not the list as whole.
     """
-    from .filebackends.filesystem import FileURL
+    from ..filebackends.filesystem import FileURL
     def checkUrl(url):
         path = url.path()
         if os.path.isfile(path):
@@ -253,7 +255,7 @@ class FlexiDate:
         # These formats are allowed in the ID3 specification and used by Mutagen
         if crop and re.match("\d{4}-\d{2}-\d{2} \d{2}(:\d{2}){0,2}$",string) is not None:
             if logCropping:
-                from . import logging
+                from .. import logging
                 logging.getLogger(__name__).warning("dropping time of day in date string '{}'"
                                                     .format(string))
             string = string[:10]
@@ -266,7 +268,7 @@ class FlexiDate:
             pass
         
         # now use locale
-        string = strutils.replace(string,{'/':'-','.':'-'}) # Recognize all kinds of separators
+        string = strings.replace(string,{'/':'-','.':'-'}) # Recognize all kinds of separators
         try:
             numbers = [int(n) for n in string.split('-')]
             if len(numbers) > 3:
@@ -313,7 +315,7 @@ class FlexiDate:
     @staticmethod
     def fromSql(value):
         """Create a FlexiDate from an int as used to store FlexiDates in the database."""
-        from omg import database
+        from .. import database
         if database.isNull(value):
             return None
         try:

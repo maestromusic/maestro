@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, dockwidget, selection, browser
-from .. import logging, strutils, utils
+from .. import logging, utils
 from ..core import levels, tags, elements
 
 
@@ -173,11 +173,11 @@ class DetailsView(dockwidget.DockWidget):
         # Length, Size
         if el.isFile():
             text.append('<tr><td>'+self.tr("Size: ")+'</td><td>')
-            value = strutils.formatLength(el.length)
+            value = utils.strings.formatLength(el.length)
             if el.url.scheme == 'file':
                 try:
                     size = os.stat(el.url.absPath).st_size
-                    value += ', '+strutils.formatSize(size)
+                    value += ', '+utils.strings.formatSize(size)
                 except Exception:
                     logging.exception(__name__, "Could not read file size.")
             text.append(value)

@@ -59,7 +59,7 @@ import os, threading, functools
 from PyQt4 import QtCore
 
 from . import sql
-from .. import config, logging, utils, constants, strutils
+from .. import config, logging, utils, constants
 from ..core import tags as tagsModule
 
 # Table type and prefix
@@ -434,7 +434,7 @@ def idFromValue(tagSpec, value, insert=False):
     except sql.EmptyResultException:
         if insert:
             if tag.type is tagsModule.TYPE_VARCHAR:
-                searchValue = strutils.removeDiacritics(value)
+                searchValue = utils.strings.removeDiacritics(value)
                 if searchValue == value:
                     searchValue = None
                 result = query("INSERT INTO {p}values_varchar (tag_id,value,search_value) VALUES (?,?,?)",

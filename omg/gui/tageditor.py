@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import strutils, utils, config, logging, filebackends
+from .. import utils, config, logging, filebackends
 from ..core import tags, levels, stack
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
@@ -519,21 +519,21 @@ class TagEditorWidget(QtGui.QWidget):
 
         if len(selectedRecords) > 0:
             if len(selectedRecords) > 1 and all(r.tag.type == tags.TYPE_VARCHAR for r in selectedRecords):
-                commonPrefix = strutils.commonPrefix([record.value for record in selectedRecords],
-                                                     separated=True)
+                commonPrefix = utils.strings.commonPrefix([record.value for record in selectedRecords],
+                                                          separated=True)
                 
                 if len(commonPrefix) > 0:
                     action = fancyMenu.addAction(self.tr("Edit common start..."))
                     action.triggered.connect(self._editCommonStart)
                     
-                    commonPrefix = strutils.commonPrefix([record.value for record in selectedRecords],
-                                                         separated=True)
+                    commonPrefix = utils.strings.commonPrefix([record.value for record in selectedRecords],
+                                                              separated=True)
                     if len(commonPrefix) > 0:
                         rests = [record.value[len(commonPrefix):] for record in selectedRecords]
-                        if any(strutils.numberFromPrefix(rest)[0] is not None for rest in rests):
+                        if any(utils.strings.numberFromPrefix(rest)[0] is not None for rest in rests):
                             newValues = []
                             for record, rest in zip(selectedRecords, rests):
-                                number, prefix = strutils.numberFromPrefix(rest)
+                                number, prefix = utils.strings.numberFromPrefix(rest)
                                 if number is not None:
                                     newValues.append(record.value[len(commonPrefix)+len(prefix):])
                                 else: newValues.append(record.value[len(commonPrefix):])
@@ -553,10 +553,10 @@ class TagEditorWidget(QtGui.QWidget):
                 else:
                     action = fancyMenu.addAction(self.tr("Add common start..."))
                     action.triggered.connect(self._editCommonStart)
-                    if any(strutils.numberFromPrefix(r.value)[0] is not None for r in selectedRecords):
+                    if any(utils.strings.numberFromPrefix(r.value)[0] is not None for r in selectedRecords):
                         # Remove the prefix returned in the second tuple part
-                        newValues = [r.value[len(strutils.numberFromPrefix(r.value)[1]):]
-                                        for r in selectedRecords]
+                        newValues = [r.value[len(utils.strings.numberFromPrefix(r.value)[1]):]
+                                     for r in selectedRecords]
                         if all(record.tag.isValid(value)
                                for record, value in zip(selectedRecords, newValues)):
                             action = fancyMenu.addAction(self.tr("Remove numbers from beginning"))
@@ -597,7 +597,7 @@ class TagEditorWidget(QtGui.QWidget):
     def _editCommonStart(self):
         """Handle 'edit common start' action from context menu."""
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
-        commonStart = strutils.commonPrefix(str(record.value) for record in selectedRecords)
+        commonStart = utils.strings.commonPrefix(str(record.value) for record in selectedRecords)
         text, ok = QtGui.QInputDialog.getText(self, self.tr("Edit common start"),
                          self.tr("Insert a new text which will replace the common start "
                                  "of all selected records:"),

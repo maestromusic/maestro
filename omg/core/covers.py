@@ -22,7 +22,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import config, logging, worker
+from .. import config, logging, utils
 from . import tags
 from .elements import Element
 
@@ -180,8 +180,9 @@ def removeUnusedCovers():
                         os.remove(os.path.join(COVER_DIR, folder, cacheFile))
     
 
-class LoadCoverTask(worker.LoadImageTask):
-    """A task to load a cover asynchronously using a worker.Worker. *path* and *size* are used as in 'get'.
+class LoadCoverTask(utils.worker.LoadImageTask):
+    """A task to load a cover asynchronously using a utils.worker.Worker.
+    *path* and *size* are used as in 'get'.
     """
     def __init__(self, path, size=None):
         super().__init__(path, QtCore.QSize(size, size) if size is not None else None)

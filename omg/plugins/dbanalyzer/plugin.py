@@ -23,7 +23,7 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, application, constants, config, strutils
+from omg import database as db, application, constants, config, utils
 from omg.gui import mainwindow
 from . import resources, checks
 
@@ -274,7 +274,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
             (self.tr("Files"),db.query(
                     "SELECT COUNT(*) FROM {}files"
                         .format(db.prefix)).getSingle()),
-            (self.tr("Total Length"),strutils.formatLength(length)),#str(datetime.timedelta(seconds=length))),
+            (self.tr("Total Length"), utils.strings.formatLength(length)),
             (self.tr("Containers"),db.query(
                     "SELECT COUNT(*) FROM {}elements WHERE file = 0"
                         .format(db.prefix)).getSingle()),

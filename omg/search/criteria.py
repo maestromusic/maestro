@@ -21,7 +21,7 @@ import pyparsing
 from pyparsing import Optional, MatchFirst, Suppress, CharsNotIn, Word
 from pyparsing import Literal, Combine, ZeroOrMore, Group, Forward, OneOrMore
 
-from .. import database as db, strutils
+from .. import database as db, utils
 from ..core import tags, flags
 
 # Initialized in search.init
@@ -432,7 +432,7 @@ class TagCriterion(Criterion):
                 if valueType == tags.TYPE_VARCHAR:
                     if self.binary:
                        value = self.value
-                    else: value = strutils.removeDiacritics(self.value) 
+                    else: value = utils.strings.removeDiacritics(self.value) 
                     if db.type == 'mysql':
                         if not self.singleWord:
                             if self.binary:

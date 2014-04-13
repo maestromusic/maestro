@@ -22,7 +22,7 @@ translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, dialogs, dockwidget
 from .preferences import profiles as profilesgui
-from .. import player, utils, strutils
+from .. import player, utils
 from ..core import levels
 
 renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
@@ -99,10 +99,10 @@ class PlaybackWidget(dockwidget.DockWidget):
         if current is None:
             text = ""
         elif current.element.length > 0:
-            text = "{} - {}".format(strutils.formatLength(value),
-                                  strutils.formatLength(self.seekSlider.maximum()))
+            text = "{} - {}".format(utils.strings.formatLength(value),
+                                    utils.strings.formatLength(self.seekSlider.maximum()))
         else:
-            text = strutils.formatLength(value)
+            text = utils.strings.formatLength(value)
             self.seekSlider.setEnabled(False)
         self.seekLabel.setText(text)
         
@@ -509,6 +509,6 @@ class SeekSlider(QtGui.QSlider):
         if event.type() == QtCore.QEvent.ToolTip and self.backend is not None \
                 and self.backend.current() is not None:
             seconds = int(event.x() / self.width() * self.backend.current().element.length)
-            self.setToolTip(self.tr("Jump to {}").format(strutils.formatLength(seconds)))
+            self.setToolTip(self.tr("Jump to {}").format(utils.strings.formatLength(seconds)))
             
         return super().event(event)

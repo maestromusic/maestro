@@ -18,7 +18,7 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, strutils, config
+from .. import database as db, utils, config
 from ..core import elements, levels, nodes, tags
 from . import tagwidgets, widgets
 
@@ -224,7 +224,7 @@ class MergeDialog(QtGui.QDialog):
                     allTitles.extend(element.tags[tags.TITLE])
             # We require that the common title is separated from the rest by whitespace or punctuation
             # Otherwise elements that happen to start with the same letter would give a common prefix.
-            prefix = strutils.commonPrefix(allTitles, separated=True)
+            prefix = utils.strings.commonPrefix(allTitles, separated=True)
             if len(prefix) > 0: 
                 import string
                 titleHint = prefix.strip(string.punctuation + string.whitespace)
@@ -283,7 +283,7 @@ class MergeDialog(QtGui.QDialog):
             layout.addWidget(self.removeEdit, row, 1)
             self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
         
-        if len(self.elements) > 1 and any(strutils.numberFromPrefix(title[len(prefix):])[0] is not None 
+        if len(self.elements) > 1 and any(utils.strings.numberFromPrefix(title[len(prefix):])[0] is not None 
                                           for title in allTitles):
             row += 1
             self.removeNumbersBox = QtGui.QCheckBox(self.tr("Remove numbers from title start"))
@@ -333,7 +333,7 @@ class MergeDialog(QtGui.QDialog):
                         newValue = value[len(prefix):]
                     else: newValue = value
                     if removeNumbers:
-                        number = strutils.numberFromPrefix(newValue)[1]
+                        number = utils.strings.numberFromPrefix(newValue)[1]
                         if len(number) > 0:
                             newValue = newValue[len(number):]
                     if len(newValue) == 0:

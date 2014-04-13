@@ -155,13 +155,13 @@ class Worker(QtCore.QObject):
     def runInit(self):
         """Called at the beginning of the worker thread. Subclasses might reimplement it."""
         if self.dbConnection:
-            from . import database
+            from .. import database
             database.connect()
     
     def runShutdown(self):
         """Called at the end of the worker thread. Subclasses might reimplement it."""
         if self.dbConnection:
-            from . import database
+            from .. import database
             database.close()
     
     def run(self):

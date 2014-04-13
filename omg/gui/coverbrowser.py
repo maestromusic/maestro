@@ -25,7 +25,7 @@ translate = QtCore.QCoreApplication.translate
 from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui, browser
 from .misc import busyindicator
 from ..models import browser as browsermodel
-from .. import database as db, utils, config, worker, search, logging
+from .. import database as db, utils, config, search, logging
 from ..core import covers, levels, nodes, tags, elements
 from ..search import criteria
 
@@ -88,7 +88,7 @@ class CoverBrowser(dockwidget.DockWidget):
                 except search.criteria.ParseException:
                     logging.exception(__name__, "Could not parse the cover browser's filter criterion.")
         
-        self.worker = worker.Worker()
+        self.worker = utils.worker.Worker()
         self.worker.start()
                     
         widget = QtGui.QWidget()
