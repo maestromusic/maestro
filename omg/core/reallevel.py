@@ -20,7 +20,6 @@ import itertools
 
 from . import elements, levels, tags, flags
 from .. import application, database as db, filebackends, stack
-from ..database import write
 
 
 # The ids of all elements that are in the database and have been loaded to some level 
@@ -354,16 +353,30 @@ class RealLevel(levels.Level):
                  element.type if element.isContainer() else 0,
                  len(element.contents) if element.isContainer() else 0)
                         for element in elements]
-        db.multiQuery("INSERT INTO {}elements (id, file, type, elements)\
-                       VALUES (?,?,?,?)".format(db.prefix), data)
+        db.multiQuery("INSERT INTO {p}elements (id, file, type, elements) VALUES (?,?,?,?)", data)
 
         # Do this early, otherwise e.g. setFlags might raise a ConsistencyError)
         _dbIds.update(element.id for element in elements)
             
         for element in elements:
-            db.write.setTags(element.id, element.tags)
-            db.write.setFlags(element.id, element.flags)
-            db.write.setStickers(element.id, element.stickers)
+            # Set tags
+            db.query("DELETE FROM {p}tags WHERE element_id = ?", element.id)
+            for tag in element.tags:
+                db.multiQuery("INSERT INTO {p}tags (element_id,tag_id,value_id) VALUES (?,?,?)",
+                      [(element.id, tag.id, db.idFromValue(tag, value, insert=True))
+                       for value in element.tags[tag]])
+            
+            # Set flags
+            db.query("DELETE FROM {p}flags WHERE element_id = ?", element.id)
+            if len(element.flags) > 0:
+                db.multiQuery("INSERT INTO {p}tags (element_id, flag_id) VALUES (?,?)",
+                              [(element.id, flag.id) for flag in element.flags])
+
+            # Set stickers
+            db.query("DELETE FROM {p}stickers WHERE element_id = ?", element.id)
+            for type, values in element.stickers.items():
+                db.multiQuery("INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
+                              [(element.id, type, i, val) for i, val in enumerate(values)])
                 
         newFiles = [element for element in elements if element.isFile()]
         if len(newFiles) > 0:
@@ -523,7 +536,7 @@ class RealLevel(levels.Level):
             db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
                           .format(db.prefix),
                           [(parent.id, pos, childId) for pos, childId in contents.items()])
-        db.write.updateElementsCounter((parent.id,))
+        db.updateElementsCounter((parent.id,))
         db.commit()
         super()._setContents(parent, contents)
 
@@ -534,7 +547,7 @@ class RealLevel(levels.Level):
         db.multiQuery("INSERT INTO {}contents (container_id, position, element_id) VALUES (?, ?, ?)"
                       .format(db.prefix),
                       [(parent.id, pos, child.id) for pos, child in insertions])
-        db.write.updateElementsCounter((parent.id,))
+        db.updateElementsCounter((parent.id,))
         db.commit()
         super()._insertContents(parent, insertions)
         
@@ -542,13 +555,21 @@ class RealLevel(levels.Level):
         db.transaction()
         db.multiQuery("DELETE FROM {}contents WHERE container_id=? AND position=?"
                    .format(db.prefix), [(parent.id, pos) for pos in positions])
-        db.write.updateElementsCounter((parent.id,))
+        db.updateElementsCounter((parent.id,))
         db.commit()
         super()._removeContents(parent, positions)
     
     def _changePositions(self, parent, changes):
         super()._changePositions(parent, changes)
-        db.write.changePositions(parent.id, list(changes.items()))
+        changes = list(changes.items())
+        changesOne = [ (newPos, parent.id, oldPos)
+                        for (oldPos, newPos) in sorted(changes, key=lambda cng: cng[1], reverse=True)
+                        if newPos > oldPos ]
+        changesTwo = [ (newPos, parent.id, oldPos)
+                        for (oldPos, newPos) in sorted(changes, key=lambda chng: chng[1])
+                        if newPos < oldPos ]
+        for data in changesOne, changesTwo:
+            db.multiQuery("UPDATE {p}contents SET position=? WHERE container_id=? AND position=?", data)
     
     def _renameFiles(self, renamings):
         """On the real level, files are renamed both on disk and in DB."""

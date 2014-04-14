@@ -32,11 +32,6 @@ ADDED,CHANGED,DELETED = 1,2,3
 REMOVED = DELETED
 CHANGE_TYPES = (ADDED,CHANGED,DELETED)
 
-# Command types
-ADD, CHANGE, DELETE = 1,2,3
-REMOVE = DELETE
-COMMAND_TYPES = CHANGE_TYPES
-
 
 def compareVersion(v):
     """Returns 1 if the program version is larger than v, 0 if it is equal, and -1 if it is lower."""

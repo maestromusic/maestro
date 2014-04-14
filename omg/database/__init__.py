@@ -127,7 +127,7 @@ def connect(**kwargs):
         global _nextId
         if _nextId is None:
             try:
-                _nextId = query("SELECT MAX(id) FROM {}elements".format(prefix)).getSingle()
+                _nextId = query("SELECT MAX(id) FROM {p}elements").getSingle()
                 if isNull(_nextId): # this happens when elements is empty
                     _nextId = 1
                 else: _nextId += 1    
@@ -297,29 +297,47 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
 #=======================================================================
 def isFile(elid):
     """Return whether the element with id *elid* exists and is a file."""
-    return query("SELECT file FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 1
+    return query("SELECT file FROM {p}elements WHERE id = ?", elid).getSingle() == 1
 
 def isContainer(elid):
     """Return whether the element with id *elid* exists and is a container."""
-    return query("SELECT file FROM {}elements WHERE id = ?".format(prefix),elid).getSingle() == 0
+    return query("SELECT file FROM {p}elements WHERE id = ?", elid).getSingle() == 0
 
 def isToplevel(elid):
     """Return whether the element with id *elid* exists and is a toplevel element."""
     return bool(query("""
         SELECT COUNT(*)
-        FROM {0}elements AS el LEFT JOIN {0}contents AS c ON el.id = c.element_id
+        FROM {p}elements AS el LEFT JOIN {p}contents AS c ON el.id = c.element_id
         WHERE el.id = ? AND c.element_id IS NULL
-        """.format(prefix), elid).getSingle())
+        """, elid).getSingle())
     
 def elementCount(elid):
     """Return the number of children of the element with id *elid* or raise an sql.EmptyResultException if
     that element does not exist."""
-    return query("SELECT elements FROM {}elements WHERE id = ?".format(prefix), elid).getSingle()
+    return query("SELECT elements FROM {p}elements WHERE id = ?", elid).getSingle()
 
 def elementType(elid):
     """Return the type of the element with id *elid* or raise an sql.EmptyResultException if
     that element does not exist."""
-    return query("SELECT type FROM {}elements WHERE id = ?".format(prefix), elid).getSingle()
+    return query("SELECT type FROM {p}elements WHERE id = ?", elid).getSingle()
+
+def updateElementsCounter(elids=None):
+    """Update the elements counter.
+    
+    If *elids* is a list of elements-ids, only the counters of those elements will be updated. If
+    *elids* is None, all counters will be set to their correct value.
+    """
+    if elids is not None:
+        cslist = csList(elids)
+        if cslist == '':
+            return
+        whereClause = "WHERE id IN ({})".format(cslist)
+    else: whereClause = '' 
+    query("""
+        UPDATE {0}elements
+        SET elements = (SELECT COUNT(*) FROM {0}contents WHERE container_id = id)
+        {1}
+        """.format(prefix, whereClause))
 
 
 # Files-Table
@@ -328,7 +346,7 @@ def url(elid):
     """Return the url of the file with id *elid* or raise an sql.EmptyResultException if that element does 
     not exist."""
     try:
-        return query("SELECT url FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+        return query("SELECT url FROM {p}files WHERE element_id=?", elid).getSingle()
     except sql.EmptyResultException:
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
@@ -338,7 +356,7 @@ def hash(elid):
     """Return the hash of the file with id *elid* or raise an sql.EmptyResultException if that element does
     not exist.""" 
     try:
-        return query("SELECT hash FROM {}files WHERE element_id=?".format(prefix),elid).getSingle()
+        return query("SELECT hash FROM {p}files WHERE element_id=?", elid).getSingle()
     except sql.EmptyResultException:
         raise sql.EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
@@ -350,14 +368,14 @@ def idFromUrl(url):
     *url* must be an instance of BackendURL or an URL string. The method returns None if no file
     with that URL exists."""
     try:
-        return query("SELECT element_id FROM {}files WHERE url=?".format(prefix), str(url)).getSingle()
+        return query("SELECT element_id FROM {p}files WHERE url=?", str(url)).getSingle()
     except sql.EmptyResultException:
         return None
 
 
 def idFromHash(hash):
     """Return the element_id of a file from its hash, or None if it is not found."""
-    result = query("SELECT element_id FROM {}files WHERE hash=?".format(prefix),hash)
+    result = query("SELECT element_id FROM {p}files WHERE hash=?", hash)
     if len(result)==1:
         return result.getSingle()
     elif len(result)==0:
@@ -374,7 +392,7 @@ def cacheTagValues():
     """Cache all id<->value relations from the values_varchar table."""
     for tag in tagsModule.tagList:
         if tag.type == tagsModule.TYPE_VARCHAR:
-            result = query("SELECT id,value FROM {}values_varchar WHERE tag_id = ?".format(prefix),tag.id)
+            result = query("SELECT id,value FROM {p}values_varchar WHERE tag_id = ?", tag.id)
             _idToValue[tag] = {id: value for id,value in result}
             # do not traverse result twice
             _valueToId[tag] = {value: id for id,value in _idToValue[tag].items()}
@@ -395,7 +413,7 @@ def valueFromId(tagSpec, valueId):
     # Look up value
     try:
         value = query("SELECT value FROM {}values_{} WHERE tag_id = ? AND id = ?"
-                        .format(prefix,tag.type.name), tag.id,valueId).getSingle()
+                        .format(prefix, tag.type.name), tag.id,valueId).getSingle()
     except sql.EmptyResultException:
         raise KeyError("There is no value of tag '{}' for id {}".format(tag,valueId))
                     
@@ -428,7 +446,7 @@ def idFromValue(tagSpec, value, insert=False):
         if type == 'mysql' and tag.type in (tagsModule.TYPE_VARCHAR,tagsModule.TYPE_TEXT):
             # Compare exactly (using binary collation)
             q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
-                 .format(prefix,tag.type.name)
+                 .format(prefix, tag.type.name)
         else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
         id = query(q,tag.id,value).getSingle()
     except sql.EmptyResultException:
@@ -497,7 +515,7 @@ def listTags(elid,tagList=None):
                 SELECT tag_id,value_id 
                 FROM {}tags
                 WHERE element_id = {} {}
-                """.format(prefix,elid,additionalWhereClause))
+                """.format(prefix, elid,additionalWhereClause))
     tags = []
     for tagid,valueid in result:
         tag = tagsModule.get(tagid)
@@ -512,7 +530,7 @@ def allTagValues(tagSpec):
     """Return all tag values in the database for the given tag."""
     tag = tagsModule.get(tagSpec)
     return query("SELECT value FROM {}values_{} WHERE tag_id = ?"
-                 .format(prefix,tag.type.name), tag.id).getSingleColumn()
+                 .format(prefix, tag.type.name), tag.id).getSingleColumn()
     
 
 # flags table
@@ -520,8 +538,7 @@ def allTagValues(tagSpec):
 def flags(elid):
     from ..core import flags
     return [flags.get(id) for id in query(
-                    "SELECT flag_id FROM {}flags WHERE element_id = ?".format(prefix),elid)
-              .getSingleColumn()]
+                    "SELECT flag_id FROM {p}flags WHERE element_id = ?", elid).getSingleColumn()]
 
 
 # Help methods

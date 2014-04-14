@@ -94,7 +94,7 @@ class ElementCounterCheck(Check):
             return [(row[0], getTitle(row[0]), row[1], row[2]) for row in result]
 
     def _fix(self):
-        db.write.updateElementsCounter()
+        db.updateElementsCounter()
             
 
 class FileFlagCheck(Check):
