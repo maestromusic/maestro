@@ -47,10 +47,10 @@ class DetailsView(dockwidget.DockWidget):
         #buttonBar.addStretch()
         #self.backButton = QtGui.QPushButton()
         #self.backButton.setFlat(True)
-        #self.backButton.setIcon(self.style().standardIcon(QtGui.QStyle.SP_ArrowBack))
+        #self.backButton.setIcon(utils.images.standardIcon("back"))
         #buttonBar.addWidget(self.backButton)
         #self.forwardButton = QtGui.QPushButton()
-        #self.forwardButton.setIcon(self.style().standardIcon(QtGui.QStyle.SP_ArrowForward))
+        #self.forwardButton.setIcon(utils.images.standardIcon("forward"))
         #buttonBar.addWidget(self.forwardButton)
         #layout.addLayout(buttonBar)
         
@@ -66,21 +66,6 @@ class DetailsView(dockwidget.DockWidget):
         selection.changed.connect(self._handleGlobalSelection)
         levels.real.connect(self._handleLevelChanged)
         levels.editor.connect(self._handleLevelChanged)
-        
-        # Load expand/collapse icons from style
-        self.plusSign = QtGui.QPixmap(16, 12)
-        self.plusSign.fill(Qt.transparent)
-        option = QtGui.QStyleOption()
-        option.type = QtGui.QStyleOption.SO_ViewItem
-        option.rect = QtCore.QRect(QtCore.QPoint(0, 0), QtCore.QPoint(10, 10))
-        option.state = QtGui.QStyle.State_Children
-        painter = QtGui.QPainter(self.plusSign)
-        self.style().drawPrimitive(QtGui.QStyle.PE_IndicatorBranch, option, painter)
-        self.minusSign = QtGui.QPixmap(16, 12)
-        self.minusSign.fill(Qt.transparent)
-        option.state |= QtGui.QStyle.State_Open
-        painter = QtGui.QPainter(self.minusSign)
-        self.style().drawPrimitive(QtGui.QStyle.PE_IndicatorBranch, option, painter)
         
         self._handleGlobalSelection(selection.getGlobalSelection())
         
@@ -137,11 +122,9 @@ class DetailsView(dockwidget.DockWidget):
         
         def link(href, text):
             return '<a href="{}" style="color: black; text-decoration: none">{}</a>'.format(href, text)
-        def pixmap(pixmap, attributes=''):
-            buffer = QtCore.QBuffer()
-            pixmap.save(buffer, "PNG")
-            string = bytes(buffer.buffer().toBase64()).decode('ascii')
-            return '<img {} src="data:image/png;base64,{}" />'.format(attributes, string)
+        
+        expander = utils.images.standardPixmap("expander")
+        collapser = utils.images.standardPixmap("collapser")
         
         el = self.element
         text = []
@@ -152,7 +135,7 @@ class DetailsView(dockwidget.DockWidget):
         if el.hasCover():
             cover = el.getCover(60)
             if cover is not None:
-                text.append(link("cover", pixmap(cover)))
+                text.append(link("cover", utils.images.html(cover)))
         text.append('</td><td>')    
         text.append('<h2>{}</h2>'.format(Qt.escape(el.getTitle())))
         text.append('</td></tr>')
@@ -192,7 +175,7 @@ class DetailsView(dockwidget.DockWidget):
             
         # Tags
         if len(el.tags) > 0:
-            ln = link("tags", pixmap(self.minusSign if self.tagsVisible else self.plusSign))
+            ln = link("tags", utils.images.html(collapser if self.tagsVisible else expander))
             text.append('<tr><td>' + ln + self.tr("Tags: ") + '</td><td>')
             if self.tagsVisible:
                 tagLines = []
@@ -233,7 +216,7 @@ class DetailsView(dockwidget.DockWidget):
             
         # Contents
         if el.isContainer():
-            ln = link("contents", pixmap(self.minusSign if self.contentsVisible else self.plusSign))
+            ln = link("contents", utils.images.html(collapser if self.contentsVisible else expander))
             text.append('<tr><td>' + ln + self.tr("Contents: ") + '</td><td>')
             if self.contentsVisible:
                 contents = el.level.fetchMany(el.contents)
@@ -244,7 +227,7 @@ class DetailsView(dockwidget.DockWidget):
             text.append('</td></tr>')
             
         if len(el.stickers) > 0:
-            ln = link("stickers", pixmap(self.minusSign if self.stickersVisible else self.plusSign))
+            ln = link("stickers", utils.images.html(collapser if self.stickersVisible else expander))
             text.append('<tr><td>' + ln + self.tr("Stickers: ") + '</td><td>')
             if self.stickersVisible:
                 stickerLines = []
@@ -263,7 +246,7 @@ mainwindow.addWidgetData(mainwindow.WidgetData(
                     id = "details",
                     name = translate("DetailsView", "Details"),
                     theClass = DetailsView,
-                    icon = utils.getIcon('widgets/details.png'),
+                    icon = utils.images.icon('widgets/details.png'),
                     preferredDockArea = Qt.RightDockWidgetArea))
 
 

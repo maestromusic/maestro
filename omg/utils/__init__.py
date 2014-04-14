@@ -21,7 +21,7 @@ from PyQt4 import QtCore, QtGui
 from .. import config
 
 # include submodules so that 'import utils' suffices to support 'utils.strings. ...'
-from . import files, strings, worker
+from . import files, images, strings, worker
 from .flexidate import FlexiDate
 
 

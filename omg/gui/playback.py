@@ -26,18 +26,7 @@ from .. import player, utils
 from ..core import levels
 
 renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
-
 ICON_SIZE = 16
-
-def renderPixmap(name, width, height):
-    """Load the object with the given name from playback.svg and render it into a pixmap of the given
-    dimensions. Return that pixmap."""
-    pixmap = QtGui.QPixmap(width, height)
-    pixmap.fill(Qt.transparent)
-    painter = QtGui.QPainter(pixmap)
-    renderer.render(painter, name)
-    painter.end()
-    return pixmap
 
 
 class PlaybackWidget(dockwidget.DockWidget):
@@ -62,12 +51,15 @@ class PlaybackWidget(dockwidget.DockWidget):
         topLayout.addWidget(self.titleLabel)   
         
         self.skipBackwardButton = QtGui.QToolButton()
-        self.skipBackwardButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_backward", ICON_SIZE, 10)))
+        self.skipBackwardButton.setIcon(QtGui.QIcon(utils.images.renderSvg(renderer, "media_skip_backward",
+                                                                           ICON_SIZE, 10)))
         self.ppButton = PlayPauseButton(self)
         self.stopButton = QtGui.QToolButton()
-        self.stopButton.setIcon(QtGui.QIcon(renderPixmap("media_playback_stop", ICON_SIZE, ICON_SIZE)))
+        self.stopButton.setIcon(QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_stop",
+                                                                   ICON_SIZE, ICON_SIZE)))
         self.skipForwardButton = QtGui.QToolButton()
-        self.skipForwardButton.setIcon(QtGui.QIcon(renderPixmap("media_skip_forward", ICON_SIZE, 10)))
+        self.skipForwardButton.setIcon(QtGui.QIcon(utils.images.renderSvg(renderer, "media_skip_forward",
+                                                                          ICON_SIZE, 10)))
         self.volumeButton = VolumeButton()
         
         for button in (self.skipBackwardButton, self.ppButton, self.stopButton,
@@ -125,7 +117,6 @@ class PlaybackWidget(dockwidget.DockWidget):
             if current is not None:
                 self.titleLabel.setText(current.getTitle())
             else: self.titleLabel.setText('')
-    
     
     def handleStateChange(self, state):
         """Update labels, buttons etc. when the playback state has changed."""
@@ -216,7 +207,7 @@ class PlaybackWidget(dockwidget.DockWidget):
     
 data = mainwindow.WidgetData(id="playback",
                              name=translate("Playback", "playback"),
-                             icon=utils.getIcon('widgets/playback.png'),
+                             icon=utils.images.icon('widgets/playback.png'),
                              theClass=PlaybackWidget,
                              central=False,
                              preferredDockArea=Qt.LeftDockWidgetArea)
@@ -290,8 +281,8 @@ class PlayPauseButton(QtGui.QToolButton):
     # Signals and icons used for the two states
     play = QtCore.pyqtSignal()
     pause = QtCore.pyqtSignal()
-    playIcon = QtGui.QIcon(renderPixmap("media_playback_start", ICON_SIZE, ICON_SIZE))
-    pauseIcon = QtGui.QIcon(renderPixmap("media_playback_pause", ICON_SIZE, ICON_SIZE))
+    playIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_start", ICON_SIZE, ICON_SIZE))
+    pauseIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_pause", ICON_SIZE, ICON_SIZE))
     stateChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, parent=None):
@@ -318,10 +309,10 @@ class VolumeButton(QtGui.QToolButton):
     # Inspired by the VolumePopupButton from Amarok 2.7.1
     volumeChanged = QtCore.pyqtSignal(int)
     
-    mutedIcon = utils.getIcon("audio_volume_muted")
-    lowIcon = utils.getIcon("audio_volume_low")
-    mediumIcon = utils.getIcon("audio_volume_medium")
-    highIcon = utils.getIcon("audio_volume_high")
+    mutedIcon = utils.images.icon("audio_volume_muted")
+    lowIcon = utils.images.icon("audio_volume_low")
+    mediumIcon = utils.images.icon("audio_volume_medium")
+    highIcon = utils.images.icon("audio_volume_high")
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -470,14 +461,17 @@ class SeekSlider(QtGui.QSlider):
         knobRect = QtCore.QRect(left, top+1, self.knobSize, self.knobSize)
         
         pt = QtCore.QPoint(0, top)
-        p.drawPixmap(pt, renderPixmap("progress_slider_left", self.sliderHeight, self.sliderHeight))
+        p.drawPixmap(pt, utils.images.renderSvg(renderer, "progress_slider_left",
+                                                self.sliderHeight, self.sliderHeight))
 
         pt = QtCore.QPoint(self.sliderHeight, top)
         midRect = QtCore.QRect(pt, QtCore.QSize(self.width() - self.sliderHeight*2, self.sliderHeight))
-        p.drawTiledPixmap(midRect, renderPixmap("progress_slider_mid", 32, self.sliderHeight))
+        p.drawTiledPixmap(midRect, utils.images.renderSvg(renderer, "progress_slider_mid",
+                                                          32, self.sliderHeight))
         
         pt = midRect.topRight() + QtCore.QPoint(1, 0)
-        p.drawPixmap(pt, renderPixmap("progress_slider_right", self.sliderHeight, self.sliderHeight))
+        p.drawPixmap(pt, utils.images.renderSvg(renderer, "progress_slider_right",
+                                                self.sliderHeight, self.sliderHeight))
 
         # draw the played background.
         playedBarHeight = self.sliderHeight - 6
@@ -487,21 +481,22 @@ class SeekSlider(QtGui.QSlider):
         if sizeOfLeftPlayed > 0:
             tl = QtCore.QPoint(3, top+4)
             br = QtCore.QPoint(knobRect.x() + 5, tl.y() + playedBarHeight - 1)
-            p.drawPixmap(tl.x(), tl.y(),
-                         renderPixmap("progress_slider_played_left", playedBarHeight, playedBarHeight),
+            p.drawPixmap(tl.x(), tl.y(), utils.images.renderSvg(renderer, "progress_slider_played_left",
+                                                                playedBarHeight, playedBarHeight),
                          0, 0, sizeOfLeftPlayed + 3, playedBarHeight) 
             tl = QtCore.QPoint(tl.x() + playedBarHeight, tl.y())
             if sizeOfLeftPlayed >= playedBarHeight:
                 p.drawTiledPixmap(QtCore.QRect(tl, br),
-                                  renderPixmap("progress_slider_played_mid", 32, playedBarHeight))
+                                  utils.images.renderSvg(renderer, "progress_slider_played_mid",
+                                                         32, playedBarHeight))
 
         if self.isEnabled():
             # Draw the knob (handle)
             if self.underMouse() and knobRect.contains(self.mapFromGlobal(QtGui.QCursor.pos())):
-                file = "slider_knob_200911_active"
-            else: file = "slider_knob_200911"
-            p.drawPixmap(knobRect.topLeft(),
-                         renderPixmap(file, knobRect.width(), knobRect.height()))
+                obj = "slider_knob_200911_active"
+            else: obj = "slider_knob_200911"
+            p.drawPixmap(knobRect.topLeft(), utils.images.renderSvg(renderer, obj,
+                                                                    knobRect.width(), knobRect.height()))
 
         p.end()
         
