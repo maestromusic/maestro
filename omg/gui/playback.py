@@ -157,7 +157,14 @@ class PlaybackWidget(dockwidget.DockWidget):
         """Enable or disable play and stop buttons when the playlist becomes empty / is filled."""
         playlistEmpty = len(self.backend.playlist.root.contents) == 0
         self.ppButton.setEnabled(not playlistEmpty)
-        self.stopButton.setEnabled(not playlistEmpty)
+        self.stopButton.setEnabled(not playlistEmpty) 
+               
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        if event.isAccepted():
+            # Bugfix: Without this line I usually get errors because handleStateChanged is still called:
+            # RuntimeError: wrapped C/C++ object of type SeekSlider has been deleted
+            self.setBackend(None)
     
     signals = [ ("self.backend.elapsedChanged", "self.updateSlider"),
                 ("self.backend.volumeChanged", "self.volumeButton.setVolume"),
