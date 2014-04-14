@@ -96,8 +96,6 @@ def critical(name, message):
 def exception(name, message):
     """Log an exception together with a string *message* on the logger called *name*.
     Information about the exception will be fetched using :mod:`traceback`."""
-    print("EXCEPTION", message)
-    return
     if not configured:
         type, value, tb = sys.exc_info()
         error(name, message + " Exception: {}".format(value))
