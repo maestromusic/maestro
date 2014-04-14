@@ -261,26 +261,27 @@ class GeneralSettingsWidget(SettingsWidget):
         audioBackendFound = False
         try:
             from PyQt4.phonon import Phonon
-            self.phononBox = QtGui.QRadioButton(self.tr("Phonon"))
+            self.phononBox = QtGui.QCheckBox(self.tr("Phonon"))
             self.phononBox.setChecked(True)
             audioBackendFound = True
         except ImportError:
-            self.phononBox = QtGui.QRadioButton(self.tr("Phonon (cannot find PyQt4.phonon)"))
+            self.phononBox = QtGui.QCheckBox(self.tr("Phonon (cannot find PyQt4.phonon)"))
             self.phononBox.setEnabled(False)
         audioBackendGroup.addButton(self.phononBox)
         audioBackendLayout.addWidget(self.phononBox)
         try:
             import mpd
-            self.mpdBox = QtGui.QRadioButton(self.tr("MPD"))
+            self.mpdBox = QtGui.QCheckBox(self.tr("MPD"))
             self.mpdBox.setChecked(not audioBackendFound) # not if Phonon is already checked
             audioBackendFound = True
         except ImportError:
-            self.mpdBox = QtGui.QRadioButton(self.tr("MPD (cannot find python-mpd2)"))
+            self.mpdBox = QtGui.QCheckBox(self.tr("MPD (cannot find python-mpd2)"))
             self.mpdBox.setEnabled(False)
         audioBackendGroup.addButton(self.mpdBox)
         audioBackendLayout.addWidget(self.mpdBox)
         if not audioBackendFound:
-            noBackendBox = QtGui.QRadioButton(self.tr("No backend (to choose a backend later, enable the corresponding plugin)."))
+            noBackendBox = QtGui.QRadioButton(self.tr("No backend (to choose a backend later, "
+                                                      "enable the corresponding plugin)."))
             noBackendBox.setChecked(True)
             audioBackendGroup.addButton(noBackendBox)
             audioBackendLayout.addWidget(noBackendBox)
@@ -719,4 +720,3 @@ def run():
     
 if __name__ == "__main__":
     run()
-    
