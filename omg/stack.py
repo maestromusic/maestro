@@ -27,6 +27,7 @@ stack = None
 
 
 def init():
+    """Initialize application stack."""
     global stack
     stack = UndoStack()
     # Redirect methods to the application stack
@@ -72,9 +73,9 @@ class UndoStack(QtCore.QObject):
         self._index = 0            # Position before the command that will be executed on redo
         self._activeMacros = []    # list of nested macros that are being built (first is outermost)
         self._inUndoRedo = False   # True during undo and redo
-        self._eventQueue = []      # list of tuples (dispatcher,event)
-        self._undoAction = UndoRedoAction(self,redo=False)
-        self._redoAction = UndoRedoAction(self,redo=True)
+        self._eventQueue = []      # list of tuples (dispatcher, event)
+        self._undoAction = UndoRedoAction(self, redo=False)
+        self._redoAction = UndoRedoAction(self, redo=True)
         self._modalDialogSubstack = None # exclusive special substack for modal dialogs
     
     def index(self):
@@ -89,7 +90,7 @@ class UndoStack(QtCore.QObject):
         """Return the number of commands on the stack."""
         return len(self._commands)
     
-    def command(self,index):
+    def command(self, index):
         """Return the UndoCommand at the given index. stack.command(stack.index()) is the command that will
         be redone next."""
         return self._commands[index]
@@ -255,14 +256,14 @@ class UndoStack(QtCore.QObject):
         self._inUndoRedo = False
         self._emitSignals()
         
-    def setIndex(self,index):
+    def setIndex(self, index):
         """Undo/redo commands until there are *index* commands left that can be undone."""
         if self._inUndoRedo or self.isComposing():
             raise UndoStackError("Cannot change index during undo/redo or while a macro is built.""")
         if index != self._index:
             if not 0 <= index <= len(self._commands):
                 raise ValueError("Invalid index {} (there are {} commands on the stack)."
-                                 .format(index,len(self._commands)))
+                                 .format(index, len(self._commands)))
             self._inUndoRedo = True
             try:
                 if index < self._index:
@@ -296,21 +297,21 @@ class UndoStack(QtCore.QObject):
     def _emitQueuedEvents(self):
         """Emit all events that have been queued."""
         #print("_emitQueuedEvents: {}".format(len(self._eventQueue)))
-        for dispatcher,event in self._eventQueue:
+        for dispatcher, event in self._eventQueue:
             # Use dispatcher._signal.emit instead of dispatcher.emit to really emit signals
             dispatcher._signal.emit(event)
         self._eventQueue = []
             
-    def addEvent(self,dispatcher,event):
+    def addEvent(self, dispatcher, event):
         """Add *event* to the queue. *dispatcher* is the ChangeEventDispatcher that should eventually emit
         the event. Try to merge the event with existing events (of the same dispatcher, of course).
         """ 
-        for d,e in reversed(self._eventQueue):
+        for d, e in reversed(self._eventQueue):
             if d is dispatcher:
                 if e.merge(event):
                     return # event was merged
                 break # Only try to merge with the last event of the same dispatcher
-        self._eventQueue.append((dispatcher,event))
+        self._eventQueue.append((dispatcher, event))
             
     def createSubstack(self, modalDialog=False):
         """Start a substack and return it. 
@@ -370,6 +371,7 @@ class UndoStack(QtCore.QObject):
                 
 
 class Call:
+    """A wrapper around a function call with arbitrary arguments and keyword arguments."""
     def __init__(self, callable, *args, **kwargs):
         self.callable = callable
         self.args = args
@@ -380,6 +382,8 @@ class Call:
         
 
 class GenericCommand:
+    """Generic command that executes two Call-instances on redo and undo. It is not necessary to create
+    such commands manually, simply submit the arguments to stack.push."""
     def __init__(self, text, redoCall, undoCall):
         self.text = text
         self.redoCall = redoCall
@@ -492,12 +496,15 @@ class Substack:
         self._mainStack = mainStack
         self._closed = False
         
-    def __getattr__(self,name):
-        return getattr(self._mainStack,name)
+    def __getattr__(self, name):
+        return getattr(self._mainStack, name)
         
-    def push(self,command):
+    def push(self, command, redoCall=None, undoCall=None):
         if self._closed:
             raise UndoStackError("Cannot push commands via a closed substack.")
+        if isinstance(command, str):
+            assert redoCall is not None and undoCall is not None
+            command = GenericCommand(command, redoCall, undoCall)
         self._mainStack.push(SubstackCommand(self, command))
         
     def reset(self):
@@ -516,8 +523,8 @@ class SubstackCommand:
         self._command = command
         self._substack = substack
         
-    def __getattr__(self,name):
-        return getattr(self._command,name)
+    def __getattr__(self, name):
+        return getattr(self._command, name)
     
     def __str__(self):
         return "<SUBSTACK: {}>".format(self._command)
@@ -534,7 +541,7 @@ def _filterSubstackCommands(substack, commands, index=0):
             if index > i:
                 index -= 1
             continue
-        elif isinstance(command,Macro):
+        elif isinstance(command, Macro):
             _filterSubstackCommands(substack, command.commands)
             _filterSubstackCommands(substack, command.attachedCommands)
             #TODO: Should macros be removed which have no commands but attached commands?
@@ -550,7 +557,7 @@ def _filterSubstackCommands(substack, commands, index=0):
                
 class UndoRedoAction(QtGui.QAction):
     """QAction that is returned by the methods createUndoAction and createRedoAction."""
-    def __init__(self,stack,redo):
+    def __init__(self, stack, redo):
         super().__init__(stack)
         if redo:
             self._prefix = self.tr("Redo")
@@ -566,8 +573,8 @@ class UndoRedoAction(QtGui.QAction):
             self.triggered.connect(stack.undo)
         self.setText('')
             
-    def setText(self,text):
+    def setText(self, text):
         if text is not None and len(text) > 0:
-            super().setText(self.tr("{}: {}").format(self._prefix,text))
+            super().setText(self.tr("{}: {}").format(self._prefix, text))
         else: super().setText(self._prefix)
     
