@@ -169,11 +169,9 @@ class CoverBrowser(dockwidget.DockWidget):
         
         if key in self._displayWidgets:
             display = self._displayWidgets[key]
-            display.selectionChanged.connect(self._handleSelectionChanged)
             self.stackedLayout.setCurrentWidget(display)
         elif key in _displayClasses:
             display = _displayClasses[key](self._displayConfig.get(key), self)
-            display.selectionChanged.connect(self._handleSelectionChanged)
             self.stackedLayout.addWidget(display)
             self.stackedLayout.setCurrentWidget(display)
             self._displayWidgets[key] = display
@@ -182,6 +180,8 @@ class CoverBrowser(dockwidget.DockWidget):
             
         self.displayChooser.setCurrentIndex(self.displayChooser.findData(key))
         self.reload()
+        # (Re)connect only after reload so that no global selection is set on startup. 
+        display.selectionChanged.connect(self._handleSelectionChanged)
         
     def getFilter(self):
         """Return the complete filter that is currently active (either a Criterion or None).
