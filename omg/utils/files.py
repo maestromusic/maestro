@@ -19,7 +19,7 @@
 import os, os.path, datetime, itertools, collections
 from .. import config
 
-        
+
 def hasKnownExtension(file):
     """Return True if the given path has a known extension (i.e., appears in options.main.extension).
     Does **not** check whether the file actually exists, is readable, etc."""
@@ -107,3 +107,51 @@ def collectAsList(urls):
             else: return []
         else: return itertools.chain.from_iterable(collect([url]).values())
     return itertools.chain.from_iterable(checkUrl(url) for url in urls)
+
+
+# 120 is a sensible max length, the real length is of course platform-dependent and not important.
+def makeFilePath(folder, fileName, forceAscii=False, maxLength=120):
+    """Return a file path that is similar to os.path.join(folder,fileName), but
+        - weird special characters will be removed,
+        - the path does not exist yet (or numbers will be appended before the extension to guarantee this),
+        - if *forceAscii* is true, the path will only contain ASCII characters,
+        - including the numbers from above and the extension the file name (not the whole path)
+          has at most *maxLength* characters.
+    """
+    fileName, extension = os.path.splitext(fileName)
+    
+    # Handle unicode characters
+    if forceAscii:
+        # How to automatically replace characters by their closest ASCII character?
+        # unicodedata.normalize('NFKD') represents characters like e.g. 'á' in its decomposed form '´a'.
+        # Since the accent is a 'combining accent' it will be combined with the letter automatically and
+        # you won't see the difference unless you check the length of the string.
+        # encode('ascii', 'ignore') throws all those scary characters away.
+        import unicodedata
+        fileName = unicodedata.normalize('NFKD', fileName).encode('ascii', 'ignore').decode()
+    
+    # Remove weird characters and weird use of whitespace
+    fileName = re.sub('[^\w\s_-]', '', fileName).strip()
+    fileName = re.sub('\s+', ' ', fileName)
+    
+    # In the easiest form, the following simply adds the extension and returns the path.
+    # Actually it deals with two problems that may arise:
+    # - The filename may be too long
+    # - The filename may exist already
+    # To solve the first problem, the fileName is shortened, to solve the second one we append '_n' for some
+    # number n to the filename (but in front of the extension)
+    # We do this until we have found a valid and non-existent filename.
+    i = -1
+    currentExt = extension # currentExt is the suffix together with the extension
+    while True:
+        i += 1
+        currentExt = extension if i == 0 else '_{}{}'.format(i, extension)
+        if len(fileName.encode()) + len(currentExt.encode()) > maxLength:
+            length = maxLength - len(currentExt.encode())
+            # ignore errors that may arise from cropping the string inside a multibyte character
+            fileName = fileName.encode()[:length].decode('utf-8', 'ignore')
+            continue
+        
+        path = os.path.join(folder, fileName+currentExt)
+        if not os.path.exists(path):
+            return path

@@ -16,12 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import locale, os, functools, re, itertools, collections
-from datetime import date, datetime, timezone
-from os.path import getmtime
-
+import locale, functools, re
 from PyQt4 import QtCore, QtGui
-
 from .. import config
 
 # include submodules so that 'import utils' suffices to support 'utils.strings. ...'

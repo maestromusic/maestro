@@ -29,9 +29,6 @@ from .elements import Element
 # Absolute path to the cover folder
 COVER_DIR = None
 
-# Maximum length of an encoded filename. Since the names aren't really important there is no need to get
-# the real limit which depends on the filesystem and operating system.
-MAX_FILENAME_LENGTH = 120
 
 # When the last check for unused covers is more than this number of seconds ago, a new one will start at
 # application shutdown.
@@ -248,11 +245,24 @@ class CoverUndoCommand:
             
             if isinstance(coverOrPath, QtGui.QPixmap):
                 pixmap = coverOrPath
-                newPath, absPath = _makeFilePath(element)
-                os.makedirs(os.path.dirname(absPath), exist_ok=True)
-                if not pixmap.save(absPath):
-                    newPath, absPath = _makeFilePath(element, forceAscii=True)
-                    pixmap.save(absPath) #TODO do something if this doesn't work
+                folder = os.path.join(COVER_DIR, 'large')
+                # Concatenate all artist-tags and all title-tags
+                if tags.get("artist") in element.tags:
+                    fileName = "-".join(element.tags[tags.get("artist")])+' - '
+                else: fileName = ''
+                if tags.TITLE in element.tags:
+                    fileName += "-".join(element.tags[tags.TITLE])
+                else:
+                    # I shortly thought about using the element's id, but often covers are changed on the editor level
+                    # before a commit, so the id will be negative and change soon.
+                    fileName += 'notitle'
+                fileName += '.' + config.options.misc.cover_extension
+                path = utils.files.makeFileName(folder, fileName)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                if not pixmap.save(path):
+                    path = utils.files.makeFilePath(folder, fileName, forceAscii=True)
+                    pixmap.save(path) #TODO do something if this doesn't work
+                newPath = os.path.relpath(path, COVER_DIR)
             elif isinstance(coverOrPath, str) or coverOrPath is None:
                 newPath = coverOrPath
             else: raise TypeError("Values of 'covers' must be either QPixmap or str or None")
@@ -282,62 +292,3 @@ def _cachePath(path, size):
     if size is not None:
         return os.path.join(COVER_DIR, 'cache_{}'.format(size), md5)
     else: return md5
-    
-        
-def _makeFilePath(element, forceAscii=False):
-    """Return a file path that can be used to save the large cover of the given element. The path should be
-    based on the element's artist-tags and title-tags. If *forceAscii* is True, the result will only contain
-    ASCII characters. Otherwise the result might contain all unicode letters, but not all unicode characters.
-    
-    This method returns a tuple containing the relative path and the absolute path.
-    """ 
-    # Concatenate all artist-tags and all title-tags
-    if tags.get("artist") in element.tags:
-        fileName = "-".join(element.tags[tags.get("artist")])+' - '
-    else: fileName = ''
-    if tags.TITLE in element.tags:
-        fileName += "-".join(element.tags[tags.TITLE])
-    else:
-        # I shortly thought about using the element's id, but often covers are changed on the editor level
-        # before a commit, so the id will be negative and change soon.
-        fileName += 'notitle'
-    
-    # Handle unicode characters
-    if forceAscii:
-        # How to automatically replace characters by their closest ASCII character?
-        # unicodedata.normalize('NFKD') represents characters like e.g. 'á' in its decomposed form '´a'.
-        # Since the accent is a 'combining accent' it will be combined with the letter automatically and
-        # you won't see the difference unless you check the length of the string.
-        # encode('ascii', 'ignore') throws all those scary characters away.
-        import unicodedata
-        fileName = unicodedata.normalize('NFKD', fileName).encode('ascii', 'ignore').decode()
-    
-    # Remove weird characters and weird use of whitespace
-    fileName = re.sub('[^\w\s_-]', '', fileName).strip()
-    fileName = re.sub('\s+', ' ', fileName)
-    
-    # In the easiest form, the following simply adds the extension and returns the path.
-    # Actually it deals with two problems that may arise:
-    # - The filename may be too long
-    # - The filename may exist already
-    # To solve the first problem, the fileName is shortened, to solve the second one we append '_n' for some
-    # number n to the filename (but in front of the extension)
-    # We do this until we have found a valid and non-existent filename.
-    extension = '.'+config.options.misc.cover_extension
-    i = -1
-    currentExt = extension # currentExt is the suffix together with the extension
-    while True:
-        i += 1
-        currentExt = extension if i == 0 else '_{}{}'.format(i, extension)
-        if len(fileName.encode()) + len(currentExt.encode()) > MAX_FILENAME_LENGTH:
-            length = MAX_FILENAME_LENGTH - len(currentExt.encode())
-            # ignore errors that may arise from cropping the string inside a multibyte character
-            fileName = fileName.encode()[:length].decode('utf-8', 'ignore')
-            continue
-        
-        path = os.path.join(COVER_DIR, 'large', fileName+currentExt)
-        if os.path.exists(path):
-            continue
-        
-        return os.path.join('large', fileName+currentExt), path
-    
