@@ -126,9 +126,7 @@ def getHTML(path, size=None, attributes=''):
             get(path, size)
         return makeImgTag(path)
     
-    # Neither the 'large' cover nor any cached size is requested. Do not create a file on disk.
-    # Instead embed the image into HTML using a data-URI
-    # https://en.wikipedia.org/wiki/Data_URI_scheme
+    # Neither the 'large' cover nor any cached size is requested.
     if not os.path.isabs(path):
         path = os.path.join(COVER_DIR, path)
     pixmap = QtGui.QPixmap(path)
@@ -136,12 +134,7 @@ def getHTML(path, size=None, attributes=''):
         return None
     if pixmap.width() != size or pixmap.height() != size:
         pixmap = pixmap.scaled(size, size, transformMode=Qt.SmoothTransformation)
-
-    buffer = QtCore.QBuffer()
-    pixmap.save(buffer, "PNG")
-    string = bytes(buffer.buffer().toBase64()).decode('ascii')
-    buffer.close()
-    return makeImgTag("data:image/png;base64, "+string)
+    return utils.images.html(pixmap, 'width="{0}" height="{0}" {1}'.format(size, attributes))
 
 
 def storeInCache(pixmap, cachePath):
