@@ -39,7 +39,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.backend = backend
         self.current = None
         if stack is None:
-            from ..core import stack
+            from .. import stack
             self.stack = stack.stack
         else: self.stack = stack
         # self.current and all of its parents. The delegate draws an arrow in front of these nodes

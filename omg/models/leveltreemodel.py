@@ -22,8 +22,8 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import config, logging, utils
-from ..core import elements, levels, nodes, stack
+from .. import config, logging, utils, stack
+from ..core import elements, levels, nodes
 from ..models import rootedtreemodel
 
 

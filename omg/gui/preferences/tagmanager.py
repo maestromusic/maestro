@@ -21,8 +21,8 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import application, database as db, utils
-from ...core import tags, stack
+from ... import application, database as db, utils, stack
+from ...core import tags
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
 

@@ -20,13 +20,11 @@ import itertools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from . import rootedtreemodel
-from .. import config, utils
-from ..core import stack
+from .. import config, utils, stack
 from ..core.nodes import Wrapper
-
-translate = QtCore.QCoreApplication.translate
 
 
 class WrapperTreeModel(rootedtreemodel.RootedTreeModel):

@@ -24,10 +24,10 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, logging, config, utils, database as db
+from .. import application, logging, config, utils, database as db, stack
 from ..filebackends import BackendURL
 from ..filebackends.filesystem import FileURL
-from ..core import levels, tags, stack
+from ..core import levels, tags
 
 logger = logging.getLogger(__name__)
 

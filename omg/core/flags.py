@@ -18,8 +18,7 @@
 
 from PyQt4 import QtGui
 
-from .. import application, constants, database as db, logging, utils
-from . import stack
+from .. import application, constants, database as db, logging, utils, stack
 from ..constants import ADDED, DELETED, CHANGED
 from ..application import ChangeEvent
 

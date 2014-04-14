@@ -18,8 +18,8 @@
 
 import itertools
 
-from . import elements, levels, tags, flags, stack
-from .. import application, database as db, filebackends
+from . import elements, levels, tags, flags
+from .. import application, database as db, filebackends, stack
 from ..database import write
 
 

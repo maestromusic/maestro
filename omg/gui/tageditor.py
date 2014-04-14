@@ -22,8 +22,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import utils, config, logging, filebackends
-from ..core import tags, levels, stack
+from .. import utils, config, logging, filebackends, stack
+from ..core import tags, levels
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
 from .misc import widgetlist

@@ -19,7 +19,7 @@
 """Improved QUndoStack."""
 
 from PyQt4 import QtCore, QtGui
-from .. import logging
+from . import logging
 
 stack = None
 # Note that it is possible to access all methods and attributes of stack directly via the module.

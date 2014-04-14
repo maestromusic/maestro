@@ -19,8 +19,8 @@
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .core import tags, stack, levels
-from .. import application, database as db
+from .core import tags, levels
+from .. import application, database as db, stack
 
 translate = QtGui.QApplication.translate
 

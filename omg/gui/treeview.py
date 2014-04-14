@@ -270,8 +270,8 @@ class DraggingTreeView(TreeView):
     @property
     def stack(self):
         """Return the stack that is used for changes to this tree."""
-        from ..core import stack
-        return stack
+        from .. import stack
+        return stack.stack
     
     def startDrag(self, supportedActions):
         model = self.model()

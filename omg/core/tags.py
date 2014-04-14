@@ -50,9 +50,8 @@ from functools import reduce
 
 from PyQt4 import QtGui
 
-from .. import application, config, constants, logging, utils
+from .. import application, config, constants, logging, utils, stack
 from ..constants import ADDED, REMOVED, CHANGED
-from . import stack
 from ..application import ChangeEvent
 
 translate = QtGui.QApplication.translate

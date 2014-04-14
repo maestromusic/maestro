@@ -69,7 +69,7 @@ class ChangeEventDispatcher(QtCore.QObject):
     def __init__(self, stack=None):
         super().__init__()
         if stack is None:
-            from .core import stack
+            from . import stack
             self.stack = stack.stack
         else: self.stack = stack
         if config.options.misc.debug_events:
@@ -187,7 +187,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     translate = QtCore.QCoreApplication.translate
     
     # Initialize undo/redo and event handling
-    from .core import stack
+    from . import stack
     stack.init()
     global dispatcher
     dispatcher = ChangeEventDispatcher()

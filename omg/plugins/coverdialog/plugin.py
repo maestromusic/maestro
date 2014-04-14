@@ -23,11 +23,11 @@ from PyQt4.QtCore import Qt
 
 translate = QtCore.QCoreApplication.translate
 
-from ...core import covers, stack
+from ...core import covers
 from ...core.elements import Element
 from ...gui import treeactions
 from ...gui.misc import busyindicator
-from ... import application
+from ... import application, stack
 
 # Various cover sizes used in the dialog
 BIG_COVER_SIZE = 400

@@ -21,8 +21,8 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import application, utils, database as db
-from ..core import tags, stack
+from .. import application, utils, database as db, stack
+from ..core import tags
 from .misc import lineedits
 
 translate = QtCore.QCoreApplication.translate

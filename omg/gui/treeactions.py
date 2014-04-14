@@ -21,8 +21,8 @@ import os.path
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import utils, filebackends, config
-from ..core import levels, tags, elements, stack
+from .. import utils, filebackends, config, stack
+from ..core import levels, tags, elements
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel

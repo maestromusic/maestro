@@ -306,7 +306,7 @@ class TagEditorModel(QtCore.QObject):
         self.recordChanged = self.records.recordChanged
         
         if stack is None:
-            from ..core import stack
+            from .. import stack
             self.stack = stack.stack
         else: self.stack = stack
         self.substack = self.stack.createSubstack()

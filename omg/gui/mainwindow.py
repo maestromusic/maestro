@@ -48,8 +48,7 @@ from PyQt4 import QtCore,QtGui
 from PyQt4.QtCore import Qt
 QWIDGETSIZE_MAX = 16777215
 
-from .. import config,constants,logging,utils
-from ..core import stack
+from .. import config,constants,logging,utils,stack
 from . import selection,dialogs
 
 # This will contain the single instance of MainWindow once it is initialized

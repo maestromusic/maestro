@@ -36,9 +36,9 @@ import contextlib
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import application, database as db, filebackends, player, logging, profiles
-from omg.core import tags, stack
-from omg.models import playlist
+from ... import application, database as db, filebackends, player, logging, profiles, stack
+from ...core import tags
+from ...models import playlist
 from . import filebackend as mpdfilebackend
 
 translate = QtCore.QCoreApplication.translate

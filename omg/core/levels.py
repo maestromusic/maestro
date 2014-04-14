@@ -21,9 +21,9 @@ import weakref
 from PyQt4 import QtCore, QtGui
 translate = QtCore.QCoreApplication.translate
 
-from . import elements, tags, flags, stickers, stack
+from . import elements, tags, flags, stickers
 from .nodes import Wrapper
-from .. import application, filebackends, database as db, logging
+from .. import application, filebackends, database as db, logging, stack
 
 
 allLevels = weakref.WeakSet()
