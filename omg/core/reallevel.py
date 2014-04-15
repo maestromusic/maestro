@@ -18,7 +18,7 @@
 
 import itertools
 
-from . import elements, levels, tags, flags
+from . import elements, levels, tags, flags, domains
 from .. import application, database as db, filebackends, stack
 
 
@@ -129,19 +129,20 @@ class RealLevel(levels.Level):
         
         # bare elements
         result = db.query("""
-                SELECT el.id, el.file, el.type, f.url, f.length
+                SELECT el.domain, el.id, el.file, el.type, f.url, f.length
                 FROM {0}elements AS el LEFT JOIN {0}files AS f ON el.id = f.element_id
                 WHERE el.id IN ({1})
                 """.format(db.prefix, csIdList))
-        for id, file, elementType, url, length in result:
+        for domainId, id, file, elementType, url, length in result:
             _dbIds.add(id)
             if file:
-                level.elements[id] = elements.File(level, id,
+                level.elements[id] = elements.File(domains.domains[domainId], level, id,
                                                    url = filebackends.BackendURL.fromString(url),
                                                    length = length,
                                                    type = elementType)
             else:
-                level.elements[id] = elements.Container(level, id, type=elementType)
+                level.elements[id] = elements.Container(domains.domains[domainId], level, id,
+                                                        type=elementType)
                 
         # contents
         result = db.query("""
@@ -226,7 +227,11 @@ class RealLevel(levels.Level):
             if db.idFromUrl(url) is not None:
                 raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
             id = levels.idFromUrl(url, create=True)
-            elem = elements.File(level, id=id, url=url, length=fLength, tags=fTags)
+            source = domains.getSource(url)
+            if source is not None:
+                domain = source.domain
+            else: domain = None
+            elem = elements.File(domain, level, id, url=url, length=fLength, tags=fTags)
             elem.specialTags = backendFile.specialTags           
             level.elements[id] = elem
             result.append(elem)

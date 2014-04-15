@@ -120,7 +120,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     *cmdConfig* is a list of options given on the command line that will
     overwrite the corresponding option from the file or the default. Each list item has to be a string like
-    ``main.collection=/var/music``.
+    ``database.type=sqlite``.
     
     *type* is determines how the application should be initialized and run: "gui" will start the usual
     application, "console" will initialize the framework without starting the the GUI. "test" is similar
@@ -175,22 +175,11 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     # Lock the lockfile to prevent a second OMG-instance from starting.
     if type == 'gui':
         lock()
-        
-    # Check for a collection directory
-    if type == 'gui' and config.options.main.collection == '':
-        logger.error("No collection directory defined.")
-        runInstaller()
     
     if type == 'gui':
         splash.showMessage("Loading translations")
     loadTranslators(app,logger)
     translate = QtCore.QCoreApplication.translate
-    
-    # Initialize undo/redo and event handling
-    from . import stack
-    stack.init()
-    global dispatcher
-    dispatcher = ChangeEventDispatcher()
         
     # Initialize database
     if type == 'test':
@@ -215,10 +204,17 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
             
     if exitPoint == 'database':
         return app
-        
-    # Initialize tags
-    from .core import tags,flags
+    
+    # Initialize undo/redo and event handling
+    from . import stack
+    stack.init()
+    global dispatcher
+    dispatcher = ChangeEventDispatcher()
+    
+    # Initialize core
+    from .core import domains, tags, flags
     try:
+        domains.init()
         tags.init()
     except RuntimeError:
         if type == 'gui':

@@ -24,7 +24,7 @@ translate = QtCore.QCoreApplication.translate
 
 from .. import application, filebackends, filesystem, config, utils
 from . import mainwindow, selection, dockwidget
-from ..core import levels
+from ..core import levels, domains
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -60,10 +60,16 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         'unknown'  : translate("FileSystemBrowserModel", "unknown status"),
         'problem'  : translate("FileSystemBrowserModel", "in conflict with database") }
     
-    def __init__(self, parent = None):
+    def __init__(self, parent=None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
+        self.source = None
 
+    def setSource(self, source):
+        if source != self.source:
+            self.source = source
+            self.setRootPath(source.path)
+            
     def columnCount(self, index):
         return 1
     
@@ -77,7 +83,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         if role == Qt.DecorationRole or role == Qt.ToolTipRole:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
-                dir = utils.files.relPath(info.absoluteFilePath())
+                dir = utils.files.relPath(info.absoluteFilePath(), self.source)
                 if dir == '..':
                     return super().data(index, role)
                 status = filesystem.folderState(dir)
@@ -86,7 +92,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 else:
                     return dir + '\n' + self.descriptions[status]
             else:
-                path = utils.files.relPath(info.absoluteFilePath())
+                path = utils.files.relPath(info.absoluteFilePath(), self.source)
                 url = filebackends.BackendURL.fromString("file:///" + path)
                 status = filesystem.fileState(url)
                 if role == Qt.DecorationRole:
@@ -96,17 +102,17 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         return super().data(index, role) 
 
 
-class FileSystemBrowser(QtGui.QTreeView):
+class FileSystemBrowserTreeView(QtGui.QTreeView):
     
     rescanRequested = QtCore.pyqtSignal(str)
     
-    def __init__(self, rootDirectory=config.options.main.collection, parent=None):
-        super().__init__(parent)
+    def __init__(self, source):
+        super().__init__()
         self.setAlternatingRowColors(True)
         self.setModel(FileSystemBrowserModel())
-        rootIndex = self.model().setRootPath(rootDirectory)
-        self.setRootIndex(rootIndex)
+        self.setSource(source)
         self.setTextElideMode(Qt.ElideMiddle)
+        self.setHeaderHidden(True)
         
         application.dispatcher.connect(self._handleDispatcher)
         if filesystem.enabled:
@@ -119,6 +125,12 @@ class FileSystemBrowser(QtGui.QTreeView):
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
     
+    def setSource(self, source):
+        model = self.model()
+        if source != model.source:
+            model.setSource(source)
+            self.setRootIndex(model.index(source.path))
+            
     def _handleDispatcher(self, event):
         if isinstance(event, application.ModuleStateChangeEvent):
             if event.module == "filesystem":
@@ -144,28 +156,45 @@ class FileSystemBrowser(QtGui.QTreeView):
             
     def _handleRescan(self):
         path = self.model().filePath(self.currentIndex())
-        self.rescanRequested.emit(utils.files.relPath(path))
+        self.rescanRequested.emit(utils.files.relPath(path, self.model().source))
         
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
-        paths = [utils.files.relPath(self.model().filePath(index)) for index in self.selectedIndexes()
+        paths = [utils.files.relPath(self.model().filePath(index), self.model().source)
+                                     for index in self.selectedIndexes()
                                      if not self.model().isDir(index)] # TODO: remove this restriction
         s = FileSystemSelection([p for p in paths if utils.files.hasKnownExtension(p)])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
     
         
-class FileSystemBrowserDock(dockwidget.DockWidget):
+class FileSystemBrowser(dockwidget.DockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
     def __init__(self, parent=None, **args):
         super().__init__(parent, **args)
-        self.setWindowTitle(translate("FileSystemBrowserDock", "Filesystem: {}")
-                            .format(config.options.main.collection))
-        self.setWidget(FileSystemBrowser())
+        widget = QtGui.QWidget()
+        layout = QtGui.QVBoxLayout(widget)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0,0,0,0)
+        self.sourceChooser = QtGui.QComboBox()
+        for source in domains.sources:
+            self.sourceChooser.addItem(source.name, source)
+        self.sourceChooser.currentIndexChanged.connect(self._handleSourceChanged)
+        layout.addWidget(self.sourceChooser)
+        
+        self.treeView = FileSystemBrowserTreeView(domains.sources[0])
+        layout.addWidget(self.treeView, 1)
+        self.setWidget(widget)
+        self._handleSourceChanged(0)
         
     def createOptionDialog(self, parent):
         from . import preferences
         preferences.show("main/filesystem")
+    
+    def _handleSourceChanged(self, index):
+        source = domains.sources[index]
+        self.setWindowTitle(self.tr("Filesystem: {}").format(source.name))
+        self.treeView.setSource(source)
         
 
 class FileSystemSelection(selection.Selection):
@@ -191,8 +220,8 @@ class FileSystemSelection(selection.Selection):
 # register this widget in the main application
 widgetData = mainwindow.WidgetData(id = "filesystembrowser",
                                    name = translate("FileSystemBrowser", "File System Browser"),
-                                   icon = utils.getIcon('widgets/filesystembrowser.png'),
-                                   theClass = FileSystemBrowserDock,
+                                   icon = utils.images.icon('widgets/filesystembrowser.png'),
+                                   theClass = FileSystemBrowser,
                                    central = False,
                                    preferredDockArea = QtCore.Qt.RightDockWidgetArea)
 mainwindow.addWidgetData(widgetData)

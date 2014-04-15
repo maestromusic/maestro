@@ -170,6 +170,8 @@ class Element:
     
     def equalsButLevel(self, other):
         """Return True if this element equals *other* in all aspects but possibly the level."""
+        if self.domain != other.domain:
+            return False
         if self.id != other.id:
             return False
         if self.tags != other.tags:
@@ -195,8 +197,9 @@ class Container(Element):
     Valid keyword-arguments are type, contents (which must be a ContentList), parents, tags, flags,
     stickers.
     """
-    def __init__(self, level, id, type=None, contents=None, parents=None, tags=None, flags=None,
+    def __init__(self, domain, level, id, type=None, contents=None, parents=None, tags=None, flags=None,
                  stickers=None):
+        self.domain = domain
         self.level = level
         self.id = id
         
@@ -229,7 +232,8 @@ class Container(Element):
         If *level* is not None, the copy will have that level as 'level'-attribute.
         Warning: When copying elements from one level to another you might have to correct the parents list.
         """
-        return Container(level = self.level if level is None else level,
+        return Container(domain = self.domain,
+                         level = self.level if level is None else level,
                          id = self.id,
                          type = self.type,
                          contents = self.contents.copy(),
@@ -259,11 +263,12 @@ class File(Element):
     You may define additional properties using keyword-arguments. Otherwise default values (empty lists etc.)
     will be used. Valid keyword-arguments are parents, tags, flags, stickers.
     """
-    def __init__(self, level, id, url, length, **kwargs):
+    def __init__(self, domain, level, id, url, length, **kwargs):
         if not isinstance(id, int) or not isinstance(url, filebackends.BackendURL) \
                 or not isinstance(length, int):
             raise TypeError("Invalid type (id, url, length): ({}, {}, {}) of types ({}, {}, {})"
                             .format(id, url, length, type(id), type(url), type(length)))
+        self.domain = domain    
         self.level = level
         self.id = id
         self.url = url
@@ -279,7 +284,8 @@ class File(Element):
         will have that level as 'level'-attribute.
         Warning: When copying elements from one level to another you might have to correct the parents list.
         """
-        copy = File(level = self.level if level is None else level,
+        copy = File(domain = domain,
+                    level = self.level if level is None else level,
                     id = self.id,
                     url = self.url,
                     length = self.length,

@@ -80,7 +80,7 @@ binary = None
 def init(cmdConfig = [],testMode=False):
     """Initialize the config-module: Read the config files and create the module variables. *cmdConfig* is a
     list of options given on the command line that will overwrite the corresponding option from the file or
-    the default. Each list item has to be a string like ``main.collection=/var/music``.
+    the default. Each list item has to be a string like ``database.type=sqlite``.
     If *testMode* is True, a different file will be used for config options (testconfig instead of config),
     storage will be set to the default values and binary will be empty.
     """
@@ -333,7 +333,7 @@ class MainSection(Section):
     It is itself a section with the name ''<Main>''. The parameters are:
 
         * *path*: path to the config file. May be None in which case no file is used.
-        * *cmdConfig*: a list of strings of the form “main.collection=/var/music”. The options given in
+        * *cmdConfig*: a list of strings of the form “database.type=sqlite”. The options given in
           these strings will overwrite the options from the file or the defaults.
         * *storage*: whether this object corresponds to a storage file (confer module documentation).
 

@@ -317,12 +317,13 @@ class Level(application.ChangeEventDispatcher):
                         stack.Call(self._removeElements, elements=elements),
                         stack.Call(self._addElements, elements=elements))
 
-    def createContainer(self, tags=None, flags=None, stickers=None, type=None, contents=None):
+    def createContainer(self, domain, tags=None, flags=None, stickers=None, type=None, contents=None):
         """Create a new container with the given properties and load it into this level.
         
         Can be undone. Returns the new container.
         """ 
-        container = elements.Container(level=self,
+        container = elements.Container(domain=domain,
+                                       level=self,
                                        id=db.nextId(),
                                        type=type, 
                                        tags=tags,

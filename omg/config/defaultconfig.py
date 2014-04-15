@@ -37,7 +37,6 @@ from collections import OrderedDict
 # No use to translate strings here, as this is executed before any translators have been loaded.
 defaults = OrderedDict((
 ("main", {
-    "collection": (str,"","Music collection base directory"),
     "plugins": (list,[],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/."),
     "extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "file extensions")
 }),
@@ -61,6 +60,7 @@ defaults = OrderedDict((
     "sqlite_path": (str,"config:omg.db","Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory.")
 }),
 
+#TODO move these into the plugin
 ("mpd", {
     "timer_interval": (int,300,"Interval of mpd synchronization"),
     "host": (str,"localhost","MPD's host name"),

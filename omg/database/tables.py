@@ -36,12 +36,12 @@ class SQLTable:
         * name: contains the name of the table including the optional prefix. This is extracted from the
           first createQuery.
     """
-    def __init__(self,createQueries):
-        self.createQueries = createQueries
-        result = re.match("\s*CREATE\s*TABLE\s*(\w+)",createQueries[0],re.I)
+    def __init__(self, createQueries):
+        self.createQueries = [query.format(p=db.prefix) for query in createQueries]
+        result = re.match("\s*CREATE\s*TABLE\s*(\w+)", self.createQueries[0],re.I)
         if result is None:
             raise DBException("First create query must be a 'CREATE TABLE' query: {}"
-                              .format(createQueries[0]))
+                              .format(self.createQueries[0]))
         else: self.name = result.group(1)
 
     def exists(self):
@@ -80,55 +80,59 @@ def _addSQLite(*queries):
 # elements #
 #----------#
 _addMySQL("""
-CREATE TABLE {}elements (
+CREATE TABLE {p}elements (
     id          MEDIUMINT UNSIGNED  NOT NULL,
+    domain      SMALLINT  UNSIGNED  NOT NULL,
     file        BOOLEAN             NOT NULL,
     type        TINYINT   UNSIGNED  NOT NULL DEFAULT 0,
     elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,
-    PRIMARY KEY(id)
+    PRIMARY KEY(id),
+    FOREIGN KEY(domain) REFERENCES {p}domains(id)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {}elements (
+CREATE TABLE {p}elements (
     id          INTEGER PRIMARY KEY,
+    domain      INTEGER             NOT NULL,
     file        BOOLEAN             NOT NULL DEFAULT 0,
     type        INTEGER             NOT NULL DEFAULT 0,
-    elements    INTEGER             NOT NULL DEFAULT 0
+    elements    INTEGER             NOT NULL DEFAULT 0,
+    FOREIGN KEY(domain) REFERENCES {p}domains(id)
 )
-""".format(db.prefix))
+""")
 
 #----------#
 # contents #
 #----------#
 _addMySQL("""
-CREATE TABLE {0}contents (
+CREATE TABLE {p}contents (
     container_id MEDIUMINT UNSIGNED NOT NULL,
     position     SMALLINT  UNSIGNED NOT NULL,
     element_id   MEDIUMINT UNSIGNED NOT NULL,
     PRIMARY KEY(container_id,position),
     INDEX element_idx(element_id),
-    FOREIGN KEY(container_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
+    FOREIGN KEY(container_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {0}contents (
+CREATE TABLE {p}contents (
     container_id MEDIUMINT UNSIGNED NOT NULL,
     position     SMALLINT  UNSIGNED NOT NULL,
     element_id   MEDIUMINT UNSIGNED NOT NULL,
     PRIMARY KEY(container_id,position),
-    FOREIGN KEY(container_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
+    FOREIGN KEY(container_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
 )
-""".format(db.prefix),
-"CREATE INDEX {0}contents_element_idx ON {0}contents (element_id)".format(db.prefix)
+""",
+"CREATE INDEX {p}contents_element_idx ON {p}contents (element_id)"
 )
 
 #-------#
 # files #
 #-------#
 _addMySQL("""
-CREATE TABLE {0}files (
+CREATE TABLE {p}files (
     element_id MEDIUMINT UNSIGNED NOT NULL,
     url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
@@ -138,35 +142,35 @@ CREATE TABLE {0}files (
     INDEX url_idx(url(333)),
     INDEX hash_idx(hash),
     INDEX length_idx(length),
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {0}files (
+CREATE TABLE {p}files (
     element_id MEDIUMINT UNSIGNED NOT NULL,
     url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     length     MEDIUMINT UNSIGNED NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
 )
-""".format(db.prefix),
-"CREATE INDEX {0}files_url_idx ON {0}files (url)".format(db.prefix),
-"CREATE INDEX {0}files_hash_idx ON {0}files (hash)".format(db.prefix),
-"CREATE INDEX {0}files_length_idx ON {0}files (length)".format(db.prefix),
+""",
+"CREATE INDEX {p}files_url_idx ON {p}files (url)",
+"CREATE INDEX {p}files_hash_idx ON {p}files (hash)",
+"CREATE INDEX {p}files_length_idx ON {p}files (length)",
 """
-CREATE TRIGGER {0}files_timestamp_trg AFTER UPDATE ON {0}files
+CREATE TRIGGER {p}files_timestamp_trg AFTER UPDATE ON {p}files
 BEGIN
-UPDATE {0}files SET verified = CURRENT_TIMESTAMP WHERE element_id = new.element_id;
+UPDATE {p}files SET verified = CURRENT_TIMESTAMP WHERE element_id = new.element_id;
 END
-""".format(db.prefix)
+"""
 )
 
 #--------#
 # tagids #
 #--------#
 _addMySQL("""
-CREATE TABLE {0}tagids (
+CREATE TABLE {p}tagids (
     id       SMALLINT UNSIGNED             NOT NULL AUTO_INCREMENT,
     tagname  VARCHAR(63)                   NOT NULL,
     tagtype  ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
@@ -177,9 +181,9 @@ CREATE TABLE {0}tagids (
     PRIMARY KEY(id),
     UNIQUE INDEX(tagname)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {}tagids (
+CREATE TABLE {p}tagids (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     tagname  VARCHAR(63)                   NOT NULL UNIQUE,
     tagtype  VARCHAR(7)                    NOT NULL DEFAULT 'varchar',
@@ -188,33 +192,33 @@ CREATE TABLE {}tagids (
     private  BOOLEAN                       NOT NULL DEFAULT 0,
     sort     INTEGER                       NOT NULL DEFAULT -1
 )
-""".format(db.prefix))
+""")
 
 #------#
 # tags #
 #------#
 _addMySQL("""
-CREATE TABLE {0}tags (
+CREATE TABLE {p}tags (
     element_id MEDIUMINT UNSIGNED NOT NULL,
     tag_id     SMALLINT  UNSIGNED NOT NULL,
     value_id   MEDIUMINT UNSIGNED NOT NULL,
     INDEX tag_value_idx(tag_id,value_id),
     INDEX element_idx(element_id),
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
+    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {0}tags (
+CREATE TABLE {p}tags (
     element_id MEDIUMINT UNSIGNED NOT NULL,
     tag_id     SMALLINT  UNSIGNED NOT NULL,
     value_id   MEDIUMINT UNSIGNED NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
+    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
 )
-""".format(db.prefix),
-"CREATE INDEX {0}tags_tag_value_idx ON {0}tags (tag_id,value_id)".format(db.prefix),
-"CREATE INDEX {0}tags_element_idx ON {0}tags (element_id)".format(db.prefix))
+""",
+"CREATE INDEX {p}tags_tag_value_idx ON {p}tags (tag_id,value_id)",
+"CREATE INDEX {p}tags_element_idx ON {p}tags (element_id)")
 
 #----------------#
 # values_varchar #
@@ -231,7 +235,7 @@ CREATE TABLE {0}values_varchar (
     INDEX tag_value_idx(tag_id,value),
     FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix,constants.TAG_VARCHAR_LENGTH))
+""".format(db.prefix, constants.TAG_VARCHAR_LENGTH))
 _addSQLite("""
 CREATE TABLE {0}values_varchar (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,54 +246,54 @@ CREATE TABLE {0}values_varchar (
     hide            BOOLEAN            NOT NULL DEFAULT 0,
     FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
 )
-""".format(db.prefix,constants.TAG_VARCHAR_LENGTH),
-"CREATE INDEX {0}values_varchar_idx ON {0}values_varchar (value)".format(db.prefix))
+""".format(db.prefix, constants.TAG_VARCHAR_LENGTH),
+"CREATE INDEX {p}values_varchar_idx ON {p}values_varchar (value)")
 
 #-------------#
 # values_text #
 #-------------#
 _addMySQL("""
-CREATE TABLE {0}values_text (
+CREATE TABLE {p}values_text (
     id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tag_id SMALLINT  UNSIGNED NOT NULL,
     value  TEXT               NOT NULL,
     PRIMARY KEY(id),
     INDEX tag_value_idx(tag_id,value(10)),
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
+    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {0}values_text (
+CREATE TABLE {p}values_text (
     id     INTEGER PRIMARY KEY AUTOINCREMENT,
     tag_id SMALLINT  UNSIGNED NOT NULL,
     value  TEXT               NOT NULL,
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
+    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
 )
-""".format(db.prefix),
-"CREATE INDEX {0}values_text_idx ON {0}values_text (value)".format(db.prefix))
+""",
+"CREATE INDEX {p}values_text_idx ON {p}values_text (value)")
 
 #-------------#
 # values_date #
 #-------------#
 _addMySQL("""
-CREATE TABLE {0}values_date (
+CREATE TABLE {p}values_date (
     id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
     tag_id SMALLINT  UNSIGNED NOT NULL,
     value  INT       UNSIGNED NOT NULL,
     PRIMARY KEY(id),
     INDEX tag_value_idx(tag_id,value),
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
+    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {0}values_date (
+CREATE TABLE {p}values_date (
     id     INTEGER PRIMARY KEY AUTOINCREMENT,
     tag_id SMALLINT  UNSIGNED NOT NULL,
     value  INT       UNSIGNED NOT NULL,
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
+    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
 )
-""".format(db.prefix),
-"CREATE INDEX {0}values_date_idx ON {0}values_date (value)".format(db.prefix))
+""",
+"CREATE INDEX {p}values_date_idx ON {p}values_date (value)")
 
 #------------#
 # flag_names #
@@ -301,105 +305,148 @@ CREATE TABLE {}flag_names (
     icon    VARCHAR(255)      DEFAULT NULL,
     PRIMARY KEY(id)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix,constants.FLAG_VARCHAR_LENGTH))
+""".format(db.prefix, constants.FLAG_VARCHAR_LENGTH))
 _addSQLite("""
 CREATE TABLE {}flag_names (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     name    VARCHAR({})       NOT NULL,
     icon    VARCHAR(255)      DEFAULT NULL
 )
-""".format(db.prefix,constants.FLAG_VARCHAR_LENGTH))
+""".format(db.prefix, constants.FLAG_VARCHAR_LENGTH))
 
 #-------#
 # flags #
 #-------#
 _addMySQL("""
-CREATE TABLE {0}flags (
+CREATE TABLE {p}flags (
     element_id      MEDIUMINT UNSIGNED NOT NULL,
     flag_id         SMALLINT UNSIGNED NOT NULL,
     UNIQUE INDEX flag_idx(element_id,flag_id),
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(flag_id) REFERENCES {0}flag_names(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
+    FOREIGN KEY(flag_id) REFERENCES {p}flag_names(id) ON DELETE CASCADE
 ) ENGINE InnoDB
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {0}flags (
+CREATE TABLE {p}flags (
     element_id      MEDIUMINT UNSIGNED NOT NULL,
     flag_id         SMALLINT UNSIGNED NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(flag_id) REFERENCES {0}flag_names(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
+    FOREIGN KEY(flag_id) REFERENCES {p}flag_names(id) ON DELETE CASCADE
 )
-""".format(db.prefix),
-"CREATE UNIQUE INDEX {0}flags_idx ON {0}flags (element_id,flag_id)".format(db.prefix))
+""",
+"CREATE UNIQUE INDEX {p}flags_idx ON {p}flags (element_id,flag_id)")
 
 #---------#
 # folders #
 #---------#
 _addMySQL("""
-CREATE TABLE {}folders (
+CREATE TABLE {p}folders (
     path         VARCHAR(511)    NOT NULL,
     state        TINYINT NOT NULL DEFAULT 0
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {}folders (
+CREATE TABLE {p}folders (
     path         VARCHAR(511)    NOT NULL,
     state        INTEGER NOT NULL DEFAULT 0
 )
-""".format(db.prefix))
+""")
 
 #----------#
 # newfiles #
 #----------#
 _addMySQL("""
-CREATE TABLE {}newfiles (
+CREATE TABLE {p}newfiles (
     url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX url_idx(url(333)),
     INDEX hash_idx(hash)
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {}newfiles (
+CREATE TABLE {p}newfiles (
     url        VARCHAR(511)       NOT NULL,
     hash       VARCHAR(63),
     verified   INTEGER DEFAULT CURRENT_TIMESTAMP
 )
-""".format(db.prefix),
-"CREATE INDEX {0}newfiles_url_idx ON {0}newfiles (url)".format(db.prefix),
-"CREATE INDEX {0}newfiles_hash_idx ON {0}newfiles (hash)".format(db.prefix),
+""",
+"CREATE INDEX {p}newfiles_url_idx ON {p}newfiles (url)",
+"CREATE INDEX {p}newfiles_hash_idx ON {p}newfiles (hash)",
 """
-CREATE TRIGGER {0}newfiles_timestamp_trg AFTER UPDATE ON {0}newfiles
+CREATE TRIGGER {p}newfiles_timestamp_trg AFTER UPDATE ON {p}newfiles
 BEGIN
-UPDATE {0}newfiles SET verified = CURRENT_TIMESTAMP WHERE url = new.url;
+UPDATE {p}newfiles SET verified = CURRENT_TIMESTAMP WHERE url = new.url;
 END
-""".format(db.prefix)
+"""
 )
 
 #----------#
 # stickers #
 #----------#
 _addMySQL("""
-CREATE TABLE {0}stickers (
+CREATE TABLE {p}stickers (
     element_id  MEDIUMINT UNSIGNED  NOT NULL,
     type        VARCHAR(255)        NOT NULL,
     sort        SMALLINT UNSIGNED   NOT NULL,
     data        TEXT                NOT NULL,
     INDEX stickers_idx(element_id,type,sort),
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
 ) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix))
+""")
 _addSQLite("""
-CREATE TABLE {0}stickers (
+CREATE TABLE {p}stickers (
     element_id  INTEGER         NOT NULL,
     type        VARCHAR(255)    NOT NULL,
     sort        INTEGER         NOT NULL,
     data        TEXT            NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {0}elements(id) ON DELETE CASCADE
+    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
 )
-""".format(db.prefix),
-"CREATE INDEX {0}stickers_idx ON {0}stickers (element_id,type,sort)".format(db.prefix)
+""",
+"CREATE INDEX {p}stickers_idx ON {p}stickers (element_id,type,sort)"
 )
+
+#---------#
+# domains #
+#---------#
+_addMySQL("""
+CREATE TABLE {p}domains (
+    id    SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name  VARCHAR(64),   
+    PRIMARY KEY(id),
+    UNIQUE INDEX(name)
+) ENGINE InnoDB, CHARACTER SET 'utf8'
+""")
+_addSQLite("""
+CREATE TABLE {p}domains (
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name  VARCHAR(64) NOT NULL UNIQUE
+)
+""")
+
+#---------#
+# sources #
+#---------#
+_addMySQL("""
+CREATE TABLE {p}sources (
+    id      SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name  VARCHAR(64),   
+    path    VARCHAR(512) NOT NULL,
+    domain  SMALLINT UNSIGNED NOT NULL
+    PRIMARY KEY(id),
+    UNIQUE INDEX(name),
+    FOREIGN KEY(domain) REFERENCES {p}domains(id) ON DELETE CASCADE
+) ENGINE InnoDB, CHARACTER SET 'utf8'
+""")
+_addSQLite("""
+CREATE TABLE {p}sources (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    name  VARCHAR(64) NOT NULL UNIQUE,
+    path    VARCHAR(512) NOT NULL,
+    domain  INTEGER NOT NULL,
+    FOREIGN KEY(domain) REFERENCES {p}domains(id) ON DELETE CASCADE
+)
+""")
+
 
 tables = [SQLTable(queries) for queries in tables]

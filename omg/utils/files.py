@@ -30,21 +30,18 @@ def hasKnownExtension(file):
         return s[1].lower() in config.options.main.extensions
     
     
-def relPath(file):
-    """Return the relative path of a music file against the collection base path."""
-    if os.path.isabs(file):
-        return os.path.relpath(file, config.options.main.collection)
-    else:
-        return file
+def relPath(path, source):
+    """Return a path relative to the given Source."""
+    if os.path.isabs(path):
+        return os.path.relpath(path, source.path)
+    else: return path
 
 
-def absPath(file):
-    """Return the absolute path of a music file inside the collection directory, if it is not absolute
-    already."""
-    if not os.path.isabs(file):
-        return os.path.join(config.options.main.collection, file)
-    else:
-        return file
+def absPath(path, source):
+    """Return the absolute path for a path relative to the given Source."""
+    if not os.path.isabs(path):
+        return os.path.join(source.path, path)
+    else: return path
 
 
 def mTimeStamp(url):

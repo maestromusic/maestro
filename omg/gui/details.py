@@ -147,6 +147,13 @@ class DetailsView(dockwidget.DockWidget):
         else: text.append(Qt.escape(el.url.extension()))
         text.append('</td></tr>')
         
+        # Domain
+        text.append('<tr><td>'+self.tr("Domain: ")+'</td><td>')
+        if el.domain is not None:
+            text.append(Qt.escape(el.domain.name))
+        else: text.append(self.tr("None"))
+        text.append('</td></tr>')
+        
         # Url
         if el.isFile():
             text.append('<tr><td>'+self.tr("URL: ")+'</td><td>')

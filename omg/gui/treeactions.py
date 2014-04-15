@@ -22,7 +22,7 @@ from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
 from .. import utils, filebackends, config, stack
-from ..core import levels, tags, elements
+from ..core import levels, tags, elements, domains
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
@@ -130,7 +130,8 @@ class ChangeFileUrlsAction(TreeAction):
             QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("The given path does not exists."))
             return False
-        if not path.startswith(config.options.main.collection):
+        source = core.domains.getSource(oldPath)
+        if not path.startswith(source.path):
             QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("Path must be inside collection directory"))
             return False
