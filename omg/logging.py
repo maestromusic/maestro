@@ -68,7 +68,7 @@ def shutdown():
 def log(name, level, message):
     """Log a message on the logger called *name* using the given log level."""
     if not configured:
-        print(" - ".join([level, self.name, message]), file=sys.stderr)
+        print(" - ".join([level, name, message]), file=sys.stderr)
     else:
         # get the integer loglevel from the constants logging.DEBUG, logging.INFO etc.
         logging.log(getattr(logging, level), "{} - {}".format(name, message))
