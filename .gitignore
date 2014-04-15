@@ -11,3 +11,5 @@ translations.py
 docs/
 distribute-*.tar.gz
 distribute-*.egg
+build/
+SQLiteTest/

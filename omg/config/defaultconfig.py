@@ -38,7 +38,7 @@ from collections import OrderedDict
 defaults = OrderedDict((
 ("main", {
     "plugins": (list,[],"List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/."),
-    "extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "file extensions")
+    "music_extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "music file extensions")
 }),
     
 ("i18n", {

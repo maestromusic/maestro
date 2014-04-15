@@ -29,12 +29,18 @@ class Domain:
         self.id = id
         self.name = name
         
+    def __repr__(self):
+        return "<Domain {}>".format(self.name)
+        
 class Source:
     def __init__(self, id, name, path, domain):
         self.id = id
         self.name = name
         self.path = os.path.normpath(path)
         self.domain = domain
+        
+    def __repr__(self):
+        return "<Source {}>".format(self.name)
         
         
 def init():

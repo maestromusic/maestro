@@ -26,7 +26,7 @@ translate = QtCore.QCoreApplication.translate
 
 from . import BackendFile, BackendURL, urlTypes
 from .. import logging, utils
-from ..core import tags
+from ..core import tags, domains
 
 
 def init():
@@ -55,9 +55,10 @@ class RealFile(BackendFile):
         
         Special tags (tracknumber, compilation, discnumber) are stored in the "specialTags" attribute.
         """
-        
-        self._taglibFile = taglib.File(self.url.absPath, applyID3v2Hack=True) 
         self.tags = tags.Storage()
+        if not utils.files.isMusicFile(self.url.path):
+            return 
+        self._taglibFile = taglib.File(self.url.absPath, applyID3v2Hack=True) 
         self.specialTags = OrderedDict()
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
@@ -79,7 +80,9 @@ class RealFile(BackendFile):
         
     @property
     def length(self):
-        return self._taglibFile.length
+        if hasattr(self, '_tagLibFile'):
+            return self._taglibFile.length
+        else: return 0
 
     @property
     def readOnly(self):
@@ -140,10 +143,24 @@ class FileURL(BackendURL):
     CAN_DELETE = True
     IMPLEMENTATIONS = [ RealFile ]
     
-    def __init__(self, urlString):
-        if "://" not in urlString:
-            urlString = "file:///" + utils.files.relPath(urlString)
+    def __init__(self, urlString, source=None):
+        if urlString.startswith('file://'):
+            super().__init__(urlString)
+            path = urlString[len('file://'):]
+            sourceId = int(path[:path.index('/')])
+            self.source = domains.sourceById(sourceId)
+            return
+        
+        if source is None:
+            assert os.path.isabs(urlString)
+            source = domains.getSource(urlString)
+            if source is None:
+                super().__init__("file://"+urlString)
+                self.source = None
+                return
+        urlString = "file://{}/{}".format(source.id, urlString)
         super().__init__(urlString)
+        self.source = source
     
     @property
     def path(self):
@@ -151,11 +168,13 @@ class FileURL(BackendURL):
     
     @property
     def absPath(self):
-        return utils.files.absPath(self.path)
+        if self.source is not None:
+            return utils.files.absPath(self.path, self.source)
+        else: return self.path 
     
     def renamed(self, newPath):
         """Return a new FileURL with the given *newPath* as path."""
-        return FileURL("file:///" + newPath)
+        return FileURL(newPath, self.source)
     
     def toQUrl(self):
         """Return a QUrl from this URL. Return None if that is not possible (e.g. weird scheme)."""

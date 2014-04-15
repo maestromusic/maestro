@@ -93,7 +93,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                     return dir + '\n' + self.descriptions[status]
             else:
                 path = utils.files.relPath(info.absoluteFilePath(), self.source)
-                url = filebackends.BackendURL.fromString("file:///" + path)
+                url = filebackends.filesystem.FileURL(path, self.source)
                 status = filesystem.fileState(url)
                 if role == Qt.DecorationRole:
                     return self.fileIcons[status]
@@ -160,10 +160,11 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
-        paths = [utils.files.relPath(self.model().filePath(index), self.model().source)
+        source = self.model().source
+        paths = [utils.files.relPath(self.model().filePath(index), source)
                                      for index in self.selectedIndexes()
                                      if not self.model().isDir(index)] # TODO: remove this restriction
-        s = FileSystemSelection([p for p in paths if utils.files.hasKnownExtension(p)])
+        s = FileSystemSelection([filebackends.filesystem.FileURL(path, source) for path in paths])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
     
@@ -199,9 +200,8 @@ class FileSystemBrowser(dockwidget.DockWidget):
 
 class FileSystemSelection(selection.Selection):
     
-    def __init__(self, paths):
+    def __init__(self, urls):
         super().__init__(levels.real,[])
-        urls = [filebackends.BackendURL.fromString("file:///" + path) for path in paths]
         self._files = levels.real.collectMany(urls)
         
     def elements(self,recursive=False):

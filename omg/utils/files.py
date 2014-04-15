@@ -18,18 +18,16 @@
 
 import os, os.path, datetime, itertools, collections
 from .. import config
+    
 
-
-def hasKnownExtension(file):
-    """Return True if the given path has a known extension (i.e., appears in options.main.extension).
-    Does **not** check whether the file actually exists, is readable, etc."""
-    s = file.rsplit(".", 1)
-    if len(s) == 1:
+def isMusicFile(path):
+    """Return whether the given file is a music file. This check looks only on the file extension."""
+    _, ext = os.path.splitext(path)
+    if not ext.startswith('.'):
         return False
-    else:
-        return s[1].lower() in config.options.main.extensions
-    
-    
+    ext = ext[1:].lower()
+    return ext in config.options.main.music_extensions
+
 def relPath(path, source):
     """Return a path relative to the given Source."""
     if os.path.isabs(path):
@@ -58,8 +56,6 @@ def collect(urls):
     filePaths = collections.OrderedDict()
     
     def add(file, parent=None):
-        if not hasKnownExtension(file):
-            return
         dir = parent or os.path.dirname(file)
         if dir not in filePaths:
             filePaths[dir] = []
@@ -99,9 +95,7 @@ def collectAsList(urls):
     def checkUrl(url):
         path = url.path()
         if os.path.isfile(path):
-            if hasKnownExtension(path):
-                return [FileURL(path)]
-            else: return []
+            return [FileURL(path)]
         else: return itertools.chain.from_iterable(collect([url]).values())
     return itertools.chain.from_iterable(checkUrl(url) for url in urls)
 

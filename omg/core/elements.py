@@ -284,7 +284,7 @@ class File(Element):
         will have that level as 'level'-attribute.
         Warning: When copying elements from one level to another you might have to correct the parents list.
         """
-        copy = File(domain = domain,
+        copy = File(domain = self.domain,
                     level = self.level if level is None else level,
                     id = self.id,
                     url = self.url,
