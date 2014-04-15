@@ -397,7 +397,7 @@ class TagCriterion(Criterion):
                 return _negHelper(self, '{tag='+tagNames+'='+prefixes+_quoteIfNecessary(self.value)+'}')
             
     def __eq__(self, other):
-        return isinstance(other, TagCriterion) and other.value == self.value\
+        return type(other) is type(self) and other.value == self.value\
                 and other.tagList == self.tagList and other.negate == self.negate\
                 and other.binary == self.binary and other.singleWord == self.singleWord
             
@@ -647,8 +647,7 @@ class DateCriterion(TagCriterion):
     """
     def __init__(self, interval, tagList=None):
         assert interval.isValid()
-        self.interval = interval
-        self.value = repr(interval) # => DateCriterion and TagCriterion can be compared (TagCriterion.__eq__)
+        self.interval = self.value = interval  # self.value is needed by TagCriterion.getQueries
         if tagList is None:
             tagList = SEARCH_TAGS
         self.tagList = [tag for tag in tagList if tag.type == tags.TYPE_DATE]
@@ -678,8 +677,15 @@ class DateCriterion(TagCriterion):
     
     def __repr__(self):
         return _negHelper(self, self.interval.__repr__())
-      
-        
+    
+    def __eq__(self, other):
+        return isinstance(other, DateCriterion) and other.interval == self.interval \
+                 and other.tagList == self.tagList
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
 class TagIdCriterion(Criterion):
     """A TagIdCriterion contains a list of (tag, value-id) tuples. It matches elements which have at
     least one of these tags. TagIdCriteria are faster than most other criteria because the search only needs
@@ -704,7 +710,7 @@ class TagIdCriterion(Criterion):
         return tag in self.valueIds
 
     def __eq__(self,other):
-        return isinstance(other,TagIdCriterion) and other.tagPairs == self.tagPairs
+        return isinstance(other, TagIdCriterion) and other.tagPairs == self.tagPairs
 
     def __ne__(self,other):
         return not self.__eq__(other)

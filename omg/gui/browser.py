@@ -177,6 +177,7 @@ class Browser(dockwidget.DockWidget):
         levels.real.connect(self._handleChangeEvent)
 
         self.createViews(layersForViews)
+        self.filterButton.setEnabled(self.getFilter() is not None)
         
         global defaultBrowser
         defaultBrowser = self

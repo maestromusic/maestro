@@ -424,7 +424,7 @@ class Macro:
     def begin(self):
         """Perform stuff before the commands of this macro are redone/undone."""
         if self.transaction:
-            from .. import database
+            from . import database
             database.transaction()
         if self.preMethod is not None:
             self.preMethod()
@@ -434,7 +434,7 @@ class Macro:
         if self.postMethod is not None:
             self.postMethod()
         if self.transaction:
-            from .. import database
+            from . import database
             database.commit()
         self.finished = True # after first redo, the macro is finished
     
@@ -463,7 +463,7 @@ class Macro:
             command.undo()
         if self.transaction:
             #This assumes that this macro has not been finished
-            from .. import database
+            from . import database
             database.rollback()
             
     def isEmpty(self):

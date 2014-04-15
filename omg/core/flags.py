@@ -125,7 +125,7 @@ def addFlagType(name, **data):
         raise ValueError("There is already a flag with name '{}'.".format(name))
     if not isValidFlagname(name):
         raise ValueError("'{}' is not a valid flagname.".format(name))
-    flagType = Flag(name, **data)
+    flagType = Flag(name=name, **data)
     stack.push(translate("Flags", "Add flag type"),
                stack.Call(_addFlagType, flagType),
                stack.Call(_deleteFlagType, flagType))
