@@ -184,11 +184,11 @@ class Level(application.ChangeEventDispatcher):
     
         - *name*: each level has a name for debugging purposes,
         - *parent*: the parent level,
-        - *levelStack*: the undostack which will be used by methods of this level (e.g. changeTags).
+        - *stack*: the undostack which will be used by methods of this level (e.g. changeTags).
           Only levels which are only used in a modal dialog may use their own stack.
           
     """ 
-    def __init__(self, name, parent, elements=None, levelStack=None):
+    def __init__(self, name, parent, elements=None, stack=None):
         super().__init__()
         allLevels.add(self)
         self.name = name
@@ -196,7 +196,7 @@ class Level(application.ChangeEventDispatcher):
         if elements is None:
             self.elements = {}
         else: self.elements = {element.id: element.copy(level=self) for element in elements}
-        self.stack = levelStack if levelStack is not None else stack.stack
+        self.stack = stack if stack is not None else globals()['stack'].stack
         
         # These are necessary to solve ticket #138
         self.lastInsertId = None      # last element into which something has been inserted
