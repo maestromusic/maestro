@@ -213,6 +213,7 @@ class MergeDialog(QtGui.QDialog):
         self.level = self.elements[0].level
         self.parentNode = wrappers[0].parent
         
+        domain = self.wrappers[0].element.domain
         containerType = config.storage.gui.merge_dialog_container_type or self.STANDARD_TYPE
         
         titleHint = ''
@@ -240,6 +241,12 @@ class MergeDialog(QtGui.QDialog):
         titleLineLayout.addWidget(QtGui.QLabel(self.tr('Title of new container:')))
         self.titleEdit = QtGui.QLineEdit(titleHint)
         titleLineLayout.addWidget(self.titleEdit)
+        
+        row += 1
+        label = QtGui.QLabel(self.tr('Domain:'))
+        layout.addWidget(label, row, 0)
+        self.domainBox = widgets.DomainBox(domain)
+        layout.addWidget(self.domainBox, row, 1)
         
         row += 1
         label = QtGui.QLabel(self.tr('Container type:'))
@@ -303,6 +310,7 @@ class MergeDialog(QtGui.QDialog):
         """The actual merge operation."""
         self.level.stack.beginMacro(self.tr("Merge elements"), transaction=self.level is levels.real)
         containerTitle = self.titleEdit.text().strip()
+        domain = self.domainBox.currentDomain()
         containerType = self.parentTypeBox.currentType()
         
         # Container tags & flags
@@ -363,7 +371,8 @@ class MergeDialog(QtGui.QDialog):
                                                and elem.type != newType})
             
         contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
-        container = self.level.createContainer(tags = containerTags,
+        container = self.level.createContainer(domain = domain,
+                                               tags = containerTags,
                                                flags = containerFlags,
                                                contents = contents,
                                                type = containerType)

@@ -18,7 +18,7 @@
 
 from PyQt4 import QtGui
 
-from omg.core import elements
+from ..core import domains, elements
 
 class ContainerTypeBox(QtGui.QComboBox):
     """ComboBox to select a container type."""
@@ -47,4 +47,19 @@ class ContainerTypeBox(QtGui.QComboBox):
                 
     def currentType(self):
         """Return the currently selected container type."""
+        return self.itemData(self.currentIndex())
+
+
+class DomainBox(QtGui.QComboBox):
+    """ComboBox to select a domain."""
+    def __init__(self, currentDomain=None):
+        """Create the DomainBox with *currentDomain* selected."""
+        super().__init__()
+        for domain in domains.domains:
+            self.addItem(domain.name, domain)
+            if domain == currentDomain:
+                self.setCurrentIndex(self.count() - 1)
+                
+    def currentDomain(self):
+        """Return the currently selected domain."""
         return self.itemData(self.currentIndex())
