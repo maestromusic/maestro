@@ -41,13 +41,14 @@ class EditorDelegate(StandardDelegate):
     
     def createEditor(self, parent, option, index):
         wrapper = index.model().data(index)
-        if wrapper is not None and tags.TITLE in wrapper.element.tags:
+        if wrapper is not None:
             return LineEdit(wrapper.element, parent)
         else: return None
 
 
 class LineEdit(QtGui.QLineEdit):
     def __init__(self, element, parent):
-        super().__init__(element.tags[tags.TITLE][0], parent)
+        title = element.tags[tags.TITLE][0] if tags.TITLE in element.tags else ''
+        super().__init__(title, parent)
         self.element = element
         self.setAutoFillBackground(True)
