@@ -95,7 +95,9 @@ def get(path, size=None):
         logging.warning(__name__, "Could not load cover from path '{}'.".format(path))
         return None
     if size is not None and (pixmap.width() != size or pixmap.height() != size):
-        pixmap = pixmap.scaled(size, size, transformMode=Qt.SmoothTransformation)
+        pixmap = pixmap.scaled(size, size,
+                               aspectRatioMode=Qt.KeepAspectRatio,
+                               transformMode=Qt.SmoothTransformation)
         
     if size in cacheSizes:
         storeInCache(pixmap, cachePath)
@@ -133,8 +135,11 @@ def getHTML(path, size=None, attributes=''):
     if pixmap.isNull():
         return None
     if pixmap.width() != size or pixmap.height() != size:
-        pixmap = pixmap.scaled(size, size, transformMode=Qt.SmoothTransformation)
-    return utils.images.html(pixmap, 'width="{0}" height="{0}" {1}'.format(size, attributes))
+        pixmap = pixmap.scaled(size, size,
+                               aspectRatioMode=Qt.KeepAspectRatio,
+                               transformMode=Qt.SmoothTransformation)
+    return utils.images.html(pixmap, 'width="{}" height="{}" {}'
+                             .format(pixmap.width(), pixmap.height(), attributes))
 
 
 def storeInCache(pixmap, cachePath):

@@ -71,7 +71,7 @@ class StandardDelegate(AbstractDelegate):
         coverSize = self.profile.options['coverSize']
         cover = element.getCover(coverSize)
         if cover is not None:
-            self.addLeft(ImageItem(element.getCover(coverSize)))
+            self.addLeft(ImageItem(cover))
             availableWidth -= coverSize + self.hSpace
         
         # Title and type
