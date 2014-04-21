@@ -372,7 +372,7 @@ class RealLevel(levels.Level):
             # Set flags
             db.query("DELETE FROM {p}flags WHERE element_id = ?", element.id)
             if len(element.flags) > 0:
-                db.multiQuery("INSERT INTO {p}tags (element_id, flag_id) VALUES (?,?)",
+                db.multiQuery("INSERT INTO {p}flags (element_id, flag_id) VALUES (?,?)",
                               [(element.id, flag.id) for flag in element.flags])
 
             # Set stickers
