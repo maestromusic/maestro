@@ -635,7 +635,7 @@ class TagEditorModel(QtCore.QObject):
         
         for tag in self.records.tags():
             if tag not in actualRecords:
-                for record in self.records[tag]:
+                for record in list(self.records[tag]):
                     self.records.removeRecord(record)
                 self.records.removeTag(tag)
                 changed = True
