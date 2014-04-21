@@ -422,8 +422,12 @@ class BrowserTreeView(treeview.TreeView):
             return
         mimeData = browsermodel.BrowserMimeData.fromIndexes(self.model(), [index])
         wrappers = [w.copy() for w in mimeData.wrappers()]
-        from . import playlist
-        playlist.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
+        if len(wrappers) == 1 and wrappers[0].isFile() \
+                and not utils.files.isMusicFile(wrappers[0].element.url.path):
+            QtGui.QDesktopServices.openUrl(wrappers[0].element.url.toQUrl())
+        else:
+            from . import playlist
+            playlist.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
             
 
 class RestoreExpander:

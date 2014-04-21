@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from omg import filebackends, player
-from omg.filebackends import filesystem
+from ... import filebackends, player
+from ...filebackends import filesystem
 
 
 class MPDURL(filebackends.BackendURL):
@@ -44,9 +44,10 @@ class MPDFile(filebackends.BackendFile):
     
     @staticmethod
     def tryLoad(url):
-        rf = filesystem.RealFile.tryLoad(url.asLocalFile())
-        if rf is not None:
-            return rf
+        #TODO support multiple urls
+        #rf = filesystem.RealFile.tryLoad(url.asLocalFile())
+        #if rf is not None:
+        #    return rf
         return MPDFile(url)
         
     def __init__(self, url):

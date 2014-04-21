@@ -500,10 +500,11 @@ class MPDPlayerBackend(player.PlayerBackend):
                 except KeyError:
                     logger.warning("Unsupported MPD URL type: {}".format(path))
             else:
-                if len(db.query("SELECT element_id FROM {p}files WHERE url=?", 'file:///' + path)):
-                    urls.append(filebackends.BackendURL.fromString("file:///" + path))
-                else:
-                    urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
+                #TODO support multiple sources
+                #if len(db.query("SELECT element_id FROM {p}files WHERE url=?", 'file:///' + path)):
+                #    urls.append(filebackends.BackendURL.fromString("file:///" + path))
+                #else:
+                urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
         return urls
     
                     

@@ -120,6 +120,8 @@ class RealFile(BackendFile):
         If some tags cannot be saved due to restrictions of the underlying metadata format, those
         tags/values that remain unsaved will be returned.
         """
+        if not hasattr(self, '_taglibFile'):
+            return
         self._taglibFile.tags = dict()
         for tag, values in self.specialTags.items():
             self._taglibFile.tags[tag.upper()] = values
@@ -147,20 +149,24 @@ class FileURL(BackendURL):
         if urlString.startswith('file://'):
             super().__init__(urlString)
             path = urlString[len('file://'):]
-            sourceId = int(path[:path.index('/')])
+            try:
+                sourceId = int(path[:path.index('/')])
+            except ValueError:
+                raise ValueError("URL '{}' does not specify a source.".format(urlString))
             self.source = domains.sourceById(sourceId)
-            return
-        
-        if source is None:
+        elif source is not None:
+            urlString = "file://{}/{}".format(source.id, urlString)
+            super().__init__(urlString)
+            self.source = source
+        else:
             assert os.path.isabs(urlString)
-            source = domains.getSource(urlString)
-            if source is None:
-                super().__init__("file://"+urlString)
-                self.source = None
-                return
-        urlString = "file://{}/{}".format(source.id, urlString)
-        super().__init__(urlString)
-        self.source = source
+            self.source = domains.getSource(urlString)
+            if self.source is not None:
+                urlString = "file://{}/{}".format(self.source.id,
+                                                  utils.files.relPath(urlString, self.source))
+                super().__init__(urlString)
+            else:
+                raise ValueError("Path does not lie in any source folder: {}".format(urlString))
     
     @property
     def path(self):

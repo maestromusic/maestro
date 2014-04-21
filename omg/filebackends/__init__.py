@@ -64,6 +64,8 @@ class BackendURL:
     CAN_DELETE = False
     """Class constant indicating whether this URL type supports deleting files.""" 
     
+    source = None #TODO add comment
+    
     def __init__(self, urlString):
         #  constructor should only be used from subclasses
         assert type(self) is not BackendURL
