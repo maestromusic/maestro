@@ -52,6 +52,7 @@ class EditorTreeView(treeview.DraggingTreeView):
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
         self.model().rowsDropped.connect(self._selectDroppedRows, Qt.QueuedConnection)
+        self.doubleClicked.connect(self.edit)
        
     def _expandInsertedRows(self, parent, start, end):
         if self.autoExpand:
@@ -63,7 +64,14 @@ class EditorTreeView(treeview.DraggingTreeView):
         self.selectionModel().select(QtGui.QItemSelection(self.model().index(start, 0, parent),
                                                           self.model().index(end, 0, parent)),
                                      QtGui.QItemSelectionModel.ClearAndSelect)   
-        self.setFocus(Qt.MouseFocusReason)         
+        self.setFocus(Qt.MouseFocusReason)
+        
+    def commitData(self, lineEdit):
+        oldTitle = lineEdit.element.tags[tags.TITLE][0] # only first value is edited
+        newTitle = lineEdit.text()
+        difference = tags.SingleTagDifference(tags.TITLE, replacements=[(oldTitle, newTitle)])
+        levels.editor.changeTags({lineEdit.element: difference})
+        
 
     
 class EditorWidget(dockwidget.DockWidget):
