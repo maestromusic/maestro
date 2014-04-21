@@ -250,7 +250,7 @@ class CoverUndoCommand:
                     # before a commit, so the id will be negative and change soon.
                     fileName += 'notitle'
                 fileName += '.' + config.options.misc.cover_extension
-                path = utils.files.makeFileName(folder, fileName)
+                path = utils.files.makeFilePath(folder, fileName)
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 if not pixmap.save(path):
                     path = utils.files.makeFilePath(folder, fileName, forceAscii=True)

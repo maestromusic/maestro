@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, os.path, datetime, itertools, collections
+import os, os.path, datetime, itertools, collections, re
 from .. import config
     
 

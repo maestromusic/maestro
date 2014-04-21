@@ -16,9 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt 
 
 from . import profiles, StandardDelegate
+from ...core import tags
 
 translate = QtCore.QCoreApplication.translate
 
@@ -36,3 +38,16 @@ class EditorDelegate(StandardDelegate):
                          'appendRemainingTags': True,
                          'showAllAncestors': True}
     )
+    
+    def createEditor(self, parent, option, index):
+        wrapper = index.model().data(index)
+        if wrapper is not None and tags.TITLE in wrapper.element.tags:
+            return LineEdit(wrapper.element, parent)
+        else: return None
+
+
+class LineEdit(QtGui.QLineEdit):
+    def __init__(self, element, parent):
+        super().__init__(element.tags[tags.TITLE][0], parent)
+        self.element = element
+        self.setAutoFillBackground(True)

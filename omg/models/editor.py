@@ -241,6 +241,12 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                 return True
         return False
     
+    def flags(self, index):
+        flags = super().flags(index)
+        if flags & Qt.ItemIsSelectable:
+            flags |= Qt.ItemIsEditable
+        return flags
+        
     def commit(self):
         """Commit the contents of this editor."""
         _processor.removeElements(levels.editor.elements.values())

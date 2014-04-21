@@ -184,7 +184,7 @@ class TagEditorDialog(QtGui.QDialog):
         try:
             self.stack.closeSubstack(self.stack)
             # make sure that the commit is added via the application stack
-            self.level.stack = stack
+            self.level.stack = stack.stack
             self.level.commit()
             super().accept()
             config.storage.gui.tag_editor_include_contents = self.tagedit.includeContentsButton.isChecked()
@@ -212,7 +212,7 @@ class TagEditorWidget(QtGui.QWidget):
         - vertical: Whether the tageditor should at the beginning be in vertical mode.
         - includeContents: Whether the "Include contents" button should be pressed down at the beginning.
         - flagEditorInTitleLine: Whether the FlagEditor should be put in the title (button) line.
-        - theStack: The stack that should be used. If None, the applications's stack is used.
+        - stack: The stack that should be used. If None, the applications's stack is used.
         
     """
     # This hack is necessary to ignore changes in the tagboxes while changing the tag programmatically
@@ -220,7 +220,7 @@ class TagEditorWidget(QtGui.QWidget):
     _ignoreHandleTagChangedByUser = False
     
     def __init__(self, vertical=False, includeContents=True, 
-                 flagEditorInTitleLine=True, theStack=None):
+                 flagEditorInTitleLine=True, stack=None):
         QtGui.QWidget.__init__(self)
         self.level = None
         self.elements = None
@@ -228,7 +228,7 @@ class TagEditorWidget(QtGui.QWidget):
         self.vertical = None # will be set in setVertical below
         self.flagEditorInTitleLine = flagEditorInTitleLine
         
-        self.model = tageditormodel.TagEditorModel(stack=theStack)
+        self.model = tageditormodel.TagEditorModel(stack=stack)
         self.model.tagInserted.connect(self._handleTagInserted)
         self.model.tagRemoved.connect(self._handleTagRemoved)
         self.model.tagChanged.connect(self._handleTagChanged)
