@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from .. import application, config, database as db, logging, utils, search
-from ..core import tags, flags, levels
+from ..core import tags, flags, levels, domains
 from ..core.elements import Element, Container
 from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget, search as searchgui
 from .delegates import browser as browserdelegate
@@ -103,6 +103,7 @@ class Browser(dockwidget.DockWidget):
         self.setWidget(widget)
         
         self.views = [] # List of treeviews
+        self.domain = domains.domains[0] if len(domains.domains) > 0 else None
         
         # These three criteria determine the set of elements displayed in the browser. They are combined
         # using AND.
@@ -141,6 +142,8 @@ class Browser(dockwidget.DockWidget):
         self.delegateProfile = browserdelegate.BrowserDelegate.profileType.default()
         self.sortTags = {}
         if state is not None and isinstance(state, dict):
+            if 'domain' in state:
+                self.domain = domains.domainById(state['domain'])
             if 'instant' in state:
                 self.searchBox.instant = bool(state['instant'])
             if 'showHiddenValues' in state:
@@ -187,6 +190,8 @@ class Browser(dockwidget.DockWidget):
             'instant': self.searchBox.instant,
             'showHiddenValues': self.showHiddenValues,
         }
+        if self.domain is not None:
+            state['domain'] = self.domain.id
         if len(self.views) > 0:
             state['views'] = [[(layer.className, layer.state()) for layer in view.model().layers]
                                  for view in self.views]
@@ -216,7 +221,7 @@ class Browser(dockwidget.DockWidget):
     
     def insertView(self, index, layers, reset=True):
         """Insert a view with the given layers at position *index*."""
-        newView = BrowserTreeView(self, layers, self.getFilter(), self.delegateProfile)
+        newView = BrowserTreeView(self, self.domain, layers, self.getFilter(), self.delegateProfile)
         self.views.insert(index, newView)
         newView.selectionModel().selectionChanged.connect(
                                 functools.partial(self.selectionChanged.emit, newView.selectionModel()))
@@ -237,6 +242,15 @@ class Browser(dockwidget.DockWidget):
         del self.views[fromIndex]
         self.views.insert(toIndex, movingView)
         self.splitter.insertWidget(toIndex, movingView) # will be removed from old position automatically
+    
+    def getDomain(self):
+        return self.domain
+        
+    def setDomain(self, domain):
+        if domain != self.domain:
+            self.domain = domain
+            for view in self.views:
+                view.model().setDomain(domain)
             
     def reload(self):
         """Clear everything and rebuilt it from the database."""
@@ -376,10 +390,10 @@ class BrowserTreeView(treeview.TreeView):
     actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'collapseAll')), treeactions.ExpandOrCollapseAllAction, expand=False)
     actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'expandAll')), treeactions.ExpandOrCollapseAllAction, expand=True)
     
-    def __init__(self, browser, layers, filter, delegateProfile):
+    def __init__(self, browser, domain, layers, filter, delegateProfile):
         super().__init__(levels.real)
         self.browser = browser
-        self.setModel(browsermodel.BrowserModel(layers, filter))
+        self.setModel(browsermodel.BrowserModel(domain, layers, filter))
         self.header().sectionResized.connect(self.model().layoutChanged)
         
         # If there are no contents, the browser model contains a help message (e.g. "no search results"),

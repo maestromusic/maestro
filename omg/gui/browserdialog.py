@@ -21,7 +21,7 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import dialogs, delegates, search as searchgui
+from . import dialogs, delegates, search as searchgui, widgets
 from .. import config, utils, database as db
 from ..core import tags, flags
 from ..models import browser as browsermodel
@@ -59,6 +59,13 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         filterTab = QtGui.QWidget()
         filterTab.setLayout(QtGui.QVBoxLayout())
         self.tabWidget.addTab(filterTab, self.tr("Filter"))
+        
+        domainLayout = QtGui.QHBoxLayout()
+        domainLayout.addWidget(QtGui.QLabel(self.tr("Domain:")))
+        self.domainBox = widgets.DomainBox(self.browser.getDomain())
+        self.domainBox.domainChanged.connect(self.browser.setDomain)
+        domainLayout.addWidget(self.domainBox)
+        filterTab.layout().addLayout(domainLayout)
         
         filterTab.layout().addWidget(QtGui.QLabel(self.tr("Flags:")))
         flagList = self.browser.flagCriterion.flags if self.browser.flagCriterion is not None else []

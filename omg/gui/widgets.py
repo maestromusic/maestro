@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtGui
+from PyQt4 import QtCore, QtGui
 
 from ..core import domains, elements
 
@@ -52,6 +52,8 @@ class ContainerTypeBox(QtGui.QComboBox):
 
 class DomainBox(QtGui.QComboBox):
     """ComboBox to select a domain."""
+    domainChanged = QtCore.pyqtSignal(domains.Domain)
+    
     def __init__(self, currentDomain=None):
         """Create the DomainBox with *currentDomain* selected."""
         super().__init__()
@@ -59,7 +61,11 @@ class DomainBox(QtGui.QComboBox):
             self.addItem(domain.name, domain)
             if domain == currentDomain:
                 self.setCurrentIndex(self.count() - 1)
+        self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
                 
     def currentDomain(self):
         """Return the currently selected domain."""
         return self.itemData(self.currentIndex())
+    
+    def _handleCurrentIndexChanged(self, i):
+        self.domainChanged.emit(self.itemData(i))

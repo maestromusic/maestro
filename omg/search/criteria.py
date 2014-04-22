@@ -209,6 +209,29 @@ class MultiCriterion(Criterion):
     def getQueries(self, fromTable):
         raise NotImplementedError() # These criteria are handled directly by the search algorithm  
 
+    
+class DomainCriterion(Criterion):
+    def __init__(self, domain):
+        self.domain = domain
+        
+    def __repr__(self):
+        return _negHelper(self, '{'+self.domain.name+'}')
+    
+    def __eq__(self, other):
+        return self.domain == other.domain
+    
+    def __ne__(self, other):
+        return self.domain != other.domain
+    
+    def getQueries(self, fromTable):
+        operator = '==' if not self.negate else '!='
+        if fromTable == db.prefix + 'elements':
+            query = "SELECT id FROM {}elements WHERE domain {} ?".format(db.prefix, operator)
+        else:
+            query = "SELECT id FROM {} JOIN {}elements AS el USING(id) WHERE el.domain {} ?"\
+                    .format(db.prefix, operator)
+        return [(query, self.domain.id)]
+        
         
 class ElementTypeCriterion(Criterion):
     """Match only containers or files, depending on *type* ('container' or 'file').""" 

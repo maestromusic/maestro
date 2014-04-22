@@ -48,8 +48,9 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)
     
-    def __init__(self, layers, filter):
+    def __init__(self, domain, layers, filter):
         super().__init__()
+        self.domain = domain
         self.level = levels.real # this is used by the selection-module
         self.layers = layers
         self.containerLayer = ContainerLayer()
@@ -62,6 +63,14 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     def shutdown(self):
         """Stop the internal worker thread."""
         self.worker.quit()
+        
+    def getDomain(self):
+        return self.domain
+    
+    def setDomain(self, domain):
+        if domain != self.domain:
+            self.domain = domain
+            self.reset()
                 
     def getLayer(self, index):
         """Return the layer at the given index."""
@@ -152,13 +161,13 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         loaded directly. If *block* is True this method will block until the node is loaded. 
         """
         layer = self.getLayer(self._getLayerIndex(node) + 1)
-        if node is self.root:
-            criterion = self.filter
-        else:
-            criteria = [self.filter] if self.filter is not None else []
+        criteria = [search.criteria.DomainCriterion(self.domain)]
+        if self.filter is not None:
+            criteria.append(self.filter)
+        if node is not self.root:
             criteria.extend(p.getCriterion() for p in node.getParents(includeSelf=True)
                                              if isinstance(p, CriterionNode))
-            criterion = search.criteria.combine('AND', criteria)
+        criterion = search.criteria.combine('AND', criteria)
         task = LoadTask(node, layer, criterion)
         self.worker.submit(task)
         if block:
@@ -182,9 +191,9 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             hasContents = len(contents) > 0
             if len(contents) == 0: 
                 if self.filter is None:
-                    text = self.tr("Your database is empty."
+                    text = self.tr("Your database is empty or there is no element in domain '{}'."
                                    " Drag files from the filesystembrowser into the editor,"
-                                   " modify them and click 'Commit'.")
+                                   " modify them and click 'Commit'.".format(self.getDomain().name))
                 else:
                     text = self.tr("No elements found.")
                 contents = [TextNode(text, wordWrap=True)]
