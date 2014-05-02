@@ -204,7 +204,7 @@ class RecordModel(QtCore.QObject):
         assert oldTag in self._records and newTag not in self._records
         self._records.changeKey(oldTag, newTag)
         self.tagChanged.emit(oldTag, newTag)
-    
+
    
 class TagEditorUndoCommand:
     """Special UndoCommand for the TagEditor. It is used together in a macro with a normal undocommand
@@ -634,7 +634,8 @@ class TagEditorModel(QtCore.QObject):
         
         for tag in self.records.tags():
             if tag not in actualRecords:
-                for record in self.records[tag]:
+                for record in self.records[tag][:]:
+                    print('ha removing {}'.format(record))
                     self.records.removeRecord(record)
                 self.records.removeTag(tag)
                 changed = True
