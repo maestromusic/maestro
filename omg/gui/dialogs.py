@@ -23,10 +23,16 @@ from ..core import elements, levels, nodes, tags
 from . import tagwidgets, widgets
 
 
-def question(title,text,parent=None):
+def question(title, text, parent=None):
     """Display a modal question dialog with the given *title* and *text*. Return True if the
     user selected "Yes" and False otherwise. The optional argument is the parent widget and default to the
-    main window."""
+    main window.
+    :param str title: Window title
+    :param str text: Main message
+    :param QtGui.QWidget parent: (optional) parent window; defaults to OMG's main window
+    :returns: The user's answer
+    :rtype: bool
+    """
     if parent is None:
         from . import mainwindow
         parent = mainwindow.mainWindow

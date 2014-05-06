@@ -32,7 +32,8 @@ translate = QtGui.QApplication.translate
 
         
 class TreeAction(QtGui.QAction):
-    """Super class for TreeActions, i.e. Actions for TreeViews."""
+    """Super class for TreeActions, i.e. Actions for TreeViews.
+    """
     def __init__(self, parent, text=None, shortcut=None, icon=None, tooltip=None):
         super().__init__(parent)
         if shortcut:
@@ -51,7 +52,8 @@ class TreeAction(QtGui.QAction):
         raise NotImplementedError()
     
     def level(self):
-        """A shorthand function to determine the level of the treeview's model."""
+        """A shorthand function to determine the level of the treeview's model.
+        :rtype: levels.Level"""
         return self.parent().model().level
 
 
@@ -224,7 +226,15 @@ class RemoveFromParentAction(TreeAction):
 
 
 class DeleteAction(TreeAction):
-    """Action to delete elements from the database and/or filesystem."""
+    """Action to delete elements from the database and/or filesystem.
+
+    When the selected elements contain files, after the deletion from OMG's database a dialog is
+    displayed that asks the user if the files should also be deleted from disk.
+
+    In the special case that an "intermediate container" (i.e., container with a parent container)
+    and existing children) is selected, another dialog is presented which offers to attach the now
+    pending children to the deleted container's parent.
+    """
     
     def __init__(self, parent, text, allowDisk=True, shortcut=None):
         """Initialize the action."""
@@ -237,9 +247,29 @@ class DeleteAction(TreeAction):
     
     def doAction(self):
         selection = self.parent().selection
+        insertPending = False
+        self.level().stack.beginMacro(self.tr('delete elements'))
+        if selection.singleWrapper() and selection.hasContainers():
+            container = selection.wrappers()[0]
+            container.loadContents(recursive=True)
+            if container.parent and container.parent.isContainer() and container.hasContents():
+                ans = dialogs.question(self.tr('Replace by children?'),
+                                 self.tr('You have selected to remove an intermediate container. '
+                                 'Do you want to append its children to its parent?'))
+                if ans:
+                    insertPos = container.position
+                    print(insertPos)
+                    insertParent = container.parent.element
+                    insertIndex = insertParent.contents.positions.index(insertPos)
+                    insertChildren = [wrapper.element for wrapper in container.contents]
+                    insertPending = True
+
         files = [wrap.element for wrap in selection.fileWrappers()
                               if wrap.element.url.CAN_DELETE]
         self.level().deleteElements(selection.elements())
+        if insertPending:
+            self.level().insertContentsAuto(insertParent, insertIndex, insertChildren)
+        self.level().stack.endMacro()
         if self.allowDisk and len(files) > 0:
             dialog = DeleteDialog(files,self.parent())
             if dialog.exec_() == QtGui.QDialog.Accepted:
