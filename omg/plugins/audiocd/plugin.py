@@ -16,7 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
+try:
+    import discid
+except ImportError:
+    raise ImportError('discid module not installed')
 from PyQt4 import QtCore, QtGui
 from omg import application, database as db, filebackends
 from omg.gui import editor
