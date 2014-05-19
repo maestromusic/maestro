@@ -65,9 +65,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.worker.quit()
         
     def getDomain(self):
+        """Return the domain whose elements are displayed."""
         return self.domain
     
     def setDomain(self, domain):
+        """Define the domain whose elements are displayed."""
         if domain != self.domain:
             self.domain = domain
             self.reset()

@@ -211,6 +211,7 @@ class MultiCriterion(Criterion):
 
     
 class DomainCriterion(Criterion):
+    """Match all elements from the given domain."""
     def __init__(self, domain):
         self.domain = domain
         
@@ -224,7 +225,7 @@ class DomainCriterion(Criterion):
         return self.domain != other.domain
     
     def getQueries(self, fromTable):
-        operator = '==' if not self.negate else '!='
+        operator = '=' if not self.negate else '!='
         if fromTable == db.prefix + 'elements':
             query = "SELECT id FROM {}elements WHERE domain {} ?".format(db.prefix, operator)
         else:

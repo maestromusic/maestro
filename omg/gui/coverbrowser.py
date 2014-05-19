@@ -26,7 +26,7 @@ from . import mainwindow, browserdialog, selection, dockwidget, search as search
 from .misc import busyindicator
 from ..models import browser as browsermodel
 from .. import database as db, utils, config, search, logging
-from ..core import covers, levels, nodes, tags, elements
+from ..core import covers, levels, nodes, tags, elements, domains
 from ..search import criteria
 
 _displayClasses = {}
@@ -74,10 +74,13 @@ class CoverBrowser(dockwidget.DockWidget):
         super().__init__(parent, **args)
         _coverBrowsers.add(self)
         
+        self.domain = domains.domains[0]
         self.flagCriterion = None
         self.filterCriterion = None
         self.searchCriterion = None
         if state is not None:
+            if 'domain' in state:
+                self.domain = domains.domainById(state['domain'])
             if 'flags' in state:
                 flagList = [flags.get(name) for name in state['flags'] if flags.exists(name)]
                 if len(flagList) > 0:
@@ -134,7 +137,8 @@ class CoverBrowser(dockwidget.DockWidget):
         self.worker.quit()
         
     def saveState(self):
-        state = {'display': self._display,
+        state = {'domain': self.domain.id,
+                 'display': self._display,
                  'config': {}}
         if self.filterCriterion is not None:
             state['filter'] = repr(self.filterCriterion)
@@ -183,6 +187,16 @@ class CoverBrowser(dockwidget.DockWidget):
         # (Re)connect only after reload so that no global selection is set on startup. 
         display.selectionChanged.connect(self._handleSelectionChanged)
         
+    def getDomain(self):
+        """Return the domain whose elements are displayed."""
+        return self.domain
+        
+    def setDomain(self, domain):
+        """Define the domain whose elements are displayed."""
+        if domain != self.domain:
+            self.domain = domain
+            self.reload()
+            
     def getFilter(self):
         """Return the complete filter that is currently active (either a Criterion or None).
         The filter consists of the search criterion entered by the user, the selected flags and the static
@@ -222,16 +236,16 @@ class CoverBrowser(dockwidget.DockWidget):
             
     def reload(self):
         """Clear everything and rebuilt it from the database."""
-        filter = self.getFilter()
-        if filter is None or not self.filterButton.active:
-            filterClause = ''
+        criteria = [search.criteria.DomainCriterion(self.domain)]
+        if self.filterButton.active:
+            criteria.append(self.getFilter)
+        criterion = search.criteria.combine('AND', criteria)
+        elids = search.search(criterion)
+        if len(elids):
+            filterClause = " AND el.id IN ({})".format(db.csList(elids))
         else:
-            elids = search.search(filter)
-            if len(elids):
-                filterClause = " AND el.id IN ({})".format(db.csList(elids))
-            else:
-                self.display().setCovers([], {})
-                return
+            self.display().setCovers([], {})
+            return
     
         result = db.query("""
             SELECT el.id, st.data

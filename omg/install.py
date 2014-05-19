@@ -222,8 +222,8 @@ class LanguageWidget(SettingsWidget):
         self.installTool.setWindowTitle(self.tr("OMG Install Tool"))
         self.installTool.createOtherWidgets()
         return True
-
-
+    
+    
 class GeneralSettingsWidget(SettingsWidget):
     """General settings include the collection directory, the database type and the audio backend type."""
     def __init__(self,installTool,titleNumber):
@@ -234,7 +234,7 @@ class GeneralSettingsWidget(SettingsWidget):
         self.layout().addStretch()
         
         collectionLayout = QtGui.QHBoxLayout()
-        self.collectionLineEdit = QtGui.QLineEdit(config.options.main.collection)
+        self.collectionLineEdit = QtGui.QLineEdit()
         collectionLayout.addWidget(self.collectionLineEdit)
         fileChooserButton = QtGui.QPushButton()
         fileChooserButton.setIcon(QtGui.QApplication.style().standardIcon(QtGui.QStyle.SP_DirIcon))
@@ -257,7 +257,7 @@ class GeneralSettingsWidget(SettingsWidget):
         formLayout.addRow(self.tr("Database type"),dbChooserLayout)
         
         audioBackendLayout = QtGui.QVBoxLayout()
-        audioBackendGroup = QtGui.QButtonGroup()
+        #audioBackendGroup = QtGui.QButtonGroup()
         audioBackendFound = False
         try:
             from PyQt4.phonon import Phonon
@@ -267,30 +267,29 @@ class GeneralSettingsWidget(SettingsWidget):
         except ImportError:
             self.phononBox = QtGui.QCheckBox(self.tr("Phonon (cannot find PyQt4.phonon)"))
             self.phononBox.setEnabled(False)
-        audioBackendGroup.addButton(self.phononBox)
+        #audioBackendGroup.addButton(self.phononBox)
         audioBackendLayout.addWidget(self.phononBox)
         try:
             import mpd
             self.mpdBox = QtGui.QCheckBox(self.tr("MPD"))
-            self.mpdBox.setChecked(not audioBackendFound) # not if Phonon is already checked
+            self.mpdBox.setChecked(True)
             audioBackendFound = True
         except ImportError:
             self.mpdBox = QtGui.QCheckBox(self.tr("MPD (cannot find python-mpd2)"))
             self.mpdBox.setEnabled(False)
-        audioBackendGroup.addButton(self.mpdBox)
+        #audioBackendGroup.addButton(self.mpdBox)
         audioBackendLayout.addWidget(self.mpdBox)
         if not audioBackendFound:
             noBackendBox = QtGui.QRadioButton(self.tr("No backend (to choose a backend later, "
                                                       "enable the corresponding plugin)."))
             noBackendBox.setChecked(True)
-            audioBackendGroup.addButton(noBackendBox)
+            #audioBackendGroup.addButton(noBackendBox)
             audioBackendLayout.addWidget(noBackendBox)
         formLayout.addRow(self.tr("Audio backend"),audioBackendLayout)
         
     def finish(self):
         """Store user input in config variables."""
         if self.collectionLineEdit.text():
-            config.options.main.collection = self.collectionLineEdit.text()
             config.options.database.type = 'mysql' if self.mysqlBox.isChecked() else 'sqlite'
         else:
             QtGui.QMessageBox.warning(self,self.tr("No music directory"),

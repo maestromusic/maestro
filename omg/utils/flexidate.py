@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # OMG Music Manager  -  http://omg.mathematik.uni-kl.de
-# Copyright (C) 2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@ class FlexiDate:
             self.day = None
         else:
             self.day = int(day)
-            from datetime import date
+            import datetime
             datetime.date(self.year, self.month, self.day) # Check date
     
     @staticmethod

@@ -44,6 +44,10 @@ class Source:
         
         
 def init():
+    if db.prefix+'domains' not in db.listTables():
+        logging.error(__name__, "domains-table is missing")
+        raise RuntimeError()
+    
     result = db.query("SELECT id, name FROM {p}domains ORDER BY name")
     for row in result:
         domains.append(Domain(*row))

@@ -22,7 +22,7 @@ from collections import OrderedDict
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from .. import logging
+from .. import logging, utils
 
 
 urlTypes = {}
@@ -205,6 +205,8 @@ def changeTags(changes):
     rollback = False
     problems = None
     for elementOrFile, diff in changes.items():
+        if not utils.files.isMusicFile(elementOrFile.url.path):
+            return 
         if isinstance(elementOrFile, elements.Element):
             if not elementOrFile.isFile():
                 continue
@@ -212,7 +214,6 @@ def changeTags(changes):
             backendFile.readTags()
         else:
             backendFile = elementOrFile
-        
         if backendFile.DUMMY_TAGS:
             continue
         if backendFile.readOnly:

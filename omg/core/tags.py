@@ -501,7 +501,7 @@ def _addTagType(tagType, data):
                      tagType.iconPath, tagType.private, index)
         tagType.id = db.query(
             "INSERT INTO {p}tagids (tagname, tagtype, title, icon, private, sort) VALUES (?,?,?,?,?,?)",
-            *data).insertId()
+            *dataTuple).insertId()
         # Store id so that when this tag is added to the database again (after undo),
         # it will get the same id.
         data['id'] = tagType.id

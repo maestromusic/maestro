@@ -182,8 +182,10 @@ def listTables():
 def resetDatabase():
     """Drop all tables and create them without data again. All table rows will be lost!"""
     from . import tables
-    # Some tables are referenced by other tables and must therefore be dropped last and created first
-    referencedTables = [prefix+"domains", prefix+"elements", prefix+"tagids", prefix+"flag_names"]
+    # Some tables are referenced by other tables and must therefore be dropped last and created first.
+    # The order is important!
+    referencedTables = [tables.byName(prefix+name)
+                        for name in ["domains", "elements", "tagids", "flag_names"]]
     otherTables = [table for table in tables.tables if table not in referencedTables]
     for table in otherTables:
         if table.exists():
@@ -201,8 +203,10 @@ def createTables(ignoreExisting=False):
     """Create all tables in an empty database (without inserting any data). If *ignoreExisting* is True,
     only missing tables will be created."""
     from . import tables
-    # Some tables are referenced by other tables and must therefore be dropped last and created first
-    referencedTables = [prefix+"domains", prefix+"elements", prefix+"tagids", prefix+"flag_names"]
+    # Some tables are referenced by other tables and must therefore be dropped last and created first.
+    # The order is important!
+    referencedTables = [tables.byName(prefix+name)
+                        for name in ["domains", "elements", "tagids", "flag_names"]]
     otherTables = [table for table in tables.tables if table not in referencedTables]
     for table in referencedTables:
         if not ignoreExisting or not table.exists():

@@ -103,7 +103,7 @@ class Browser(dockwidget.DockWidget):
         self.setWidget(widget)
         
         self.views = [] # List of treeviews
-        self.domain = domains.domains[0] if len(domains.domains) > 0 else None
+        self.domain = domains.domains[0]
         
         # These three criteria determine the set of elements displayed in the browser. They are combined
         # using AND.
@@ -187,11 +187,10 @@ class Browser(dockwidget.DockWidget):
 
     def saveState(self):
         state = {
+            'domain': self.domain.id,
             'instant': self.searchBox.instant,
             'showHiddenValues': self.showHiddenValues,
         }
-        if self.domain is not None:
-            state['domain'] = self.domain.id
         if len(self.views) > 0:
             state['views'] = [[(layer.className, layer.state()) for layer in view.model().layers]
                                  for view in self.views]
@@ -244,9 +243,11 @@ class Browser(dockwidget.DockWidget):
         self.splitter.insertWidget(toIndex, movingView) # will be removed from old position automatically
     
     def getDomain(self):
+        """Return the domain whose elements are displayed."""
         return self.domain
         
     def setDomain(self, domain):
+        """Define the domain whose elements are displayed."""
         if domain != self.domain:
             self.domain = domain
             for view in self.views:
