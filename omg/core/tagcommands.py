@@ -115,9 +115,9 @@ def renameTagValue(tag, oldValue, newValue):
     bothDiff = tags.SingleTagDifference(tag, removals=[newValue])
     for i, elid in enumerate(onlyOld):
         bar.setValue(i)
-        levels.real.changeTags({level.real.fetch(elid) : onlyOldDiff})
+        levels.real.changeTags({levels.real.fetch(elid) : onlyOldDiff})
     for i, elid in enumerate(both, start=len(onlyOld)):
         bar.setValue(i)
-        levels.real.changeTags({level.real.fetch(elid) : bothDiff})
+        levels.real.changeTags({levels.real.fetch(elid) : bothDiff})
     bar.setValue(bar.value()+1)
     stack.endMacro()
