@@ -205,15 +205,17 @@ def changeTags(changes):
     rollback = False
     problems = None
     for elementOrFile, diff in changes.items():
-        if not utils.files.isMusicFile(elementOrFile.url.path):
-            return 
         if isinstance(elementOrFile, elements.Element):
-            if not elementOrFile.isFile():
+            if not elementOrFile.isFile() or not utils.files.isMusicFile(elementOrFile.url.path):
                 continue
             backendFile = elementOrFile.url.getBackendFile()
             backendFile.readTags()
+        elif not utils.files.isMusicFile(elementOrFile.url.path):
+            continue
         else:
             backendFile = elementOrFile
+        if not utils.files.isMusicFile(elementOrFile.url.path):
+            return 
         if backendFile.DUMMY_TAGS:
             continue
         if backendFile.readOnly:
