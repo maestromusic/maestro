@@ -459,7 +459,9 @@ class CoverDialog(QtGui.QDialog):
         if currentCover is not None:
             pixmap = currentCover.pixmap
             if pixmap.width() > BIG_COVER_SIZE or pixmap.height() > BIG_COVER_SIZE:
-                pixmap = pixmap.scaled(BIG_COVER_SIZE,BIG_COVER_SIZE,transformMode=Qt.SmoothTransformation)
+                pixmap = pixmap.scaled(BIG_COVER_SIZE, BIG_COVER_SIZE,
+                                       aspectRatioMode=Qt.KeepAspectRatio,
+                                       transformMode=Qt.SmoothTransformation)
             self.label.setPixmap(pixmap)
         else: self.label.setPixmap(QtGui.QPixmap())
         
