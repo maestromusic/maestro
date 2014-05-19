@@ -236,16 +236,20 @@ class CoverBrowser(dockwidget.DockWidget):
             
     def reload(self):
         """Clear everything and rebuilt it from the database."""
-        criteria = [search.criteria.DomainCriterion(self.domain)]
+        criteria = []
         if self.filterButton.active:
             criteria.append(self.getFilter)
         criterion = search.criteria.combine('AND', criteria)
-        elids = search.search(criterion)
-        if len(elids):
-            filterClause = " AND el.id IN ({})".format(db.csList(elids))
+        
+        if criterion is not None:
+            elids = search.search(criterion, domain=self.domain)
+            if len(elids):
+                filterClause = " AND el.id IN ({})".format(db.csList(elids))
+            else:
+                self.display().setCovers([], {})
+                return
         else:
-            self.display().setCovers([], {})
-            return
+            filterClause = " AND el.domain={}".format(self.domain.id)
     
         result = db.query("""
             SELECT el.id, st.data

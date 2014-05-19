@@ -48,13 +48,13 @@ def init():
         db.query("CREATE INDEX IF NOT EXISTS {0}_idx ON {0} (value_id, tag_id)".format(TT_HELP))
 
 
-def search(searchCriterion, abortSwitch=None):
+def search(searchCriterion, domain=None, abortSwitch=None):
     """Process the given search criterion. Store the results in the attribute 'result' of the criterion.
     If *abortSwitch* is given, it is called during the algorithm. By throwing an exception in abortSwitch,
     this provides a way to abort a running search."""
     for criterion in searchCriterion.getCriteriaDepthFirst():
         if not isinstance(criterion, criteria.MultiCriterion):
-            for queryData in criterion.getQueries(db.prefix+"elements"):
+            for queryData in criterion.getQueries(db.prefix+"elements", domain):
                 #print(queryData)
                 if isinstance(queryData, str):
                     result = db.query(queryData)

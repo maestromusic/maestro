@@ -166,6 +166,14 @@ class Criterion:
     def getCriteriaDepthFirst(self):
         """Return all criteria contained in this one in depth-first manner."""
         yield self
+    
+    def getQueries(self, fromTable, domain=None):
+        """Return database queries that are necessary to process this query. The queries are returned as 
+        a list where each entry can be a query string or a tuple. In the latter case the first tuple
+        component is the query string, the remaining components are parameters.
+        If domain is given, the query should only regard elements from this domain.
+        """
+        raise NotImplementedError()  
 
 
 class MultiCriterion(Criterion):
@@ -204,34 +212,7 @@ class MultiCriterion(Criterion):
         for criterion in self.criteria:
             for c in criterion.getCriteriaDepthFirst():
                 yield c
-        yield self        
-    
-    def getQueries(self, fromTable):
-        raise NotImplementedError() # These criteria are handled directly by the search algorithm  
-
-    
-class DomainCriterion(Criterion):
-    """Match all elements from the given domain."""
-    def __init__(self, domain):
-        self.domain = domain
-        
-    def __repr__(self):
-        return _negHelper(self, '{'+self.domain.name+'}')
-    
-    def __eq__(self, other):
-        return self.domain == other.domain
-    
-    def __ne__(self, other):
-        return self.domain != other.domain
-    
-    def getQueries(self, fromTable):
-        operator = '=' if not self.negate else '!='
-        if fromTable == db.prefix + 'elements':
-            query = "SELECT id FROM {}elements WHERE domain {} ?".format(db.prefix, operator)
-        else:
-            query = "SELECT id FROM {} JOIN {}elements AS el USING(id) WHERE el.domain {} ?"\
-                    .format(db.prefix, operator)
-        return [(query, self.domain.id)]
+        yield self
         
         
 class ElementTypeCriterion(Criterion):
@@ -250,15 +231,19 @@ class ElementTypeCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def getQueries(self, fromTable):
+    def getQueries(self, fromTable, domain=None):
         value = self.type == 'file'
         if self.negate:
             value = not value
         if fromTable == db.prefix + 'elements':
-            query = "SELECT id FROM {}elements WHERE file = ?".format(db.prefix)
-        else: query = "SELECT id FROM {} JOIN {}elements AS el USING(id) WHERE el.file = ?"\
-                        .format(fromTable, db.prefix)
-        return [(query, value)]
+            query = "SELECT id FROM {}elements AS el".format(db.prefix)
+        else: query = "SELECT id FROM {} JOIN {}elements AS el USING(id)".format(fromTable, db.prefix)
+        # Add where clause
+        query += " WHERE el.file=?"
+        if domain is not None:
+            query += " AND el.domain=?"
+            return [(query, value, domain.id)]
+        else: return [(query, value)]
     
     @staticmethod
     def parse(key, data):
@@ -298,13 +283,19 @@ class IdCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def getQueries(self, fromTable):
+    def getQueries(self, fromTable, domain=None):
         if self.interval is not None:
-            whereClause = '(id {})'.format(self.interval.queryPart())
-        else: whereClause = 'id IN ({})'.format(db.csList(self.idList))
+            whereClause = '(el.id {})'.format(self.interval.queryPart())
+        else: whereClause = 'el.id IN ({})'.format(db.csList(self.idList))
         if self.negate:
             whereClause = 'NOT '+whereClause
-        return ["SELECT id FROM {} WHERE {}".format(fromTable, whereClause)]
+        if domain is not None:
+            whereClause = "el.domain={} AND ".format(domain.id) + whereClause
+        if fromTable == db.prefix+"elements" or domain is None:
+            return ["SELECT el.id FROM {} AS el WHERE {}".format(fromTable, whereClause)]
+        else:
+            return ["SELECT el.id FROM {} JOIN {}elements AS el WHERE {}"
+                    .format(fromTable, db.prefix, whereClause)]
     
     @staticmethod
     def parse(key, data):
@@ -352,13 +343,15 @@ class AnyCriterion(Criterion):
     def isUsingSticker(self):
         return self.type == 'sticker'
     
-    def getQueries(self, fromTable):
+    def getQueries(self, fromTable, domain=None):
         # fortunately there's only one common method to build a plural in English...
         joinTable = db.prefix + self.type + 's'
         if not self.negate:
-            query = "SELECT DISTINCT id FROM {} AS el JOIN {} AS j ON el.id = j.element_id"
+            query = "SELECT DISTINCT id FROM {} AS el JOIN {} AS j ON el.id = j.element_id WHERE 1"
         else: query = "SELECT id FROM {} AS el LEFT JOIN {} AS j ON el.id = j.element_id "\
                       "WHERE j.element_id IS NULL"
+        if domain is not None:
+            query += " AND el.domain={}".format(domain.id)
         return [query.format(fromTable, joinTable)]
     
     @staticmethod
@@ -428,7 +421,7 @@ class TagCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def getQueries(self, fromTable):
+    def getQueries(self, fromTable, domain=None):
         if self.value is None:
             joinClause = "{}tags AS t ON el.id = t.element_id AND t.tag_id IN ({})"\
                             .format(db.prefix, db.csIdList(self.tagList))
@@ -511,20 +504,23 @@ class TagCriterion(Criterion):
                     
             # Select elements which have these values (or not)
             #=================================================
+            domainWhereClause = "el.domain={}".format(domain.id) if domain is not None else "1"
             if not self.negate:
                 queries.append("""
                     SELECT DISTINCT el.id FROM {} AS el
                         JOIN {}tags AS t ON el.id = t.element_id
                         JOIN {} AS h USING(tag_id, value_id)
-                    """.format(fromTable, db.prefix, TT_HELP))
+                        WHERE {}
+                    """.format(fromTable, db.prefix, TT_HELP, domainWhereClause))
             else: 
                 queries.append("""
                     SELECT el.id FROM {} AS el
                         JOIN {}tags AS t ON el.id = t.element_id
                         LEFT JOIN {} AS h ON t.tag_id = h.tag_id AND t.value_id = h.value_id
+                    WHERE {}
                     GROUP BY el.id
                     HAVING COUNT(h.value_id) = 0
-                    """.format(fromTable, db.prefix, TT_HELP))
+                    """.format(fromTable, db.prefix, TT_HELP, domainWhereClause))
 
             return queries
     
@@ -572,21 +568,23 @@ class FlagCriterion(Criterion):
     def isUsingFlag(self, flag):
         return flag in self.flags
     
-    def getQueries(self, fromTable):
+    def getQueries(self, fromTable, domain=None):
+        domainWhereClause = " AND el.domain={}".format(domain.id) if domain is not None else ''
         if self.junction == 'AND':
             return ["""
                 SELECT el.id
                 FROM {} AS el JOIN {}flags AS fl ON el.id = fl.element_id
-                WHERE fl.flag_id IN ({})
+                WHERE fl.flag_id IN ({}) {}
                 GROUP BY el.id
                 HAVING COUNT(fl.element_id) = {}
-                """.format(fromTable, db.prefix, db.csIdList(self.flags), len(self.flags))]
+                """.format(fromTable, db.prefix, db.csIdList(self.flags),
+                           len(self.flags), domainWhereClause)]
         else: # use or
             return ["""
                 SELECT DISTINCT el.id
                 FROM {} AS el JOIN {}flags AS fl ON el.id = fl.element_id
-                WHERE fl.flag_id IN ({})
-                """.format(fromTable, db.prefix, db.csIdList(self.flags))]
+                WHERE fl.flag_id IN ({}) {}
+                """.format(fromTable, db.prefix, db.csIdList(self.flags), domainWhereClause)]
 
     def __eq__(self, other):
         return isinstance(other, FlagCriterion) and self.flags == other.flags \
@@ -643,14 +641,16 @@ class StickerCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)   
     
-    def getQueries(self, fromTable):
+    def getQueries(self, fromTable, domain=None):
         # Currently there is no restriction on the strings in self.types. Thus use SQL placeholders '?'
         # to make sure that strings are correctly escaped.
         joinClause = "{}stickers AS j ON el.id = j.element_id AND j.type IN ({})"\
                         .format(db.prefix, ','.join(['?']*len(self.types)))
         if not self.negate:
-            query = "SELECT DISTINCT id FROM {} AS el JOIN {}"
+            query = "SELECT DISTINCT id FROM {} AS el JOIN {} WHERE 1"
         else: query = "SELECT id FROM {} AS el LEFT JOIN {} WHERE j.element_id IS NULL"
+        if domain is not None:
+            query += " AND el.domain={}".format(domain.id)
         return [[query.format(fromTable, joinClause)] + self.types]
         
     @staticmethod
@@ -719,16 +719,15 @@ class TagIdCriterion(Criterion):
         assert isinstance(tagPairs, list)
         self.tagPairs = tagPairs
         
-    def getQueries(self, fromTable):
+    def getQueries(self, fromTable, domain=None):
         whereClause = " OR ".join("(t.tag_id = {} AND t.value_id = {})".format(*p) for p in self.tagPairs)
-        if fromTable == db.prefix + 'elements':
-            return ["SELECT DISTINCT element_id FROM {}tags AS t WHERE {}".format(db.prefix, whereClause)]
-        else:
-            return ["""
-                SELECT DISTINCT el.id
-                FROM {} AS el JOIN {}tags AS t ON el.id = t.element_id
-                WHERE {}
-                """.format(fromTable, db.prefix, whereClause)]
+        if domain is not None:
+            whereClause = "el.domain={} AND ({})".format(domain.id, whereClause)
+        return ["""
+            SELECT DISTINCT el.id
+            FROM {} AS el JOIN {}tags AS t ON el.id = t.element_id
+            WHERE {}
+            """.format(fromTable, db.prefix, whereClause)]
 
     def isUsingTag(self, tag):
         return tag in self.valueIds

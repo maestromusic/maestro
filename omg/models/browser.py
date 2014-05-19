@@ -163,14 +163,14 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         loaded directly. If *block* is True this method will block until the node is loaded. 
         """
         layer = self.getLayer(self._getLayerIndex(node) + 1)
-        criteria = [search.criteria.DomainCriterion(self.domain)]
+        criteria = []
         if self.filter is not None:
             criteria.append(self.filter)
         if node is not self.root:
             criteria.extend(p.getCriterion() for p in node.getParents(includeSelf=True)
                                              if isinstance(p, CriterionNode))
         criterion = search.criteria.combine('AND', criteria)
-        task = LoadTask(node, layer, criterion)
+        task = LoadTask(node, layer, criterion, self.domain)
         self.worker.submit(task)
         if block:
             self.worker.join()
@@ -224,12 +224,13 @@ class LoadTask(utils.worker.Task):
     to its worker thread. *layer* is the layer to which the node's contents belong. *criterion* is the
     filter that specifies which elements to load as contents.
     """ 
-    def __init__(self, node, layer, criterion):
+    def __init__(self, node, layer, criterion, domain):
         # Note to self: If layer and criterion were not immutable,
         # they should be copied here to avoid concurrent access.
         self.node = node
         self.layer = layer
         self.criterion = criterion
+        self.domain = domain
         self.contents = None
         
     def merge(self, node):
@@ -237,13 +238,14 @@ class LoadTask(utils.worker.Task):
     
     def process(self):
         if self.criterion is not None:
-            elids = search.search(self.criterion, abortSwitch=self.checkWorkerState) # see worker.py
+            elids = search.search(self.criterion, self.domain,
+                                  abortSwitch=self.checkWorkerState) # see worker.py
             #logging.debug(__name__, "Found {} elements.".format(len(elids)))
         else: elids = None
         import time
         #time.sleep(1)
         #logging.debug(__name__, "Start building contents...")
-        self.contents = self.layer.build(elids)
+        self.contents = self.layer.build(elids, self.domain)
         #logging.debug(__name__, "Build contents. Toplevel: {}".format(len(self.contents)))
     
     def __repr__(self):
@@ -283,11 +285,11 @@ class TagLayer:
     def __repr__(self):
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
-    def build(self, elids):
+    def build(self, elids, domain):
         # Get all tag values that should appear in TagNodes 
         if elids is None:
             # Search all elements
-            idFilter = "1" # for use in WHERE clause
+            idFilter = "res.domain={}".format(domain.id) # for use in WHERE clause
         elif len(elids) == 0:
             return []
         else: idFilter = "res.id IN ({})".format(db.csList(elids))
@@ -387,12 +389,14 @@ addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 class ContainerLayer:
     """A Container layer organizes nodes in their natural tree structure."""
-    def build(self, elids):
+    def build(self, elids, domain):
         """Build a container structure containing the elements with ids in *elids*."""
         if elids is None:
-            toplevel = list(db.query(
-                    "SELECT id FROM {p}elements WHERE id NOT IN (SELECT element_id FROM {p}contents)")
-                    .getSingleColumn())
+            toplevel = list(db.query("""
+                    SELECT id
+                    FROM {p}elements
+                    WHERE domain=? AND id NOT IN (SELECT element_id FROM {p}contents)
+                    """, domain.id).getSingleColumn())
         else:
             toplevel = set(elids)
             toplevel.difference_update(db.query(
