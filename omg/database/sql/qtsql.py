@@ -31,11 +31,11 @@ class Sql(AbstractSql):
         super().__init__()
         self._db = QtSql.QSqlDatabase("QMYSQL")
                 
-    def connect(self,username,password,database,host="localhost",port=3306,**kwargs):
+    def connect(self, username, password, database, host="localhost", port=3306, **kwargs):
         self._db.setHostName(host)
         self._db.setPort(int(port))
         self._db.setDatabaseName(database)
-        ok = self._db.open(username,password)
+        ok = self._db.open(username, password)
         if not ok:
             raise DBException("DB-connection failed: {}".format(self._db.lastError().databaseText()))
 
@@ -43,35 +43,37 @@ class Sql(AbstractSql):
         self._db.close()
         del self._db
         
-    def query(self,queryString,*args):
+    def query(self, queryString, *args, **kwargs):
         query = QtSql.QSqlQuery(self._db)
         query.setForwardOnly(True) # improves performance
-        queryString = queryString.format(p=prefix)
+        kwargs['p'] = prefix
+        queryString = queryString.format(**kwargs)
 
         # Prepare
         if not query.prepare(queryString):
             if self._db.lastError() is not None:
-                raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
-            else: raise DBException("Query failed",queryString,args)
+                raise DBException("Query failed: {}".format(self._db.lastError().text()), queryString, args)
+            else: raise DBException("Query failed", queryString, args)
 
         # Bind
-        for i,arg in enumerate(args):
-            query.bindValue(i,_convertBindParameter(arg))
+        for i, arg in enumerate(args):
+            query.bindValue(i, _convertBindParameter(arg))
 
         # Execute
         if query.exec_():
-            return SqlResult(query,False)
+            return SqlResult(query, False)
         else:
             if self._db.lastError() is not None:
-                raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,args)
-            else: raise DBException("Query failed",queryString,args)
+                raise DBException("Query failed: {}".format(self._db.lastError().text()), queryString, args)
+            else: raise DBException("Query failed", queryString, args)
         
-    def multiQuery(self,queryString,argSets):
-        if not isinstance(argSets,list):
+    def multiQuery(self, queryString, argSets, **kwargs):
+        if not isinstance(argSets, list):
             argSets = list(argSets)
         if len(argSets) == 0:
             raise ValueError("You must give at least one set of arguments.")
-        queryString = queryString.format(p=prefix)
+        kwargs['p'] = prefix
+        queryString = queryString.format(**kwargs)
         
         # Prepare
         query = QtSql.QSqlQuery(self._db)
@@ -85,11 +87,12 @@ class Sql(AbstractSql):
 
         # Execute
         if query.execBatch():
-            return SqlResult(query,True)
+            return SqlResult(query, True)
         else:
             if self._db.lastError() is not None:
-                raise DBException("Query failed: {}".format(self._db.lastError().text()),queryString,argSets)
-            else: raise DBException("Query failed",queryString,argSets)
+                raise DBException("Query failed: {}".format(self._db.lastError().text()), 
+                                  queryString, argSets)
+            else: raise DBException("Query failed", queryString, argSets)
 
     def transaction(self):
         if super().transaction():
@@ -114,15 +117,15 @@ class Sql(AbstractSql):
                 raise DBException("Rollback failed: {}".format(self._db.lastError().text()))
             else: raise DBException("Rollback failed.")
 
-    def isNull(self,value):
-        return isinstance(value,QtCore.QPyNullVariant)
+    def isNull(self, value):
+        return isinstance(value, QtCore.QPyNullVariant)
         
-    def getDate(self,value):
+    def getDate(self, value):
         return datetime.datetime.fromtimestamp(value.toTime_t()).replace(tzinfo=datetime.timezone.utc)
 
 
 class SqlResult(AbstractSqlResult):
-    def __init__(self,query,multi):
+    def __init__(self, query, multi):
         self._result = query # No need to use QSqlResult objects
         # Store these values as the methods will return -1 after the query has become inactive
         if not multi:
@@ -163,7 +166,7 @@ class SqlResult(AbstractSqlResult):
 
 class SqlResultIterator:
     """Iterator-object which is used to iterate over an SqlResult."""
-    def __init__(self,qSqlResult):
+    def __init__(self, qSqlResult):
         self._result = qSqlResult
         
     def __iter__(self):
@@ -182,6 +185,6 @@ def _convertBindParameter(arg):
         # TODO: This is ugly! We need a type to create a QPyNullVariant, but we cannot know the type of the
         # column this value will be bound to. Luckily it works regardless what type we choose...
         return QtCore.QPyNullVariant(int)
-    elif isinstance(arg,utils.FlexiDate):
+    elif isinstance(arg, utils.FlexiDate):
         return arg.toSql()
     else: return arg

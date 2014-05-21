@@ -29,7 +29,7 @@ transactionLock = threading.RLock()
 
     
 class Sql(AbstractSql):
-    def connect(self,path, isolation_level=None):
+    def connect(self, path, isolation_level=None):
         # There doesn't seem to be a real documentation of the isolation_level parameter. 
         # But I like the conclusion of this discussion:
         # http://mail.python.org/pipermail/python-list/2010-March/1239395.html
@@ -37,43 +37,45 @@ class Sql(AbstractSql):
         # Foreign keys must be enabled in each connection
         self._db.execute("PRAGMA foreign_keys = ON")
         
-        self._db.create_function('regexp', 2, lambda p,s: re.search(p, s) is not None)
+        self._db.create_function('regexp', 2, lambda p, s: re.search(p, s) is not None)
 
     def close(self):
         self._db.close()
             
-    def query(self,queryString,*args):
-        queryString = queryString.format(p=prefix)
+    def query(self, queryString, *args, **kwargs):
+        kwargs['p'] = prefix
+        queryString = queryString.format(prefix)
         with transactionLock:
             while True:
                 try:
-                    return SqlResult(self._db.execute(queryString,args),False)
+                    return SqlResult(self._db.execute(queryString, args), False)
                 except Exception as e:
-                    if isinstance(e,sqlite3.OperationalError) and str(e) == 'database is locked':
+                    if isinstance(e, sqlite3.OperationalError) and str(e) == 'database is locked':
                         logger.warning("Database is locked (I will retry). Query: {}".format(queryString))
                         import time
                         time.sleep(0.1)
                         continue
-                    raise DBException(str(e),query=queryString,args=args)
+                    raise DBException(str(e), query=queryString, args=args)
     
-    def multiQuery(self,queryString,argSets):
-        queryString = queryString.format(p=prefix)
+    def multiQuery(self, queryString, argSets, **kwargs):
+        kwargs['p'] = prefix
+        queryString = queryString.format(**kwargs)
         with transactionLock:
             while True:
                 try:
                     if self._transactionDepth == 0:
                         self.query('BEGIN TRANSACTION')
-                    result = SqlResult(self._db.executemany(queryString,argSets),True)
+                    result = SqlResult(self._db.executemany(queryString, argSets), True)
                     if self._transactionDepth == 0:
                         self._db.commit()
                     return result
                 except Exception as e:
-                    if isinstance(e,sqlite3.OperationalError) and str(e) == 'database is locked':
+                    if isinstance(e, sqlite3.OperationalError) and str(e) == 'database is locked':
                         logger.warning("Database is locked (I will retry). Multiquery: {}".format(queryString))
                         import time
                         time.sleep(0.1)
                         continue
-                    raise DBException(str(e),query=queryString,args=argSets)
+                    raise DBException(str(e), query=queryString, args=argSets)
         
     def transaction(self):
         if super().transaction():
@@ -94,14 +96,14 @@ class Sql(AbstractSql):
         self._db.rollback()
         transactionLock.release()
         
-    def getDate(self,value):
+    def getDate(self, value):
         if value.endswith('+00:00'):
             value = value[:-6]
-        return datetime.datetime.strptime(value,"%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+        return datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc)
             
 
 class SqlResult(AbstractSqlResult):
-    def __init__(self,cursor,multi):
+    def __init__(self, cursor, multi):
         self._cursor = cursor
         self._multi = multi
         if cursor.rowcount == -1: # chances are that this is a SELECT query

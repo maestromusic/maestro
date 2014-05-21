@@ -20,16 +20,15 @@
 The database module establishes the database connection and provides many functions to fetch data.
 
 The actual database drivers which connect to the database using a third party connector can be found in the
-:mod:`SQL package <omg.database.sql>`. The definitions of OMG's tables can be found in the
-:mod:`tables-module <omg.database.tables>`.
+SQL package. The definitions of OMG's tables can be found in the tables-module.
 
-The easiest way to use this package is::
+The easiest way to use this package is:
 
     from omg import database as db
     db.connect()
     db.query(...)
 
-or, if the connection was already established in another module::
+or, if the connection was already established in another module:
 
     from omg import database as db
     db.query(...)
@@ -38,9 +37,9 @@ or, if the connection was already established in another module::
 **Threading**
 
 Each thread must have its own connection object. This module stores all connection objects and methods like
-``query`` automatically choose the correct connection. However you have to initialize the connection for
-each thread and use a ``with`` statement to ensure the connection is finally closed again. Typically the
-``run``-method of your thread will look like this::
+'query' automatically choose the correct connection. However you have to initialize the connection for
+each thread and use a 'with' statement to ensure the connection is finally closed again. Typically the
+'run'-method of your thread will look like this:
 
     from omg import database as db
     
@@ -80,7 +79,7 @@ _nextIdLock = threading.Lock()
 #=======================================================================
 class ConnectionContextManager:
     """Connection manager that ensures that connections in threads other than the main thread are closed and
-    removed from the dict ``connections`` when the thread terminates.
+    removed from the dict 'connections' when the thread terminates.
     """
     def __enter__(self):
         return None
@@ -98,7 +97,7 @@ class ConnectionContextManager:
 def connect(**kwargs):
     """Connect to the database server with information from the config file. This method must be called 
     exactly once for each thread that wishes to access the database. If successful, it returns a
-    :class:`ConnectionContextManager` that will automatically close the connection if used in a ``with``
+    ConnectionContextManager that will automatically close the connection if used in a 'with'
     statement. If the connection fails, it will raise a DBException.
     
     Keyword arguments are passed to the connect-method of the new connection.
@@ -147,7 +146,7 @@ def _connect(drivers,authValues, **kwargs):
 
 def close():
     """Close the database connection of this thread, if present. If you use the context manager returned by
-    :func:`connect`, this method is called automatically.
+    'connect', this method is called automatically.
     """
     threadId = threading.current_thread().ident
     if threadId in connections:
@@ -189,10 +188,10 @@ def resetDatabase():
     otherTables = [table for table in tables.tables if table not in referencedTables]
     for table in otherTables:
         if table.exists():
-            query("DROP TABLE {}".format(table.name))
+            query("DROP TABLE {name}", name=table.name)
     for table in reversed(referencedTables):
         if table.exists():
-            query("DROP TABLE {}".format(table.name))
+            query("DROP TABLE {name}", name=table.name)
     for table in referencedTables:
         table.create()
     for table in otherTables:
@@ -218,15 +217,15 @@ def createTables(ignoreExisting=False):
 
 # Standard methods which are redirected to this thread's connection object (see sql.AbstractSql)
 #===============================================================================================
-def query(*params):
+def query(*args, **kwargs):
     try:
-        return connections[threading.current_thread().ident].query(*params)
+        return connections[threading.current_thread().ident].query(*args, **kwargs)
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 
-def multiQuery(queryString,args):
+def multiQuery(queryString, argSets, **kwargs):
     try:
-        return connections[threading.current_thread().ident].multiQuery(queryString,args)
+        return connections[threading.current_thread().ident].multiQuery(queryString, argSets, **kwargs)
     except KeyError:
         raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
 

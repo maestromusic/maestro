@@ -38,11 +38,12 @@ class Sql(AbstractSql):
     def close(self):
         self._db.close()
                     
-    def query(self, queryString, *args):
-        queryString = queryString.format(p=prefix)
+    def query(self, queryString, *args, **kwargs):
         if len(args) > 0:
-            queryString = queryString.replace('?','%s')
+            queryString = queryString.replace('?', '%s')
             args = [a.toSql() if isinstance(a, utils.FlexiDate) else a for a in args]
+        kwargs['p'] = prefix
+        queryString = queryString.format(**kwargs)
         try:
             cursor = self._db.cursor()
             cursor.execute(queryString, args)
@@ -50,20 +51,22 @@ class Sql(AbstractSql):
             raise DBException(str(e), queryString, args)
         return SqlResult(cursor, False)
     
-    def multiQuery(self, queryString, argSets):
-        if not isinstance(argSets, (list,tuple)):
+    def multiQuery(self, queryString, argSets, **kwargs):
+        if not isinstance(argSets, (list, tuple)):
             # Usually this means that argSets is some other iterable object,
             # but mysql connector will complain.
             argSets = list(argSets)
-        queryString = queryString.format(p=prefix).replace('?','%s')
+        queryString = queryString.replace('?', '%s')
         argSets = [[a.toSql() if isinstance(a, utils.FlexiDate) else a for a in argSet]
                    for argSet in argSets]
+        kwargs['p'] = prefix
+        queryString = queryString.format(**kwargs)
         try:
             cursor = self._db.cursor()
             cursor.executemany(queryString, argSets)
         except mysql.connector.errors.Error as e:
             raise DBException(str(e), queryString, argSets)
-        return SqlResult(cursor,True)
+        return SqlResult(cursor, True)
         
     def transaction(self):
         if super().transaction():
@@ -83,7 +86,7 @@ class Sql(AbstractSql):
 
 
 class SqlResult(AbstractSqlResult):
-    def __init__(self,cursor,multi):
+    def __init__(self, cursor, multi):
         self._cursor = cursor
         self._multi = multi
     
