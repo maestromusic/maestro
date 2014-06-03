@@ -106,11 +106,10 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
     
     rescanRequested = QtCore.pyqtSignal(str)
     
-    def __init__(self, source):
+    def __init__(self):
         super().__init__()
         self.setAlternatingRowColors(True)
         self.setModel(FileSystemBrowserModel())
-        self.setSource(source)
         self.setTextElideMode(Qt.ElideMiddle)
         self.setHeaderHidden(True)
         
@@ -124,6 +123,9 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         self.rescanDirectoryAction = QtGui.QAction(self.tr("rescan"), self)
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
+    
+    def getSource(self):
+        return self.model().source
     
     def setSource(self, source):
         model = self.model()
@@ -171,22 +173,32 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         
 class FileSystemBrowser(dockwidget.DockWidget):
     """A DockWidget wrapper for the FileSystemBrowser."""
-    def __init__(self, parent=None, **args):
+    def __init__(self, parent=None, state=None, **args):
         super().__init__(parent, **args)
         widget = QtGui.QWidget()
         layout = QtGui.QVBoxLayout(widget)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
+        source = None
+        if state is not None and 'source' in state:
+            source = domains.sourceById(state['source'])
+        if source is None:
+            source = domains.sources[0]
         self.sourceChooser = QtGui.QComboBox()
-        for source in domains.sources:
-            self.sourceChooser.addItem(source.name, source)
+        for s in domains.sources:
+            self.sourceChooser.addItem(s.name, s)
+            if s == source:
+                self.sourceChooser.setCurrentIndex(self.sourceChooser.count()-1)
         self.sourceChooser.currentIndexChanged.connect(self._handleSourceChanged)
         layout.addWidget(self.sourceChooser)
         
-        self.treeView = FileSystemBrowserTreeView(domains.sources[0])
+        self.treeView = FileSystemBrowserTreeView()
         layout.addWidget(self.treeView, 1)
         self.setWidget(widget)
-        self._handleSourceChanged(0)
+        self._handleSourceChanged(domains.sources.index(source)) # initialize
+        
+    def saveState(self):
+        return {'source': self.treeView.getSource().id}
         
     def createOptionDialog(self, parent):
         from . import preferences
