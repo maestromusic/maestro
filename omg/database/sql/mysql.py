@@ -39,11 +39,11 @@ class Sql(AbstractSql):
         self._db.close()
                     
     def query(self, queryString, *args, **kwargs):
+        kwargs['p'] = prefix
+        queryString = queryString.format(**kwargs)
         if len(args) > 0:
             queryString = queryString.replace('?', '%s')
             args = [a.toSql() if isinstance(a, utils.FlexiDate) else a for a in args]
-        kwargs['p'] = prefix
-        queryString = queryString.format(**kwargs)
         try:
             cursor = self._db.cursor()
             cursor.execute(queryString, args)
@@ -56,11 +56,11 @@ class Sql(AbstractSql):
             # Usually this means that argSets is some other iterable object,
             # but mysql connector will complain.
             argSets = list(argSets)
+        kwargs['p'] = prefix
+        queryString = queryString.format(**kwargs)
         queryString = queryString.replace('?', '%s')
         argSets = [[a.toSql() if isinstance(a, utils.FlexiDate) else a for a in argSet]
                    for argSet in argSets]
-        kwargs['p'] = prefix
-        queryString = queryString.format(**kwargs)
         try:
             cursor = self._db.cursor()
             cursor.executemany(queryString, argSets)
