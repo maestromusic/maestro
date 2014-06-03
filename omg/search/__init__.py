@@ -17,7 +17,7 @@
 #
 
 from . import criteria
-from .. import database as db, config
+from .. import database as db, config, utils
 from ..core import tags
 
 # Name of the temporary search table
@@ -31,6 +31,8 @@ def init():
     for tagname in config.options.tags.search_tags:
         if tags.isInDb(tagname):
             criteria.SEARCH_TAGS.add(tags.get(tagname))
+    # Using temporary tables is important when several (worker) threads use the search function
+    # at the same time: With temporary tables each thread has its own help table.
     if db.type == 'mysql':
         db.query("""
             CREATE TEMPORARY TABLE IF NOT EXISTS {} (
@@ -41,41 +43,43 @@ def init():
             """.format(TT_HELP))
     else:
         db.query("""
-            CREATE TABLE IF NOT EXISTS {} (
+            CREATE TEMPORARY TABLE IF NOT EXISTS {} (
                 value_id  MEDIUMINT UNSIGNED NOT NULL,
                 tag_id MEDIUMINT UNSIGNED NULL)
             """.format(TT_HELP))
         db.query("CREATE INDEX IF NOT EXISTS {0}_idx ON {0} (value_id, tag_id)".format(TT_HELP))
 
 
-def search(searchCriterion, domain=None, abortSwitch=None):
-    """Process the given search criterion. Store the results in the attribute 'result' of the criterion.
-    If *abortSwitch* is given, it is called during the algorithm. By throwing an exception in abortSwitch,
-    this provides a way to abort a running search."""
-    for criterion in searchCriterion.getCriteriaDepthFirst():
-        if not isinstance(criterion, criteria.MultiCriterion):
-            for queryData in criterion.getQueries(db.prefix+"elements", domain):
-                #print(queryData)
-                if isinstance(queryData, str):
-                    result = db.query(queryData)
-                else: result = db.query(*queryData)
-                #print(list(db.query("SELECT value FROM new_values_varchar WHERE id IN (SELECT value_id FROM tmp_help)").getSingleColumn()))
-                if abortSwitch is not None:
-                    abortSwitch()
-            criterion.result = set(result.getSingleColumn())
-        else:
-            #TODO: implement MultiCriterions more efficiently
-            # If the first criterion in an AND-criterion returns only a small set,
-            # this could be used to make the second criterion faster.
-            if criterion.junction == 'AND':
-                method = criterion.criteria[0].result.intersection
-            else: method = criterion.criteria[0].result.union
-            criterion.result = method(*[crit.result for crit in criterion.criteria[1:]])
-            if criterion.negate:
-                allElements = set(db.query("SELECT id FROM {p}elements").getSingleColumn())
-                criterion.result = allElements - criterion.result
-            if abortSwitch is not None:
-                abortSwitch()
+def search(searchCriterion, domain=None):
+    """Process the given search criterion. Store the results in the attribute 'result' of the criterion."""
+    SearchTask(searchCriterion, domain).processImmediately()
 
-    assert searchCriterion.result is not None
-    return searchCriterion.result
+
+class SearchTask(utils.worker.Task):
+    def __init__(self, criterion, domain):
+        self.criterion = criterion
+        self.domain = domain
+        
+    def process(self):
+        for criterion in self.criterion.getCriteriaDepthFirst():
+            if not isinstance(criterion, criteria.MultiCriterion):
+                generator = criterion.process(db.prefix+"elements", self.domain)
+                if generator is not None:
+                    yield from generator
+                else: yield
+            else:
+                #TODO: implement MultiCriterions more efficiently
+                # If the first criterion in an AND-criterion returns only a small set,
+                # this could be used to make the second criterion faster.
+                if criterion.junction == 'AND':
+                    method = criterion.criteria[0].result.intersection
+                else: method = criterion.criteria[0].result.union
+                criterion.result = method(*[crit.result for crit in criterion.criteria[1:]])
+                if criterion.negate:
+                    if self.domain is not None:
+                        query = "SELECT id FROM {p}elements WHERE domain={}".format(self.domain.id)
+                    else: query = "SELECT id FROM {p}elements"
+                    allElements = set(db.query(query).getSingleColumn())
+                    criterion.result = allElements - criterion.result
+                yield
+                

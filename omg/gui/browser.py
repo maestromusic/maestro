@@ -342,7 +342,7 @@ class Browser(dockwidget.DockWidget):
             self.optionButton.setVisible(checked)
             
     def _handleFilterButton(self):
-        """React to the filter button: Activate/deactive filter."""
+        """React to the filter button: Activate/deactivate filter."""
         if self.getFilter() is not None:
             self.filterButton.setActive(not self.filterButton.active)
             self.updateFilter()

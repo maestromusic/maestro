@@ -40,6 +40,8 @@ TAG_ABBREVIATIONS = {"t": "title",
                      "d": "date"
                      }  
 
+MAX_MATCHING_TAGS = 20 # Maximum number of "matching tags" (feature is disabled if more tags match)
+
 
 class ParseException(Exception):
     """This exceptions is raised when a search string is ill-formatted."""
@@ -166,14 +168,24 @@ class Criterion:
     def getCriteriaDepthFirst(self):
         """Return all criteria contained in this one in depth-first manner."""
         yield self
-    
-    def getQueries(self, fromTable, domain=None):
-        """Return database queries that are necessary to process this query. The queries are returned as 
-        a list where each entry can be a query string or a tuple. In the latter case the first tuple
-        component is the query string, the remaining components are parameters.
-        If domain is given, the query should only regard elements from this domain.
+        
+    def process(self, fromTable, domain):
+        """Process this criterion: Search all elements belonging to *domain* and whose id is in the 'id'
+        column of *fromTable* (usually 'elements') and which match this criterion. Store the ids of those
+        elements in self.result.
+        For complicated criteria this method should be implemented as a generator which yields between
+        major steps. This allows the browser to abort the search (e.g. when the user has typed a new
+        criterion in the mean time).
         """
-        raise NotImplementedError()  
+        raise NotImplementedError()
+    
+    def getMatchingTags(self):
+        """Return a list of (tagId, valueId)-tuples that match this criterion directly. Return None if
+        such a list does not exist for this criterion (e.g. because it has nothing to do with tags).
+        
+        This feature allows the browser to render tag values which match directly in bold font.
+        """
+        return None
 
 
 class MultiCriterion(Criterion):
@@ -214,6 +226,28 @@ class MultiCriterion(Criterion):
                 yield c
         yield self
         
+    def getMatchingTags(self):
+        if self.negate:
+            return None # not implemented
+        matchingTags = None
+        # Find first set returned by a criterion
+        i = 0
+        while i < len(self.criteria) and matchingTags is None:
+            matchingTags = self.criteria[i].getMatchingTags()
+            i += 1
+        if matchingTags is not None:
+            # Merge / intersect all sets from the other criteria
+            for criterion in self.criteria[i:]:
+                m = criterion.getMatchingTags()
+                if m is not None:
+                    if self.junction == 'AND':
+                        matchingTags.intersection(m)
+                        if len(matchingTags) == 0: # skip other criteria
+                            return []
+                    else:
+                        matchingTags.update(m)
+        return matchingTags
+        
         
 class ElementTypeCriterion(Criterion):
     """Match only containers or files, depending on *type* ('container' or 'file').""" 
@@ -231,19 +265,18 @@ class ElementTypeCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def getQueries(self, fromTable, domain=None):
+    def process(self, fromTable, domain):
         value = self.type == 'file'
         if self.negate:
             value = not value
         if fromTable == db.prefix + 'elements':
-            query = "SELECT id FROM {}elements AS el".format(db.prefix)
-        else: query = "SELECT id FROM {} JOIN {}elements AS el USING(id)".format(fromTable, db.prefix)
+            query = "SELECT id FROM {p}elements AS el"
+        else: query = "SELECT id FROM {table} JOIN {p}elements AS el USING(id)"
         # Add where clause
-        query += " WHERE el.file=?"
+        query += " WHERE el.file={}".format(value)
         if domain is not None:
-            query += " AND el.domain=?"
-            return [(query, value, domain.id)]
-        else: return [(query, value)]
+            query += " AND el.domain={}".format(domain.id)
+        self.result = set(db.query(query, table=fromTable).getSingleColumn())
     
     @staticmethod
     def parse(key, data):
@@ -283,19 +316,19 @@ class IdCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def getQueries(self, fromTable, domain=None):
-        if self.interval is not None:
-            whereClause = '(el.id {})'.format(self.interval.queryPart())
-        else: whereClause = 'el.id IN ({})'.format(db.csList(self.idList))
-        if self.negate:
-            whereClause = 'NOT '+whereClause
-        if domain is not None:
-            whereClause = "el.domain={} AND ".format(domain.id) + whereClause
+    def process(self, fromTable, domain):
         if fromTable == db.prefix+"elements" or domain is None:
-            return ["SELECT el.id FROM {} AS el WHERE {}".format(fromTable, whereClause)]
-        else:
-            return ["SELECT el.id FROM {} JOIN {}elements AS el WHERE {}"
-                    .format(fromTable, db.prefix, whereClause)]
+            query = "SELECT el.id FROM {table} AS el WHERE "
+        else: query = "SELECT el.id FROM {table} JOIN {p}elements AS el WHERE "
+        if domain is not None:
+            query += "el.domain={} AND ".format(domain.id)
+        if self.negate:
+            query += "NOT "
+        if self.interval is not None:
+            query += '(el.id {})'.format(self.interval.queryPart())
+        else: query += 'el.id IN ({})'.format(db.csList(self.idList))
+        print(query)
+        self.result = set(db.query(query, table=fromTable).getSingleColumn())
     
     @staticmethod
     def parse(key, data):
@@ -343,16 +376,16 @@ class AnyCriterion(Criterion):
     def isUsingSticker(self):
         return self.type == 'sticker'
     
-    def getQueries(self, fromTable, domain=None):
+    def process(self, fromTable, domain):
         # fortunately there's only one common method to build a plural in English...
         joinTable = db.prefix + self.type + 's'
         if not self.negate:
-            query = "SELECT DISTINCT id FROM {} AS el JOIN {} AS j ON el.id = j.element_id WHERE 1"
-        else: query = "SELECT id FROM {} AS el LEFT JOIN {} AS j ON el.id = j.element_id "\
+            query = "SELECT DISTINCT id FROM {table} AS el JOIN {join} AS j ON el.id = j.element_id WHERE 1"
+        else: query = "SELECT id FROM {table} AS el LEFT JOIN {join} AS j ON el.id = j.element_id "\
                       "WHERE j.element_id IS NULL"
         if domain is not None:
             query += " AND el.domain={}".format(domain.id)
-        return [query.format(fromTable, joinTable)]
+        self.result = set(db.query(query, table=fromTable, join=joinTable).getSingleColumn())
     
     @staticmethod
     def parse(key, data):
@@ -393,6 +426,7 @@ class TagCriterion(Criterion):
                 
         self.singleWord = singleWord
         self.binary = binary
+        self.matchingTags = None
         
     def isUsingTag(self, tag):
         return tag in self.tagList
@@ -421,112 +455,122 @@ class TagCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def getQueries(self, fromTable, domain=None):
+    def process(self, fromTable, domain):
+        # First handle the case where we search only for existence or non-existence of a given tag
         if self.value is None:
             joinClause = "{}tags AS t ON el.id = t.element_id AND t.tag_id IN ({})"\
                             .format(db.prefix, db.csIdList(self.tagList))
             if not self.negate:
-                query = "SELECT DISTINCT id FROM {} AS el JOIN {}"
-            else: query = "SELECT id FROM {} AS el LEFT JOIN {} WHERE t.element_id IS NULL"
-            return [query.format(fromTable, joinClause)]
-        else:
-            queries = []
-            
-            # Truncate help table
-            #==================
-            from . import TT_HELP
-            if db.type == 'mysql':
-                # truncate may be much faster than delete http://dev.mysql.com/doc/refman/5.6/en/delete.html
-                queries.append("TRUNCATE {}".format(TT_HELP))
-            else: queries.append("DELETE FROM {}".format(TT_HELP))
-            
-            # Select matching values and put them into help table
-            #====================================================
-            for valueType in tags.TYPES:
-                tagList = [tag for tag in self.tagList if tag.type == valueType]
-                if len(tagList) == 0:
-                    continue
-                if valueType == tags.TYPE_VARCHAR:
-                    if self.binary:
-                       value = self.value
-                    else: value = utils.strings.removeDiacritics(self.value) 
-                    if db.type == 'mysql':
-                        if not self.singleWord:
-                            if self.binary:
-                                whereClause = 'INSTR(value, BINARY ?)'
-                            else: whereClause = "INSTR(COALESCE(search_value, value), ?)"
-                            parameter = value
-                        else:
-                            if self.binary:
-                                whereClause = 'value REGEXP BINARY ?' # case-sensitive
-                            else: whereClause = 'COALESCE(search_value, value) REGEXP ?'
-                            parameter = '[[:<:]]{}[[:>:]]'.format(re.escape(value))
-                            
-                    else: # SQLite
-                        if not self.singleWord:
-                            if self.binary:
-                                # INSTR exists only in SQLite 3.7.15 and later
-                                queries.append('PRAGMA case_sensitive_like = 1')
-                                whereClause = "value LIKE ?"
-                            else: whereClause = "COALESCE(search_value, value) LIKE ?"
-                            parameter = '%{}%'.format(self._escapeParameter(value))
-                        else:
-                            if self.binary:
-                                whereClause = "value REGEXP ?"
-                                parameter = '\\b{}\\b'.format(re.escape(value))
-                            else:
-                                whereClause = "COALESCE(search_value, value) REGEXP ?" 
-                                parameter = '(?i)\\b{}\\b'.format(re.escape(value))
-
-                    queries.append(("INSERT INTO {} (value_id, tag_id) "
-                                    "SELECT id, tag_id FROM {}values_varchar WHERE tag_id IN({}) AND {}"
-                                    .format(TT_HELP, db.prefix, db.csIdList(tagList), whereClause),
-                                    parameter))
-                    
-                    if db.type == 'sqlite' and not self.singleWord and self.binary:
-                        queries.append('PRAGMA case_sensitive_like = 0')
+                query = "SELECT DISTINCT id FROM {table} AS el JOIN {join}"
+            else: query = "SELECT id FROM {table} AS el LEFT JOIN {join} WHERE t.element_id IS NULL"
+            self.result = set(db.query(query, table=fromTable, join=joinClause).getSingleColumn())
+            return
+        
+        # Truncate help table
+        #==================
+        from . import TT_HELP
+        if db.type == 'mysql':
+            # truncate may be much faster than delete http://dev.mysql.com/doc/refman/5.6/en/delete.html
+            db.query("TRUNCATE {}".format(TT_HELP))
+        else: db.query("DELETE FROM {}".format(TT_HELP))
+        
+        # Select matching values and put them into help table
+        #====================================================
+        pragmaNecessary = False
+        for valueType in tags.TYPES:
+            tagList = [tag for tag in self.tagList if tag.type == valueType]
+            if len(tagList) == 0:
+                continue
+            if valueType == tags.TYPE_VARCHAR:
+                if self.binary:
+                   value = self.value
+                else: value = utils.strings.removeDiacritics(self.value) 
+                if db.type == 'mysql':
+                    if not self.singleWord:
+                        if self.binary:
+                            whereClause = 'INSTR(value, BINARY ?)'
+                        else: whereClause = "INSTR(COALESCE(search_value, value), ?)"
+                        args = [value]
+                    else:
+                        if self.binary:
+                            whereClause = 'value REGEXP BINARY ?' # case-sensitive
+                        else: whereClause = 'COALESCE(search_value, value) REGEXP ?'
+                        args = ['[[:<:]]{}[[:>:]]'.format(re.escape(value))]
                         
-                elif valueType == tags.TYPE_TEXT:
-                    whereClause = "value LIKE ?"
-                    parameter = '%{}%'.format(self._escapeParameter(self.value))
-                    queries.append(("INSERT INTO {} (value_id, tag_id) "
-                                    "SELECT id, tag_id FROM {}values_text WHERE tag_id IN({}) AND {}"
-                                    .format(TT_HELP, db.prefix, db.csIdList(tagList), whereClause),
-                                    parameter))
-                    
-                elif valueType == tags.TYPE_DATE:
-                    if self.interval is None:
-                        continue
-                    whereClause = self.interval.toDateSql().queryPart()
-                    queries.append("INSERT INTO {} (value_id, tag_id) "
-                                   "SELECT id, tag_id FROM {}values_date WHERE tag_id IN({}) AND value {}"
-                                   .format(TT_HELP, db.prefix, db.csIdList(tagList), whereClause))
-                    
-            # Select elements which have these values (or not)
-            #=================================================
-            domainWhereClause = "el.domain={}".format(domain.id) if domain is not None else "1"
-            if not self.negate:
-                queries.append("""
-                    SELECT DISTINCT el.id FROM {} AS el
-                        JOIN {}tags AS t ON el.id = t.element_id
-                        JOIN {} AS h USING(tag_id, value_id)
-                        WHERE {}
-                    """.format(fromTable, db.prefix, TT_HELP, domainWhereClause))
-            else: 
-                queries.append("""
-                    SELECT el.id FROM {} AS el
-                        JOIN {}tags AS t ON el.id = t.element_id
-                        LEFT JOIN {} AS h ON t.tag_id = h.tag_id AND t.value_id = h.value_id
-                    WHERE {}
-                    GROUP BY el.id
-                    HAVING COUNT(h.value_id) = 0
-                    """.format(fromTable, db.prefix, TT_HELP, domainWhereClause))
-
-            return queries
+                else: # SQLite
+                    if not self.singleWord:
+                        if self.binary:
+                            # INSTR exists only in SQLite 3.7.15 and later
+                            pragmaNecessary = True
+                            db.query('PRAGMA case_sensitive_like = 1')
+                            whereClause = "value LIKE ?"
+                        else: whereClause = "COALESCE(search_value, value) LIKE ?"
+                        args = ['%{}%'.format(self._escapeParameter(value))]
+                    else:
+                        if self.binary:
+                            whereClause = "value REGEXP ?"
+                            args = ['\\b{}\\b'.format(re.escape(value))]
+                        else:
+                            whereClause = "COALESCE(search_value, value) REGEXP ?" 
+                            args = ['(?i)\\b{}\\b'.format(re.escape(value))]
+                
+            elif valueType == tags.TYPE_TEXT:
+                whereClause = "value LIKE ?"
+                args = ['%{}%'.format(self._escapeParameter(self.value))]
+                
+            elif valueType == tags.TYPE_DATE:
+                if self.interval is None:
+                    continue
+                whereClause = self.interval.toDateSql().queryPart()
+                args = []
+                
+            db.query("""
+                    INSERT INTO {help} (value_id, tag_id)
+                        SELECT id, tag_id
+                        FROM {p}values_{type}
+                        WHERE tag_id IN({tags}) AND {where}
+                    """, *args, help=TT_HELP, type=valueType.name,
+                                tags=db.csIdList(tagList), where=whereClause)
+                
+            if pragmaNecessary:
+                db.query('PRAGMA case_sensitive_like = 0')
+                
+            yield
+                
+        # Store values that match
+        #=================================================
+        if db.query("SELECT COUNT(*) FROM {help}", help=TT_HELP).getSingle() <= MAX_MATCHING_TAGS:
+            self.matchingTags = set(db.query("SELECT tag_id, value_id FROM {help}", help=TT_HELP))
+        yield
+        
+        # Select elements which have these values (or not)
+        #=================================================
+        domainWhereClause = "el.domain={}".format(domain.id) if domain is not None else "1"
+        if not self.negate:
+            self.result = set(db.query("""
+                SELECT DISTINCT el.id
+                FROM {table} AS el
+                    JOIN {p}tags AS t ON el.id = t.element_id
+                    JOIN {help} AS h USING(tag_id, value_id)
+                    WHERE {where}
+                """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColumn())
+        else: 
+            self.result = set(db.query("""
+                SELECT el.id
+                FROM {table} AS el
+                    JOIN {p}tags AS t ON el.id = t.element_id
+                    LEFT JOIN {help} AS h ON t.tag_id = h.tag_id AND t.value_id = h.value_id
+                WHERE {where}
+                GROUP BY el.id
+                HAVING COUNT(h.value_id) = 0
+                """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColum())
     
     def _escapeParameter(self, parameter):
         """Escape parameter for use in LIKE expression."""
         return parameter.replace('\\','\\\\').replace('_','\\_').replace('%','\\%')
+    
+    def getMatchingTags(self):
+        return self.matchingTags
     
     @staticmethod
     def parse(key, data):
@@ -568,23 +612,23 @@ class FlagCriterion(Criterion):
     def isUsingFlag(self, flag):
         return flag in self.flags
     
-    def getQueries(self, fromTable, domain=None):
-        domainWhereClause = " AND el.domain={}".format(domain.id) if domain is not None else ''
+    def process(self, fromTable, domain):
+        domainClause = " AND el.domain={}".format(domain.id) if domain is not None else ''
         if self.junction == 'AND':
-            return ["""
+            self.result = set(db.query("""
                 SELECT el.id
-                FROM {} AS el JOIN {}flags AS fl ON el.id = fl.element_id
-                WHERE fl.flag_id IN ({}) {}
+                FROM {table} AS el JOIN {p}flags AS fl ON el.id = fl.element_id
+                WHERE fl.flag_id IN ({flags}) {domain}
                 GROUP BY el.id
-                HAVING COUNT(fl.element_id) = {}
-                """.format(fromTable, db.prefix, db.csIdList(self.flags),
-                           len(self.flags), domainWhereClause)]
+                HAVING COUNT(fl.element_id) = {count}
+                """, table=fromTable, domain=domainClause,
+                     flags=db.csIdList(self.flags), count=len(self.flags)).getSingleColumn())
         else: # use or
-            return ["""
+            self.result = set(db.query("""
                 SELECT DISTINCT el.id
-                FROM {} AS el JOIN {}flags AS fl ON el.id = fl.element_id
-                WHERE fl.flag_id IN ({}) {}
-                """.format(fromTable, db.prefix, db.csIdList(self.flags), domainWhereClause)]
+                FROM {table} AS el JOIN {p}flags AS fl ON el.id = fl.element_id
+                WHERE fl.flag_id IN ({flags}) {domain}
+                """, table=fromTable, domain=domainClause, flags=db.csIdList(self.flags)).getSingleColumn())
 
     def __eq__(self, other):
         return isinstance(other, FlagCriterion) and self.flags == other.flags \
@@ -641,17 +685,17 @@ class StickerCriterion(Criterion):
     def __ne__(self, other):
         return not self.__eq__(other)   
     
-    def getQueries(self, fromTable, domain=None):
+    def process(self, fromTable, domain):
         # Currently there is no restriction on the strings in self.types. Thus use SQL placeholders '?'
         # to make sure that strings are correctly escaped.
         joinClause = "{}stickers AS j ON el.id = j.element_id AND j.type IN ({})"\
                         .format(db.prefix, ','.join(['?']*len(self.types)))
         if not self.negate:
-            query = "SELECT DISTINCT id FROM {} AS el JOIN {} WHERE 1"
-        else: query = "SELECT id FROM {} AS el LEFT JOIN {} WHERE j.element_id IS NULL"
+            query = "SELECT DISTINCT id FROM {table} AS el JOIN {join} WHERE 1"
+        else: query = "SELECT id FROM {table} AS el LEFT JOIN {join} WHERE j.element_id IS NULL"
         if domain is not None:
             query += " AND el.domain={}".format(domain.id)
-        return [[query.format(fromTable, joinClause)] + self.types]
+        self.result = set(db.query(query, table=fromTable, join=joinClause).getSingleColumn())
         
     @staticmethod
     def parse(key, data):
@@ -716,18 +760,17 @@ class TagIdCriterion(Criterion):
     the tags-table for lookup.
     """
     def __init__(self, tagPairs):
-        assert isinstance(tagPairs, list)
         self.tagPairs = tagPairs
         
-    def getQueries(self, fromTable, domain=None):
+    def process(self, fromTable, domain):
         whereClause = " OR ".join("(t.tag_id = {} AND t.value_id = {})".format(*p) for p in self.tagPairs)
         if domain is not None:
             whereClause = "el.domain={} AND ({})".format(domain.id, whereClause)
-        return ["""
+        self.result = set(db.query("""
             SELECT DISTINCT el.id
-            FROM {} AS el JOIN {}tags AS t ON el.id = t.element_id
-            WHERE {}
-            """.format(fromTable, db.prefix, whereClause)]
+            FROM {table} AS el JOIN {p}tags AS t ON el.id = t.element_id
+            WHERE {where}
+            """, table=fromTable, where=whereClause).getSingleColumn())
 
     def isUsingTag(self, tag):
         return tag in self.valueIds

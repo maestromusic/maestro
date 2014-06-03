@@ -20,7 +20,7 @@ from PyQt4 import QtCore
 
 from ...core import tags, covers
 from ...core.nodes import Wrapper
-from . import profiles, StandardDelegate, TextItem, ITALIC_STYLE
+from . import profiles, StandardDelegate, TextItem, STD_STYLE, ITALIC_STYLE, BOLD_STYLE
 from ...models import browser as browsermodel
 
 translate = QtCore.QCoreApplication.translate
@@ -52,8 +52,8 @@ class BrowserDelegate(StandardDelegate):
         
         if isinstance(node, browsermodel.TagNode):
             valueList = node.sortValues if self.profile.options['showSortValues'] else node.values
-            for value in valueList:
-                self.addCenter(TextItem(value))
+            for value, matching in valueList:
+                self.addCenter(TextItem(value, style=BOLD_STYLE if matching else STD_STYLE))
                 self.newRow()
         elif isinstance(node,browsermodel.VariousNode):
             self.addCenter(TextItem(self.tr("Unknown/Various"),ITALIC_STYLE))

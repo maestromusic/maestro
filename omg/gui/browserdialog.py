@@ -241,7 +241,7 @@ class SingleViewConfiguration(QtGui.QWidget):
     def _handleAddLayerButton(self):
         layerName = self.layerTypeBox.itemData(self.layerTypeBox.currentIndex())
         theClass = browsermodel.layerClasses[layerName][1]
-        layer = theClass.openDialog(self)
+        layer = theClass.openDialog(self, self.model)
         if layer is not None:
             self.model.addLayer(layer)
             self.updateLayerView()

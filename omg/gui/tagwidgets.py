@@ -455,7 +455,6 @@ class TagValueEditor(QtGui.QWidget):
         # This must not emit a value-changed signal because conceptually only the way the value is displayed
         # changes and not the value itself.
         if tag.canConvert(text):
-            # This is 
             self._emitValueChanged = False
             self.setValue(text)
             self._emitValueChanged = True

@@ -39,14 +39,25 @@ class Task:
         self.kwargs = kwargs
         
     def process(self):
-        """Called from the worker thread to get this task done."""
-        self.callable(*self.args, **self.kwargs)
+        """Called from the worker thread to get this task done. Big tasks can implement this as a generator
+        which yields between each major step. This gives the worker the chance to abort the task in between.
+        """
+        self.result = self.callable(*self.args, **self.kwargs)
+        
+    def processImmediately(self):
+        """In subclasses that return a generator in "process" this can be used to process the task
+        without suspending on 'yield'. Use this when processing a task by yourself, not in a Worker thread.
+        """
+        generator = self.process()
+        if generator is not None:
+            for n in task.process():
+                pass
         
     def merge(self, other):
         """Try to merge the task *other* in this task and return whether it was successful. The worker queue
         will try to merge new tasks into older tasks instead of putting them into the queue."""
-        return False
-       
+        return False   
+        
     
 class Queue:
     """A simple FIFO-queue for inter-thread communication. Contrary to Python's queue.Queue it supports
@@ -140,17 +151,6 @@ class Worker(QtCore.QObject):
     def join(self, timeout=None):
         """Block until all tasks have been processed (or *timeout* has elapsed)."""
         self._emptyEvent.wait(timeout)
-    
-    def checkWorkerState(self, task):
-        """This method is called before tasks are processed. If for some reason the task should not be
-        processed anymore (e.g. reset has been called), this method will raise a ResetException.
-        Also this method is stored in the attribute 'checkWorkerState' of each task. Long-running tasks
-        may call it during processing so that processing is aborted if the worker state requires it.
-        Note that it is not possible or necessary to pass the specific task as argument to
-        task.checkWorkerState.
-        """
-        if task._resetCount != self._resetCount:
-            raise ResetException()
             
     def runInit(self):
         """Called at the beginning of the worker thread. Subclasses might reimplement it."""
@@ -173,11 +173,13 @@ class Worker(QtCore.QObject):
                     if self._queue.isEmpty():
                         self._emptyEvent.set()
                     task = self._queue.get()
-                    if task is None:
-                        raise ResetException()
-                    self.checkWorkerState(task)
-                    task.checkWorkerState = functools.partial(self.checkWorkerState, task)
-                    task.process()
+                    if task is None or task._resetCount != self._resetCount:
+                        raise ResetException() # None is inserted to wake up the thread in reset/quit
+                    generator = task.process()
+                    if generator is not None: # tasks yields None between each major step...
+                        for n in generator:   # ...to give us the chance to abort in between.
+                            if task._resetCount != self._resetCount:
+                                raise ResetException()
                     self._done.emit(task)
                 except ResetException:
                     if self.state == STATE_QUIT:
@@ -189,6 +191,7 @@ class Worker(QtCore.QObject):
     
     def _handleDone(self, task):
         """Before emitting the real 'done'-signal, filter tasks out that were added before the last reset."""
+        # This method is executed in the main thread, not in the worker thread
         if task._resetCount == self._resetCount:
             self.done.emit(task)
     

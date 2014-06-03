@@ -291,7 +291,7 @@ class StandardDelegate(AbstractDelegate):
             elif isinstance(parent,RootNode):
                 break
             elif isinstance(parent, browsermodel.TagNode):
-                parentValues = parent.values
+                parentValues = parent.getValues()
             else:
                 parentValues = []
             

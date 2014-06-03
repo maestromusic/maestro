@@ -41,9 +41,32 @@ def addLayerClass(name, title, theClass):
 
 
 class BrowserModel(rootedtreemodel.RootedTreeModel):
-    """ItemModel for the BrowserTreeViews (a browser may have several views and hence several models). The
-    model will group its contents according to the parameter *layers*.
-    TODO: improve comment
+    """ItemModel for the BrowserTreeViews (a browser may have several views and hence several models).
+    
+    Parameters:
+        - *domain*: A BrowserModel only displays elements from this domain (exception: Usually all contents
+          of an element are displayed; so if a container from this domain contains elements from another
+          domain, they will be displayed).
+        - *layers*: Used to group elements, see below. Basically each layer is asked to group the contents
+          of the nodes of the previous layer. A special ContainerLayer is used after all layers in *layers*.
+          In particular *layers* may be an empty list.
+        - *filter*: A search criterion or None. The browser will only display elements matching the
+          criterion. Use setFilter to change it.
+    
+    To build its tree structure, the BrowserModel performs the following steps:
+        1. The search module is used to find the set of elements matching self.filter. If the latter is None,
+           all elements will be displayed.
+        2. The first layer is asked to create a list of nodes grouping these elements. For this the layer's
+           'build'-method is used.
+        3. Nodes returned by a layer must either have their contents already loaded or provide the method
+           'getElids' to define the set of elements below this node, or provide the method getCriterion.
+           In the latter case the node will contain all elements contained in the parent node matching the
+           additional criterion returned by getCriterion.
+        4. When a node is expanded whose contents are not loaded yet, getElids/getCriterion is used to
+           determine the set of elements below the node. Also the layer of the node is determined (usually
+           one layer after the parent node's layer). Then the layer is asked to group the elements.
+           
+    All these steps are performed in a separate worker thread.
     """
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)
@@ -115,21 +138,24 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.reset()
     
     def setFilter(self, filter):
-        """Define a search Criterion. The model will only display elements matching the filter."""
+        """The model will only display elements matching the given filter. Set *filter* to None to see
+        all elements."""
         self.filter = filter
         self.reset()
         
     def hasContents(self):
         """Return whether the current model contains elements."""
         # A textnode is only used in empty models to display e.g. "no search results"
-        return len(self.root.contents) >= 1 and not (isinstance(self.root.contents[0], TextNode))
+        return self.root.contents is not None and len(self.root.contents) >= 1 \
+                and not (isinstance(self.root.contents[0], TextNode))
     
     def reset(self):
+        """Reset and reload the browser completely."""
         self.worker.reset()
         super().reset()
         self._startLoading(self.root)
             
-    def flags(self,index):
+    def flags(self, index):
         defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
         if index.isValid():
             return defaultFlags | Qt.ItemIsDragEnabled
@@ -163,18 +189,27 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         loaded directly. If *block* is True this method will block until the node is loaded. 
         """
         layer = self.getLayer(self._getLayerIndex(node) + 1)
-        criteria = []
-        if self.filter is not None:
-            criteria.append(self.filter)
-        if node is not self.root:
-            criteria.extend(p.getCriterion() for p in node.getParents(includeSelf=True)
-                                             if isinstance(p, CriterionNode))
-        criterion = search.criteria.combine('AND', criteria)
-        task = LoadTask(node, layer, criterion, self.domain)
+        task = None
+        if hasattr(node, 'getElids'):
+            elids = node.getElids()
+            if elids is not None:
+                task = LoadTask(self.domain, node, layer, elids=elids)
+        if task is None:
+            criteria = []
+            if self.filter is not None:
+                criteria.append(self.filter)
+            if node is not self.root:
+                criteria.extend(p.getCriterion() for p in node.getParents(includeSelf=True)
+                                                 if isinstance(p, CriterionNode))
+            criterion = search.criteria.combine('AND', criteria)
+            task = LoadTask(self.domain, node, layer, criterion=criterion)
         self.worker.submit(task)
         if block:
             self.worker.join()
-            self._loaded(task)
+            # Usually nodes are only loaded when the _loaded-signal arrives. But usually when block=True
+            # is used, the caller expects nodes to be loaded after this method.
+            # So: Don't wait for the signal. 
+            self._loaded(task) # Do not wait for the signal to arrive because the caller often expe
     
     def _loaded(self, task):
         """This is called (in the main thread) when a task has been processed. It will insert the loaded
@@ -188,9 +223,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         task.node = None
         
         if node is self.root:
-            hadContents = node.contents is not None and len(node.contents) > 0 \
-                            and not isinstance(node.contents[0], TextNode)
-            hasContents = len(contents) > 0
+            hadContents = self.hasContents()
             if len(contents) == 0: 
                 if self.filter is None:
                     text = self.tr("Your database is empty or there is no element in domain '{}'."
@@ -208,6 +241,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node.setContents([])
             self.endRemoveRows()
             self.beginInsertRows(self.getIndex(node), 0, len(contents)-1)
+            if node is self.root:
+                print("SETTING ROOT CONTENTS", len(node.contents), len(contents))
             node.setContents(contents)
             self.endInsertRows()
         else:
@@ -215,8 +250,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         
         self.nodeLoaded.emit(node)
         
-        if node is self.root and hasContents != hadContents:
-            self.hasContentsChanged.emit(hasContents)
+        if node is self.root and self.hasContents() != hadContents:
+            self.hasContentsChanged.emit(self.hasContents())
 
     
 class LoadTask(utils.worker.Task):
@@ -224,35 +259,54 @@ class LoadTask(utils.worker.Task):
     to its worker thread. *layer* is the layer to which the node's contents belong. *criterion* is the
     filter that specifies which elements to load as contents.
     """ 
-    def __init__(self, node, layer, criterion, domain):
+    def __init__(self, domain, node, layer, elids=None, criterion=None):
         # Note to self: If layer and criterion were not immutable,
         # they should be copied here to avoid concurrent access.
+        self.domain = domain
         self.node = node
         self.layer = layer
+        self.elids = elids
         self.criterion = criterion
-        self.domain = domain
         self.contents = None
         
     def merge(self, node):
         return node == self.node
     
     def process(self):
-        if self.criterion is not None:
-            elids = search.search(self.criterion, self.domain,
-                                  abortSwitch=self.checkWorkerState) # see worker.py
-            #logging.debug(__name__, "Found {} elements.".format(len(elids)))
-        else: elids = None
-        import time
-        #time.sleep(1)
-        #logging.debug(__name__, "Start building contents...")
-        self.contents = self.layer.build(elids, self.domain)
-        #logging.debug(__name__, "Build contents. Toplevel: {}".format(len(self.contents)))
+        if self.elids is not None:
+            elids = self.elids
+        elif self.criterion is not None:
+            yield from search.SearchTask(self.criterion, self.domain).process()
+            elids = self.criterion.result
+        else: elids = None # display all nodes
+        matchingTags = self.criterion.getMatchingTags() if self.criterion is not None else []
+        if matchingTags is None:
+            matchingTags = []
+        self.contents = self.layer.build(self.domain, elids, matchingTags)
     
     def __repr__(self):
-        return "<TASK:{},{}>".format(self.node,self.criterion)
+        return "<TASK:{},{}>".format(self.node, self.criterion)
 
-            
-class TagLayer:
+
+class Layer:
+    def text(self):
+        """Return a text representing this layer, e.g. for configuration dialogs."""
+        raise NotImplementedError()
+    
+    def state(self):
+        """Return something that can be used to persistently store the configuration of this layer."""
+        return None
+
+    def build(self, domain, elids, matchingTags):
+        """Return a set of nodes grouping the elements with ids in the set *elids*. All elements are
+        assumed to belong to *domain*. *matchingTags* is the set of (tagId, valueId)-tuples, that were
+        directly matched by the search query (see search.criteria.Criterion.getMatchingTags). Layers
+        may use this to draw corresponding TagNodes in bold.
+        """
+        raise NotImplementedError()        
+        
+        
+class TagLayer(Layer):
     """
     A TagLayer groups elements by their tag values in a predefined set of tags (e.g. artist & composer).
     
@@ -279,81 +333,123 @@ class TagLayer:
                                ', '.join(tag.title for tag in self.tagList))
     
     def state(self):
-        """Return something that can be used to persistently store the configuration of this layer."""
         return [tag.name for tag in self.tagList]
     
     def __repr__(self):
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
-    def build(self, elids, domain):
-        # Get all tag values that should appear in TagNodes 
+    def build(self, domain, elids, matchingTags):
+        # 1. Get toplevel nodes 
         if elids is None:
-            # Search all elements
-            idFilter = "res.domain={}".format(domain.id) # for use in WHERE clause
-        elif len(elids) == 0:
+            toplevel = set(db.query("""
+                    SELECT id
+                    FROM {p}elements
+                    WHERE domain=? AND id NOT IN (SELECT element_id FROM {p}contents)
+                    """, domain.id).getSingleColumn())
+        elif len(elids) > 0:
+            toplevel = set(elids)
+            toplevel.difference_update(db.query(
+                     "SELECT element_id FROM {p}contents WHERE container_id IN ({elids})",
+                     elids=db.csList(elids)).getSingleColumn())
+        else:
             return []
-        else: idFilter = "res.id IN ({})".format(db.csList(elids))
-       
+        
+        # 2. Add contents of permeable nodes
+        new = toplevel
+        while len(new):
+            new = set(db.query("""
+                    SELECT c.element_id
+                    FROM {p}contents AS c JOIN {p}elements AS el ON c.container_id = el.id
+                    WHERE el.type IN ({collection},{container}) AND el.id IN ({parents})
+                    """, collection=elements.TYPE_COLLECTION, container=elements.TYPE_CONTAINER,
+                    parents=db.csList(new)).getSingleColumn())
+            toplevel.update(new)
+        
+        
+        # 3. Get tag values that might form tag nodes
+        idFilter = "el.id IN ({})".format(db.csList(toplevel))
         tagFilter = db.csIdList(self.tagList)
         if db.type == 'sqlite':
             collate = 'COLLATE NOCASE'
         else: collate = ''
         result = db.query("""
-            SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value
-            FROM {0}elements AS res JOIN {0}tags AS t ON res.id = t.element_id
-                     JOIN {0}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
-            WHERE t.tag_id IN ({1}) AND {2}
-            ORDER BY COALESCE(v.sort_value, v.value) {3}
-        """.format(db.prefix, tagFilter, idFilter, collate))
-
-        nodes = []
-        hiddenNodes = []
-        values = set()
-    
-        for row in result:
-            tagId, valueId, value, hide, sortValue = row
+            SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value, el.id
+            FROM {p}elements AS el JOIN {p}tags AS t ON el.id = t.element_id
+                     JOIN {p}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
+            WHERE t.tag_id IN ({tagFilter}) AND {idFilter}
+            """, tagFilter=tagFilter, idFilter=idFilter, collate=collate)
+        
+        withinMatchingNodes = set()
+        elementSets = collections.defaultdict(set)
+        visibleNodes, hiddenNodes = {},{}
+        for tagId, valueId, value, hide, sortValue, elid in result:
             if db.isNull(sortValue):
                 sortValue = None
-
-            if not hide or self.browser.showHiddenValues:
-                theList = nodes
-            else: theList = hiddenNodes
-            
-            if value not in values:
-                theList.append(TagNode(value, [(tagId, valueId)], sortValue))
-                values.add(value)
-            else:
-                # If there is already a value node with this value,
-                # add tagId -> valueId to that node
-                for aNode in theList:
-                    if value in aNode.values:
-                        aNode.tagPairs.append((tagId, valueId))
-                        if sortValue is not None and sortValue not in aNode.sortValues:
-                            aNode.sortValues.append(sortValue)
-                            aNode.sortValues.sort()
-                        break
-
-        # Check whether a VariousNode is necessary
+            nodes = visibleNodes if not hide or self.browser.showHiddenValues else hiddenNodes
+            matching = (tagId,valueId) in matchingTags
+            if value not in nodes:
+                nodes[value] = node = TagNode()
+            else: node = nodes[value]
+            node.elids.add(elid)
+            if not hide:
+                elementSets[elid].add(node)
+            if matching and not hide:
+                withinMatchingNodes.add(elid)
+            node.addTagValue(tagId, valueId, value, sortValue, matching)
+        
+        visibleNodes = list(visibleNodes.values())
+        hiddenNodes = list(hiddenNodes.values())
+                
+        # 4. Filter unnecessary tag nodes
+        def processNodes(nodes):
+            nodesToRemove = [] 
+            if len(nodes) <= 20:
+                for node in nodes:
+                    if node.matching or node in nodesToRemove:
+                        continue
+                    superNodes = set.intersection(*(elementSets[elid] for elid in node.elids))
+                    if len(superNodes) > 1:
+                        if any(len(superNode.elids) > len(node.elids) for superNode in superNodes):
+                            nodesToRemove.append(node)
+                        else:
+                            # Merge
+                            for superNode in superNodes:
+                                if superNode != node:
+                                    print("Merging", node, superNode)
+                                    node.merge(superNode)
+                                    print("Removing", superNode)
+                                    nodesToRemove.append(superNode)
+            nodes = [n for n in nodes if (n.matching or not n.elids <= withinMatchingNodes)
+                                        and n not in nodesToRemove]
+            nodes.sort(key=lambda node: node.sortValues[0])
+            return nodes
+        
+        visibleNodes = processNodes(visibleNodes)
+        hiddenNodes = processNodes(hiddenNodes)
+        
+        
+        # 5. Check whether a VariousNode is necessary
         result = db.query("""
-            SELECT res.id
-            FROM {0}elements AS res LEFT JOIN {0}tags AS t
-                                ON res.id = t.element_id AND t.tag_id IN ({1})
-            WHERE {2} AND t.value_id IS NULL
+            SELECT el.id
+            FROM {p}elements AS el LEFT JOIN {p}tags AS t
+                                ON el.id = t.element_id AND t.tag_id IN ({tagFilter})
+            WHERE {idFilter} AND t.value_id IS NULL
             LIMIT 1
-            """.format(db.prefix, tagFilter, idFilter))
+            """, tagFilter=tagFilter, idFilter=idFilter)
 
         if len(result) > 0:
-            nodes.append(VariousNode(self.tagList))
+            visibleNodes.append(VariousNode(self.tagList))
             
+        # 6. Create HiddenNode
         if len(hiddenNodes) > 0:
             # If hidden nodes are present this layer needs two actual levels in the tree structure
             # Since this interferes with the algorithm to determine the layer of a node, we have to store
             # that layer index. See BrowserModel._getLayerIndex
             for node in hiddenNodes:
                 node.layer = self
-            nodes.append(HiddenValuesNode(hiddenNodes))
+            visibleNodes.append(HiddenValuesNode(hiddenNodes))
         
-        return nodes
+        return visibleNodes
     
     @staticmethod
     def defaultTagList():
@@ -362,7 +458,7 @@ class TagLayer:
         return [tag for tag in tagList if tag.isInDb() and tag.type == tags.TYPE_VARCHAR]
     
     @staticmethod
-    def openDialog(parent, layer=None):
+    def openDialog(parent, model, layer=None):
         """Open a dialog to configure a new or existing TagLayer."""
         from PyQt4 import QtGui
         tagList = layer.tagList if layer is not None else TagLayer.defaultTagList()
@@ -380,16 +476,16 @@ class TagLayer:
                 QtGui.QMessageBox.error(parent, translate("TagLayer", "Invalid value"),
                         translate("TagLayer", "Only varchar-tags registered in the database may be used."))
             else:
-                return TagLayer(tagList)
+                return TagLayer(model, tagList)
         return None
 
 
 addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 
-class ContainerLayer:
+class ContainerLayer(Layer):
     """A Container layer organizes nodes in their natural tree structure."""
-    def build(self, elids, domain):
+    def build(self, domain, elids, matchingTags):
         """Build a container structure containing the elements with ids in *elids*."""
         if elids is None:
             toplevel = list(db.query("""
@@ -397,11 +493,13 @@ class ContainerLayer:
                     FROM {p}elements
                     WHERE domain=? AND id NOT IN (SELECT element_id FROM {p}contents)
                     """, domain.id).getSingleColumn())
-        else:
+        elif len(elids) > 0:
             toplevel = set(elids)
             toplevel.difference_update(db.query(
                      "SELECT element_id FROM {}contents WHERE container_id IN ({})"
                     .format(db.prefix, db.csList(elids))).getSingleColumn())
+        else:
+            return []
             
         # Load all toplevel elements and all of their ancestors
         newIds = toplevel
@@ -472,15 +570,15 @@ class ContainerLayer:
             dateTag = tags.get("date")
             if dateTag.type == tags.TYPE_DATE and dateTag in element.tags: 
                 date = -element.tags[dateTag][0].toSql() # minus leads to descending sort
-        return (date, element.getTitle())
+        return (date, element.getTitle(neverShowIds=True))
 
 
 class CriterionNode(Node):
     """CriterionNode is the base class for nodes used to group elements according to a criterion (confer 
-    search.criteria) in a BrowserModel. The level below this node will contain all elements of this level
-    that match the criterion."""
+    search.criteria) in a BrowserModel. The layer below this node will contain all elements of this layer
+    that additionally match the criterion.
+    """
     def __init__(self):
-        """Initialize this CriterionNode with the parent-node <parent> and the given model and criterion."""
         self.parent = None
         self.contents = None
 
@@ -510,6 +608,16 @@ class CriterionNode(Node):
         else: 
             for node in super().getAllNodes():
                 yield node
+                
+    def getElids(self):
+        """Return a set containing the ids of all elements below this node. Return None, if the set has not
+        been stored (in that case getCriterion will be used).
+        """
+        if hasattr(self, 'elids'):
+            elids = self.elids
+            del self.elids # save memory: elids are only requested once when this node is expanded.
+            return elids
+        else: return None
             
     def hasLoaded(self):
         """Return whether this CriterionNode did already load its contents."""
@@ -530,45 +638,79 @@ class CriterionNode(Node):
             if not block:
                 self.setContents([LoadingNode()])
                 model._startLoading(self)
-                # The contents will be added in BrowserModel.searchFinished
+                # The contents will be added in BrowserModel._loaded
             else:
                 model._startLoading(self, block=True)
                     
 
-
 class TagNode(CriterionNode):
-    """A TagNode groups elements which have the same value in one or more tags. Not that only the value
-    must coincide, the tags need not be the same.
-        - *value* is the common value (a string)
-        - *tagPairs* is a dict mapping tag-ids to value-ids. A TagNode will contain all elements that
-          have at least one of the pairs in their tags. Having the ids speeds up the search compared to
-          searching for value as string.
-        - *sortValue* is the sortValue belonging to *value*. The delegate might want to display it instead
-          of *value*.
+    """A TagNode groups elements which have the same value in one or more tags: To be precise it will
+    contain all nodes having at least one of the (tagId, valueId)-pairs from self.tagIds in their tags.
+    This construction allows TagNodes to represent the same value in different tags and also several
+    different values. 
+    
+    Attributes:
+        - 'tagIds': Describes the set of elements below this one, see above.
+        - 'values', 'sortValues': List of tuples (value, matching) with the values that should be displayed
+          for this node. The second tuple component specifies whether the value is directly matched by
+          the current browser search criterion.
+        - 'matching': Whether at least one of the values in this node directly matches the search criterion.
     """
-    def __init__(self, value, tagPairs, sortValue):
+    def __init__(self):
         super().__init__()
-        self.tagPairs = tagPairs
-        self.values = [value]
-        self.sortValues = [sortValue if sortValue is not None else value]
+        self.tagIds = set()
+        self.values = []
+        self.sortValues = []
+        self.elids = set()
+        self.matching = False
     
     def getCriterion(self):
-        return search.criteria.TagIdCriterion(self.tagPairs)
+        return search.criteria.TagIdCriterion(self.tagIds)
 
-    def addValues(self, other):
-        """Add the values (and sortValues) of *other* to this node. This won't affect the contents of this
-        node, so be sure to call this node only when it makes sense.
+    def getValues(self):
+        """Return a list with all values of this node."""
+        return [value for value, matching in self.values]
+    
+    def addTagValue(self, tagId, valueId, value, sortValue, matching):
+        """Add (*tagId*, *valueId*)-mapping to self.tagIds and a *value* and *sortValue* to the list of
+        values to display. *matching* specifies whether this value was directly matched by the current
+        browser search criterion.
         """
-        self.values.extend(other.values)
-        self.values.sort()
-        self.sortValues.extend(other.sortValues)
-        self.sortValues.sort()
+        if (tagId, valueId) not in self.tagIds:
+            self.tagIds.add((tagId, valueId))
+            self._addValue(self.values, value, matching)
+            self._addValue(self.sortValues, value, matching)
+            if matching:
+                self.matching = True
+        
+    def _addValue(self, list, value, matching):
+        """Add the tuple (*value*, *matching*) to the given list (either self.values or self.sortValues).
+        """
+        for pair in list:
+            if pair[0] == value:
+                if matching and not pair[1]:
+                    pair[1] = True
+                return
+        list.append([value, matching])
+        list.sort(key=lambda t: t[0])
+        
+    def merge(self, other):
+        """Merge the TagNode *other* into this node."""
+        for value, matching in other.values:
+            self._addValue(self.values, value, matching)
+        for value, matching in other.sortValues:
+            self._addValue(self.sortValues, value, matching)
+        if not self.matching and other.matching:
+            self.matching = True
         
     def __repr__(self):
-        return "<ValueNode {} {}>".format(self.values, self.tagPairs)
+        return "<ValueNode {} {}>".format(self.values, self.tagIds)
     
     def getKey(self):
-        return "tag:"+str(self.tagPairs)
+        return "tag:"+str(self.tagIds)
+
+    def toolTipText(self):
+        return str(self.values) + '\n' + str(self.tagIds)
 
 
 class VariousNode(CriterionNode):

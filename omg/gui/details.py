@@ -169,7 +169,7 @@ class DetailsView(dockwidget.DockWidget):
                     size = os.stat(el.url.absPath).st_size
                     value += ', '+utils.strings.formatSize(size)
                 except Exception:
-                    logging.exception(__name__, "Could not read file size.")
+                    logging.info(__name__, "Could not read file size of '{}'.".format(el.url))
             text.append(value)
             text.append('</td></tr>')
             

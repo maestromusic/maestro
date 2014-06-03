@@ -78,14 +78,16 @@ class Element:
         """Return whether the type of this element implies the 'major'-property."""
         return self.isContainer() and self.type in MAJOR_TYPES
         
-    def getTitle(self, usePath=True):
+    def getTitle(self, usePath=True, neverShowIds=False):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
-        If config.options.misc.show_ids is True, the title will be prepended by the element's id.
         If *usePath* is True, the url will be used as title for files without a title tag.
+        If config.options.misc.show_ids is True, the title will be prepended by the element's id. When
+        the title is requested in order to sort elements, this behavior should be disabled via
+        *neverShowIds*.
         """
         result = ''
         
-        if config.options.misc.show_ids:
+        if config.options.misc.show_ids and not neverShowIds:
             result += "[{}] ".format(self.id)
             
         if tagsModule.TITLE in self.tags:
