@@ -80,7 +80,7 @@ class RealFile(BackendFile):
         
     @property
     def length(self):
-        if hasattr(self, '_tagLibFile'):
+        if hasattr(self, '_taglibFile'):
             return self._taglibFile.length
         else: return 0
 
@@ -91,7 +91,6 @@ class RealFile(BackendFile):
         fileAtt = os.stat(self.url.absPath)
         import stat
         return not (fileAtt[stat.ST_MODE] & stat.S_IWUSR)
-
     
     def rename(self, newUrl):
         # TODO: handle open taglib file references
