@@ -124,5 +124,6 @@
         <file alias="profiles_small.png">icons/preferences/profiles_small.png</file>
         <file alias="audiobackends.png">icons/preferences/audiobackends.png</file>
         <file alias="audiobackends_small.png">icons/preferences/audiobackends_small.png</file>
+        <file alias="domains_small.png">icons/preferences/domains_small.png</file>
     </qresource>
 </RCC>

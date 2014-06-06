@@ -354,6 +354,12 @@ def removePanel(path):
 
 # Add core panels
 addPanel("main", translate("Preferences", "Main"), None)
+addPanel("main/domainmanager", translate("Preferences", "Domain Manager"),
+         callable = ('gui.preferences.domainmanager', 'DomainManager'),
+         description = translate("Preferences",
+                            'A domain is a big category of elements, like "Music", "Movies", etc..'),
+         iconPath = ':omg/icons/preferences/domains_small.png'
+)
 addPanel("main/tagmanager", translate("Preferences", "Tag Manager"),
          callable = ('gui.preferences.tagmanager', 'TagManager'),
          description = translate("Preferences", 

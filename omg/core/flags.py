@@ -16,13 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtGui
+from PyQt4 import QtCore, QtGui
+translate = QtCore.QCoreApplication.translate
 
 from .. import application, constants, database as db, logging, utils, stack
 from ..constants import ADDED, DELETED, CHANGED
 from ..application import ChangeEvent
 
-translate = QtGui.QApplication.translate
 
 _flagsById = None
 _flagsByName = None

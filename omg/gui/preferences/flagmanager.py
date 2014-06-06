@@ -102,9 +102,7 @@ class FlagManager(QtGui.QWidget):
         """Load flags information from flags-module to GUI."""
         self._flagTypes = sorted(flags.allFlags(), key=lambda f: f.name)
         self.tableWidget.clear()
-        self.tableWidget.setHorizontalHeaderLabels(
-                    [self.tr("Icon"), self.tr("Name"), self.tr("# of elements")])
-    
+        self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
         self.tableWidget.setRowCount(len(self._flagTypes))
         
         NumericSortItem = misc.createSortingTableWidgetClass('NumericSortItem', misc.leadingInt)
@@ -178,7 +176,7 @@ class FlagManager(QtGui.QWidget):
         
         if flags.exists(newName):
             QtGui.QMessageBox.warning(self, self.tr("Cannot change flag"),
-                                      self.tr("A flag name '{}' does already exist.").format(newName))
+                                      self.tr("A flag named '{}' does already exist.").format(newName))
             item.setText(oldName)
             return
                       
@@ -264,7 +262,7 @@ class FlagManager(QtGui.QWidget):
 
 def createNewFlagType(parent=None):
     """Ask the user to supply a name and then create a new flag with this name. Return the new flag or None
-    if no flag is created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
+    if no flag was created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
     name, ok = QtGui.QInputDialog.getText(parent, translate("FlagManager", "New Flag"),
                                           translate("FlagManager", "Please enter the name of the new flag:"))
     if not ok:
@@ -276,7 +274,7 @@ def createNewFlagType(parent=None):
         return None
     elif not flags.isValidFlagname(name):
         QtGui.QMessageBox.warning(parent, translate("FlagManager", "Invalid flagname"),
-                                  translate("FlagManager", "This is no a valid flagname."))
+                                  translate("FlagManager", "This is not a valid flagname."))
         return None
     
     return flags.addFlagType(name)
