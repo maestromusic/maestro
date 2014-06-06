@@ -146,10 +146,20 @@ def _addFlagType(flagType):
 
 
 def deleteFlagType(flagType):
-    """Delete a flagtype from the database."""
-    stack.push(translate("Flags", "Delete flag type"),
-               stack.Call(_deleteFlagType, flagType),
-               stack.Call(_addFlagType, flagType))
+    """Delete a flagtype from all elements and the database."""
+    stack.beginMacro(translate("Flags", "Delete flag type"))
+    from . import levels
+    difference = FlagDifference(removals=[flagType])
+    for level in levels.allLevels:
+        if level == levels.real:
+            elementIds = db.query("SELECT element_id FROM {p}flags WHERE flag_id=?", flagType.id)\
+                                  .getSingleColumn()
+            elements = level.collectMany(elementIds)
+        else: elements = [el for el in level.elements.values() if flagType in el.flags]
+        if len(elements) > 0:
+            level.changeFlags({element: difference for element in elements})
+    stack.push('', stack.Call(_deleteFlagType, flagType), stack.Call(_addFlagType, flagType))
+    stack.endMacro()
     
     
 def _deleteFlagType(flagType):
@@ -157,7 +167,7 @@ def _deleteFlagType(flagType):
     if not exists(flagType.name):
         raise ValueError("Cannot remove flagtype '{}' because it does not exist.".format(flagType))
     
-    logging.info(__name__, "Removing flag '{}'.".format(flagType))
+    logging.info(__name__, "Deleting flag '{}'.".format(flagType))
     db.query("DELETE FROM {p}flag_names WHERE id = ?", flagType.id)
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]

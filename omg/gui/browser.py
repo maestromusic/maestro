@@ -22,7 +22,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, config, database as db, logging, utils, search
+from .. import application, config, database as db, logging, utils, search, constants
 from ..core import tags, flags, levels, domains
 from ..core.elements import Element, Container
 from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget, search as searchgui
@@ -329,6 +329,13 @@ class Browser(dockwidget.DockWidget):
             return
         for view in self.views:
             view.expander = RestoreExpander(view)
+        # When a flag is deleted it must be removed from the flagfilter
+        if self.flagCriterion is not None and isinstance(event, flags.FlagTypeChangedEvent)\
+                 and event.action == constants.DELETED:
+            flagList = list(self.flagCriterion.flags) # criteria must not be changed (threading)
+            if event.flagType in flagList:
+                flagList.remove(event.flagType)
+                self.setFlagFilter(flagList)
         self.reload()
     
     def createOptionDialog(self, parent):

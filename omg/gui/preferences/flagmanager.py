@@ -134,8 +134,7 @@ class FlagManager(QtGui.QWidget):
     
     def _getElementCount(self, flagType):
         """Return the number of elements having the given flag."""
-        return db.query("SELECT COUNT(*) FROM {}flags WHERE flag_id = ?".format(db.prefix), flagType.id)\
-                        .getSingle()
+        return db.query("SELECT COUNT(*) FROM {p}flags WHERE flag_id = ?", flagType.id).getSingle()
                         
     def _handleAddButton(self):
         """Create a new flag (querying the user for the flag's name)."""
@@ -154,16 +153,10 @@ class FlagManager(QtGui.QWidget):
         rows = self.tableWidget.selectionModel().selectedRows()
         if len(rows) == 1:
             flagType = self._flagTypes[rows[0].row()]
-            number, allowChanges = self._appearsInElements(flagType)
-            if not allowChanges:
-                dialogs.warning(self.tr("Cannot delete flag"),
-                                self.tr("Cannot delete a flag that appears in elements."),
-                                self)
-                return
-            #TODO: Contrary to tags, removing flags which appear in elements should be implemented.
-            #if not allowChanges:
-            #    question = self.tr("Do you really want to delete the flag '{}'? "
-            #                       "It will be deleted from %n element(s).", None, number)
+            number = self._getElementCount(flagType)
+            if number > 0:
+                question = self.tr("Do you really want to delete the flag '{}'? "
+                                   "It will be deleted from %n element(s).", None, number)
             flags.deleteFlagType(flagType)
 
     def _handleItemChanged(self, item):
@@ -183,15 +176,16 @@ class FlagManager(QtGui.QWidget):
             item.setText(oldName)
             return
         
-        number, allowChanges = self._appearsInElements(flagType)
         if flags.exists(newName):
             QtGui.QMessageBox.warning(self, self.tr("Cannot change flag"),
                                       self.tr("A flag name '{}' does already exist.").format(newName))
             item.setText(oldName)
             return
-                                
+                      
+        number = self._getElementCount(flagType)          
         if number > 0:
-            question = self.tr("Do you really want to change the flag '{}'? It will be changed in %n element(s).",
+            question = self.tr("Do you really want to change the flag '{}'?"
+                               " It will be changed in %n element(s).",
                                None, number).format(oldName)
             if (QtGui.QMessageBox.question(self, self.tr("Change flag?"), question,
                                    QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
@@ -258,22 +252,6 @@ class FlagManager(QtGui.QWidget):
         # Both works also if iconPath is None
         label.setPixmap(QtGui.QPixmap(flagType.iconPath))
         label.setToolTip(flagType.iconPath)
-                   
-    def _appearsInElements(self, flagType):
-        """Return the number of db-elements that contain a flag of the given type in the database. As second 
-        result return whether the user should be allowed to change the flag, i.e. whether the flag does not
-        appear in any element in the database nor in the editor.
-        """
-        number = db.query("SELECT COUNT(element_id) FROM {}flags WHERE flag_id = ?"
-                            .format(db.prefix), flagType.id).getSingle()  
-        if number > 0:
-            return number, False
-        else:
-            from ...core import levels
-            for elem in levels.editor.elements.values():
-                if flagType in elem.flags:
-                    return 0, False
-            return 0, True
         
     def _getColumnIndex(self, columnKey):
         """Return the index of the column with the given key (i.e. the first part of the corresponding tuple
