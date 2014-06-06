@@ -136,8 +136,11 @@ def _addFlagType(flagType):
     """Add a flagType to database and some internal lists and emit a FlagTypeChanged-event. If *flagType*
     doesn't have an id, choose an unused one.
     """
-    flagType.id = db.query("INSERT INTO {p}flag_names (name, icon) VALUES (?,?)",
-                           flagType.name, flagType.iconPath).insertId()
+    if flagType.id is None:
+        flagType.id = db.query("INSERT INTO {p}flag_names (name, icon) VALUES (?,?)",
+                               flagType.name, flagType.iconPath).insertId()
+    else: db.query("INSERT INTO {p}flag_names (id, name, icon) VALUES (?,?,?)",
+                   flagType.id, flagType.name, flagType.iconPath)
     logging.info(__name__, "Added new flag '{}'".format(flagType.name))
     
     _flagsById[flagType.id] = flagType
