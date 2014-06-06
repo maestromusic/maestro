@@ -16,8 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore,QtGui
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+
+from ... import utils
 
 
 class IconLineEdit(QtGui.QLineEdit):
@@ -123,3 +125,39 @@ class LineEditWithHint(QtGui.QLineEdit):
             painter.drawText(r,Qt.AlignRight | Qt.AlignVCenter,self._rightText)
             painter.setPen(oldPen)
             
+            
+class PathLineEdit(QtGui.QWidget):
+    """A line edit together with a small button that opens a file dialog. The user can select an existing
+    directory which will then be inserted into the line edit. *dialogTitle* is the dialog title.
+    """
+    textChanged = QtCore.pyqtSignal(str)
+    
+    def __init__(self, dialogTitle, path=None):
+        super().__init__()
+        self.dialogTitle = dialogTitle
+        layout = QtGui.QHBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
+        self.lineEdit = QtGui.QLineEdit()
+        if path is not None:
+            self.lineEdit.setText(path)
+        self.lineEdit.textChanged.connect(self.textChanged)
+        layout.addWidget(self.lineEdit, 1)
+        button = QtGui.QPushButton()
+        button.setIcon(utils.images.standardIcon('directory'))
+        button.setIconSize(QtCore.QSize(16, 16))
+        button.clicked.connect(self._handleButton)
+        layout.addWidget(button)
+        
+    def _handleButton(self):
+        """Handle the button next to the line edit: Open a file dialog."""
+        result = QtGui.QFileDialog.getExistingDirectory(self, self.dialogTitle, self.lineEdit.text())
+        if result:
+            self.lineEdit.setText(result)
+            
+    def text(self):
+        """Return the current text."""
+        return self.lineEdit.text()
+    
+    def setText(self, text):
+        """Set the text of this line edit."""
+        self.lineEdit.setText(text)

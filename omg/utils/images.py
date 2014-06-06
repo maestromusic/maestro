@@ -55,7 +55,7 @@ def standardIcon(name):
         "forward": QtGui.QStyle.SP_ArrowForward,
     }
     if name in qtIcons:
-        return style.standardIcon(qtIcons(name))
+        return style.standardIcon(qtIcons[name])
     else:
         return QtGui.QIcon()
 

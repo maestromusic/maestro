@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os.path
+
 from ... import filebackends, player
 from ...filebackends import filesystem
 
@@ -32,7 +34,8 @@ class MPDURL(filebackends.BackendURL):
         self.path = self.parsedUrl.path[1:]
         
     def asLocalFile(self):
-        return filesystem.FileURL("file:///" + self.path)
+        mpdProfile = player.profileCategory.get(self.profile)
+        return filesystem.FileURL("file://" + os.path.join(mpdProfile.path, self.path))
         
     def toQUrl(self):
         return self.asLocalFile().toQUrl()

@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import re, time, select, contextlib, os.path
+
 try:
     import mpd
     # Disable the 'Calling <this or that>' messages
@@ -29,15 +31,13 @@ if mpd_version < [0,5,1]:
     raise ImportError("The installed version of python-mpd2 is too old. OMG needs at least "
                       "python-mpd2-0.5.1 to function properly.")
 
-import re, time
-import select
-import contextlib
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import application, database as db, filebackends, player, logging, profiles, stack
-from ...core import tags
+from ...filebackends import filesystem as filesystembackend
+from ...gui.misc import lineedits
+from ...core import domains, tags
 from ...models import playlist
 from . import filebackend as mpdfilebackend
 
@@ -88,6 +88,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.host = state.get('host', 'localhost')
         self.port = state.get('port', 6600)
         self.password = state.get('password', '')
+        self.path = state.get('path', '')
 
         self._numFrontends = 0
         
@@ -123,10 +124,8 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.outputs = None
         self.client = None
 
-    
     def save(self):
-        return dict(host=self.host, port=self.port, password=self.password)
-    
+        return {'host': self.host, 'port': self.port, 'password': self.password, 'path': self.path}
     
     def setConnectionParameters(self, host, port, password):
         """Change the connection parameters. Issues a reconnect with the new ones."""
@@ -137,7 +136,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.disconnectClient()
         self.connectBackend()
         player.profileCategory.profileChanged.emit(self)
-    
+        
+    def setPath(self, path):
+        """Change the path where OMG believes the MPD music folder to be."""
+        if path != self.path:
+            self.path = path
+            player.profileCategory.profileChanged.emit(self)
     
     def connectBackend(self):
         """Connect to MPD.
@@ -168,7 +172,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.idling = True
         self.idleTimer.start()
     
-    
     def disconnectClient(self, skipSocket=False):
         """Disconnect from MPD.
         
@@ -186,7 +189,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.connectionStateChanged.emit(player.DISCONNECTED)
         stack.resetSubstack(self.stack)
        
-    
     def checkIdle(self, resumeIdle=True):
         """Check the client socket for responses to the "idle" command.
         
@@ -215,7 +217,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.idling = False
             self.disconnectClient(True)
             return e
-    
     
     def checkMPDChanges(self, changed):
         """Check for changes in the MPD subsystems listed in "changed" (as returned from idle).
@@ -247,7 +248,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         if len(changed) > 0:
             logger.warning('unhandled MPD changes: {}'.format(changed))
     
-    
     @contextlib.contextmanager
     def getClient(self):
         """Intermits idling and returns the MPDClient object. Might raise ConnectionErrors."""
@@ -263,14 +263,12 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             yield self.client
     
-    
     def updateMixer(self):
         """Check if MPD's volume has changed and set backend's volume accordingly."""
         volume = int(self.mpdStatus['volume'])
         if volume != self._volume:
             self._volume = volume
             self.volumeChanged.emit(self._volume)
-    
     
     def updatePlaylist(self):
         """Update the playlist if it has changed on the server.
@@ -339,7 +337,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.playlist.resetFromUrls(self.makeUrls(self.mpdPlaylist),
                                         updateBackend='onundoredo')   
         
-    
     def updatePlayer(self):
         """Check if player state (current song, elapsed, state) have changed from MPD."""
         if "song" in self.mpdStatus:
@@ -374,13 +371,11 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.currentChanged.emit(None)
         self._state = state
 
-
     def updateOutputs(self):
         """Check if the selected audio outputs have been changed by MPD."""
         outputs = self.client.outputs()
         if outputs != self.outputs:
             self.outputs = outputs
-    
     
     def updateFlags(self):
         """Check if random flag has been changed by MPD."""
@@ -389,10 +384,8 @@ class MPDPlayerBackend(player.PlayerBackend):
             self._flags = flags
             self.flagsChanged.emit(flags)
     
-    
     def state(self):
         return self._state
-    
     
     def setState(self, state):
         with self.getClient() as client:
@@ -403,10 +396,8 @@ class MPDPlayerBackend(player.PlayerBackend):
             elif state is player.STOP:
                 client.stop()
     
-    
     def volume(self):
         return self._volume
-    
     
     def setVolume(self, volume):
         with self.getClient() as client:
@@ -415,21 +406,17 @@ class MPDPlayerBackend(player.PlayerBackend):
             except mpd.CommandError:
                 logger.error("Problems setting volume. Does MPD allow setting the volume?")
 
-
     def current(self):
         return self.playlist.current
 
-    
     def setCurrent(self, index):
         with self.getClient() as client:
             client.play(index if index is not None else -1)
-    
     
     def skipForward(self):
         with self.getClient() as client:
             client.next()
         
-    
     def skipBackward(self):
         with self.getClient() as client:
             client.previous()        
@@ -439,23 +426,20 @@ class MPDPlayerBackend(player.PlayerBackend):
             return 0
         return time.time() - self._currentStart
     
-    
     def setElapsed(self, elapsed):
         self.seekRequest = elapsed
         self.seekTimer.start()
-    
     
     def _seek(self):
         if self.seekRequest is not None:
             with self.getClient() as client:
                 client.seekcur(self.seekRequest)
         self.seekRequest = None
-    
+
     
     def updateElapsed(self):
         if not self.seekTimer.isActive():
             self.elapsedChanged.emit(self.elapsed())
-    
     
     def checkElapsedTimer(self, newState):
         if newState is player.PLAY:
@@ -463,17 +447,14 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             self.elapsedTimer.stop()
     
-    
     def flags(self):
         return self._flags
-    
     
     def setFlags(self, flags):
         if flags != self._flags:
             with self.getClient() as client:
                 client.repeat(flags & player.FLAG_REPEATING)
             # self._flags will be updated when a change in MPD's status is detected
-    
     
     def updateDB(self, path=None):
         """Update MPD's database. An optional *path* can be given to only update that file/dir."""
@@ -482,7 +463,6 @@ class MPDPlayerBackend(player.PlayerBackend):
                 client.update(path)
             else:
                 client.update()
-    
     
     def makeUrls(self, paths):
         """Create OMG URLs for the given paths reported by MPD.
@@ -500,31 +480,27 @@ class MPDPlayerBackend(player.PlayerBackend):
                 except KeyError:
                     logger.warning("Unsupported MPD URL type: {}".format(path))
             else:
-                #TODO support multiple sources
-                #if len(db.query("SELECT element_id FROM {p}files WHERE url=?", 'file:///' + path)):
-                #    urls.append(filebackends.BackendURL.fromString("file:///" + path))
-                #else:
-                urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
+                source = domains.getSource(os.path.join(self.path, path)) if len(self.path) > 0 else None
+                if source is not None:
+                    urls.append(filesystembackend.FileURL(path, source=source))
+                else:
+                    urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
         return urls
-    
-                    
+        
     def treeActions(self):
         yield self.separator
         yield self.updateDBAction
         yield self.configOutputsAction
-    
 
     def registerFrontend(self, obj):
         self._numFrontends += 1
         if self._numFrontends == 1:
             self.connectBackend()
-
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
         if self._numFrontends == 0 and self.connectionState == player.CONNECTED:
             self.disconnectClient()
-    
     
     def setPlaylist(self, urls):
         with self.getClient() as client:
@@ -532,7 +508,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.playlistVersion += 1
             self.mpdPlaylist = []
             self.insertIntoPlaylist(0, urls)
-    
     
     def insertIntoPlaylist(self, pos, urls):
         """Insert *urls* into the MPD playlist at position *pos*.
@@ -557,14 +532,12 @@ class MPDPlayerBackend(player.PlayerBackend):
             except mpd.CommandError:
                 raise player.InsertError('Could not insert all files', inserted)
     
-    
     def removeFromPlaylist(self, begin, end):
         with self.getClient() as client:
             del self.mpdPlaylist[begin:end]
             client.delete((begin,end))
             self.playlistVersion += 1
     
-        
     def move(self, fromOffset, toOffset):
         if fromOffset == toOffset:
             return
@@ -574,11 +547,9 @@ class MPDPlayerBackend(player.PlayerBackend):
             client.move(fromOffset, toOffset)
             self.playlistVersion += 1
     
-    
     def configurationWidget(self, parent):
         """Return a config widget, initialized with the data of the given *profile*."""
         return MPDConfigWidget(self, parent)
-    
     
     def getInfo(self, path):
         """Query MPD to get tags & length of the file at *path* (relative to this MPD instance).
@@ -601,7 +572,6 @@ class MPDPlayerBackend(player.PlayerBackend):
                     values = [ values ]
                 storage[tag] = [ tag.convertValue(value, crop=True) for value in values ]
             return storage, length
-        
         
     def showOutputDialog(self):
         """Open a dialog to select the active audio outputs MPD uses."""
@@ -628,10 +598,8 @@ class MPDPlayerBackend(player.PlayerBackend):
                     with self.getClient() as client:
                         client.disableoutput(output["outputid"])
     
-    
     def __str__(self):
         return "MPDPlayerBackend({})".format(self.name)
-
 
 
 class MPDConfigWidget(QtGui.QWidget):
@@ -657,6 +625,9 @@ class MPDConfigWidget(QtGui.QWidget):
         self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
         formLayout.addRow(self.tr("Password visible?"), self.passwordVisibleBox)
         
+        self.pathEdit = lineedits.PathLineEdit(self.tr("Path to music folder"))
+        formLayout.addRow(self.tr("Path to music folder:"), self.pathEdit)
+        
         self.saveButton = QtGui.QPushButton(self.tr("Save"))
         self.saveButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
         self.saveButton.setEnabled(False)
@@ -669,6 +640,7 @@ class MPDConfigWidget(QtGui.QWidget):
         self.hostEdit.textChanged.connect(self._handleChange)
         self.portEdit.textChanged.connect(self._handleChange)
         self.passwordEdit.textChanged.connect(self._handleChange)
+        self.pathEdit.textChanged.connect(self._handleChange)
     
     def setProfile(self, profile):
         """Change the profile whose data is displayed."""
@@ -677,6 +649,7 @@ class MPDConfigWidget(QtGui.QWidget):
         self.portEdit.setText(str(profile.port))
         self.passwordEdit.setText(profile.password)
         self.passwordVisibleBox.setChecked(len(profile.password) == 0)
+        self.pathEdit.setText(profile.path)
     
     def _handleChange(self):
         """(De)activate save button when configuration is modified."""
@@ -690,14 +663,18 @@ class MPDConfigWidget(QtGui.QWidget):
         except ValueError:
             return True # Not an int
         password = self.passwordEdit.text()
-        return [host, port, password] != [self.profile.host, self.profile.port, self.profile.password]
+        path = self.pathEdit.text()
+        return [host, port, password, path] != \
+                [self.profile.host, self.profile.port, self.profile.password, self.profile.path]
         
     def save(self):
         """Really change the profile."""
         host = self.hostEdit.text()
         port = int(self.portEdit.text())
         password = self.passwordEdit.text()
+        path = self.pathEdit.text()
         self.profile.setConnectionParameters(host, port, password)
+        self.profile.setPath(path)
         player.profileCategory.save()
         self.saveButton.setEnabled(False)
     
