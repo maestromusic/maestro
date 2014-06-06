@@ -19,6 +19,7 @@
 from PyQt4 import QtCore, QtGui
 
 from ..core import domains, elements
+from .. import application
 
 class ContainerTypeBox(QtGui.QComboBox):
     """ComboBox to select a container type."""
@@ -57,11 +58,19 @@ class DomainBox(QtGui.QComboBox):
     def __init__(self, currentDomain=None):
         """Create the DomainBox with *currentDomain* selected."""
         super().__init__()
-        for domain in domains.domains:
+        self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
+        self._fillBox(currentDomain)
+        application.dispatcher.connect(self._handleDispatcher)
+            
+    def _fillBox(self, currentDomain):
+        """Fill the box with all existing domains."""
+        self.clear()
+        for domain in sorted(domains.domains, key=lambda d: d.name):
             self.addItem(domain.name, domain)
             if domain == currentDomain:
                 self.setCurrentIndex(self.count() - 1)
-        self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
+        if self.currentIndex() == -1:
+            self.setCurrentIndex(0)
                 
     def currentDomain(self):
         """Return the currently selected domain."""
@@ -69,3 +78,12 @@ class DomainBox(QtGui.QComboBox):
     
     def _handleCurrentIndexChanged(self, i):
         self.domainChanged.emit(self.itemData(i))
+        
+    def _handleDispatcher(self, event):
+        if isinstance(event, domains.DomainChangeEvent):
+            currentDomain = self.currentDomain()
+            self.currentIndexChanged.disconnect(self._handleCurrentIndexChanged)
+            self._fillBox(currentDomain)
+            self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
+            if self.currentDomain() != currentDomain:
+                self.domainChanged.emit(self.currentDomain())
