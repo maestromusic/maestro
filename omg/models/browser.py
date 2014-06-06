@@ -346,6 +346,8 @@ class TagLayer(Layer):
                     FROM {p}elements
                     WHERE domain=? AND id NOT IN (SELECT element_id FROM {p}contents)
                     """, domain.id).getSingleColumn())
+            if len(toplevel) == 0:
+                return []
         elif len(elids) > 0:
             toplevel = set(elids)
             toplevel.difference_update(db.query(
