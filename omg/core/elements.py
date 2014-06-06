@@ -304,10 +304,6 @@ class File(Element):
     
     def isContainer(self):
         return False
-    
-    def getExtension(self):
-        """Return the filename extension of this file."""
-        return self.url.extension()
         
     def __repr__(self):
         return "<File[{}] {}>".format(self.id, self.url)

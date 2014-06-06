@@ -75,6 +75,13 @@ class BackendURL:
     def scheme(self):
         return self.parsedUrl.scheme
     
+    @property
+    def extension(self):
+        ext = os.path.splitext(str(self))[1]
+        if len(ext) > 1:
+            return ext[1:].lower()
+        return None
+    
     def getBackendFile(self):
         """Create and return a BackendFile object matching this URL.
         
@@ -86,13 +93,6 @@ class BackendURL:
             if backendFile is not None:
                 return backendFile
         raise ValueError("No backend succeeded to load {}".format(self))
-    
-    def extension(self):
-        """Return the extension of this file as lower case string."""
-        ext = os.path.splitext(str(self))[1]
-        if len(ext) > 1:
-            return ext[1:].lower()
-        return None
     
     def renamed(self, newPath):
         """Return a new URL object with path *newPath*, while all other attributes are unchanged."""

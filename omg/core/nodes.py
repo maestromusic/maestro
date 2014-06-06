@@ -439,12 +439,11 @@ class Wrapper(Node):
                 return sum(lengths)
         return None
 
-
     def getExtension(self):
         """Return the extension of all files in this container. Return None if they have different extension
         or at least one of them does not have an extension."""
         if self.isFile():
-            return self.element.getExtension()
+            return self.element.url.extension
         else:
             extension = None
             for wrapper in self.contents:

@@ -244,9 +244,9 @@ class StandardDelegate(AbstractDelegate):
             return self.getFormattedTagValues(dataPiece.tag,wrapper)
         else:
             if dataPiece.data == "filetype":
-                ext = wrapper.element.getExtension()
+                ext = wrapper.getExtension()
                 # Do not display extensions in each file if they are the same for the whole container
-                if isinstance(wrapper.parent,Wrapper) and wrapper.parent.getExtension() == ext:
+                if isinstance(wrapper.parent, Wrapper) and wrapper.parent.getExtension() == ext:
                     return ''
                 else: return ext
             elif dataPiece.data == "length":

@@ -144,7 +144,7 @@ class DetailsView(dockwidget.DockWidget):
         text.append('<tr><td>'+self.tr("Type: ")+'</td><td>')
         if el.isContainer():
             text.append(elements.getTypeTitle(el.type))
-        else: text.append(Qt.escape(el.url.extension()))
+        else: text.append(Qt.escape(el.url.extension))
         text.append('</td></tr>')
         
         # Domain

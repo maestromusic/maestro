@@ -178,7 +178,7 @@ class GrammarRenamer(profiles.Profile):
     
     def computeNewPath(self):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
-        extension = self.currentElem.getExtension()
+        extension = self.currentElem.url.extension
         try:
             return  "".join(map(str, self.expression.parseString(self.formatString))) + "." + extension
         except pyparsing.ParseException as e:
