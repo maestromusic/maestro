@@ -21,7 +21,7 @@
 
 import os, shutil, re, tempfile
 from os.path import dirname, exists,join
-
+import subprocess
 from PyQt4 import QtCore, QtGui
 
 from omg import utils, database as db, logging
@@ -93,6 +93,7 @@ class Ripper(QtCore.QObject):
         self.ripProcess.setWorkingDirectory(self.tmpdir)
         self.ripProcess.setReadChannelMode(QtCore.QProcess.MergedChannels)
         self.ripProcess.readyRead.connect(self.parseParanoiaOutput)
+        self.ripProcess.finished.connect(self.handleRipFinish)
         trackArg = str(self.fromTrack) + '-' + (str(self.toTrack) if self.toTrack else '')
         self.ripProcess.start('cdparanoia', ['-B', '-e', '-d', self.device, trackArg])
         self.statusWidget = RipperStatusWidget()
@@ -148,6 +149,15 @@ class Ripper(QtCore.QObject):
                 proc.terminate()
                 proc.waitForFinished()
         shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def handleRipFinish(self, exitCode, exitStatus):
+        if exitCode == 0:
+            try:
+                subprocess.check_call(['eject', self.device])
+            except:
+                # 'eject' might not be installed or not working ... well,
+                # then we don't
+                pass
 
     def cancel(self):
         for proc in self.ripProcess, self.encodingProcess:
