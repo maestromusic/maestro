@@ -129,7 +129,8 @@ class MBTreeElement:
                 newChildren = [(pos, child) for (pos, child) in self.children.items() if not child.ignore]
                 assert len(newChildren) == 1
                 mediumPos, mediumChild = newChildren[0]
-                if not config.mediumContainer and isinstance(mediumChild, Medium):
+                if not config.mediumContainer and isinstance(mediumChild, Medium) \
+                                              and 'title' not in mediumChild.tags:
                     if len(releaseElem.contents) == 0:
                         firstPos = 1
                     else:
@@ -154,7 +155,8 @@ class MBTreeElement:
             contents = elements.ContentList()
             for pos, child in self.children.items():
                 if not child.ignore:
-                    if not config.mediumContainer and isinstance(child, Medium):
+                    if not config.mediumContainer and isinstance(child, Medium) \
+                                                  and 'title' not in child.tags:
                         for ppos, cchild in child.children.items():
                             elem = cchild.makeElements(level, config)
                             contents.insert(ppos, elem.id)
@@ -239,9 +241,10 @@ class Medium(MBTreeElement):
         """
         super().__init__(mbid=None)
         release.insertChild(pos, self)
-        if not title:
-            title = "Disc {}".format(pos)
-        self.tags.add("title", title)
+        #if not title:
+        #    title = "Disc {}".format(pos)
+        if title:
+            self.tags.add("title", title)
         self.discids = set(discids)
     
     def idTag(self):

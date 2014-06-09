@@ -63,10 +63,11 @@ def enable():
         else:
             tagMap[mbtag] = None
     
+
 def disable():
     global tagMap
     tagMap = {}
-    #albumguesser.profileCategory.removeType('musicbrainz')
+
 
 def aliasFromDB(entity, mbid):
     try:

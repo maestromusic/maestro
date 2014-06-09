@@ -23,6 +23,7 @@ from lxml import etree
 
 from omg import config, database as db
 from omg.core import elements, tags
+from omg.core.elements import TYPE_ALBUM
 from omg.utils import FlexiDate
 from omg.filebackends import BackendURL
 from omg import logging
@@ -278,6 +279,8 @@ def fillReleaseForDisc(MBrelease, discid):
                                                  .format(discid, tracknr, config.options.audiocd.rippath))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
+    if MBmedium.containerType == TYPE_ALBUM:
+        MBmedium.passTags(excludes=['title'])
     MBmedium.insertWorks()
     
     if len(MBrelease.children) == 1:
