@@ -40,7 +40,12 @@ def domainById(id):
     for domain in domains:
         if domain.id == id:
             return domain
-    else: return None
+
+
+def domainByName(name):
+    for domain in domains:
+        if domain.name == name:
+            return domain
 
 
 def init():

@@ -177,10 +177,10 @@ class InsertRippedFileCommand:
         self.text = translate("AudioCD Plugin", "Ripped Track {}".format(element.url.tracknr))
 
     def redo(self):
-        targetAbs = utils.files.absPath(self.element.url.targetPath)
-        if not exists(dirname(targetAbs)):
-            os.makedirs(dirname(targetAbs))
-        shutil.move(self.tmpPath, targetAbs)
+        target = self.element.url.targetPath
+        if not exists(dirname(target)):
+            os.makedirs(dirname(target))
+        shutil.move(self.tmpPath, target)
         tmpFile = RealFile(self.newUrl)
         tmpFile.readTags()
         length = tmpFile.length
@@ -200,7 +200,7 @@ class InsertRippedFileCommand:
     def undo(self):
         if not exists(dirname(self.tmpPath)):
             os.makedirs(dirname(self.tmpPath))
-        shutil.move(utils.files.absPath(self.element.url.path), self.tmpPath)
+        shutil.move(self.element.url.path, self.tmpPath)
         db.query("UPDATE {}files SET url=? WHERE element_id=?".format(db.prefix),
                  str(self.oldUrl), self.element.id)
         for level in levels.allLevels:

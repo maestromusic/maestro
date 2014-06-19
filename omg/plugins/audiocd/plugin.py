@@ -24,12 +24,13 @@ from PyQt4 import QtCore, QtGui
 from omg import application, database as db, filebackends
 from omg.gui import editor
 from omg import config
+from omg.core import domains
 
 translate = QtCore.QCoreApplication.translate
 
 def defaultConfig():
     return {"audiocd": {
-            "rippath":  (str, "ripped", "Default path in which ripped tracks are put."),
+            "rippath":  (str, "/tmp", "Default path in which ripped tracks are put."),
             "earlyrip": (bool, True, "Start ripping before the MusicBrainz dialog is opened."),
             'eject':    (bool, True, 'Eject CD after ripping is completed or aborted'),
         }}

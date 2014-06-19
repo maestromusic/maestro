@@ -50,7 +50,7 @@ class Task:
         """
         generator = self.process()
         if generator is not None:
-            for n in task.process():
+            for n in self.process():
                 pass
         
     def merge(self, other):
