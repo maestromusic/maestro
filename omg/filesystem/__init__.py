@@ -27,7 +27,7 @@ translate = QtCore.QCoreApplication.translate
 from .. import application, logging, config, utils, database as db, stack
 from ..filebackends import BackendURL
 from ..filebackends.filesystem import FileURL
-from ..core import levels, tags
+from ..core import levels, tags, domains
 
 logger = logging.getLogger(__name__)
 
@@ -76,16 +76,24 @@ def shutdown():
 
 
 class Folder:
-    def __init__(self, name, path):
+    def __init__(self, name, path, domainId):
         self.name = name
         self.path = path
+        self.domain = domains.domainById(domainId)
         
     def save(self):
-        return {'name': self.name, 'path': self.path}
+        return {'name': self.name, 'path': self.path, 'domainId': self.domain.id}
 
 def folderByName(name):
     for folder in folders:
         if folder.name == name:
+            return folder
+    else: return None
+    
+def folderByPath(path):
+    path = os.path.normpath(path)
+    for folder in folders:
+        if path.startswith(os.path.normpath(folder.path)):
             return folder
     else: return None
 
