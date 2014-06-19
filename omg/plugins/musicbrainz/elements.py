@@ -348,8 +348,12 @@ class Recording(MBTreeElement):
             elif reltype in simpleTags:
                 tag = simpleTags[reltype]
             elif reltype == "vocal":
-                voice = relation.findtext("attribute-list/attribute")
-                if voice is None:
+                attributes = relation.iterfind('attribute-list/attribute')
+                try:
+                    voice = next(attributes).text
+                    if voice == 'solo':
+                        voice = next(attributes).text
+                except StopIteration:
                     tag = "vocals"
                 else:
                     for vtype in "soprano", "mezzo-soprano", "tenor", "baritone", "bass":
@@ -360,7 +364,7 @@ class Recording(MBTreeElement):
                         if voice == "choir vocals":
                             tag = "performer:choir"
                         else:
-                            logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
+                            logger.warning("unknown voice: {} in {}".format(voice, self))
                             continue
             else:
                 logger.warning("unknown artist relation '{}' in recording '{}'"
@@ -412,9 +416,10 @@ class Work(MBTreeElement):
         ent.asTag.add("title")
         self.tags['title'] = ent
         for relation in work.iterfind('relation-list[@target-type="artist"]/relation'):
-            easyRelations = { "composer" : "composer",
-                              "lyricist" : "lyricist",
-                              "orchestrator" : "orchestrator"
+            easyRelations = { 'composer' : 'composer',
+                              'lyricist' : 'lyricist',
+                              'orchestrator' : 'orchestrator',
+                              'librettist' : 'librettist',
                             }
             reltype = relation.get("type")
             artist = AliasEntity.get(relation.find('artist'))
@@ -434,7 +439,7 @@ class Work(MBTreeElement):
                     self.parentWork.tags["title"] = [relation.findtext('work/title')]
                 else:
                     logger.warning('ignoring forward parts relation in {}'.format(self))
-            elif relation.get('type') == 'based on':
-                pass
+            elif relation.get('type') in ('based on', 'other version'):
+                pass # ignore these
             else:
                 logger.warning('unknown work-work relation "{}" in {}'.format(relation.get("type"), self.mbid))

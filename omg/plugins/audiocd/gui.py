@@ -124,6 +124,8 @@ class ImportAudioCDAction(treeactions.TreeAction):
             model = self.parent().model()
             model.insertElements(model.root, len(model.root.contents), [container])
             self.level().stack.endMacro()
+        except ConnectionError as e:
+            dialogs.warning(self.tr('Error communicating with MusicBrainz'), str(e))
 
 
 class ReleaseSelectionDialog(QtGui.QDialog):

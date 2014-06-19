@@ -36,6 +36,12 @@ wsURL = "http://musicbrainz.org/ws/2" # the base URL for MusicBrainz' web servic
 
 queryCallback = None
 
+
+class UnknownDiscException(Exception):
+    """Raised when a disc ID is not known in the musicbrainz database."""
+    pass
+
+
 def query(resource, mbid, includes=[]):
     """Queries MusicBrainz' web service for *resource* with *mbid* and the given list of includes.
     
@@ -51,8 +57,11 @@ def query(resource, mbid, includes=[]):
     if len(ans):
         data = ans.getSingle()
     else:
-        with urllib.request.urlopen(url) as response:
-            data = response.readall()
+        try:
+            with urllib.request.urlopen(url) as response:
+                data = response.readall()
+        except urllib.error.HTTPError as e:
+            raise ConnectionError(e.msg)
         db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)"
                  .format(db.prefix), url, data)
     root = etree.fromstring(data)
@@ -200,10 +209,7 @@ class AliasEntity:
     
     def url(self):
         return "http://www.musicbrainz.org/{}/{}".format(self.type, self.mbid)
-    
 
-class UnknownDiscException(Exception):
-    pass
 
 def findReleasesForDiscid(discid):
     """Finds releases containing specified disc using MusicBrainz.

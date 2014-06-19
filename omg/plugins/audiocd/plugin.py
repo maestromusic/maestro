@@ -31,6 +31,7 @@ def defaultConfig():
     return {"audiocd": {
             "rippath":  (str, "ripped", "Default path in which ripped tracks are put."),
             "earlyrip": (bool, True, "Start ripping before the MusicBrainz dialog is opened."),
+            'eject':    (bool, True, 'Eject CD after ripping is completed or aborted'),
         }}
 
 

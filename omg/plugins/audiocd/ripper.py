@@ -24,7 +24,7 @@ from os.path import dirname, exists,join
 import subprocess
 from PyQt4 import QtCore, QtGui
 
-from omg import utils, database as db, logging
+from omg import utils, database as db, logging, config
 from omg.core import levels
 from omg.gui import mainwindow
 from omg.filebackends.filesystem import RealFile, FileURL
@@ -151,7 +151,7 @@ class Ripper(QtCore.QObject):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def handleRipFinish(self, exitCode, exitStatus):
-        if exitCode == 0:
+        if exitCode == 0 and config.options.audiocd.eject:
             try:
                 subprocess.check_call(['eject', self.device])
             except:
@@ -167,7 +167,8 @@ class Ripper(QtCore.QObject):
 
 
 class InsertRippedFileCommand:
-
+    """Command to replace a file of backend type `AudioCDURL` by the ripped real file.
+    """
     def __init__(self, element, tmpPath):
         self.element = element
         self.tmpPath = tmpPath
