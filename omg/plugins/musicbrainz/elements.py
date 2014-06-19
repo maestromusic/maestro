@@ -30,10 +30,11 @@ logger = logging.getLogger("musicbrainz.elements")
 
 class ElementConfiguration:
 
-    def __init__(self, tagMap, searchRelease=True, mediumContainer=False):
+    def __init__(self, tagMap, searchRelease=True, mediumContainer=False, forceMediumContainer=False):
         self.tagMap = tagMap
         self.searchRelease = searchRelease
         self.mediumContainer = mediumContainer
+        self.forceMediumContainer = forceMediumContainer
 
 
 class MBNode(nodes.Node):
@@ -59,7 +60,7 @@ class MBNode(nodes.Node):
         return posText + "<no title>"
     
     def __str__(self):
-        return ("<{}>({})".format(self.element.__class__, self.element.tags.get("title")))
+        return "<{}>({})".format(self.element.__class__, self.element.tags.get("title"))
         
 
 class MBTreeElement:
@@ -116,6 +117,14 @@ class MBTreeElement:
         :param levels.Level level: Level in which to create the elements.
         :param ELementConfiguration config: Configuration influencing the creation.
         """
+        def skipMediumContainer(medium):
+            if not isinstance(medium, Medium):
+                return False
+            if config.forceMediumContainer:
+                return False
+            if not config.mediumContainer:
+                return True
+            return 'title' not in mediumChild.tags
         if config.searchRelease and isinstance(self, Release) and tags.isInDb('musicbrainz_albumid'):
             albumid = self.mbid
             from omg import search
@@ -129,8 +138,7 @@ class MBTreeElement:
                 newChildren = [(pos, child) for (pos, child) in self.children.items() if not child.ignore]
                 assert len(newChildren) == 1
                 mediumPos, mediumChild = newChildren[0]
-                if not config.mediumContainer and isinstance(mediumChild, Medium) \
-                                              and 'title' not in mediumChild.tags:
+                if skipMediumContainer(mediumChild):
                     if len(releaseElem.contents) == 0:
                         firstPos = 1
                     else:
@@ -155,8 +163,7 @@ class MBTreeElement:
             contents = elements.ContentList()
             for pos, child in self.children.items():
                 if not child.ignore:
-                    if not config.mediumContainer and isinstance(child, Medium) \
-                                                  and 'title' not in child.tags:
+                    if skipMediumContainer(child):
                         for ppos, cchild in child.children.items():
                             elem = cchild.makeElements(level, config)
                             contents.insert(ppos, elem.id)
@@ -202,8 +209,8 @@ class MBTreeElement:
             if tag in excludes:
                 continue
             for child in self.walk(False):
-                if tag not in child.tags:
-                    child.tags[tag] = vals
+                for val in vals:
+                    child.tags.add(tag, val)
     
     def __str__(self):
         return "{}({})".format(type(self).__name__, self.mbid if "title" not in self.tags else self.tags["title"][0])
@@ -418,11 +425,13 @@ class Work(MBTreeElement):
         
         for relation in work.iterfind('relation-list[@target-type="work"]/relation'):
             if relation.get("type") == "parts":
-                assert relation.findtext("direction") == "backward"
-                assert self.parentWork is None
-                parentWorkId = relation.find('work').get('id')
-                self.parentWork = Work(parentWorkId)
-                self.parentWork.tags["title"] = [relation.findtext('work/title')]
+                if relation.findtext("direction") == "backward":
+                    assert self.parentWork is None
+                    parentWorkId = relation.find('work').get('id')
+                    self.parentWork = Work(parentWorkId)
+                    self.parentWork.tags["title"] = [relation.findtext('work/title')]
+                else:
+                    logger.warning('ignoring forward parts relation in {}'.format(self))
             elif relation.get('type') == 'based on':
                 pass
             else:

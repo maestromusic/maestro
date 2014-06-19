@@ -64,10 +64,10 @@ class ImportAudioCDAction(treeactions.TreeAction):
             discid.get_default_device())
         if not ok:
             return None
-        with discid.read(device) as disc:
-            try:
+        try:
+            with discid.read(device) as disc:
                 disc.read()
-            except discid.disc.DiscError as e:
+        except discid.disc.DiscError as e:
                 dialogs.warning(translate("AudioCD Plugin", "CDROM drive is empty"), str(e))
                 return None
         return device, disc.id, len(disc.tracks)
@@ -127,15 +127,17 @@ class ImportAudioCDAction(treeactions.TreeAction):
 
 
 class ReleaseSelectionDialog(QtGui.QDialog):
+
     def __init__(self, releases, discid):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
         lay = QtGui.QVBoxLayout()
+        lay.addWidget(QtGui.QLabel(self.tr('Select release:')))
         for release in releases:
             text = ""
             if len(release.children) > 1:
-                text = "[Disc {} of {} in] ".format(release.mediumForDiscid(discid),
-                                                    len(release.children))
+                pos, medium = release.mediumForDiscid(discid)
+                text = "[Disc {}: '{}' of {} in] ".format(pos, medium, len(release.children))
             text += release.tags["title"][0] + "\nby {}".format(release.tags["artist"][0])
             if "date" in release.tags:
                 text += "\nreleased {}".format(release.tags["date"][0])
@@ -387,7 +389,9 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.searchReleaseBox.setChecked(True)
         configLayout.addWidget(self.searchReleaseBox)
         self.mediumContainerBox = QtGui.QCheckBox(self.tr('add containers for discs'))
+        self.forceBox = QtGui.QCheckBox(self.tr('...even without title'))
         configLayout.addWidget(self.mediumContainerBox)
+        configLayout.addWidget(self.forceBox)
 
         btbx = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btbx.accepted.connect(self.finalize)
@@ -413,6 +417,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         elemConfig = elements.ElementConfiguration(self.newTagWidget.tagMapping)
         elemConfig.searchRelease = self.searchReleaseBox.isChecked()
         elemConfig.mediumContainer = self.mediumContainerBox.isChecked()
+        elemConfig.forceMediumContainer = self.forceBox.isChecked()
         self.container = self.release.makeElements(self.level, elemConfig)
         self.omgModel.insertElements(self.omgModel.root, 0, [self.container])
         self.omgView.expandAll()
