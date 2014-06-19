@@ -23,6 +23,7 @@ from lxml import etree
 
 from omg import config, database as db
 from omg.core import elements, tags
+from omg.core.elements import TYPE_ALBUM
 from omg.utils import FlexiDate
 from omg.filebackends import BackendURL
 from omg import logging
@@ -34,6 +35,12 @@ logger = logging.getLogger("musicbrainz.xmlapi")
 wsURL = "http://musicbrainz.org/ws/2" # the base URL for MusicBrainz' web service
 
 queryCallback = None
+
+
+class UnknownDiscException(Exception):
+    """Raised when a disc ID is not known in the musicbrainz database."""
+    pass
+
 
 def query(resource, mbid, includes=[]):
     """Queries MusicBrainz' web service for *resource* with *mbid* and the given list of includes.
@@ -50,8 +57,11 @@ def query(resource, mbid, includes=[]):
     if len(ans):
         data = ans.getSingle()
     else:
-        with urllib.request.urlopen(url) as response:
-            data = response.readall()
+        try:
+            with urllib.request.urlopen(url) as response:
+                data = response.readall()
+        except urllib.error.HTTPError as e:
+            raise ConnectionError(e.msg)
         db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)"
                  .format(db.prefix), url, data)
     root = etree.fromstring(data)
@@ -199,10 +209,7 @@ class AliasEntity:
     
     def url(self):
         return "http://www.musicbrainz.org/{}/{}".format(self.type, self.mbid)
-    
 
-class UnknownDiscException(Exception):
-    pass
 
 def findReleasesForDiscid(discid):
     """Finds releases containing specified disc using MusicBrainz.
@@ -278,6 +285,8 @@ def fillReleaseForDisc(MBrelease, discid):
                                                  .format(discid, tracknr, config.options.audiocd.rippath))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
+    if MBmedium.containerType == TYPE_ALBUM:
+        MBmedium.passTags(excludes=['title'])
     MBmedium.insertWorks()
     
     if len(MBrelease.children) == 1:

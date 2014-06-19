@@ -227,7 +227,7 @@ class RealLevel(levels.Level):
             if db.idFromUrl(url) is not None:
                 raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
             id = levels.idFromUrl(url, create=True)
-            domain = url.source.domain if url.source is not None else None
+            domain = domains.domains [0] # TODO url.source.domain if url.source is not None else None geht nicht
             elem = elements.File(domain, level, id, url=url, length=fLength, tags=fTags)
             elem.specialTags = backendFile.specialTags           
             level.elements[id] = elem
