@@ -32,7 +32,7 @@ class AcoustIDIdentifier:
     
     First, the fingerprint of a file is generated using the "fpcalc" utility which must be
     installed. Afterwards, an API lookup is made to find out the AcoustID track ID. If the
-    AcoustID database contains an associated MusicBrainz ID, that one is preferred. The returend
+    AcoustID database contains an associated MusicBrainz ID, that one is preferred. The returned
     strings are prepended by "acoustid:" or "mbid:" to distinguish the two cases.
     
     In case the AcoustID lookup fails, an md5 hash of the first 15 seconds of raw audio is used

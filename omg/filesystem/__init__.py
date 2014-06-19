@@ -353,7 +353,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             self.tableFolders[dir.path] = False
     
     def loadDBFiles(self):
-        """Load the commited files from the files table.
+        """Load the committed files from the files table.
         
         Adds them to self.tracks and self.dbTracks, and to the Directory objects in memory.
         It might happen that the folders table does not contain the directory of some DB file (e.g.
