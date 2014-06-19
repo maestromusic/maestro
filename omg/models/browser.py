@@ -435,9 +435,9 @@ class TagLayer(Layer):
             SELECT el.id
             FROM {p}elements AS el LEFT JOIN {p}tags AS t
                                 ON el.id = t.element_id AND t.tag_id IN ({tagFilter})
-            WHERE {idFilter} AND t.value_id IS NULL
+            WHERE domain={domain} AND {idFilter} AND t.value_id IS NULL
             LIMIT 1
-            """, tagFilter=tagFilter, idFilter=idFilter)
+            """, tagFilter=tagFilter, idFilter=idFilter, domain=domain.id)
 
         if len(result) > 0:
             visibleNodes.append(VariousNode(self.tagList))
