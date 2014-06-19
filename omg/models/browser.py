@@ -417,9 +417,7 @@ class TagLayer(Layer):
                             # Merge
                             for superNode in superNodes:
                                 if superNode != node:
-                                    print("Merging", node, superNode)
                                     node.merge(superNode)
-                                    print("Removing", superNode)
                                     nodesToRemove.append(superNode)
             nodes = [n for n in nodes if (n.matching or not n.elids <= withinMatchingNodes)
                                         and n not in nodesToRemove]

@@ -460,10 +460,13 @@ class TagCriterion(Criterion):
         if self.value is None:
             joinClause = "{}tags AS t ON el.id = t.element_id AND t.tag_id IN ({})"\
                             .format(db.prefix, db.csIdList(self.tagList))
+            domainWhereClause = "domain={}".format(domain.id) if domain is not None else '1'
             if not self.negate:
-                query = "SELECT DISTINCT id FROM {table} AS el JOIN {join}"
-            else: query = "SELECT id FROM {table} AS el LEFT JOIN {join} WHERE t.element_id IS NULL"
-            self.result = set(db.query(query, table=fromTable, join=joinClause).getSingleColumn())
+                query = "SELECT DISTINCT id FROM {table} AS el JOIN {join} WHERE {domain}"
+            else: query = "SELECT id FROM {table} AS el LEFT JOIN {join}"\
+                                " WHERE {domain} AND t.element_id IS NULL"
+            self.result = set(db.query(query, table=fromTable, join=joinClause, domain=domainWhereClause)
+                                .getSingleColumn())
             return
         
         # Truncate help table
@@ -523,7 +526,6 @@ class TagCriterion(Criterion):
                     continue
                 whereClause = self.interval.toDateSql().queryPart()
                 args = []
-                
             db.query("""
                     INSERT INTO {help} (value_id, tag_id)
                         SELECT id, tag_id
