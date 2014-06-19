@@ -44,7 +44,7 @@ class Sql(AbstractSql):
             
     def query(self, queryString, *args, **kwargs):
         kwargs['p'] = prefix
-        queryString = queryString.format(prefix)
+        queryString = queryString.format(**kwargs)
         with transactionLock:
             while True:
                 try:
