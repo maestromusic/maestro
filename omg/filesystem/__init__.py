@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 synchronizer = None
 enabled = False
 
+folders = None
+
 NO_MUSIC = 0
 HAS_FILES = 1
 HAS_NEW_FILES = 2
@@ -44,9 +46,12 @@ def init():
     
     This will start a separate thread that repeatedly scans the music folder for changes.
     """
-    global enabled, synchronizer
+    global enabled, synchronizer, folders
     import _strptime
     from . import identification
+    # Create folders even if filesystem watching is disabled (for filesystembrowser etc.)
+    folders = [Folder(**data) for data in config.storage.filesystem.folders]
+    folders.sort(key=lambda f: f.name)
     if config.options.filesystem.disable:
         return
     synchronizer = FileSystemSynchronizer()
@@ -57,6 +62,7 @@ def init():
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
     global enabled, synchronizer
+    config.storage.filesystem.folders = [f.save() for f in folders]
     if config.options.filesystem.disable or synchronizer is None:
         return
     levels.real.filesystemDispatcher.disconnect(synchronizer.handleRealFileEvent)
@@ -68,6 +74,20 @@ def shutdown():
     enabled = False
     logger.debug("Filesystem module: shutdown complete")
 
+
+class Folder:
+    def __init__(self, name, path):
+        self.name = name
+        self.path = path
+        
+    def save(self):
+        return {'name': self.name, 'path': self.path}
+
+def folderByName(name):
+    for folder in folders:
+        if folder.name == name:
+            return folder
+    else: return None
 
 def folderState(path):
     """Return the state of a given folder, or 'unknown' if it can't be obtained. """

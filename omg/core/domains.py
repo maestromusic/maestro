@@ -26,7 +26,6 @@ from ..constants import ADDED, DELETED, CHANGED
 from ..application import ChangeEvent
 
 domains = []
-sources = []
     
 
 def isValidName(name):
@@ -42,15 +41,8 @@ def domainById(id):
         if domain.id == id:
             return domain
     else: return None
-    
-    
-def sourceById(id):
-    for source in sources:
-        if source.id == id:
-            return source
-    else: return None
 
-        
+
 def init():
     if db.prefix+'domains' not in db.listTables():
         logging.error(__name__, "domains-table is missing")
@@ -61,13 +53,6 @@ def init():
         domains.append(Domain(*row))
     if len(domains) == 0:
         logging.error(__name__, "No domain defined.")
-        raise RuntimeError()
-    
-    result = db.query("SELECT id, name, path, domain FROM {p}sources ORDER BY name")
-    for row in result:
-        sources.append(Source(*row[:3], domain=domainById(row[3])))
-    if len(sources) == 0:
-        logging.error(__name__, "No source defined.")
         raise RuntimeError()
     
     
@@ -164,23 +149,3 @@ class DomainChangedEvent(ChangeEvent):
         self.action = action
         self.domain = domain
     
-
-class Source:
-    def __init__(self, id, name, path, domain):
-        self.id = id
-        self.name = name
-        self.path = os.path.normpath(path)
-        self.domain = domain
-        
-    def __repr__(self):
-        return "<Source {}>".format(self.name)
-        
-        
-def getSource(path):
-    if not isinstance(path, str): # Should be a BackendURL
-        path = path.path
-    path = os.path.normpath(path)
-    for source in sources:
-        if path.startswith(source.path):
-            return source
-    else: return None

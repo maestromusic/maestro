@@ -142,9 +142,9 @@ class ChangeFileUrlsAction(TreeAction):
         from ..filebackends.filesystem import FileURL
         path = QtGui.QFileDialog.getSaveFileName(None,
                                                  self.tr("Select new file location"),
-                                                 element.url.absPath,
+                                                 element.url.path,
                                                  options=QtGui.QFileDialog.DontConfirmOverwrite)
-        if self._checkFilePath(path, shouldExist=False, oldPath=element.url.absPath):
+        if self._checkFilePath(path, shouldExist=False, oldPath=element.url.path):
             self.level().renameFiles( {element: (element.url, FileURL(path)) })
             
     def changeOtherUrl(self, element):
@@ -169,15 +169,13 @@ class ChangeFileUrlsAction(TreeAction):
         dir = self._getDirectory(elements)
         if dir is None:
             return
-        path = QtGui.QFileDialog.getExistingDirectory(None,
-                                                      self.tr("Select new files directory"),
-                                                      utils.files.absPath(dir))
-        if self._checkFilePath(path, shouldExist=True, oldPath=utils.files.absPath(dir)):
+        path = QtGui.QFileDialog.getExistingDirectory(None, self.tr("Select new files directory"), dir)
+        if self._checkFilePath(path, shouldExist=True, oldPath=dir):
             from ..filebackends.filesystem import FileURL
             changes = {element: (element.url, FileURL(os.path.join(path, os.path.basename(element.url.path))))
                        for element in elements}
             for oldUrl, newUrl in changes.values():
-                if os.path.exists(newUrl.absPath):
+                if os.path.exists(newUrl.path):
                     QtGui.QMessageBox.warning(None, self.tr("Path collision"),
                                 self.tr("Cannot move '{}' to '{}' because the latter path exists already."
                                         .format(str(oldUrl), str(newUrl))))

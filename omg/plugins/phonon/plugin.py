@@ -111,10 +111,11 @@ class PhononPlayerBackend(player.PlayerBackend):
     # We only have to change the state and random list if necessary.
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
+        print(urls)
         for i, url in enumerate(urls):
             if not isinstance(url, (FileURL, HTTPStreamURL)):
                 raise player.InsertError("URL type {} not supported".format(type(url)))
-            if isinstance(url, FileURL) and not os.path.exists(url.absPath):
+            if isinstance(url, FileURL) and not os.path.exists(url.path):
                 raise player.InsertError(self.tr("Cannot play '{}': File does not exist.")
                                          .format(url), urls[:i])
         if self.getRandom() != player.RANDOM_OFF:
@@ -330,7 +331,7 @@ class PhononPlayerBackend(player.PlayerBackend):
         """Return the absolute path of the file at the given offset."""
         url = self.playlist.root.fileAtOffset(offset).element.url
         if isinstance(url, FileURL):
-            return url.absPath
+            return url.path
         if isinstance(url, HTTPStreamURL):
             return url.toQUrl()
         raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))

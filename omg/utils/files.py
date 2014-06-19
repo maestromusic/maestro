@@ -28,23 +28,10 @@ def isMusicFile(path):
     ext = ext[1:].lower()
     return ext in config.options.main.music_extensions
 
-def relPath(path, source):
-    """Return a path relative to the given Source."""
-    if os.path.isabs(path):
-        return os.path.relpath(path, source.path)
-    else: return path
-
-
-def absPath(path, source):
-    """Return the absolute path for a path relative to the given Source."""
-    if not os.path.isabs(path):
-        return os.path.join(source.path, path)
-    else: return path
-
 
 def mTimeStamp(url):
     """Get the modification timestamp of a file given by *url* as UTC datetime."""
-    return datetime.datetime.fromtimestamp(os.path.getmtime(url.absPath),
+    return datetime.datetime.fromtimestamp(os.path.getmtime(url.path),
                                            tz=datetime.timezone.utc).replace(microsecond=0)
 
 
@@ -93,7 +80,7 @@ def collectAsList(urls):
     """
     from ..filebackends.filesystem import FileURL
     def checkUrl(url):
-        path = url.path()
+        path = url.path
         if os.path.isfile(path):
             return [FileURL(path)]
         else: return itertools.chain.from_iterable(collect([url]).values())

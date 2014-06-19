@@ -166,7 +166,7 @@ class DetailsView(dockwidget.DockWidget):
             value = utils.strings.formatLength(el.length)
             if el.url.scheme == 'file':
                 try:
-                    size = os.stat(el.url.absPath).st_size
+                    size = os.stat(el.url.path).st_size
                     value += ', '+utils.strings.formatSize(size)
                 except Exception:
                     logging.info(__name__, "Could not read file size of '{}'.".format(el.url))

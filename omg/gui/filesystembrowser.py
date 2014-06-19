@@ -63,19 +63,19 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     def __init__(self, parent=None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        self.source = None
+        self.folder = None
 
-    def setSource(self, source):
-        if source != self.source:
-            self.source = source
-            self.setRootPath(source.path)
+    def setFolder(self, folder):
+        if folder != self.folder:
+            self.folder = folder
+            self.setRootPath(folder.path)
             
     def columnCount(self, index):
         return 1
     
     @QtCore.pyqtSlot(object)
     def handleStateChange(self, url):
-        index = self.index(url.absPath)
+        index = self.index(url.path)
         self.dataChanged.emit(index, index)    
     
     def data(self, index, role=Qt.DisplayRole):
@@ -83,7 +83,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         if role == Qt.DecorationRole or role == Qt.ToolTipRole:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
-                dir = utils.files.relPath(info.absoluteFilePath(), self.source)
+                dir = info.absoluteFilePath()
                 if dir == '..':
                     return super().data(index, role)
                 status = filesystem.folderState(dir)
@@ -92,8 +92,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 else:
                     return dir + '\n' + self.descriptions[status]
             else:
-                path = utils.files.relPath(info.absoluteFilePath(), self.source)
-                url = filebackends.filesystem.FileURL(path, self.source)
+                url = filebackends.filesystem.FileURL(info.absoluteFilePath())
                 status = filesystem.fileState(url)
                 if role == Qt.DecorationRole:
                     return self.fileIcons[status]
@@ -124,14 +123,14 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
     
-    def getSource(self):
-        return self.model().source
+    def getFolder(self):
+        return self.model().folder
     
-    def setSource(self, source):
+    def setFolder(self, folder):
         model = self.model()
-        if source != model.source:
-            model.setSource(source)
-            self.setRootIndex(model.index(source.path))
+        if folder != model.folder:
+            model.setFolder(folder)
+            self.setRootIndex(model.index(folder.path))
             
     def _handleDispatcher(self, event):
         if isinstance(event, application.ModuleStateChangeEvent):
@@ -158,15 +157,14 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
             
     def _handleRescan(self):
         path = self.model().filePath(self.currentIndex())
-        self.rescanRequested.emit(utils.files.relPath(path, self.model().source))
+        self.rescanRequested.emit(path)
         
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
-        source = self.model().source
-        paths = [utils.files.relPath(self.model().filePath(index), source)
-                                     for index in self.selectedIndexes()
-                                     if not self.model().isDir(index)] # TODO: remove this restriction
-        s = FileSystemSelection([filebackends.filesystem.FileURL(path, source) for path in paths])
+        paths = [self.model().filePath(index)
+                 for index in self.selectedIndexes()
+                 if not self.model().isDir(index)] # TODO: remove this restriction
+        s = FileSystemSelection([filebackends.filesystem.FileURL(path) for path in paths])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
     
@@ -179,35 +177,36 @@ class FileSystemBrowser(dockwidget.DockWidget):
         layout = QtGui.QVBoxLayout(widget)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
-        source = None
-        if state is not None and 'source' in state:
-            source = domains.sourceById(state['source'])
-        if source is None:
-            source = domains.sources[0]
-        self.sourceChooser = QtGui.QComboBox()
-        for s in domains.sources:
-            self.sourceChooser.addItem(s.name, s)
-            if s == source:
-                self.sourceChooser.setCurrentIndex(self.sourceChooser.count()-1)
-        self.sourceChooser.currentIndexChanged.connect(self._handleSourceChanged)
-        layout.addWidget(self.sourceChooser)
+        folder = None
+        if state is not None and 'folder' in state:
+            folder = filesystem.folderByName(state['folder'])
+        if folder is None and len(filesystem.folders) > 0:
+            folder = filesystem.folders[0]
+        self.folderChooser = QtGui.QComboBox()
+        for f in filesystem.folders:
+            self.folderChooser.addItem(f.name, f)
+            if f == folder:
+                self.folderChooser.setCurrentIndex(self.folderChooser.count()-1)
+        self.folderChooser.currentIndexChanged.connect(self._handleFolderChanged)
+        layout.addWidget(self.folderChooser)
         
         self.treeView = FileSystemBrowserTreeView()
         layout.addWidget(self.treeView, 1)
         self.setWidget(widget)
-        self._handleSourceChanged(domains.sources.index(source)) # initialize
+        if folder is not None:
+            self._handleFolderChanged(filesystem.folders.index(folder)) # initialize
         
     def saveState(self):
-        return {'source': self.treeView.getSource().id}
+        return {'folder': self.treeView.getFolder().name}
         
     def createOptionDialog(self, parent):
         from . import preferences
         preferences.show("main/filesystem")
     
-    def _handleSourceChanged(self, index):
-        source = domains.sources[index]
-        self.setWindowTitle(self.tr("Filesystem: {}").format(source.name))
-        self.treeView.setSource(source)
+    def _handleFolderChanged(self, index):
+        folder = filesystem.folders[index]
+        self.setWindowTitle(self.tr("Filesystem: {}").format(folder.name))
+        self.treeView.setFolder(folder)
         
 
 class FileSystemSelection(selection.Selection):

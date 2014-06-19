@@ -480,9 +480,8 @@ class MPDPlayerBackend(player.PlayerBackend):
                 except KeyError:
                     logger.warning("Unsupported MPD URL type: {}".format(path))
             else:
-                source = domains.getSource(os.path.join(self.path, path)) if len(self.path) > 0 else None
-                if source is not None:
-                    urls.append(filesystembackend.FileURL(path, source=source))
+                if os.path.exists(os.path.join(self.path, path)):
+                    urls.append(filesystembackend.FileURL(os.path.join(self.path, path)))
                 else:
                     urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
         return urls
@@ -521,13 +520,18 @@ class MPDPlayerBackend(player.PlayerBackend):
             try:
                 isEnd = (pos == len(self.mpdPlaylist))
                 for position, url in enumerate(urls, start=pos):
+                    print(url.path, self.path)
+                    if url.path.startswith(self.path):
+                        path = os.path.relpath(url.path, self.path)
+                    else: path = url.path
+                    print(path)
                     if isEnd:
-                        client.add(url.path)
+                        client.add(path)
                         self.playlistVersion += 1
                     else:
                         client.addid(url.path, position)
                         self.playlistVersion += 2
-                    self.mpdPlaylist[position:position] = [url.path]
+                    self.mpdPlaylist[position:position] = [path]
                     inserted.append(url)
             except mpd.CommandError:
                 raise player.InsertError('Could not insert all files', inserted)

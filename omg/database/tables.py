@@ -424,30 +424,6 @@ CREATE TABLE {p}domains (
 )
 """)
 
-#---------#
-# sources #
-#---------#
-_addMySQL("""
-CREATE TABLE {p}sources (
-    id      SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    name  VARCHAR(64),   
-    path    VARCHAR(512) NOT NULL,
-    domain  SMALLINT UNSIGNED NOT NULL,
-    PRIMARY KEY(id),
-    UNIQUE INDEX(name),
-    FOREIGN KEY(domain) REFERENCES {p}domains(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}sources (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    name  VARCHAR(64) NOT NULL UNIQUE,
-    path    VARCHAR(512) NOT NULL,
-    domain  INTEGER NOT NULL,
-    FOREIGN KEY(domain) REFERENCES {p}domains(id) ON DELETE CASCADE
-)
-""")
-
 
 tables = [SQLTable(queries) for queries in tables]
 

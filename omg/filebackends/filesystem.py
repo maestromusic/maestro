@@ -32,7 +32,7 @@ from ..core import tags, domains
 def init():
     # register the file:// URL scheme
     urlTypes["file"] = FileURL
-
+    
 
 class RealFile(BackendFile):
     """A normal file that is accessed directly on the filesystem."""
@@ -40,7 +40,7 @@ class RealFile(BackendFile):
     @staticmethod
     def tryLoad(url):
         """Returns a RealFile instance if the url scheme fits and the file exists."""
-        if url.scheme == 'file' and os.path.exists(url.absPath):
+        if url.scheme == 'file' and os.path.exists(url.path):
             return RealFile(url)
         return None
     
@@ -58,7 +58,7 @@ class RealFile(BackendFile):
         self.tags = tags.Storage()
         if not utils.files.isMusicFile(self.url.path):
             return 
-        self._taglibFile = taglib.File(self.url.absPath, applyID3v2Hack=True) 
+        self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True) 
         self.specialTags = OrderedDict()
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
@@ -88,23 +88,23 @@ class RealFile(BackendFile):
     def readOnly(self):
         if hasattr(self, '_taglibFile'):
             return self._taglibFile.readOnly
-        fileAtt = os.stat(self.url.absPath)
+        fileAtt = os.stat(self.url.path)
         import stat
         return not (fileAtt[stat.ST_MODE] & stat.S_IWUSR)
     
     def rename(self, newUrl):
         # TODO: handle open taglib file references
-        if os.path.exists(newUrl.absPath):
+        if os.path.exists(newUrl.path):
             raise OSError("Target exists.")
-        os.renames(self.url.absPath, newUrl.absPath)
+        os.renames(self.url.path, newUrl.path)
         from ..core import levels
         levels.real.emitFilesystemEvent(renamed=((self.url, newUrl),))
         self.url = newUrl
     
     def delete(self):
         """Deletes this file from disk. Also removes empty directories."""
-        os.remove(self.url.absPath)
-        directory = os.path.dirname(self.url.absPath)
+        os.remove(self.url.path)
+        directory = os.path.dirname(self.url.path)
         if len(os.listdir(directory)) == 0:
             os.removedirs(directory)
         from ..core import levels
@@ -144,43 +144,20 @@ class FileURL(BackendURL):
     CAN_DELETE = True
     IMPLEMENTATIONS = [ RealFile ]
     
-    def __init__(self, urlString, source=None):
-        if urlString.startswith('file://'):
-            super().__init__(urlString)
-            path = urlString[len('file://'):]
-            try:
-                sourceId = int(path[:path.index('/')])
-            except ValueError:
-                raise ValueError("URL '{}' does not specify a source.".format(urlString))
-            self.source = domains.sourceById(sourceId)
-        elif source is not None:
-            urlString = "file://{}/{}".format(source.id, urlString)
-            super().__init__(urlString)
-            self.source = source
-        else:
+    def __init__(self, urlString):
+        if not urlString.startswith('file://'):
             assert os.path.isabs(urlString)
-            self.source = domains.getSource(urlString)
-            if self.source is not None:
-                urlString = "file://{}/{}".format(self.source.id,
-                                                  utils.files.relPath(urlString, self.source))
-                super().__init__(urlString)
-            else:
-                raise ValueError("Path does not lie in any source folder: {}".format(urlString))
+            urlString = 'file://'+urlString
+        super().__init__(urlString)
     
     @property
     def path(self):
-        return self.parsedUrl.path[1:]
-    
-    @property
-    def absPath(self):
-        if self.source is not None:
-            return utils.files.absPath(self.path, self.source)
-        else: return self.path 
+        return self.parsedUrl.path
     
     def renamed(self, newPath):
         """Return a new FileURL with the given *newPath* as path."""
-        return FileURL(newPath, self.source)
+        return FileURL(newPath)
     
     def toQUrl(self):
         """Return a QUrl from this URL. Return None if that is not possible (e.g. weird scheme)."""
-        return QtCore.QUrl('file://'+self.absPath)
+        return QtCore.QUrl(str(self.parsedUrl))
