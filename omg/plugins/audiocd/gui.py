@@ -26,38 +26,19 @@ from omg.gui import dialogs, delegates, mainwindow, treeactions, treeview
 from omg.gui.delegates.abstractdelegate import *
 from omg.models import leveltreemodel, rootedtreemodel
 from omg.plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
-from omg.plugins.musicbrainz.delegate import MusicBrainzDelegate
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
 
 
-def askForDiscId():
-    import discid
-    device, ok = QtGui.QInputDialog.getText(
-                        mainwindow.mainWindow,
-                        translate("AudioCD Plugin", "Select device"),
-                        translate("AudioCD Plugin", "CDROM device:"),
-                        QtGui.QLineEdit.Normal,
-                        discid.get_default_device())
-    if not ok:
-        return None
-    with discid.read(device) as disc:
-        try:
-            disc.read(device)
-        except discid.disc.DiscError as e:
-            dialogs.warning(translate("AudioCD Plugin", "CDROM drive is empty"), str(e))
-            return None
-    return device, disc.id, len(disc.tracks)
-
-
 class ImportAudioCDAction(treeactions.TreeAction):
-    
     def __init__(self, parent):
         super().__init__(parent)
         self.setText(self.tr('load audio CD'))
+        self.ripper = None
 
-    def _getRelease(self, theDiscid):
+    @staticmethod
+    def _getRelease(theDiscid):
         releases = xmlapi.findReleasesForDiscid(theDiscid)
         if len(releases) > 1:
             dialog = ReleaseSelectionDialog(releases, theDiscid)
@@ -67,34 +48,60 @@ class ImportAudioCDAction(treeactions.TreeAction):
                 return None
         else:
             return releases[0]
-    
+
+    @staticmethod
+    def askForDiscId():
+        """Asks the user for a CD-ROM device to use.
+        :returns: Three-tuple of the *device*, *disc id*, and number of tracks.
+        """
+        import discid
+
+        device, ok = QtGui.QInputDialog.getText(
+            mainwindow.mainWindow,
+            translate('AudioCD Plugin', 'Select device'),
+            translate('AudioCD Plugin', 'CDROM device:'),
+            QtGui.QLineEdit.Normal,
+            discid.get_default_device())
+        if not ok:
+            return None
+        try:
+            with discid.read(device) as disc:
+                disc.read()
+        except discid.disc.DiscError as e:
+                dialogs.warning(translate("AudioCD Plugin", "CDROM drive is empty"), str(e))
+                return None
+        return device, disc.id, len(disc.tracks)
+
     def doAction(self):
-        ans = askForDiscId()
+        # device, theDiscid, trackCount = '/dev/sr0', 'qx_MV1nqkljh.L37bA_rgVoyAgU-', 3
+        ans = self.askForDiscId()
         if ans is None:
             return
         device, theDiscid, trackCount = ans
         from . import ripper
+
         self.ripper = ripper.Ripper(device, theDiscid)
-        if config.options.audiocd.earlyrip: 
+        if config.options.audiocd.earlyrip:
             self.ripper.start()
         try:
             release = self._getRelease(theDiscid)
             if release is None:
                 return
             progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
-            progress.open()        
+            progress.open()
             stack = self.level().stack.createSubstack(modalDialog=True)
             level = levels.Level("audiocd", self.level(), stack=stack)
+
             def callback(url):
                 progress.setText(self.tr("Fetching data from:\n{}").format(url))
                 QtGui.qApp.processEvents()
-            xmlapi.queryCallback = callback 
+
+            xmlapi.queryCallback = callback
             xmlapi.fillReleaseForDisc(release, theDiscid)
             progress.close()
             xmlapi.queryCallback = None
             QtGui.qApp.processEvents()
             dialog = ImportAudioCDDialog(level, release)
-            logger.debug("yeah")
             if dialog.exec_():
                 model = self.parent().model()
                 model.insertElements(model.root, len(model.root.contents), [dialog.container])
@@ -103,39 +110,43 @@ class ImportAudioCDAction(treeactions.TreeAction):
             stack.close()
         except xmlapi.UnknownDiscException:
             ans = dialogs.question(self.tr("Disc not found"),
-                    self.tr("The disc was not found in the MusicBrainz database. "
-                            "You need to tag the album yourself. Proceed?"))
+                                   self.tr("The disc was not found in the MusicBrainz database. "
+                                           "You need to tag the album yourself. Proceed?"))
             if not ans:
                 return False
             from .plugin import simpleDiscContainer
-            if not config.options.audiocd.earlyrip:
+
+            if not config.options.audiocd.earlyrip and False:  #TODO: only for debugging
                 self.ripper.start()
-            
+
             self.level().stack.beginMacro(self.tr("Load Audio CD"))
             container = simpleDiscContainer(theDiscid, trackCount, self.level())
             model = self.parent().model()
             model.insertElements(model.root, len(model.root.contents), [container])
             self.level().stack.endMacro()
+        except ConnectionError as e:
+            dialogs.warning(self.tr('Error communicating with MusicBrainz'), str(e))
 
 
 class ReleaseSelectionDialog(QtGui.QDialog):
-    
+
     def __init__(self, releases, discid):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
         lay = QtGui.QVBoxLayout()
+        lay.addWidget(QtGui.QLabel(self.tr('Select release:')))
         for release in releases:
             text = ""
             if len(release.children) > 1:
-                text = "[Disc {} of {} in] ".format(release.mediumForDiscid(discid),
-                                                   len(release.children))
+                pos, medium = release.mediumForDiscid(discid)
+                text = "[Disc {}: '{}' of {} in] ".format(pos, medium, len(release.children))
             text += release.tags["title"][0] + "\nby {}".format(release.tags["artist"][0])
             if "date" in release.tags:
                 text += "\nreleased {}".format(release.tags["date"][0])
                 if "country" in release.tags:
                     text += " ({})".format(release.tags["country"][0])
                 if "barcode" in release.tags:
-                    text +=", barcode={}".format(release.tags["barcode"][0])
+                    text += ", barcode={}".format(release.tags["barcode"][0])
             but = QtGui.QPushButton(text)
             but.release = release
             but.setStyleSheet("text-align: left")
@@ -145,21 +156,20 @@ class ReleaseSelectionDialog(QtGui.QDialog):
         btbx.rejected.connect(self.reject)
         lay.addWidget(btbx)
         self.setLayout(lay)
-    
+
     def _handleClick(self):
         self.selectedRelease = self.sender().release
         self.accept()
 
 
 class CDROMDelegate(delegates.StandardDelegate):
-
     def __init__(self, view):
         self.profile = delegates.profiles.DelegateProfile("cdrom")
         self.profile.options['appendRemainingTags'] = True
         self.profile.options['showPaths'] = True
         self.profile.options['showType'] = True
         super().__init__(view, self.profile)
-        
+
     def getUrlWarningItem(self, wrapper):
         element = wrapper.element
         if element.isFile() and element.url.scheme == "audiocd":
@@ -169,11 +179,10 @@ class CDROMDelegate(delegates.StandardDelegate):
 
 
 class AliasComboDelegate(QtGui.QStyledItemDelegate):
-    
     def __init__(self, box, parent=None):
         super().__init__(parent)
         self.box = box
-        
+
     def paint(self, painter, option, index):
         alias = self.box.entity.aliases[index.row()]
         if alias.primary:
@@ -183,9 +192,8 @@ class AliasComboDelegate(QtGui.QStyledItemDelegate):
 
 
 class AliasComboBox(QtGui.QComboBox):
-    
     aliasChanged = QtCore.pyqtSignal(object)
-    
+
     def __init__(self, entity, sortNameItem):
         super().__init__()
         self.addItem(entity.aliases[0].name)
@@ -196,20 +204,20 @@ class AliasComboBox(QtGui.QComboBox):
         self.setItemDelegate(AliasComboDelegate(self))
         self.activated.connect(self._handleActivate)
         self.editTextChanged.connect(self._handleEditTextChanged)
-    
+
     def showPopup(self):
         if not self.entity.loaded:
             self.entity.loadAliases()
             for alias in self.entity.aliases[1:]:
                 self.addItem(alias.name)
                 if alias.locale:
-                    self.setItemData(self.count()-1,
+                    self.setItemData(self.count() - 1,
                                      ("primary " if alias.primary else "") + \
                                      "alias for locale {}".format(alias.locale),
                                      Qt.ToolTipRole)
             QtGui.qApp.processEvents()
         return super().showPopup()
-    
+
     def _handleActivate(self, index):
         alias = self.entity.aliases[index]
         sortname = alias.sortName
@@ -217,17 +225,18 @@ class AliasComboBox(QtGui.QComboBox):
         if self.currentText() != self.entity.name:
             self.entity.selectAlias(index)
             self.aliasChanged.emit(self.entity)
-    
+
     def _handleEditTextChanged(self, text):
         self.entity.name = text
         self.aliasChanged.emit(self.entity)
-        
 
-        
+
 class AliasWidget(QtGui.QTableWidget):
-    
+    """
+    TODO: use sort names!
+    """
     aliasChanged = QtCore.pyqtSignal(object)
-    
+
     def __init__(self, entities):
         super().__init__()
         self.entities = sorted(entities, key=lambda ent: "".join(sorted(ent.asTag)))
@@ -246,19 +255,19 @@ class AliasWidget(QtGui.QTableWidget):
             label = QtGui.QTableWidgetItem(", ".join(ent.asTag))
             label.setFlags(Qt.ItemIsEnabled)
             self.setItem(row, 0, label)
-            
+
             label = QtGui.QLabel('<a href="{}">{}</a>'.format(ent.url(), self.tr("lookup")))
             label.setToolTip(ent.url())
             label.setOpenExternalLinks(True)
             self.setCellWidget(row, 1, label)
-            
+
             sortNameItem = QtGui.QTableWidgetItem(ent.sortName)
             combo = AliasComboBox(ent, sortNameItem)
             combo.aliasChanged.connect(self.aliasChanged)
             self.setCellWidget(row, 2, combo)
-            
+
             self.setItem(row, 3, sortNameItem)
-    
+
     def activeEntities(self):
         entities = []
         for row, ent in enumerate(self.entities):
@@ -287,12 +296,11 @@ class AliasWidget(QtGui.QTableWidget):
 
 
 class TagMapWidget(QtGui.QTableWidget):
-    
     tagConfigChanged = QtCore.pyqtSignal(dict)
-    
+
     def __init__(self, newtags):
         super().__init__()
-        self.columns = [ self.tr("Import"), self.tr("MusicBrainz Name"), self.tr("OMG Tag") ]
+        self.columns = [self.tr("Import"), self.tr("MusicBrainz Name"), self.tr("OMG Tag")]
         self.setColumnCount(len(self.columns))
         self.verticalHeader().hide()
         self.setHorizontalHeaderLabels(self.columns)
@@ -300,26 +308,28 @@ class TagMapWidget(QtGui.QTableWidget):
         self.setRowCount(len(newtags))
         self.tagMapping = mbplugin.tagMap.copy()
         from omg.gui.tagwidgets import TagTypeBox
+
         for row, tagname in enumerate(newtags):
+
             tag = tags.get(tagname)
-            self.tagMapping[tagname] = tag
             checkbox = QtGui.QTableWidgetItem()
-            if tagname in self.tagMapping and self.tagMapping[tagname] is None:
-                checkbox.setCheckState(Qt.Unchecked)
-            else:
-                checkbox.setCheckState(Qt.Checked)
-            self.setItem(row, 0, checkbox)
-            
-            mbname = QtGui.QTableWidgetItem(tagname)
-            mbname.setFlags(Qt.ItemIsEnabled)
-            self.setItem(row, 1, mbname)
-            
             ttBox = TagTypeBox(tag, editable=True)
             ttBox.tagChanged.connect(self._handleTagTypeChanged)
+            mbname = QtGui.QTableWidgetItem(tagname)
             self.setCellWidget(row, 2, ttBox)
-            
+            if tagname in self.tagMapping and self.tagMapping[tagname] is None:
+                checkbox.setCheckState(Qt.Unchecked)
+                ttBox.setEnabled(False)
+                mbname.setFlags(mbname.flags() ^ Qt.ItemIsEnabled)
+            else:
+                checkbox.setCheckState(Qt.Checked)
+                self.tagMapping[tagname] = tag
+                mbname.setFlags(Qt.ItemIsEnabled)
+            self.setItem(row, 0, checkbox)
+            self.setItem(row, 1, mbname)
+
         self.cellChanged.connect(self._handleCellChange)
-    
+
     def _handleCellChange(self, row, col):
         if col != 0:
             return
@@ -332,8 +342,8 @@ class TagMapWidget(QtGui.QTableWidget):
             item.setFlags(item.flags() ^ Qt.ItemIsEnabled)
             self.tagMapping[item.text()] = None
         self.cellWidget(row, 2).setEnabled(state)
-        self.tagConfigChanged.emit(self.tagMapping)           
-            
+        self.tagConfigChanged.emit(self.tagMapping)
+
     def _handleTagTypeChanged(self, tag):
         for row in range(self.rowCount()):
             if self.cellWidget(row, 2) is self.sender():
@@ -348,67 +358,72 @@ class ImportAudioCDDialog(QtGui.QDialog):
     Shows the container structure obtained from musicbrainz and allows to configure alias handling
     and some other options.
     """
+
     def __init__(self, level, release):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
         self.level = level
-        
+
         self.mbNode = elements.MBNode(release)
         self.release = release
-        
-        self.mbModel = rootedtreemodel.RootedTreeModel()
-        self.mbModel.root.setContents([self.mbNode])
-        self.mbView = treeview.TreeView(level=None, affectGlobalSelection=False)
-        self.mbView.setModel(self.mbModel)
-        self.mbView.setItemDelegate(MusicBrainzDelegate(self.mbView))
-        
         self.omgModel = leveltreemodel.LevelTreeModel(level)
         self.omgView = treeview.TreeView(level, affectGlobalSelection=False)
         self.omgView.setModel(self.omgModel)
-        self.omgView.expandAll()
         self.omgView.setItemDelegate(CDROMDelegate(self.omgView))
-        
+
         # collect alias entities in this release
         entities = set()
         for item in release.walk():
             if not item.ignore:
                 entities.update(val for val in itertools.chain.from_iterable(item.tags.values())
-                                    if isinstance(val, xmlapi.AliasEntity))
+                                if isinstance(val, xmlapi.AliasEntity))
         self.aliasWidget = AliasWidget(entities)
-        self.aliasWidget.aliasChanged.connect(self.mbModel.layoutChanged)
-        
         self.newTagWidget = TagMapWidget(release.collectExternalTags())
         self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
-        
+
+        configLayout = QtGui.QVBoxLayout()
         makeElementsButton = QtGui.QPushButton(
-            QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_ArrowRight), "")
+            QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_ArrowRight),
+            self.tr('Re-generate elements'))
         makeElementsButton.clicked.connect(self.makeElements)
+        configLayout.addWidget(makeElementsButton)
+        self.searchReleaseBox = QtGui.QCheckBox(self.tr('search for existing release'))
+        self.searchReleaseBox.setChecked(True)
+        configLayout.addWidget(self.searchReleaseBox)
+        self.mediumContainerBox = QtGui.QCheckBox(self.tr('add containers for discs'))
+        self.forceBox = QtGui.QCheckBox(self.tr('...even without title'))
+        configLayout.addWidget(self.mediumContainerBox)
+        configLayout.addWidget(self.forceBox)
 
         btbx = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btbx.accepted.connect(self.finalize)
         btbx.rejected.connect(self.reject)
-        
+
         lay = QtGui.QVBoxLayout()
-        viewLayout = QtGui.QHBoxLayout()
-        viewLayout.addWidget(self.mbView)
-        viewLayout.addWidget(makeElementsButton)
-        viewLayout.addWidget(self.omgView)
-        lay.addLayout(viewLayout, stretch=1)
+        topLayout = QtGui.QHBoxLayout()
+        topLayout.addLayout(configLayout)
+        topLayout.addWidget(self.omgView)
+        lay.addLayout(topLayout, stretch=5)
         lay.addWidget(QtGui.QLabel(self.tr("Alias handling:")))
-        lay.addWidget(self.aliasWidget, stretch=0)
+        lay.addWidget(self.aliasWidget, stretch=2)
         lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
-        lay.addWidget(self.newTagWidget, stretch=0)
-        lay.addWidget(btbx, stretch=0)
+        lay.addWidget(self.newTagWidget, stretch=1)
+        lay.addWidget(btbx, stretch=1)
         self.setLayout(lay)
-        
-        self.resize(mainwindow.mainWindow.size()*0.8)
-    
+        self.makeElements()
+        self.resize(mainwindow.mainWindow.size() * 0.9)
+
     def makeElements(self):
         self.omgModel.clear()
         self.level.removeElements(list(self.level.elements.values()))
-        self.container = self.release.makeElements(self.level, self.newTagWidget.tagMapping)
+        elemConfig = elements.ElementConfiguration(self.newTagWidget.tagMapping)
+        elemConfig.searchRelease = self.searchReleaseBox.isChecked()
+        elemConfig.mediumContainer = self.mediumContainerBox.isChecked()
+        elemConfig.forceMediumContainer = self.forceBox.isChecked()
+        self.container = self.release.makeElements(self.level, elemConfig)
         self.omgModel.insertElements(self.omgModel.root, 0, [self.container])
-    
+        self.omgView.expandAll()
+
     def finalize(self):
         mbplugin.updateDBAliases(self.aliasWidget.activeEntities())
         for mbname, omgtag in self.newTagWidget.tagMapping.items():

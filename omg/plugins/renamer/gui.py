@@ -73,6 +73,9 @@ class PathDelegate(delegates.StandardDelegate):
         
     def addPath(self, element):
         if element.isFile():
+            if not element.inParentLevel():
+                logger.warning('?')
+                return
             oldPath = element.inParentLevel().url.path
             newPath = element.url.path
             if oldPath != newPath:

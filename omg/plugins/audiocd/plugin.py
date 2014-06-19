@@ -16,7 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
+try:
+    import discid
+except ImportError:
+    raise ImportError('discid module not installed')
 from PyQt4 import QtCore, QtGui
 from omg import application, database as db, filebackends
 from omg.gui import editor
@@ -28,6 +31,7 @@ def defaultConfig():
     return {"audiocd": {
             "rippath":  (str, "ripped", "Default path in which ripped tracks are put."),
             "earlyrip": (bool, True, "Start ripping before the MusicBrainz dialog is opened."),
+            'eject':    (bool, True, 'Eject CD after ripping is completed or aborted'),
         }}
 
 
@@ -81,11 +85,12 @@ def showRipMissingDialog():
         assert url.tracknr not in discids[url.discid][1]
         discids[url.discid][1].add(url.tracknr)
     from . import gui
-    dev, discid, ntracks = gui.askForDiscId()
+    dev, discid, ntracks = gui.ImportAudioCDAction.askForDiscId()
     if discid in discids:
         id, tracks = discids[discid]
+        assert set(range(min(tracks), max(tracks)+1)) == tracks
         from . import ripper
-        rppr = ripper.Ripper(dev, discid, tracks)
+        rppr = ripper.Ripper(dev, discid, fromTrack=min(tracks), toTrack=max(tracks))
         rppr.start()
         warning(translate("AudioCD Plugin", "unripped tracks found"),
                 translate("AudioCD Plugin", "The disc in the selected drive contains {} tracks "

@@ -17,13 +17,25 @@
 #
 
 from functools import reduce
+from collections import namedtuple
 
 from omg.core import elements, nodes, tags
 from omg import logging
+from omg.core.nodes import Wrapper
 
 from .xmlapi import AliasEntity, MBTagStorage, query
 
 logger = logging.getLogger("musicbrainz.elements")
+
+
+class ElementConfiguration:
+
+    def __init__(self, tagMap, searchRelease=True, mediumContainer=False, forceMediumContainer=False):
+        self.tagMap = tagMap
+        self.searchRelease = searchRelease
+        self.mediumContainer = mediumContainer
+        self.forceMediumContainer = forceMediumContainer
+
 
 class MBNode(nodes.Node):
     
@@ -48,7 +60,7 @@ class MBNode(nodes.Node):
         return posText + "<no title>"
     
     def __str__(self):
-        return ("<{}>({})".format(self.element.__class__, self.element.tags.get("title")))
+        return "<{}>({})".format(self.element.__class__, self.element.tags.get("title"))
         
 
 class MBTreeElement:
@@ -99,9 +111,49 @@ class MBTreeElement:
                 yield subchild
             #yield from child.walk() py3.3 version
     
-    def makeElements(self, level, tagMap):
-        """Creates a tree of OMG elements in *level* matching this MusicBrainz item."""
-        elTags = self.tags.asOMGTags(tagMap)
+    def makeElements(self, level, config):
+        """Creates a tree of OMG elements resembling the calling :class:`MBTreeElement`.
+
+        :param levels.Level level: Level in which to create the elements.
+        :param ELementConfiguration config: Configuration influencing the creation.
+        """
+        def skipMediumContainer(medium):
+            if not isinstance(medium, Medium):
+                return False
+            if config.forceMediumContainer:
+                return False
+            if not config.mediumContainer:
+                return True
+            return 'title' not in mediumChild.tags
+        if config.searchRelease and isinstance(self, Release) and tags.isInDb('musicbrainz_albumid'):
+            albumid = self.mbid
+            from omg import search
+            from omg.search.criteria import TagCriterion
+            tag = tags.get('musicbrainz_albumid')
+            ans = search.search(TagCriterion(value=albumid, tagList=[tag]))
+            if len(ans) == 1:
+                relId = list(ans)[0]
+                releaseElem = level.collect(relId)
+                Wrapper(releaseElem).loadContents(recursive=True)
+                newChildren = [(pos, child) for (pos, child) in self.children.items() if not child.ignore]
+                assert len(newChildren) == 1
+                mediumPos, mediumChild = newChildren[0]
+                if skipMediumContainer(mediumChild):
+                    if len(releaseElem.contents) == 0:
+                        firstPos = 1
+                    else:
+                        firstPos = releaseElem.contents.positions[-1] + 1
+                    for i, child in enumerate(mediumChild.children.values()):
+                        level.insertContents(releaseElem,
+                                             [(firstPos + i, child.makeElements(level, config))])
+                else:
+                    if mediumPos in releaseElem.contents.positions:
+                        pos = releaseElem.contents.positions[-1] + 1
+                    else:
+                        pos = mediumPos
+                    level.insertContents(releaseElem, [(pos, mediumChild.makeElements(level, config))])
+                return releaseElem
+        elTags = self.tags.asOMGTags(config.tagMap)
         elTags.add(*self.idTag())
         if isinstance(self, Recording):
             elem = level.collect(self.backendUrl)
@@ -111,10 +163,14 @@ class MBTreeElement:
             contents = elements.ContentList()
             for pos, child in self.children.items():
                 if not child.ignore:
-                    elem = child.makeElements(level, tagMap)            
-                    contents.insert(pos, elem.id)
-            elem = level.createContainer(tags=elTags, contents=contents,
-                                         type=self.containerType)
+                    if skipMediumContainer(child):
+                        for ppos, cchild in child.children.items():
+                            elem = cchild.makeElements(level, config)
+                            contents.insert(ppos, elem.id)
+                    else:
+                        elem = child.makeElements(level, config)
+                        contents.insert(pos, elem.id)
+            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType)
         return elem
     
     def assignCommonTags(self):
@@ -153,8 +209,8 @@ class MBTreeElement:
             if tag in excludes:
                 continue
             for child in self.walk(False):
-                if tag not in child.tags:
-                    child.tags[tag] = vals
+                for val in vals:
+                    child.tags.add(tag, val)
     
     def __str__(self):
         return "{}({})".format(type(self).__name__, self.mbid if "title" not in self.tags else self.tags["title"][0])
@@ -192,9 +248,10 @@ class Medium(MBTreeElement):
         """
         super().__init__(mbid=None)
         release.insertChild(pos, self)
-        if not title:
-            title = "Disc {}".format(pos)
-        self.tags.add("title", title)
+        #if not title:
+        #    title = "Disc {}".format(pos)
+        if title:
+            self.tags.add("title", title)
         self.discids = set(discids)
     
     def idTag(self):
@@ -206,7 +263,7 @@ class Medium(MBTreeElement):
     def insertWorks(self):
         """Inserts superworks as intermediate level between the medium and its recording.
         
-        This method assumes that all childs of *self* are Recording instances.
+        This method assumes that all children of *self* are :class:`Recording` instances.
         """
         newChildren = []
         posOffset = 0
@@ -227,7 +284,8 @@ class Medium(MBTreeElement):
         for pos, child in newChildren:
             self.insertChild(pos, child)
             if isinstance(child, Work):
-                child.passTags("title")
+                child.tags['album'] = child.tags['title'][:]
+                child.passTags(['title'])
                 child.assignCommonTags()
     
     def __eq__(self, other):
@@ -290,18 +348,24 @@ class Recording(MBTreeElement):
             elif reltype in simpleTags:
                 tag = simpleTags[reltype]
             elif reltype == "vocal":
-                voice = relation.findtext("attribute-list/attribute")
-                if voice is None:
+                attributes = relation.iterfind('attribute-list/attribute')
+                try:
+                    voice = next(attributes).text
+                    if voice == 'solo':
+                        voice = next(attributes).text
+                except StopIteration:
                     tag = "vocals"
                 else:
-                    for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
+                    for vtype in "soprano", "mezzo-soprano", "tenor", "baritone", "bass":
                         if voice.startswith(vtype):
                             tag = "performer:" + vtype
-                            continue
-                    if voice == "choir vocals":
-                        tag = "performer:choir"
+                            break
                     else:
-                        logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
+                        if voice == "choir vocals":
+                            tag = "performer:choir"
+                        else:
+                            logger.warning("unknown voice: {} in {}".format(voice, self))
+                            continue
             else:
                 logger.warning("unknown artist relation '{}' in recording '{}'"
                                .format(relation.get("type"), self.mbid))
@@ -350,11 +414,12 @@ class Work(MBTreeElement):
         work = query("work", self.mbid, incs).find("work")
         ent = AliasEntity.get(work)
         ent.asTag.add("title")
-        self.tags.add("title", ent)
+        self.tags['title'] = ent
         for relation in work.iterfind('relation-list[@target-type="artist"]/relation'):
-            easyRelations = { "composer" : "composer",
-                              "lyricist" : "lyricist",
-                              "orchestrator" : "orchestrator"
+            easyRelations = { 'composer' : 'composer',
+                              'lyricist' : 'lyricist',
+                              'orchestrator' : 'orchestrator',
+                              'librettist' : 'librettist',
                             }
             reltype = relation.get("type")
             artist = AliasEntity.get(relation.find('artist'))
@@ -367,10 +432,14 @@ class Work(MBTreeElement):
         
         for relation in work.iterfind('relation-list[@target-type="work"]/relation'):
             if relation.get("type") == "parts":
-                assert relation.findtext("direction") == "backward"
-                assert self.parentWork is None
-                parentWorkId = relation.find('work').get('id')
-                self.parentWork = Work(parentWorkId)
-                self.parentWork.tags["title"] = [relation.findtext('work/title')]
+                if relation.findtext("direction") == "backward":
+                    assert self.parentWork is None
+                    parentWorkId = relation.find('work').get('id')
+                    self.parentWork = Work(parentWorkId)
+                    self.parentWork.tags["title"] = [relation.findtext('work/title')]
+                else:
+                    logger.warning('ignoring forward parts relation in {}'.format(self))
+            elif relation.get('type') in ('based on', 'other version'):
+                pass # ignore these
             else:
-                logger.warning("unknown work-work relation {} in {}".format(relation.get("type"), self.mbid))
+                logger.warning('unknown work-work relation "{}" in {}'.format(relation.get("type"), self.mbid))
