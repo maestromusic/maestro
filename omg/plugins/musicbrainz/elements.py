@@ -352,14 +352,16 @@ class Recording(MBTreeElement):
                 if voice is None:
                     tag = "vocals"
                 else:
-                    for vtype in "soprano", "mezzo-soprano", "tenor", "baritone":
+                    for vtype in "soprano", "mezzo-soprano", "tenor", "baritone", "bass":
                         if voice.startswith(vtype):
                             tag = "performer:" + vtype
-                            continue
-                    if voice == "choir vocals":
-                        tag = "performer:choir"
+                            break
                     else:
-                        logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
+                        if voice == "choir vocals":
+                            tag = "performer:choir"
+                        else:
+                            logger.warning("unknown voice: {} in {}".format(voice, self.mbid))
+                            continue
             else:
                 logger.warning("unknown artist relation '{}' in recording '{}'"
                                .format(relation.get("type"), self.mbid))

@@ -84,11 +84,12 @@ def showRipMissingDialog():
         assert url.tracknr not in discids[url.discid][1]
         discids[url.discid][1].add(url.tracknr)
     from . import gui
-    dev, discid, ntracks = gui.askForDiscId()
+    dev, discid, ntracks = gui.ImportAudioCDAction.askForDiscId()
     if discid in discids:
         id, tracks = discids[discid]
+        assert set(range(min(tracks), max(tracks)+1)) == tracks
         from . import ripper
-        rppr = ripper.Ripper(dev, discid, tracks)
+        rppr = ripper.Ripper(dev, discid, fromTrack=min(tracks), toTrack=max(tracks))
         rppr.start()
         warning(translate("AudioCD Plugin", "unripped tracks found"),
                 translate("AudioCD Plugin", "The disc in the selected drive contains {} tracks "
