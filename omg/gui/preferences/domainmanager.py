@@ -89,7 +89,7 @@ class DomainManager(QtGui.QWidget):
             self._loadDomains()
             
     def _loadDomains(self):
-        """Load domain information from doamins-module to GUI."""
+        """Load domain information from domains-module to GUI."""
         self._domains = sorted(domains.domains, key=lambda d: d.name)
         self.tableWidget.clear()
         self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
@@ -120,7 +120,7 @@ class DomainManager(QtGui.QWidget):
         createNewDomain(self) # DomainManager will be reloaded via the dispatcher event
             
     def _handleDeleteButton(self):
-        """Ask the user if he really wants this and if so, delete the domain."""
+        """Delete the selected domain."""
         rows = self.tableWidget.selectionModel().selectedRows()
         if len(rows) == 1:
             if len(domains.domains) == 1:
@@ -143,7 +143,7 @@ class DomainManager(QtGui.QWidget):
             return
         domain = self._domains[item.row()]
         oldName = domain.name
-        newName = item.text()
+        newName = item.text().strip()
         if oldName == newName:
             return
         
@@ -155,7 +155,7 @@ class DomainManager(QtGui.QWidget):
         
         if domains.exists(newName):
             QtGui.QMessageBox.warning(self, self.tr("Cannot change domain"),
-                                      self.tr("A domain named '{}' does already exist.").format(newName))
+                                      self.tr("A domain named '{}' already exists.").format(newName))
             item.setText(oldName)
             return
               

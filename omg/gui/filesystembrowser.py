@@ -22,8 +22,8 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, filebackends, filesystem, config, utils
-from . import mainwindow, selection, dockwidget
+from .. import application, filebackends, filesystem, config, utils, constants
+from . import mainwindow, selection, dockwidget, widgets
 from ..core import levels, domains
 
 
@@ -63,12 +63,16 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     def __init__(self, parent=None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
-        self.folder = None
-
-    def setFolder(self, folder):
-        if folder != self.folder:
-            self.folder = folder
-            self.setRootPath(folder.path)
+        self.source = None
+        #filesystem.synchronizer.folderStateChanged.connect(self.handleStateChange)
+        #filesystem.synchronizer.fileStateChanged.connect(self.handleStateChange)
+        #self.rescanRequested.connect(filesystem.synchronizer.recheck)
+        self.setRootPath(None)
+        
+    def setSource(self, source):
+        if source != self.source:
+            self.source = source
+            self.setRootPath(source.path)
             
     def columnCount(self, index):
         return 1
@@ -76,7 +80,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     @QtCore.pyqtSlot(object)
     def handleStateChange(self, url):
         index = self.index(url.path)
-        self.dataChanged.emit(index, index)    
+        self.dataChanged.emit(index, index)   
     
     def data(self, index, role=Qt.DisplayRole):
         """Overridden for DecorationRole and ToolTipRole."""
@@ -108,13 +112,9 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
     def __init__(self):
         super().__init__()
         self.setAlternatingRowColors(True)
-        self.setModel(FileSystemBrowserModel())
         self.setTextElideMode(Qt.ElideMiddle)
-        self.setHeaderHidden(True)
-        
-        application.dispatcher.connect(self._handleDispatcher)
-        if filesystem.enabled:
-            self.connectFilesystemSignals()            
+        self.setHeaderHidden(True)   
+        self.setEnabled(False)        
         
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
@@ -122,28 +122,30 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         self.rescanDirectoryAction = QtGui.QAction(self.tr("rescan"), self)
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
+        application.dispatcher.connect(self._handleDispatcher)
+        self.setRootIndex(QtCore.QModelIndex())
     
-    def getFolder(self):
-        return self.model().folder
+    def getSource(self):
+        return self.model().source if self.model() is not None else None
     
-    def setFolder(self, folder):
-        model = self.model()
-        if folder != model.folder:
-            model.setFolder(folder)
-            self.setRootIndex(model.index(folder.path))
+    def setSource(self, source):
+        oldSource = self.model().source if self.model() is not None else None 
+        if source != oldSource:
+            if source is not None:
+                if self.model() is None:
+                    self.setModel(FileSystemBrowserModel())
+                self.model().setSource(source)
+                self.setRootIndex(self.model().index(source.path))
+                self.setEnabled(True)
+            else:
+                self.setModel(None)
+                self.setEnabled(False)
             
     def _handleDispatcher(self, event):
-        if isinstance(event, application.ModuleStateChangeEvent):
-            if event.module == "filesystem":
-                if event.state in ("initialized", "disabled"):
-                    self.model().layoutChanged.emit()
-                elif event.state == "enabled":
-                    self.connectFilesystemSignals()
-    
-    def connectFilesystemSignals(self):
-        filesystem.synchronizer.folderStateChanged.connect(self.model().handleStateChange)
-        filesystem.synchronizer.fileStateChanged.connect(self.model().handleStateChange)
-        self.rescanRequested.connect(filesystem.synchronizer.recheck)
+        if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.getSource():
+            if event.action == constants.DELETED:
+                self.setSource(None)
+            else: self.setRootIndex(self.model().index(event.source.path))
     
     def contextMenuEvent(self, event):
         index = self.indexAt(event.pos())
@@ -177,36 +179,34 @@ class FileSystemBrowser(dockwidget.DockWidget):
         layout = QtGui.QVBoxLayout(widget)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
-        folder = None
-        if state is not None and 'folder' in state:
-            folder = filesystem.folderByName(state['folder'])
-        if folder is None and len(filesystem.folders) > 0:
-            folder = filesystem.folders[0]
-        self.folderChooser = QtGui.QComboBox()
-        for f in filesystem.folders:
-            self.folderChooser.addItem(f.name, f)
-            if f == folder:
-                self.folderChooser.setCurrentIndex(self.folderChooser.count()-1)
-        self.folderChooser.currentIndexChanged.connect(self._handleFolderChanged)
-        layout.addWidget(self.folderChooser)
+        source = None
+        if state is not None and 'source' in state:
+            source = filesystem.sourceByName(state['source'])
+        if source is None and len(filesystem.sources) > 0:
+            source = filesystem.sources[0]
+        self.sourceChooser = widgets.SourceBox()
+        self.sourceChooser.sourceChanged.connect(self._handleSourceChanged)
+        layout.addWidget(self.sourceChooser)
         
         self.treeView = FileSystemBrowserTreeView()
         layout.addWidget(self.treeView, 1)
         self.setWidget(widget)
-        if folder is not None:
-            self._handleFolderChanged(filesystem.folders.index(folder)) # initialize
+        self._handleSourceChanged(source) # initialize
         
     def saveState(self):
-        return {'folder': self.treeView.getFolder().name}
+        source = self.treeView.getSource()
+        if source is not None:
+            return {'source': source.name}
+        else: return None
         
     def createOptionDialog(self, parent):
         from . import preferences
         preferences.show("main/filesystem")
     
-    def _handleFolderChanged(self, index):
-        folder = filesystem.folders[index]
-        self.setWindowTitle(self.tr("Filesystem: {}").format(folder.name))
-        self.treeView.setFolder(folder)
+    def _handleSourceChanged(self, source):
+        title = source.name if source is not None else self.tr("No source")
+        self.setWindowTitle(self.tr("Filesystem: {}").format(title))
+        self.treeView.setSource(source)
         
 
 class FileSystemSelection(selection.Selection):

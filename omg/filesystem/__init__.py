@@ -24,7 +24,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, logging, config, utils, database as db, stack
+from .. import application, logging, config, utils, database as db, stack, constants
 from ..filebackends import BackendURL
 from ..filebackends.filesystem import FileURL
 from ..core import levels, tags, domains
@@ -32,9 +32,9 @@ from ..core import levels, tags, domains
 logger = logging.getLogger(__name__)
 
 synchronizer = None
-enabled = False
+sources = None
 
-folders = None
+enabled = False #TODO
 
 NO_MUSIC = 0
 HAS_FILES = 1
@@ -46,57 +46,107 @@ def init():
     
     This will start a separate thread that repeatedly scans the music folder for changes.
     """
-    global enabled, synchronizer, folders
+    global synchronizer, sources
     import _strptime
     from . import identification
     # Create folders even if filesystem watching is disabled (for filesystembrowser etc.)
-    folders = [Folder(**data) for data in config.storage.filesystem.folders]
-    folders.sort(key=lambda f: f.name)
-    if config.options.filesystem.disable:
-        return
-    synchronizer = FileSystemSynchronizer()
-    application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "enabled"))
-    enabled = True
+    sources = [Source(**data) for data in config.storage.filesystem.sources]
+    sources.sort(key=lambda s: s.name)
+    #synchronizer = FileSystemSynchronizer()
+    #application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "enabled"))
+
     
 
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
-    global enabled, synchronizer
-    config.storage.filesystem.folders = [f.save() for f in folders]
-    if config.options.filesystem.disable or synchronizer is None:
-        return
-    levels.real.filesystemDispatcher.disconnect(synchronizer.handleRealFileEvent)
-    synchronizer.shouldStop.set()
-    synchronizer.exit()
-    synchronizer.wait()
-    synchronizer = None
-    application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "disabled"))
-    enabled = False
+    global synchronizer
+    config.storage.filesystem.sources = [s.save() for s in sources]
+    if synchronizer is not None:
+        levels.real.filesystemDispatcher.disconnect(synchronizer.handleRealFileEvent)
+        synchronizer.shouldStop.set()
+        synchronizer.exit()
+        synchronizer.wait()
+        synchronizer = None
+        application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "disabled"))
     logger.debug("Filesystem module: shutdown complete")
 
 
-class Folder:
-    def __init__(self, name, path, domainId):
+class Source:
+    def __init__(self, name, path, domain, enabled):
         self.name = name
         self.path = path
-        self.domain = domains.domainById(domainId)
-        
+        if isinstance(domain, int):
+            self.domain = domains.domainById(domain)
+        else: self.domain = domain
+        self.enabled = enabled
+    
     def save(self):
-        return {'name': self.name, 'path': self.path, 'domainId': self.domain.id}
+        return {'name': self.name,
+                'path': self.path,
+                'domain': self.domain.id,
+                'enabled': self.enabled}
+    
+    def contains(self, path):
+        path = os.path.normpath(path)
+        return path.startswith(os.path.normpath(self.path))
 
-def folderByName(name):
-    for folder in folders:
-        if folder.name == name:
-            return folder
+
+def sourceByName(name):
+    for source in sources:
+        if source.name == name:
+            return source
     else: return None
     
-def folderByPath(path):
-    path = os.path.normpath(path)
-    for folder in folders:
-        if path.startswith(os.path.normpath(folder.path)):
-            return folder
+def sourceByPath(path):
+    for source in sources:
+        if source.contains(path):
+            return source
     else: return None
+    
+def isValidSourceName(name):
+    return name == name.strip() and 0 < len(name) <= 64
 
+def addSource(**data):
+    source = Source(**data)
+    stack.push(translate("Filesystem", "Add source"), 
+               stack.Call(_addSource, source),
+               stack.Call(_deleteSource, source))
+    
+def _addSource(source):
+    sources.append(source)
+    sources.sort(key=lambda s: s.name)
+    application.dispatcher.emit(SourceChangeEvent(constants.ADDED, source))
+    
+def deleteSource(source):
+    stack.push(translate("Filesystem", "Delete source"),
+               stack.Call(_deleteSource, source), 
+               stack.Call(_addSource, source))
+
+def _deleteSource(source):
+    sources.remove(source)
+    application.dispatcher.emit(SourceChangeEvent(constants.DELETED, source))
+    
+
+def changeSource(source, **data):
+    oldData = {attr: getattr(source, attr) for attr in ['name', 'path', 'domain', 'enabled']}
+    stack.push(translate("Filesystem", "Change source"),
+               stack.Call(_changeSource, source, data),
+               stack.Call(_changeSource, source, oldData))
+    
+def _changeSource(source, data):
+    for attr in ['name', 'path', 'domain', 'enabled']:
+        if attr in data:
+            setattr(source, attr, data[attr])
+    application.dispatcher.emit(SourceChangeEvent(constants.CHANGED, source))
+
+
+class SourceChangeEvent(application.ChangeEvent):
+    """SourceChangedEvent are used when a source is added, changed or deleted."""
+    def __init__(self, action, source):
+        assert action in constants.CHANGE_TYPES
+        self.action = action
+        self.source = source
+        
 def folderState(path):
     """Return the state of a given folder, or 'unknown' if it can't be obtained. """
     if enabled:

@@ -19,7 +19,7 @@
 from PyQt4 import QtCore, QtGui
 
 from ..core import domains, elements
-from .. import application
+from .. import application, filesystem
 
 class ContainerTypeBox(QtGui.QComboBox):
     """ComboBox to select a container type."""
@@ -55,9 +55,9 @@ class DomainBox(QtGui.QComboBox):
     """ComboBox to select a domain."""
     domainChanged = QtCore.pyqtSignal(domains.Domain)
     
-    def __init__(self, currentDomain=None):
+    def __init__(self, currentDomain=None, parent=None):
         """Create the DomainBox with *currentDomain* selected."""
-        super().__init__()
+        super().__init__(parent)
         self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
         self._fillBox(currentDomain)
         application.dispatcher.connect(self._handleDispatcher)
@@ -76,14 +76,70 @@ class DomainBox(QtGui.QComboBox):
         """Return the currently selected domain."""
         return self.itemData(self.currentIndex())
     
+    def setCurrentDomain(self, domain):
+        for i in range(self.count()):
+            if domain == self.itemData(i):
+                self.setCurrentIndex(i)
+                return
+        else: raise ValueError("Domain '{}' not contained in DomainBox.".format(domain.name))
+    
     def _handleCurrentIndexChanged(self, i):
         self.domainChanged.emit(self.itemData(i))
         
     def _handleDispatcher(self, event):
-        if isinstance(event, domains.DomainChangeEvent):
+        if isinstance(event, domains.DomainChangedEvent):
             currentDomain = self.currentDomain()
             self.currentIndexChanged.disconnect(self._handleCurrentIndexChanged)
             self._fillBox(currentDomain)
             self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
             if self.currentDomain() != currentDomain:
                 self.domainChanged.emit(self.currentDomain())
+                
+
+class SourceBox(QtGui.QComboBox):
+    """ComboBox to select a filesystem source."""
+    sourceChanged = QtCore.pyqtSignal(filesystem.Source)
+    
+    def __init__(self, currentSource=None):
+        """Create the DomainBox with *currentDomain* selected."""
+        super().__init__()
+        self._fillBox(currentSource)
+        self.highlighted.connect(self._activated)
+        self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
+        application.dispatcher.connect(self._handleDispatcher)
+            
+    def _fillBox(self, currentSource):
+        """Fill the box with all existing domains."""
+        self.clear()
+        if len(filesystem.sources) > 0:
+            for source in filesystem.sources:
+                self.addItem(source.name, source)
+                if source == currentSource:
+                    self.setCurrentIndex(self.count() - 1)
+        else:
+            self.addItem("Create source...")
+        if self.currentIndex() == -1:
+            self.setCurrentIndex(0)
+        
+    def currentSource(self):
+        """Return the currently selected source."""
+        return self.itemData(self.currentIndex())
+    
+    def _handleCurrentIndexChanged(self, i):
+        source = self.itemData(i)
+        if source is not None:
+            self.sourceChanged.emit(source)
+        
+    def _activated(self, i):
+        if len(filesystem.sources) == 0 and i == 0:
+            from . import preferences
+            preferences.show("main/filesystem")
+            
+    def _handleDispatcher(self, event):
+        if isinstance(event, filesystem.SourceChangeEvent):
+            currentSource = self.currentSource()
+            self.currentIndexChanged.disconnect(self._handleCurrentIndexChanged)
+            self._fillBox(currentSource)
+            self.currentIndexChanged.connect(self._handleCurrentIndexChanged)
+            if self.currentSource() != currentSource and self.currentSource() is not None:
+                self.sourceChanged.emit(self.currentSource())

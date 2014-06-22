@@ -154,7 +154,7 @@ storage = OrderedDict((
     'profiles': [],
 }),
 ("SECTION:filesystem", {
-    'folders': [],
+    'sources': [],
 }),
 ("SECTION:misc", {
     'last_cover_check': 0

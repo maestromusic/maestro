@@ -375,7 +375,7 @@ addPanel("main/flagmanager", translate("Preferences", "Flag Manager"),
                                     "but only in the database."),
             iconPath = ':omg/icons/flag_blue.png')
 addPanel("main/filesystem", translate("Preferences", "File system"),
-            ('filesystem.preferences', 'FilesystemSettings'),
+            ('gui.preferences.filesystem', 'FilesystemSettings'),
             iconPath = ':omg/icons/folder.svg')
 
 # Profile panels                   
