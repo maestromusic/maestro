@@ -408,8 +408,8 @@ class MainSection(Section):
                 if self.storage:
                     configio.writeStorage(self._path,self)
                 else: configio.writeConfig(self._path,self)
-            except configio.ConfigError:
-                logging.error(__name__, "Could not write configuration file.")
+            except configio.ConfigError as e:
+                logging.error(__name__, "Cannot write configuration file. ({})".format(str(e)))
         
     def pprint(self):
         """Debug method: Print this configuration."""
