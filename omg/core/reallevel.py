@@ -25,8 +25,8 @@ from .. import application, database as db, filebackends, stack
 # The ids of all elements that are in the database and have been loaded to some level 
 _dbIds = set()
 
+
 class RealFileEvent(application.ChangeEvent):
-    
     _attrs = ("modified", "added", "removed", "renamed", "deleted")
     
     def __init__(self, **kwargs):
@@ -404,7 +404,7 @@ class RealLevel(levels.Level):
                           contentData)
                                       
         db.commit()
-        self.emit(levels.LevelChangedEvent(dbAddedIds=[el.id for el in elements]))
+        self.emit(levels.LevelChangeEvent(dbAddedIds=[el.id for el in elements]))
                 
     def _removeFromDb(self, elements):
         """Like removeFromDb but not undoable."""
@@ -425,7 +425,7 @@ class RealLevel(levels.Level):
                                                             and element.url.scheme == "file"]
         if len(removedFiles) > 0:
             self.emitFilesystemEvent(removed=removedFiles)
-        self.emit(levels.LevelChangedEvent(dbRemovedIds=[el.id for el in elements]))
+        self.emit(levels.LevelChangeEvent(dbRemovedIds=[el.id for el in elements]))
         
     def deleteElements(self, elements, fromDisk=False):
         elements = list(elements)

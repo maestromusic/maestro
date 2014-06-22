@@ -339,7 +339,7 @@ class TagEditor(QtGui.QComboBox):
     
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
-        if isinstance(event,tags.TagTypeChangedEvent):
+        if isinstance(event,tags.TagTypeChangeEvent):
             self._updateBox(self.getValue())
             
 
@@ -383,7 +383,7 @@ class DataPieceEditor(QtGui.QComboBox):
     
     def _handleTagTypeChanged(self,event):
         """React upon tagTypeChanged-signals from the dispatcher."""
-        if isinstance(event,tags.TagTypeChangedEvent):
+        if isinstance(event,tags.TagTypeChangeEvent):
             self._updateBox(self.getValue())
             
             

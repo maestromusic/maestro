@@ -330,7 +330,7 @@ class Browser(dockwidget.DockWidget):
         for view in self.views:
             view.expander = RestoreExpander(view)
         # When a flag is deleted it must be removed from the flagfilter
-        if self.flagCriterion is not None and isinstance(event, flags.FlagTypeChangedEvent)\
+        if self.flagCriterion is not None and isinstance(event, flags.FlagTypeChangeEvent)\
                  and event.action == constants.DELETED:
             flagList = list(self.flagCriterion.flags) # criteria must not be changed (threading)
             if event.flagType in flagList:

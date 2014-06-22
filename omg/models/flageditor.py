@@ -174,7 +174,7 @@ class FlagEditorModel(QtCore.QObject):
 
     def _handleLevelChanged(self, event):
         """React to change events of the underlying level."""
-        if not isinstance(event, levels.LevelChangedEvent):
+        if not isinstance(event, levels.LevelChangeEvent):
             return
         
         if len(event.removedIds) > 0 and any(element.id in event.removedIds for element in self.elements):

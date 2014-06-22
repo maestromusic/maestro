@@ -209,7 +209,7 @@ class RecordModel(QtCore.QObject):
 class TagEditorUndoCommand:
     """Special UndoCommand for the TagEditor. It is used together in a macro with a normal undocommand
     created by Level.changeTags to update the internal structure of the tageditor accordingly. When the
-    macro is finished and an LevelChangedEvent is emitted, the tageditor will detect that it is already
+    macro is finished and an LevelChangeEvent is emitted, the tageditor will detect that it is already
     up-to-date and do nothing. Without TagEditorUndoCommand it would have to compute the appropriate change
     of its internal structure from the changed ids. This is difficult and in some cases even impossible. 
     
@@ -273,7 +273,7 @@ class TagEditorModel(QtCore.QObject):
     structure together with the tags of elements.
     
     Change by the user in GUI -> method of TagEditorModel (e.g. addRecord) -> in one macro Level.changeTags
-    is called and a TagEditorUndoCommand is created -> at the end of the macro a LevelChangedEvent is
+    is called and a TagEditorUndoCommand is created -> at the end of the macro a LevelChangeEvent is
     emitted -> The TagEditorModel receives the event and does nothing, because its structure has already
     been updated.
     
@@ -614,7 +614,7 @@ class TagEditorModel(QtCore.QObject):
     
     def _handleLevelChanged(self, event):
         """React to change events of the underlying level."""
-        if not isinstance(event, levels.LevelChangedEvent):
+        if not isinstance(event, levels.LevelChangeEvent):
             return
         
         if len(event.removedIds) > 0 and any(element.id in event.removedIds for element in self.elements):

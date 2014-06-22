@@ -75,7 +75,7 @@ class ConsistencyError(RuntimeError):
     pass
 
 
-class LevelChangedEvent(application.ChangeEvent):
+class LevelChangeEvent(application.ChangeEvent):
     """Event that is emitted when elements on a level change.
     
     The event stores the ids of changed elements in several sets, grouped by the type of the change:
@@ -109,7 +109,7 @@ class LevelChangedEvent(application.ChangeEvent):
     def __getattr__(self, attr):
         if attr in self._idAttributes:
             return set()
-        else: raise AttributeError("LevelChangedEvent has no attribute '{}'.".format(attr))
+        else: raise AttributeError("LevelChangeEvent has no attribute '{}'.".format(attr))
         
     def _clearIds(self, ids):
         """Remove *ids* from all idLists except 'removedIds'.""" 
@@ -154,7 +154,7 @@ class LevelChangedEvent(application.ChangeEvent):
             idLists['dbRemovedIds'] = self.dbRemovedIds
         
         if any(len(l) > 0 for l in idLists.values()):
-            return LevelChangedEvent(**idLists)
+            return LevelChangeEvent(**idLists)
         else: return None
         
     def __repr__(self):
@@ -212,8 +212,8 @@ class Level(application.ChangeEventDispatcher):
                     level.emit(forwardEvent)
         
     def emitEvent(self, **args):
-        """Simple shortcut to emit a LevelChangedEvent."""
-        self.emit(LevelChangedEvent(**args))
+        """Simple shortcut to emit a LevelChangeEvent."""
+        self.emit(LevelChangeEvent(**args))
     
     def __contains__(self, param):
         """Returns if the given element is loaded in this level.
@@ -553,14 +553,14 @@ class Level(application.ChangeEventDispatcher):
             assert element.id not in self and element.level is self
             self.elements[element.id] = element
         if len(elements) > 0:
-            self.emit(LevelChangedEvent(addedIds=[element.id for element in elements]))
+            self.emit(LevelChangeEvent(addedIds=[element.id for element in elements]))
             
     def _removeElements(self, elements):
         for element in elements:
             if element.id in self.elements: # *elements* might contain some elements more than once
                 del self.elements[element.id]
         if len(elements) > 0:
-            self.emit(LevelChangedEvent(removedIds=[element.id for element in elements]))
+            self.emit(LevelChangeEvent(removedIds=[element.id for element in elements]))
             
     def _applyDiffs(self, changes):
         """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply

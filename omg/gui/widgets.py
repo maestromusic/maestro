@@ -87,7 +87,7 @@ class DomainBox(QtGui.QComboBox):
         self.domainChanged.emit(self.itemData(i))
         
     def _handleDispatcher(self, event):
-        if isinstance(event, domains.DomainChangedEvent):
+        if isinstance(event, domains.DomainChangeEvent):
             currentDomain = self.currentDomain()
             self.currentIndexChanged.disconnect(self._handleCurrentIndexChanged)
             self._fillBox(currentDomain)

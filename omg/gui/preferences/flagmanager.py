@@ -94,8 +94,8 @@ class FlagManager(QtGui.QWidget):
         application.dispatcher.connect(self._handleDispatcher)
         
     def _handleDispatcher(self, event):
-        """React to FlagTypeChangedEvents from the dispatcher."""
-        if isinstance(event, flags.FlagTypeChangedEvent):
+        """React to FlagTypeChangeEvents from the dispatcher."""
+        if isinstance(event, flags.FlagTypeChangeEvent):
             self._loadFlags()
             
     def _loadFlags(self):

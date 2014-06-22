@@ -97,8 +97,8 @@ class TagLabel(QtGui.QLabel):
             self.setTag(self.tag)
             
     def _handleDispatcher(self, event):
-        """Reload the widget on TagTypeChangedEvents applying to our tag."""
-        if isinstance(event, tags.TagTypeChangedEvent) and event.tagType == self.tag:
+        """Reload the widget on TagTypeChangeEvents applying to our tag."""
+        if isinstance(event, tags.TagTypeChangeEvent) and event.tagType == self.tag:
             self.setTag(self.tag)
 
 
@@ -325,8 +325,8 @@ class TagTypeBox(QtGui.QStackedWidget):
         else: QtGui.QStackedWidget.keyPressEvent(self, keyEvent)
     
     def _handleDispatcher(self, event):
-        """React upon TagTypeChangedEvents and TagTypeOrderChangeEvents from the dispatcher."""
-        if isinstance(event, (tags.TagTypeChangedEvent, tags.TagTypeOrderChangeEvent)):
+        """React upon TagTypeChangeEvents and TagTypeOrderChangeEvents from the dispatcher."""
+        if isinstance(event, (tags.TagTypeChangeEvent, tags.TagTypeOrderChangeEvent)):
             self._createItems()
 
 
@@ -375,8 +375,8 @@ class TagTypeButton(QtGui.QPushButton):
         preferences.show('main/tagmanager')
         
     def _handleDispatcher(self, event):
-        """React upon TagTypeChangedEvents and TagTypeOrderChangeEvents from the dispatcher."""
-        if isinstance(event, (tags.TagTypeChangedEvent, tags.TagTypeOrderChangeEvent)):
+        """React upon TagTypeChangeEvents and TagTypeOrderChangeEvents from the dispatcher."""
+        if isinstance(event, (tags.TagTypeChangeEvent, tags.TagTypeOrderChangeEvent)):
             self._fillMenu()
         
 
@@ -476,8 +476,8 @@ class TagValueEditor(QtGui.QWidget):
         self.tagChanged.emit(tag)
                 
     def _handleDispatcher(self, event):
-        """Handle dispatcher: On TagTypeChangedEvents we might have to change the editor type.""" 
-        if isinstance(event, tags.TagTypeChangedEvent) and event.tagType == self.tag:
+        """Handle dispatcher: On TagTypeChangeEvents we might have to change the editor type.""" 
+        if isinstance(event, tags.TagTypeChangeEvent) and event.tagType == self.tag:
             if self._editorClass(self.tag) != type(self._getActualEditor()):
                 # _setTag will change the editor type even though the tag stays the same
                 self._setTag(self.tag)

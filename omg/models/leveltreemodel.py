@@ -217,7 +217,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
     
     def _handleLevelChanged(self, event):
         """Update elements if the state of the level has changed."""
-        if not isinstance(event, levels.LevelChangedEvent):
+        if not isinstance(event, levels.LevelChangeEvent):
             return
         dataIds = event.dataIds.union(event.dbAddedIds, event.dbRemovedIds)
         for node, contents in self.walk(self.root):

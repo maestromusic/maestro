@@ -84,8 +84,8 @@ class DomainManager(QtGui.QWidget):
         application.dispatcher.connect(self._handleDispatcher)
         
     def _handleDispatcher(self, event):
-        """React to DomainChangedEvent from the dispatcher."""
-        if isinstance(event, domains.DomainChangedEvent):
+        """React to DomainChangeEvent from the dispatcher."""
+        if isinstance(event, domains.DomainChangeEvent):
             self._loadDomains()
             
     def _loadDomains(self):

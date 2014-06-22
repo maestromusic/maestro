@@ -152,8 +152,8 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         application.dispatcher.connect(self._handleDispatcher)
         
     def _handleDispatcher(self, event):
-        """React to TagTypeChangedEvents from the dispatcher."""
-        if isinstance(event, (tags.TagTypeChangedEvent, tags.TagTypeOrderChangeEvent)):
+        """React to TagTypeChangeEvents from the dispatcher."""
+        if isinstance(event, (tags.TagTypeChangeEvent, tags.TagTypeOrderChangeEvent)):
             self._loadTags()
             
     def _loadTags(self):

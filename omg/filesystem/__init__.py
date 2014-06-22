@@ -141,7 +141,7 @@ def _changeSource(source, data):
 
 
 class SourceChangeEvent(application.ChangeEvent):
-    """SourceChangedEvent are used when a source is added, changed or deleted."""
+    """SourceChangeEvent are used when a source is added, changed or deleted."""
     def __init__(self, action, source):
         assert action in constants.CHANGE_TYPES
         self.action = action

@@ -93,7 +93,7 @@ def _addDomain(domain):
     logging.info(__name__, "Added new domain '{}'".format(domain.name))
     
     domains.append(domain)
-    application.dispatcher.emit(DomainChangedEvent(ADDED, domain))
+    application.dispatcher.emit(DomainChangeEvent(ADDED, domain))
 
 
 def deleteDomain(domain):
@@ -111,7 +111,7 @@ def _deleteDomain(domain):
     logging.info(__name__, "Deleting domain '{}'.".format(domain))
     db.query("DELETE FROM {p}domains WHERE id = ?", domain.id)
     domains.remove(domain)
-    application.dispatcher.emit(DomainChangedEvent(DELETED, domain))
+    application.dispatcher.emit(DomainChangeEvent(DELETED, domain))
 
 
 def changeDomain(domain, **data):
@@ -144,11 +144,11 @@ def _changeDomain(domain, **data):
     if len(assignments) > 0:
         params.append(domain.id) # for the where clause
         db.query("UPDATE {p}domains SET "+','.join(assignments)+" WHERE id = ?", *params)
-        application.dispatcher.emit(DomainChangedEvent(CHANGED, domain))
+        application.dispatcher.emit(DomainChangeEvent(CHANGED, domain))
 
 
-class DomainChangedEvent(ChangeEvent):
-    """DomainChangedEvents are used when a domain is added, changed or deleted."""
+class DomainChangeEvent(ChangeEvent):
+    """DomainChangeEvents are used when a domain is added, changed or deleted."""
     def __init__(self, action, domain):
         assert action in constants.CHANGE_TYPES
         self.action = action

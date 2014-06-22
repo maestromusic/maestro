@@ -169,7 +169,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         
     def _handleLevelChanged(self, event):
         super()._handleLevelChanged(event)
-        if not isinstance(event, levels.LevelChangedEvent):
+        if not isinstance(event, levels.LevelChangeEvent):
             return
         
         if len(event.addedIds) > 0 or len(event.removedIds) > 0:
@@ -199,7 +199,7 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                 self.extTagInfosChanged.emit()
                 
     def _handleDispatcher(self,event):
-        if isinstance(event,tags.TagTypeChangedEvent) and event.action != constants.CHANGED:
+        if isinstance(event,tags.TagTypeChangeEvent) and event.action != constants.CHANGED:
             self._updateExtTagInfos()
           
     def undoExtTagInfo(self,info):

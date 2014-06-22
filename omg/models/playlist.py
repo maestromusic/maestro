@@ -117,7 +117,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.stack.push(PlaylistChangeCommand(self, [], updateBackend))
     
     def _handleLevelChanged(self, event):
-        if not isinstance(event, levels.LevelChangedEvent):
+        if not isinstance(event, levels.LevelChangeEvent):
             return
         dataIds = event.dataIds
         contentIds = event.contentIds
