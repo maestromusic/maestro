@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 
 from omg import database as db
 from omg import config
-from omg.core import tags
+from omg.core import tags, domains
 translate = QtCore.QCoreApplication.translate
 
 def defaultStorage():
@@ -30,7 +30,8 @@ def defaultStorage():
 
 def defaultConfig():
     return {"musicbrainz": {
-            "queryCacheDays": (int, 7, "Number of days after which cached web service calls expire.")
+            "queryCacheDays": (int, 7, "Number of days after which cached web service calls expire."),
+            'domain':         (str, domains.domains[0].name, 'domain for new containers')
         }}
 
 tagMap = {}

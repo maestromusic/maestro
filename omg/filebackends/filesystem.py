@@ -19,8 +19,8 @@
 """This module implements the BackendFile and BackendURL for files on the local filesystem."""
 
 from collections import OrderedDict
-import os.path, taglib
-
+import os.path, shutil, os
+import taglib
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
@@ -96,7 +96,15 @@ class RealFile(BackendFile):
         # TODO: handle open taglib file references
         if os.path.exists(newUrl.path):
             raise OSError("Target exists.")
-        os.renames(self.url.path, newUrl.path)
+        dir = os.path.dirname(newUrl.path)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        shutil.copy2(self.url.path, newUrl.path)
+        os.remove(self.url.path)
+        try:
+            os.removedirs(os.path.dirname(self.url.path))
+        except OSError:
+            pass
         from ..core import levels
         levels.real.emitFilesystemEvent(renamed=((self.url, newUrl),))
         self.url = newUrl

@@ -19,8 +19,8 @@
 from functools import reduce
 from collections import namedtuple
 
-from omg.core import elements, nodes, tags
-from omg import logging
+from omg.core import elements, nodes, tags, domains
+from omg import logging, config
 from omg.core.nodes import Wrapper
 
 from .xmlapi import AliasEntity, MBTagStorage, query
@@ -111,28 +111,29 @@ class MBTreeElement:
                 yield subchild
             #yield from child.walk() py3.3 version
     
-    def makeElements(self, level, config):
+    def makeElements(self, level, conf):
         """Creates a tree of OMG elements resembling the calling :class:`MBTreeElement`.
 
         :param levels.Level level: Level in which to create the elements.
-        :param ELementConfiguration config: Configuration influencing the creation.
+        :param ELementConfiguration conf: Configuration influencing the creation.
         """
         def skipMediumContainer(medium):
             if not isinstance(medium, Medium):
                 return False
-            if config.forceMediumContainer:
+            if conf.forceMediumContainer:
                 return False
-            if not config.mediumContainer:
+            if not conf.mediumContainer:
                 return True
             return 'title' not in mediumChild.tags
-        if config.searchRelease and isinstance(self, Release) and tags.isInDb('musicbrainz_albumid'):
+        if conf.searchRelease and isinstance(self, Release) and tags.isInDb('musicbrainz_albumid'):
             albumid = self.mbid
             from omg import search
             from omg.search.criteria import TagCriterion
             tag = tags.get('musicbrainz_albumid')
-            ans = search.search(TagCriterion(value=albumid, tagList=[tag]))
-            if len(ans) == 1:
-                relId = list(ans)[0]
+            criterion = TagCriterion(value=albumid, tagList=[tag])
+            search.search(criterion)
+            if len(criterion.result) == 1:
+                relId = list(criterion.result)[0]
                 releaseElem = level.collect(relId)
                 Wrapper(releaseElem).loadContents(recursive=True)
                 newChildren = [(pos, child) for (pos, child) in self.children.items() if not child.ignore]
@@ -145,15 +146,15 @@ class MBTreeElement:
                         firstPos = releaseElem.contents.positions[-1] + 1
                     for i, child in enumerate(mediumChild.children.values()):
                         level.insertContents(releaseElem,
-                                             [(firstPos + i, child.makeElements(level, config))])
+                                             [(firstPos + i, child.makeElements(level, conf))])
                 else:
                     if mediumPos in releaseElem.contents.positions:
                         pos = releaseElem.contents.positions[-1] + 1
                     else:
                         pos = mediumPos
-                    level.insertContents(releaseElem, [(pos, mediumChild.makeElements(level, config))])
+                    level.insertContents(releaseElem, [(pos, mediumChild.makeElements(level, conf))])
                 return releaseElem
-        elTags = self.tags.asOMGTags(config.tagMap)
+        elTags = self.tags.asOMGTags(conf.tagMap)
         elTags.add(*self.idTag())
         if isinstance(self, Recording):
             elem = level.collect(self.backendUrl)
@@ -165,12 +166,13 @@ class MBTreeElement:
                 if not child.ignore:
                     if skipMediumContainer(child):
                         for ppos, cchild in child.children.items():
-                            elem = cchild.makeElements(level, config)
+                            elem = cchild.makeElements(level, conf)
                             contents.insert(ppos, elem.id)
                     else:
-                        elem = child.makeElements(level, config)
+                        elem = child.makeElements(level, conf)
                         contents.insert(pos, elem.id)
-            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType)
+            elem = level.createContainer(tags=elTags, contents=contents, type=self.containerType,
+                                         domain=domains.domainByName(config.options.musicbrainz.domain))
         return elem
     
     def assignCommonTags(self):
