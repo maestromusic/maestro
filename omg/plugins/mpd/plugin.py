@@ -119,7 +119,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self._state = None
         self._currentLength = None
         self._volume = None
-        self._flags = player.RANDOM_OFF
         self.seekRequest = None
         self.outputs = None
         self.client = None
@@ -165,7 +164,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.updatePlaylist()
         self.updatePlayer()
         self.updateOutputs()
-        self.updateFlags()
         self.connectionState = player.CONNECTED
         self.connectionStateChanged.emit(player.CONNECTED)
         self.client.send_idle()
@@ -242,9 +240,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         if 'output' in changed:
             self.updateOutputs()
             changed.remove('output')
-        if 'options' in changed:
-            self.updateFlags()
-            changed.remove('options')
         if len(changed) > 0:
             logger.warning('unhandled MPD changes: {}'.format(changed))
     
@@ -377,13 +372,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         if outputs != self.outputs:
             self.outputs = outputs
     
-    def updateFlags(self):
-        """Check if random flag has been changed by MPD."""
-        flags = player.FLAG_REPEATING & (self.mpdStatus['repeat'] == '1')
-        if flags != self._flags:
-            self._flags = flags
-            self.flagsChanged.emit(flags)
-    
     def state(self):
         return self._state
     
@@ -446,15 +434,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.elapsedTimer.start()
         else:
             self.elapsedTimer.stop()
-    
-    def flags(self):
-        return self._flags
-    
-    def setFlags(self, flags):
-        if flags != self._flags:
-            with self.getClient() as client:
-                client.repeat(flags & player.FLAG_REPEATING)
-            # self._flags will be updated when a change in MPD's status is detected
     
     def updateDB(self, path=None):
         """Update MPD's database. An optional *path* can be given to only update that file/dir."""

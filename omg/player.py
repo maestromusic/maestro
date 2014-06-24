@@ -24,16 +24,6 @@ from . import config, profiles
 STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
-FLAG_REPEATING = 1
-FLAG_RANDOM = 2
-FLAG_RANDOM_WORKS = 4
-
-# Return values for getRandom, setRandom
-RANDOM_OFF = 0
-RANDOM_ON = FLAG_RANDOM
-RANDOM_WORKS = FLAG_RANDOM_WORKS
-
-
 _runningBackends = {}
 
 profileCategory = profiles.TypedProfileCategory(
@@ -68,7 +58,6 @@ class PlayerBackend(profiles.Profile):
     currentChanged = QtCore.pyqtSignal(int)
     elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(int)
-    flagsChanged = QtCore.pyqtSignal(int)
     
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
@@ -165,41 +154,3 @@ class PlayerBackend(profiles.Profile):
     
     def connectBackend(self):
         pass
-    
-    def flags(self):
-        """Return a bitwise-OR of the currently set flags (see the FLAG_*-constants defined in this module).
-        """
-        return 0
-    
-    def setFlags(self, flags):
-        """Set flags using a bitwise-OR of the FLAG_*-constants defined in this module."""
-        pass
-    
-    def isRepeating(self):
-        """Return whether the player will restart the playlist when it is finished."""
-        return FLAG_REPEATING & self.flags()
-    
-    def setRepeating(self, repeating):
-        """Set whether the player should restart the playlist when it is finished."""
-        if repeating:
-            self.setFlags(self.flags() | FLAG_REPEATING)
-        else: self.setFlags(self.flags() & ~FLAG_REPEATING)
-        
-    def getRandom(self):
-        """Return random mode from {RANDOM_OFF, RANDOM_ON, RANDOM_WORKS}."""
-        if FLAG_RANDOM_WORKS & self.flags():
-            return RANDOM_WORKS
-        elif FLAG_RANDOM & self.flags():
-            return RANDOM_ON
-        else: return RANDOM_OFF
-    
-    def setRandom(self, random):
-        """Set random mode to one of RANDOM_OFF, RANDOM_ON, RANDOM_WORKS."""
-        if random == RANDOM_OFF:
-            self.setFlags(self.flags() & ~FLAG_RANDOM & ~FLAG_RANDOM_WORKS)
-        elif random == RANDOM_ON:
-            self.setFlags(self.flags() | FLAG_RANDOM)
-        elif random == RANDOM_WORKS:
-            self.setFlags(self.flags() | FLAG_RANDOM | FLAG_RANDOM_WORKS)
-        else:
-            raise ValueError("Invalid value for argument *random*: {}".format(random))

@@ -141,12 +141,7 @@ class PlaybackWidget(dockwidget.DockWidget):
             self.updateSlider(self.backend.elapsed())
             self.handleStateChange(self.backend.state())
             self.volumeButton.setVolume(self.backend.volume())
-    
-    def handleFlagsChange(self, flags=None):
-        """React to changes of the backend's flags."""
-        # In random mode, there is no reasonable meaning for this button
-        self.skipBackwardButton.setEnabled(self.backend.getRandom() == player.RANDOM_OFF)
-        
+
     def handleLevelChange(self, event):
         """Handle changes of the real-level."""
         current = self.backend.current()
@@ -171,7 +166,6 @@ class PlaybackWidget(dockwidget.DockWidget):
                 ("self.backend.stateChanged", "self.handleStateChange"),
                 ("self.backend.currentChanged", "self.updateTitleLabel"),
                 ("self.backend.connectionStateChanged", "self.handleConnectionChange"),
-                ("self.backend.flagsChanged", "self.handleFlagsChange"),
                 ("self.backend.playlist.rowsInserted", "self.handlePlaylistChange"),
                 ("self.backend.playlist.rowsRemoved", "self.handlePlaylistChange"),
                 ("self.volumeButton.volumeChanged", "self.backend.setVolume"),
@@ -206,7 +200,6 @@ class PlaybackWidget(dockwidget.DockWidget):
             self.handleConnectionChange(player.DISCONNECTED)
         self.setWindowTitle("Playback [{}]".format(backend.name))
         self.handlePlaylistChange()
-        self.handleFlagsChange()
         
     def saveState(self):
         return self.backend.name if self.backend is not None else None
@@ -231,54 +224,10 @@ class OptionDialog(dialogs.FancyPopup):
         hLayout.addWidget(QtGui.QLabel(self.tr("Backend:")))
         backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playback.backend)
         backendChooser.profileChosen.connect(playback.setBackend)
-        backendChooser.profileChosen.connect(self.setBackend)
         hLayout.addWidget(backendChooser)
         hLayout.addStretch()
-        
-        self.repeatBox = QtGui.QCheckBox(self.tr("Repeat playlist"))
-        layout.addWidget(self.repeatBox)
-        
-        hLayout = QtGui.QHBoxLayout()
-        layout.addLayout(hLayout)
-        hLayout.addWidget(QtGui.QLabel(self.tr("Random:")))
-        randomOffButton = QtGui.QRadioButton(self.tr("Off"))
-        hLayout.addWidget(randomOffButton)
-        randomOnButton = QtGui.QRadioButton(self.tr("On"))
-        hLayout.addWidget(randomOnButton)
-        randomWorksButton = QtGui.QRadioButton(self.tr("Works"))
-        hLayout.addWidget(randomWorksButton)
-        helpLabel = QtGui.QLabel()
-        helpLabel.setPixmap(utils.getPixmap('help-browser.png'))
-        helpLabel.setToolTip(self.tr("In 'Random Works' mode the playlist is played in random order,\n "
-                                     "but containers of type 'Work' are kept together. Use this to e.g.\n "
-                                     "play symphonies in random order, without mixing the movements."))
-        hLayout.addWidget(helpLabel)
-        
-        self.randomButtonGroup = QtGui.QButtonGroup()
-        self.randomButtonGroup.addButton(randomOffButton, player.RANDOM_OFF)
-        self.randomButtonGroup.addButton(randomOnButton, player.RANDOM_ON)
-        self.randomButtonGroup.addButton(randomWorksButton, player.RANDOM_WORKS)
-        
         layout.addStretch()
-        
-        self.backend = -1
-        self.setBackend(playback.backend)
-        
-    def setBackend(self, backend):
-        if backend != self.backend:
-            if self.backend is not None and self.backend != -1:
-                self.repeatBox.toggled.disconnect(self.backend.setRepeating)
-                self.randomButtonGroup.buttonClicked[int].disconnect(self.backend.setRandom)
-            self.backend = backend
-            self.repeatBox.setEnabled(backend is not None)
-            for button in self.randomButtonGroup.buttons():
-                button.setEnabled(backend is not None)
-                
-            if backend is not None:
-                self.repeatBox.setChecked(backend.isRepeating())
-                self.repeatBox.toggled.connect(backend.setRepeating)
-                self.randomButtonGroup.button(backend.getRandom()).setChecked(True)
-                self.randomButtonGroup.buttonClicked[int].connect(backend.setRandom)
+    
 
 
 class PlayPauseButton(QtGui.QToolButton):
@@ -504,7 +453,6 @@ class SeekSlider(QtGui.QSlider):
             else: obj = "slider_knob_200911"
             p.drawPixmap(knobRect.topLeft(), utils.images.renderSvg(renderer, obj,
                                                                     knobRect.width(), knobRect.height()))
-
         p.end()
         
     def event(self, event):
