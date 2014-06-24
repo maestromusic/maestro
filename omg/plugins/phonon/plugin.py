@@ -27,7 +27,6 @@ except ImportError as e:
 
 from ... import player, profiles
 from ...filebackends.filesystem import FileURL
-from ...filebackends.stream import HTTPStreamURL
 from ...models import playlist
 from ...core import elements
         
@@ -105,9 +104,9 @@ class PhononPlayerBackend(player.PlayerBackend):
         urls = list(urls)
         print(urls)
         for i, url in enumerate(urls):
-            if not isinstance(url, (FileURL, HTTPStreamURL)):
+            if not isinstance(url, FileURL):
                 raise player.InsertError("URL type {} not supported".format(type(url)))
-            if isinstance(url, FileURL) and not os.path.exists(url.path):
+            elif not os.path.exists(url.path):
                 raise player.InsertError(self.tr("Cannot play '{}': File does not exist.")
                                          .format(url), urls[:i])
     
@@ -234,8 +233,6 @@ class PhononPlayerBackend(player.PlayerBackend):
         url = self.playlist.root.fileAtOffset(offset).element.url
         if isinstance(url, FileURL):
             return url.path
-        if isinstance(url, HTTPStreamURL):
-            return url.toQUrl()
         raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))
     
     def save(self):
