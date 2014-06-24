@@ -247,9 +247,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     covers.init()
     
     import omg.filebackends.filesystem
-    import omg.filebackends.stream
     omg.filebackends.filesystem.init()
-    omg.filebackends.stream.init()
     
     global network
     network = QtNetwork.QNetworkAccessManager()
