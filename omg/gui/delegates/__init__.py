@@ -81,7 +81,7 @@ class StandardDelegate(AbstractDelegate):
         urlWarningItem = self.getUrlWarningItem(wrapper)
         titleItem = TextItem(wrapper.getTitle(prependPosition=self.profile.options['showPositions'],
                                            usePath=False),
-                             BOLD_STYLE if element.isContainer() else STD_STYLE,
+                             STD_STYLE if isinstance(wrapper.parent, Wrapper) else BOLD_STYLE,
                              minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
         
         if not element.isInDb():
@@ -178,6 +178,8 @@ class StandardDelegate(AbstractDelegate):
 
         if len(leftTexts) > 0 or len(rightTexts) > 0:
             self.addCenter(MultiTextItem(leftTexts,rightTexts))
+            #if len(leftTexts) > 0:
+             #   titleItem.style = BOLD_STYLE
         
         # Path
         self.addPath(element)
