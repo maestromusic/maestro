@@ -179,6 +179,7 @@ class FileSystemBrowser(dockwidget.DockWidget):
         layout = QtGui.QVBoxLayout(widget)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
+        application.dispatcher.connect(self._handleDispatcher)
         source = None
         if state is not None and 'source' in state:
             source = filesystem.sourceByName(state['source'])
@@ -204,9 +205,17 @@ class FileSystemBrowser(dockwidget.DockWidget):
         preferences.show("main/filesystem")
     
     def _handleSourceChanged(self, source):
+        self.treeView.setSource(source)
+        self._updateTitle()
+            
+    def _handleDispatcher(self, event):
+        if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.treeView.getSource():
+            self._updateTitle()
+            
+    def _updateTitle(self):
+        source = self.treeView.getSource()
         title = source.name if source is not None else self.tr("No source")
         self.setWindowTitle(self.tr("Filesystem: {}").format(title))
-        self.treeView.setSource(source)
         
 
 class FileSystemSelection(selection.Selection):
