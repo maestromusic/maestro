@@ -18,7 +18,7 @@
 
 """WTF - The write-to-filesystem plugin."""
 
-import functools, os, os.path, shutil, copy
+import functools, os, os.path, shutil, copy, itertools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -53,10 +53,15 @@ def enable():
     _action = QtGui.QAction(application.mainWindow)
     _action.setText(QtGui.QApplication.translate("wtf", "Export..."))
     _action.triggered[tuple()].connect(Dialog.execute)
+    global _sqlAction
+    _sqlAction = QtGui.QAction(application.mainWindow)
+    _sqlAction.setText("Export SQLite...")
+    _sqlAction.triggered.connect(exportSQLite)
     
     
 def mainWindowInit():
     application.mainWindow.menus['extras'].addAction(_action)
+    application.mainWindow.menus['extras'].addAction(_sqlAction)
 
 
 def disable():
@@ -347,3 +352,28 @@ def export(profile):
             
     return True
         
+        
+def exportSQLite():
+    """Ask the user for an SQLite-database file and export the whole database to it."""
+    from ...gui import mainwindow
+    path = QtGui.QFileDialog.getSaveFileName(mainwindow.mainWindow, "Choose export location",
+                                             os.path.expanduser('~'))
+    if not path:
+        return
+    if os.path.exists(path):
+        os.remove(path)
+    from ...database.sql import sqlite
+    dbNew = sqlite.Sql()
+    dbNew.connect(path)
+    from ...database import tables
+    for table in tables.sortedList():
+        for query in table.createQueries['sqlite']:
+            print(query)
+            dbNew.query(query)
+        columns = ','.join(table.columns)
+        result = list(db.query("SELECT {columns} FROM {table}", columns=columns, table=table.name))
+        print("INSERT INTO {table} ({columns}) VALUES ({qm})"\
+                        .format(table=table.name, columns=columns, qm=','.join(['?']*len(table.columns))))
+        dbNew.multiQuery("INSERT INTO {table} ({columns}) VALUES ({qm})",
+                         result,
+                         table=table.name, columns=columns, qm=','.join(['?']*len(table.columns)))

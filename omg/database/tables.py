@@ -22,27 +22,37 @@ import re
 
 from .sql import DBException
 from .. import constants, database as db
-
-
+  
+  
 class SQLTable:
     """A table in the database.
     
     This class contains methods to create, check and drop a table in an SQL database. Note that instantiating
-    SQLTable does not create an actual table or modify the database in any way. The class has two public
+    SQLTable does not create an actual table or modify the database in any way. The class has three public
     attributes:
 
-        * createQueries: contains the queries which can be used to create the table. The first query must be
-          a 'CREATE TABLE' query. Further queries may add indexes and triggers.
+        * createQueries: maps db type to a list of queries necessary to create the table and associated 
+        indexes and triggers. The first query must be a 'CREATE TABLE' query.
         * name: contains the name of the table including the optional prefix. This is extracted from the
           first createQuery.
+        * columns: the names of the columns
     """
     def __init__(self, createQueries):
-        self.createQueries = [query.format(p=db.prefix) for query in createQueries]
-        result = re.match("\s*CREATE\s*TABLE\s*(\w+)", self.createQueries[0],re.I)
+        # replace {p} by db.prefix
+        self.createQueries = {key: [query.format(p=db.prefix) for query in queries]
+                              for key, queries in createQueries.items()}
+        result = re.match("\s*CREATE\s*TABLE\s*(\w+)\s*\((.*)\)", self.createQueries[db.type][0], re.I|re.S)
         if result is None:
             raise DBException("First create query must be a 'CREATE TABLE' query: {}"
-                              .format(self.createQueries[0]))
-        else: self.name = result.group(1)
+                              .format(self.createQueries[db.type][0]))
+        self.name = result.group(1)
+        lines = result.group(2).split('\n')
+        columns = [line.split()[0] for line in lines if len(line.split()) > 0]
+        # Filter out definitions of keys, indexes etc.
+        # See https://dev.mysql.com/doc/refman/5.5/en/create-table.html
+        # or  https://www.sqlite.org/lang_createtable.html
+        specialWords = ["CONSTRAINT","PRIMARY","KEY","INDEX","UNIQUE","FULLTEXT","SPATIAL","FOREIGN","CHECK"]
+        self.columns = [c for c in columns if c not in specialWords]
 
     def exists(self):
         """Return whether this table exists in the database."""
@@ -53,7 +63,7 @@ class SQLTable:
         if self.exists():
             raise DBException("Table '{}' does already exist.".format(self.name))
         print("Creating", self.name)
-        for query in self.createQueries:
+        for query in self.createQueries[db.type]:
             print(query)
             db.query(query)
     
@@ -69,12 +79,11 @@ class SQLTable:
 tables = []
 
 def _addMySQL(*queries):
-    if db.type == 'mysql':
-        tables.append(queries)
+    tables.append({'mysql': queries})
         
 def _addSQLite(*queries):
-    if db.type == 'sqlite':
-        tables.append(queries)
+    assert 'sqlite' not in tables[-1]
+    tables[-1]['sqlite'] = queries
 
 #----------#
 # elements #
@@ -425,7 +434,7 @@ CREATE TABLE {p}domains (
 """)
 
 
-tables = [SQLTable(queries) for queries in tables]
+tables = [SQLTable(queryDict) for queryDict in tables]
 
 def byName(name):
     """Return the table with the given name, which must include the database prefix."""
@@ -433,4 +442,13 @@ def byName(name):
         if name == table.name:
             return table
     else: return None
-
+    
+    
+def sortedList():
+    """Get all tables in an order such that each table only references tables that appeared earlier
+    in the list."""
+    # Some tables are referenced by other tables and must therefore be dropped last and created first.
+    # The order is important!
+    referencedTables = [byName(db.prefix+name) for name in ["domains", "elements", "tagids", "flag_names"]]
+    otherTables = [table for table in tables if table not in referencedTables]
+    return referencedTables + otherTables
