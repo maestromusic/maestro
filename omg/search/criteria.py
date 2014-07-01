@@ -327,7 +327,6 @@ class IdCriterion(Criterion):
         if self.interval is not None:
             query += '(el.id {})'.format(self.interval.queryPart())
         else: query += 'el.id IN ({})'.format(db.csList(self.idList))
-        print(query)
         self.result = set(db.query(query, table=fromTable).getSingleColumn())
     
     @staticmethod

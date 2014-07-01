@@ -416,7 +416,7 @@ class BrowserTreeView(treeview.TreeView):
         
         # The expander will decide which nodes to load/expand after the view is reset. Because each loading
         # might perform a search, Expanders work asynchronously.
-        self.expander = None
+        self.expander = VisibleLevelsExpander(self)
 
     def focusInEvent(self, event):
         global defaultBrowser

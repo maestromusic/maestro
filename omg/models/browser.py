@@ -285,7 +285,8 @@ class LoadTask(utils.worker.Task):
         self.contents = self.layer.build(self.domain, elids, matchingTags)
     
     def __repr__(self):
-        return "<TASK:{},{}>".format(self.node, self.criterion)
+        return "<TASK: Load {} with '{}'".format(self.node,
+                                         self.criterion if self.criterion is not None else self.elids)
 
 
 class Layer:
@@ -339,7 +340,7 @@ class TagLayer(Layer):
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
     def build(self, domain, elids, matchingTags):
-        # 1. Get toplevel nodes 
+        # 1. Get toplevel nodes.
         if elids is None:
             toplevel = set(db.query("""
                     SELECT id
@@ -356,7 +357,22 @@ class TagLayer(Layer):
         else:
             return []
         
-        # 2. Add contents of permeable nodes
+        # 2. Check whether a VariousNode is necessary.
+        # (that is, some toplevel nodes don't have a tag from self.tagList)
+        # We do this so early because 'toplevel' will be enlarged in the next step.
+        tagFilter = db.csIdList(self.tagList)
+        idFilter = db.csList(toplevel)
+        variousNodeElements = list(db.query("""
+            SELECT el.id
+            FROM {p}elements AS el LEFT JOIN {p}tags AS t
+                                ON el.id = t.element_id AND t.tag_id IN ({tagFilter})
+            WHERE domain={domain} AND el.id IN ({idFilter}) AND t.value_id IS NULL
+            LIMIT 1
+            """, tagFilter=tagFilter, idFilter=idFilter, domain=domain.id).getSingleColumn())
+    
+        # 3. Add contents of permeable nodes to 'toplevel', as long as they are in the search result.
+        # Tag values in these nodes should get a TagNode even if
+        # they don't appear in an actual toplevel node.
         new = toplevel
         while len(new):
             new = set(db.query("""
@@ -365,82 +381,97 @@ class TagLayer(Layer):
                     WHERE el.type IN ({collection},{container}) AND el.id IN ({parents})
                     """, collection=elements.TYPE_COLLECTION, container=elements.TYPE_CONTAINER,
                     parents=db.csList(new)).getSingleColumn())
+            # Restrict to search result. If the node's value only appears in contents of a permeable
+            # node in the search result and these contents are not in the result themselves,
+            # we would create an empty TagNode.
+            if elids is not None:
+                new.intersection_update(elids)
             toplevel.update(new)
-        
-        
-        # 3. Get tag values that might form tag nodes
-        idFilter = "el.id IN ({})".format(db.csList(toplevel))
-        tagFilter = db.csIdList(self.tagList)
+
+        # 4. Create a TagNode for each tag value that appears in 'toplevel'
+        # Make sure to use as single TagNode for equal values in different tags 
+        nodes = collections.defaultdict(TagNode)
+        idFilter = db.csList(toplevel)
         if db.type == 'sqlite':
             collate = 'COLLATE NOCASE'
         else: collate = ''
         result = db.query("""
-            SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value, el.id
-            FROM {p}elements AS el JOIN {p}tags AS t ON el.id = t.element_id
-                     JOIN {p}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
-            WHERE t.tag_id IN ({tagFilter}) AND {idFilter}
+            SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value
+            FROM {p}tags AS t JOIN {p}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
+            WHERE t.tag_id IN ({tagFilter}) AND t.element_id IN ({idFilter})
             """, tagFilter=tagFilter, idFilter=idFilter, collate=collate)
-        
-        withinMatchingNodes = set()
-        elementSets = collections.defaultdict(set)
-        visibleNodes, hiddenNodes = {},{}
-        for tagId, valueId, value, hide, sortValue, elid in result:
+        for tagId, valueId, value, hide, sortValue in result:
             if db.isNull(sortValue):
                 sortValue = None
-            nodes = visibleNodes if not hide or self.browser.showHiddenValues else hiddenNodes
             matching = (tagId,valueId) in matchingTags
-            if value not in nodes:
-                nodes[value] = node = TagNode()
-            else: node = nodes[value]
-            node.elids.add(elid)
-            if not hide:
-                elementSets[elid].add(node)
-            if matching and not hide:
-                withinMatchingNodes.add(elid)
-            node.addTagValue(tagId, valueId, value, sortValue, matching)
-        
-        visibleNodes = list(visibleNodes.values())
-        hiddenNodes = list(hiddenNodes.values())
-                
-        # 4. Filter unnecessary tag nodes
-        def processNodes(nodes):
-            nodesToRemove = [] 
-            if len(nodes) <= 20:
-                for node in nodes:
-                    if node.matching or node in nodesToRemove:
-                        continue
-                    superNodes = set.intersection(*(elementSets[elid] for elid in node.elids))
-                    if len(superNodes) > 1:
-                        if any(len(superNode.elids) > len(node.elids) for superNode in superNodes):
-                            nodesToRemove.append(node)
-                        else:
-                            # Merge
-                            for superNode in superNodes:
-                                if superNode != node:
-                                    node.merge(superNode)
-                                    nodesToRemove.append(superNode)
-            nodes = [n for n in nodes if (n.matching or not n.elids <= withinMatchingNodes)
-                                        and n not in nodesToRemove]
-            nodes.sort(key=lambda node: node.sortValues[0])
-            return nodes
-        
-        visibleNodes = processNodes(visibleNodes)
-        hiddenNodes = processNodes(hiddenNodes)
-        
-        
-        # 5. Check whether a VariousNode is necessary
-        result = db.query("""
-            SELECT el.id
-            FROM {p}elements AS el LEFT JOIN {p}tags AS t
-                                ON el.id = t.element_id AND t.tag_id IN ({tagFilter})
-            WHERE domain={domain} AND {idFilter} AND t.value_id IS NULL
-            LIMIT 1
-            """, tagFilter=tagFilter, idFilter=idFilter, domain=domain.id)
-
-        if len(result) > 0:
-            visibleNodes.append(VariousNode(self.tagList))
+            nodes[value].addTagValue(tagId, valueId, value, hide, sortValue, matching)
             
-        # 6. Create HiddenNode
+        # 5. Optimize TagNodes (if there are only few of them)
+        if False and len(nodes) <= 20:
+            # Above we had to use values as keys, here ids are more useful
+            nodes = {tagTuple: node for node in nodes.values() for tagTuple in node.tagIds}
+            # The first task is to find all contents of each TagNode. Note that the last query (to find
+            # TagNodes) only considered toplevel elements. 
+            for node in nodes.values():
+                node.elids = set()
+            if elids is not None:
+                idFilter = "t.element_id IN ({})".format(db.csList(elids))
+            else: idFilter = '1'
+            result = db.query("""
+                SELECT DISTINCT tag_id, value_id, element_id
+                FROM {p}tags AS t
+                WHERE t.tag_id IN ({tagFilter}) AND {idFilter}
+                """, tagFilter=tagFilter, idFilter=idFilter)
+            withinMatchingNodes = set()
+            for tagId, valueId, elementId in result:
+                if (tagId, valueId) in nodes:
+                    node = nodes[(tagId, valueId)]
+                else: continue # this means that this value does not appear in a 'toplevel' node
+                node.elids.add(elementId)
+                if (tagId, valueId) in matchingTags:
+                    withinMatchingNodes.add(elementId)
+                    
+            def checkSuperNode(node, superNode):
+                """Given two nodes where the second contains all contents of the first, return whether
+                the first node may be deleted. As a sideeffect this method may merge *node* into *superNode*.
+                """
+                # If *node* is completely contained in superNode, delete it.
+                if len(node.elids) < len(superNode.elids):
+                    # However, matching nodes must not be deleted in favor of not matching ones.
+                    # and visible nodes must not be deleted in favor of a hidden superNode.
+                    return not ((node.matching and not superNode.matching)
+                                or (not node.hide and superNode.hide)) 
+                else:
+                    if node.hide == superNode.hide:
+                        superNode.merge(node)
+                        return True
+                    else: return node.hide
+                
+            for k in list(nodes.keys()):
+                node = nodes[k]
+                # Delete nodes whose contents are covered by nodes matching the search query.
+                if not node.matching and node.elids <= withinMatchingTags:
+                    del nodes[k]
+                    continue
+                # Try to delete (or merge) TagNodes whose contents are contained in (or equal to) another
+                # TagNode
+                for node2 in nodes.values():
+                    if node2 is not node and node.elids <= node2.elids: # node2 is a superNode:
+                        if checkSuperNode(node, node2):
+                            del nodes[k]
+                            break
+        
+        # 6. Create final list of nodes
+        visibleNodes = [node for node in nodes.values() if not node.hide]
+        hiddenNodes = [node for node in nodes.values() if node.hide]       
+        visibleNodes.sort(key=lambda node: node.sortValues[0])
+        hiddenNodes.sort(key=lambda node: node.sortValues[0])
+        
+        if len(variousNodeElements) > 0:
+            node = VariousNode(self.tagList)
+            node.elids = variousNodeElements
+            visibleNodes.append(node)
+            
         if len(hiddenNodes) > 0:
             # If hidden nodes are present this layer needs two actual levels in the tree structure
             # Since this interferes with the algorithm to determine the layer of a node, we have to store
@@ -450,6 +481,69 @@ class TagLayer(Layer):
             visibleNodes.append(HiddenValuesNode(hiddenNodes))
         
         return visibleNodes
+        
+        
+        
+        # 3. Get tag values that might form tag nodes
+#         idFilter = "el.id IN ({})".format(db.csList(toplevel))
+#         tagFilter = db.csIdList(self.tagList)
+#         if db.type == 'sqlite':
+#             collate = 'COLLATE NOCASE'
+#         else: collate = ''
+#         result = db.query("""
+#             SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value, el.id
+#             FROM {p}elements AS el JOIN {p}tags AS t ON el.id = t.element_id
+#                      JOIN {p}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
+#             WHERE t.tag_id IN ({tagFilter}) AND {idFilter}
+#             """, tagFilter=tagFilter, idFilter=idFilter, collate=collate)
+#         
+#         withinMatchingNodes = set()
+#         elementSets = collections.defaultdict(set)
+#         visibleNodes, hiddenNodes = {},{}
+#         for tagId, valueId, value, hide, sortValue, elid in result:
+#             if db.isNull(sortValue):
+#                 sortValue = None
+#             nodes = visibleNodes if not hide or self.browser.showHiddenValues else hiddenNodes
+#             matching = (tagId,valueId) in matchingTags
+#             if value not in nodes:
+#                 nodes[value] = node = TagNode()
+#             else: node = nodes[value]
+#             node.elids.add(elid)
+#             if not hide:
+#                 elementSets[elid].add(node)
+#             if matching and not hide:
+#                 withinMatchingNodes.add(elid)
+#             node.addTagValue(tagId, valueId, value, sortValue, matching)
+#         
+#         visibleNodes = list(visibleNodes.values())
+#         hiddenNodes = list(hiddenNodes.values())
+#                 
+#         # 4. Filter unnecessary tag nodes
+#         def processNodes(nodes):
+#             nodesToRemove = [] 
+#             if len(nodes) <= 20:
+#                 for node in nodes:
+#                     if node.matching or node in nodesToRemove:
+#                         continue
+#                     superNodes = set.intersection(*(elementSets[elid] for elid in node.elids))
+#                     if len(superNodes) > 1:
+#                         if any(len(superNode.elids) > len(node.elids) for superNode in superNodes):
+#                             nodesToRemove.append(node)
+#                         else:
+#                             # Merge
+#                             for superNode in superNodes:
+#                                 if superNode != node:
+#                                     node.merge(superNode)
+#                                     nodesToRemove.append(superNode)
+#             nodes = [n for n in nodes if (n.matching or not n.elids <= withinMatchingNodes)
+#                                         and n not in nodesToRemove]
+#             nodes.sort(key=lambda node: node.sortValues[0])
+#             return nodes
+#         
+#         visibleNodes = processNodes(visibleNodes)
+#         hiddenNodes = processNodes(hiddenNodes)
+            
+        # 6. Create HiddenNode
     
     @staticmethod
     def defaultTagList():
@@ -661,7 +755,7 @@ class TagNode(CriterionNode):
         self.tagIds = set()
         self.values = []
         self.sortValues = []
-        self.elids = set()
+        self.hide = True # will be corrected in addTagVaulue
         self.matching = False
     
     def getCriterion(self):
@@ -671,7 +765,7 @@ class TagNode(CriterionNode):
         """Return a list with all values of this node."""
         return [value for value, matching in self.values]
     
-    def addTagValue(self, tagId, valueId, value, sortValue, matching):
+    def addTagValue(self, tagId, valueId, value, hide, sortValue, matching):
         """Add (*tagId*, *valueId*)-mapping to self.tagIds and a *value* and *sortValue* to the list of
         values to display. *matching* specifies whether this value was directly matched by the current
         browser search criterion.
@@ -680,6 +774,7 @@ class TagNode(CriterionNode):
             self.tagIds.add((tagId, valueId))
             self._addValue(self.values, value, matching)
             self._addValue(self.sortValues, value, matching)
+            self.hide = self.hide and hide # node.hide <=> all values are hidden
             if matching:
                 self.matching = True
         
@@ -700,6 +795,8 @@ class TagNode(CriterionNode):
             self._addValue(self.values, value, matching)
         for value, matching in other.sortValues:
             self._addValue(self.sortValues, value, matching)
+        if self.hide and not other.hide:
+            self.hide = False
         if not self.matching and other.matching:
             self.matching = True
         
