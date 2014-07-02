@@ -564,7 +564,7 @@ class TagCriterion(Criterion):
                 WHERE {where}
                 GROUP BY el.id
                 HAVING COUNT(h.value_id) = 0
-                """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColum())
+                """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColumn())
     
     def _escapeParameter(self, parameter):
         """Escape parameter for use in LIKE expression."""
