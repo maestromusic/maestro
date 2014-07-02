@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import itertools, collections
+import itertools, collections, functools
 
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
@@ -48,8 +48,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
           of an element are displayed; so if a container from this domain contains elements from another
           domain, they will be displayed).
         - *layers*: Used to group elements, see below. Basically each layer is asked to group the contents
-          of the nodes of the previous layer. A special ContainerLayer is used after all layers in *layers*.
-          In particular *layers* may be an empty list.
+          of the nodes of the previous layer. Below the last layer elements are simply grouped via
+          contents-relations. In particular *layers* may be an empty list.
         - *filter*: A search criterion or None. The browser will only display elements matching the
           criterion. Use setFilter to change it.
     
@@ -76,7 +76,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.domain = domain
         self.level = levels.real # this is used by the selection-module
         self.layers = layers
-        self.containerLayer = ContainerLayer()
         self.filter = filter
         self.worker = utils.worker.Worker(dbConnection=True)
         self.worker.done.connect(self._loaded)
@@ -99,10 +98,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 
     def getLayer(self, index):
         """Return the layer at the given index."""
-        assert index >= 0
-        if index < len(self.layers):
-            return self.layers[index]
-        else: return self.containerLayer
+        return self.layers[index]
         
     def setLayers(self, layers):
         """Set all layers of this model at once."""
@@ -171,29 +167,24 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         # disable filenumbers by default because containers in the browser often do not contain all of their
         # element's contents. Also BrowserWrappers might not have loaded their contents yet.
         return super().createWrapperToolTip(wrapper, showFileNumber=showFileNumber, **kwargs)
-                
-    def _getLayerIndex(self, node):
-        """Return the index of the layer to which the given node belongs. Return -1 for the root node."""
-        if isinstance(node, Wrapper): 
-            return len(self.layers) # always use containerLayer
-        elif node is self.root:
-            return -1
-        elif hasattr(node, 'layer'):
-            return self.layers.index(getattr(node, 'layer'))
-        else: return self._getLayerIndex(node.parent) + 1
-        
+ 
     def _startLoading(self, node, block=False):
         """Start loading the contents of *node*, which must be either root or a CriterionNode (The contents
         of containers are loaded via Container.loadContents). If *node* is a CriterionNode, start a search
         for the contents. The actual loading will be done in the searchFinished event. Only the root node is
         loaded directly. If *block* is True this method will block until the node is loaded. 
         """
-        layer = self.getLayer(self._getLayerIndex(node) + 1)
+        if isinstance(node, Wrapper):
+            layer = None
+            layerIndex = None
+        else:
+            layerIndex = 0 if node is self.root else node.layerIndex+1
+            layer = self.layers[layerIndex] if layerIndex < len(self.layers) else None
         task = None
         if hasattr(node, 'getElids'):
             elids = node.getElids()
             if elids is not None:
-                task = LoadTask(self.domain, node, layer, elids=elids)
+                task = LoadTask(node, layerIndex, layer, self.domain, elids=elids)
         if task is None:
             criteria = []
             if self.filter is not None:
@@ -202,7 +193,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
                 criteria.extend(p.getCriterion() for p in node.getParents(includeSelf=True)
                                                  if isinstance(p, CriterionNode))
             criterion = search.criteria.combine('AND', criteria)
-            task = LoadTask(self.domain, node, layer, criterion=criterion)
+            task = LoadTask(node, layerIndex, layer, self.domain, criterion=criterion)
         self.worker.submit(task)
         if block:
             self.worker.join()
@@ -259,12 +250,13 @@ class LoadTask(utils.worker.Task):
     to its worker thread. *layer* is the layer to which the node's contents belong. *criterion* is the
     filter that specifies which elements to load as contents.
     """ 
-    def __init__(self, domain, node, layer, elids=None, criterion=None):
+    def __init__(self, node, layerIndex, layer, domain, elids=None, criterion=None):
         # Note to self: If layer and criterion were not immutable,
         # they should be copied here to avoid concurrent access.
-        self.domain = domain
         self.node = node
+        self.layerIndex = layerIndex
         self.layer = layer
+        self.domain = domain
         self.elids = elids
         self.criterion = criterion
         self.contents = None
@@ -282,7 +274,9 @@ class LoadTask(utils.worker.Task):
         matchingTags = self.criterion.getMatchingTags() if self.criterion is not None else []
         if matchingTags is None:
             matchingTags = []
-        self.contents = self.layer.build(self.domain, elids, matchingTags)
+        if self.layer is not None:
+            self.contents = self.layer.build(self.layerIndex, self.domain, elids, matchingTags)
+        else: self.contents = _buildContainerTree(self.domain, elids)
     
     def __repr__(self):
         return "<TASK: Load {} with '{}'".format(self.node,
@@ -339,7 +333,7 @@ class TagLayer(Layer):
     def __repr__(self):
         return "<TagLayer: {}>".format(', '.join(tag.name for tag in self.tagList))
         
-    def build(self, domain, elids, matchingTags):
+    def build(self, layerIndex, domain, elids, matchingTags):
         # 1. Get toplevel nodes.
         if elids is None:
             toplevel = set(db.query("""
@@ -390,7 +384,7 @@ class TagLayer(Layer):
 
         # 4. Create a TagNode for each tag value that appears in 'toplevel'
         # Make sure to use as single TagNode for equal values in different tags 
-        nodes = collections.defaultdict(TagNode)
+        nodes = collections.defaultdict(functools.partial(TagNode, layerIndex))
         idFilter = db.csList(toplevel)
         if db.type == 'sqlite':
             collate = 'COLLATE NOCASE'
@@ -468,7 +462,7 @@ class TagLayer(Layer):
         hiddenNodes.sort(key=lambda node: node.sortValues[0])
         
         if len(variousNodeElements) > 0:
-            node = VariousNode(self.tagList)
+            node = VariousNode(layerIndex, self.tagList)
             node.elids = variousNodeElements
             visibleNodes.append(node)
             
@@ -481,69 +475,6 @@ class TagLayer(Layer):
             visibleNodes.append(HiddenValuesNode(hiddenNodes))
         
         return visibleNodes
-        
-        
-        
-        # 3. Get tag values that might form tag nodes
-#         idFilter = "el.id IN ({})".format(db.csList(toplevel))
-#         tagFilter = db.csIdList(self.tagList)
-#         if db.type == 'sqlite':
-#             collate = 'COLLATE NOCASE'
-#         else: collate = ''
-#         result = db.query("""
-#             SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value, el.id
-#             FROM {p}elements AS el JOIN {p}tags AS t ON el.id = t.element_id
-#                      JOIN {p}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
-#             WHERE t.tag_id IN ({tagFilter}) AND {idFilter}
-#             """, tagFilter=tagFilter, idFilter=idFilter, collate=collate)
-#         
-#         withinMatchingNodes = set()
-#         elementSets = collections.defaultdict(set)
-#         visibleNodes, hiddenNodes = {},{}
-#         for tagId, valueId, value, hide, sortValue, elid in result:
-#             if db.isNull(sortValue):
-#                 sortValue = None
-#             nodes = visibleNodes if not hide or self.browser.showHiddenValues else hiddenNodes
-#             matching = (tagId,valueId) in matchingTags
-#             if value not in nodes:
-#                 nodes[value] = node = TagNode()
-#             else: node = nodes[value]
-#             node.elids.add(elid)
-#             if not hide:
-#                 elementSets[elid].add(node)
-#             if matching and not hide:
-#                 withinMatchingNodes.add(elid)
-#             node.addTagValue(tagId, valueId, value, sortValue, matching)
-#         
-#         visibleNodes = list(visibleNodes.values())
-#         hiddenNodes = list(hiddenNodes.values())
-#                 
-#         # 4. Filter unnecessary tag nodes
-#         def processNodes(nodes):
-#             nodesToRemove = [] 
-#             if len(nodes) <= 20:
-#                 for node in nodes:
-#                     if node.matching or node in nodesToRemove:
-#                         continue
-#                     superNodes = set.intersection(*(elementSets[elid] for elid in node.elids))
-#                     if len(superNodes) > 1:
-#                         if any(len(superNode.elids) > len(node.elids) for superNode in superNodes):
-#                             nodesToRemove.append(node)
-#                         else:
-#                             # Merge
-#                             for superNode in superNodes:
-#                                 if superNode != node:
-#                                     node.merge(superNode)
-#                                     nodesToRemove.append(superNode)
-#             nodes = [n for n in nodes if (n.matching or not n.elids <= withinMatchingNodes)
-#                                         and n not in nodesToRemove]
-#             nodes.sort(key=lambda node: node.sortValues[0])
-#             return nodes
-#         
-#         visibleNodes = processNodes(visibleNodes)
-#         hiddenNodes = processNodes(hiddenNodes)
-            
-        # 6. Create HiddenNode
     
     @staticmethod
     def defaultTagList():
@@ -577,86 +508,83 @@ class TagLayer(Layer):
 addLayerClass('taglayer', translate("BrowserModel", "Tag layer"), TagLayer)
 
 
-class ContainerLayer(Layer):
-    """A Container layer organizes nodes in their natural tree structure."""
-    def build(self, domain, elids, matchingTags):
-        """Build a container structure containing the elements with ids in *elids*."""
-        if elids is None:
-            toplevel = list(db.query("""
-                    SELECT id
-                    FROM {p}elements
-                    WHERE domain=? AND id NOT IN (SELECT element_id FROM {p}contents)
-                    """, domain.id).getSingleColumn())
-        elif len(elids) > 0:
-            toplevel = set(elids)
-            toplevel.difference_update(db.query(
-                     "SELECT element_id FROM {}contents WHERE container_id IN ({})"
-                    .format(db.prefix, db.csList(elids))).getSingleColumn())
-        else:
-            return []
-            
-        # Load all toplevel elements and all of their ancestors
-        newIds = toplevel
-        while len(newIds) > 0:
-            levels.real.collectMany(newIds)
-            nextIds = []
-            for id in newIds:
-                nextIds.extend(levels.real[id].parents)
-            newIds = nextIds
+def _buildContainerTree(domain, elids):
+    """Create a wrapper tree including all elements from *elids* (or all elements with the given domain,
+    if *elids* is None). The tree will organize wrappers according to the natural tree structure.
+    """
+    if elids is None:
+        toplevel = list(db.query("""
+                SELECT id
+                FROM {p}elements
+                WHERE domain=? AND id NOT IN (SELECT element_id FROM {p}contents)
+                """, domain.id).getSingleColumn())
+    elif len(elids) > 0:
+        toplevel = set(elids)
+        toplevel.difference_update(db.query(
+                 "SELECT element_id FROM {}contents WHERE container_id IN ({})"
+                .format(db.prefix, db.csList(elids))).getSingleColumn())
+    else:
+        return []
+        
+    # Load all toplevel elements and all of their ancestors
+    newIds = toplevel
+    while len(newIds) > 0:
+        levels.real.collectMany(newIds)
+        nextIds = []
+        for id in newIds:
+            nextIds.extend(levels.real[id].parents)
+        newIds = nextIds
 
-        # Collect all parents in cDict (mapping parent id -> list of children ids)
-        # Parents contained as key in this dict, will only contain part of their element's contants in
-        # the browser. The part is given by the corresponding value (a list) in this dict.
-        # The dict must not contain direct search results as keys, as they should always show all their
-        # contents.
-        cDict = collections.defaultdict(list)
-            
-        def processNode(id):
-            """Check whether the element with the given id has major parents that need to be added to the 
-            browser's tree. If such a parent is found, update cDict and toplevel and return True.
-            """
-            result = False
-            for pid in levels.real[id].parents:
-                if pid in cDict: # We've already added this parent
-                    result = True
-                    cDict[pid].append(id)
-                    toplevel.discard(id)
-                elif elids is None or pid in elids: # This parent belongs to the direct search result
-                    result = True
-                    toplevel.discard(id)
-                elif processNode(pid): # We must add this parent, because it has a major ancestor.
-                    result = True
-                    cDict[pid].append(id)
-                    toplevel.discard(id)
-                elif levels.real[pid].isMajor(): # This is a major parent. Add it to toplevel
-                    result = True
-                    cDict[pid].append(id)
-                    toplevel.discard(id)
-                    toplevel.add(pid)
-            return result
+    # Collect all parents in cDict (mapping parent id -> list of children ids)
+    # Parents contained as key in this dict, will only contain part of their element's contants in
+    # the browser. The part is given by the corresponding value (a list) in this dict.
+    # The dict must not contain direct search results as keys, as they should always show all their
+    # contents.
+    cDict = collections.defaultdict(list)
         
-        for id in list(toplevel): # copy!
-            processNode(id)
-        
-        def createWrapper(id):
-            """Create a wrapper to be inserted in the browser. If the wrapper should contain all of its
-            element's contents, create a BrowserWrapper, that will load the contents """
-            element = levels.real[id]
-            if id in cDict: # wrapper should contain only a part of its element's contents
-                wrapper = Wrapper(element)
-                wrapper.setContents([createWrapper(cid) for cid in cDict[id]])
-                return wrapper
-            elif element.isFile() or len(element.contents) == 0:
-                return Wrapper(element)
-            else:
-                return BrowserWrapper(element) # a wrapper that will load all its contents when needed
-        
-        contents = [createWrapper(id) for id in toplevel]
-        
-        contents.sort(key=self.sortFunction)
-        return contents
+    def processNode(id):
+        """Check whether the element with the given id has major parents that need to be added to the 
+        browser's tree. If such a parent is found, update cDict and toplevel and return True.
+        """
+        result = False
+        for pid in levels.real[id].parents:
+            if pid in cDict: # We've already added this parent
+                result = True
+                cDict[pid].append(id)
+                toplevel.discard(id)
+            elif elids is None or pid in elids: # This parent belongs to the direct search result
+                result = True
+                toplevel.discard(id)
+            elif processNode(pid): # We must add this parent, because it has a major ancestor.
+                result = True
+                cDict[pid].append(id)
+                toplevel.discard(id)
+            elif levels.real[pid].isMajor(): # This is a major parent. Add it to toplevel
+                result = True
+                cDict[pid].append(id)
+                toplevel.discard(id)
+                toplevel.add(pid)
+        return result
     
-    def sortFunction(self, wrapper):
+    for id in list(toplevel): # copy!
+        processNode(id)
+    
+    def createWrapper(id):
+        """Create a wrapper to be inserted in the browser. If the wrapper should contain all of its
+        element's contents, create a BrowserWrapper, that will load the contents """
+        element = levels.real[id]
+        if id in cDict: # wrapper should contain only a part of its element's contents
+            wrapper = Wrapper(element)
+            wrapper.setContents([createWrapper(cid) for cid in cDict[id]])
+            return wrapper
+        elif element.isFile() or len(element.contents) == 0:
+            return Wrapper(element)
+        else:
+            return BrowserWrapper(element) # a wrapper that will load all its contents when needed
+    
+    contents = [createWrapper(id) for id in toplevel]
+    
+    def sortFunction(wrapper):
         """Intelligent sort: sort albums by their date, everything else by name."""
         element = wrapper.element
         date = 0
@@ -665,6 +593,9 @@ class ContainerLayer(Layer):
             if dateTag.type == tags.TYPE_DATE and dateTag in element.tags: 
                 date = -element.tags[dateTag][0].toSql() # minus leads to descending sort
         return (date, element.getTitle(neverShowIds=True))
+    
+    contents.sort(key=sortFunction)
+    return contents
 
 
 class CriterionNode(Node):
@@ -672,9 +603,10 @@ class CriterionNode(Node):
     search.criteria) in a BrowserModel. The layer below this node will contain all elements of this layer
     that additionally match the criterion.
     """
-    def __init__(self):
+    def __init__(self, layerIndex):
         self.parent = None
         self.contents = None
+        self.layerIndex = layerIndex
 
     def getCriterion(self):
         """Return the criterion of this node."""
@@ -750,8 +682,8 @@ class TagNode(CriterionNode):
           the current browser search criterion.
         - 'matching': Whether at least one of the values in this node directly matches the search criterion.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, layerIndex):
+        super().__init__(layerIndex)
         self.tagIds = set()
         self.values = []
         self.sortValues = []
@@ -813,10 +745,10 @@ class TagNode(CriterionNode):
 class VariousNode(CriterionNode):
     """A VariousNode groups elements in a tag-layer which have no tag in any of the tags in the tag-layer's
     tagset."""
-    def __init__(self, tagSet):
+    def __init__(self, layerIndex, tagSet):
         """Initialize this VariousNode with the parent-node <parent>, the given model and the tag-layer's
         tagset *tagSet*."""
-        super().__init__()
+        super().__init__(layerIndex)
         self.tagSet = tagSet
 
     def getCriterion(self):
