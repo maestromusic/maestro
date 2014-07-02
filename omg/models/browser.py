@@ -292,11 +292,17 @@ class Layer:
         """Return something that can be used to persistently store the configuration of this layer."""
         return None
 
-    def build(self, domain, elids, matchingTags):
-        """Return a set of nodes grouping the elements with ids in the set *elids*. All elements are
-        assumed to belong to *domain*. *matchingTags* is the set of (tagId, valueId)-tuples, that were
-        directly matched by the search query (see search.criteria.Criterion.getMatchingTags). Layers
-        may use this to draw corresponding TagNodes in bold.
+    def build(self, layerIndex, domain, elids, matchingTags):
+        """Return a set of nodes grouping the elements with ids in the set *elids*.
+        
+        Arguments:
+            - *layerIndex*: Will be stored as attribute 'layerIndex' in each non-Wrapper node. Used to
+              determine the layer that should load the next level of the tree structure.
+            - *domain*: All elements are assumed to belong to this domain.
+            - *elids*: The ids of the elements that should be contained in the tree.
+            - *matchingTags*: A set of (tagId, valueId)-tuples, that were directly matched by the search
+              query (see search.criteria.Criterion.getMatchingTags). Layers may use this to draw
+              corresponding TagNodes in bold.
         """
         raise NotImplementedError()        
         
@@ -350,6 +356,10 @@ class TagLayer(Layer):
                      elids=db.csList(elids)).getSingleColumn())
         else:
             return []
+        
+        # Shortcut: For very small result sets simply use a container tree
+        if len(toplevel) <= 3:
+            return _buildContainerTree(domain, elids)
         
         # 2. Check whether a VariousNode is necessary.
         # (that is, some toplevel nodes don't have a tag from self.tagList)
