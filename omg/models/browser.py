@@ -358,7 +358,7 @@ class TagLayer(Layer):
             return []
         
         # Shortcut: For very small result sets simply use a container tree
-        if len(toplevel) <= 3:
+        if len(toplevel) <= 5:
             return _buildContainerTree(domain, elids)
         
         # 2. Check whether a VariousNode is necessary.
@@ -411,7 +411,7 @@ class TagLayer(Layer):
             nodes[value].addTagValue(tagId, valueId, value, hide, sortValue, matching)
             
         # 5. Optimize TagNodes (if there are only few of them)
-        if False and len(nodes) <= 20:
+        if len(nodes) <= 20:
             # Above we had to use values as keys, here ids are more useful
             nodes = {tagTuple: node for node in nodes.values() for tagTuple in node.tagIds}
             # The first task is to find all contents of each TagNode. Note that the last query (to find
@@ -426,14 +426,14 @@ class TagLayer(Layer):
                 FROM {p}tags AS t
                 WHERE t.tag_id IN ({tagFilter}) AND {idFilter}
                 """, tagFilter=tagFilter, idFilter=idFilter)
-            withinMatchingNodes = set()
+            withinMatchingTags = set()
             for tagId, valueId, elementId in result:
                 if (tagId, valueId) in nodes:
                     node = nodes[(tagId, valueId)]
                 else: continue # this means that this value does not appear in a 'toplevel' node
                 node.elids.add(elementId)
                 if (tagId, valueId) in matchingTags:
-                    withinMatchingNodes.add(elementId)
+                    withinMatchingTags.add(elementId)
                     
             def checkSuperNode(node, superNode):
                 """Given two nodes where the second contains all contents of the first, return whether
