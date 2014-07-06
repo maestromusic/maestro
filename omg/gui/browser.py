@@ -158,7 +158,7 @@ class Browser(dockwidget.DockWidget):
                             className, layerState = layerConfig
                             if className in browsermodel.layerClasses:
                                 theClass = browsermodel.layerClasses[className][1]
-                                layer = theClass(self, state=layerState)
+                                layer = theClass(state=layerState)
                                 layers.append(layer)
                         except Exception:
                             logging.exception(__name__, "Could not parse a layer of the browser.")
@@ -358,7 +358,7 @@ class Browser(dockwidget.DockWidget):
         """Return the default list of layers for a view."""
         tagList = browsermodel.TagLayer.defaultTagList()
         if len(tagList) > 0:
-            return [browsermodel.TagLayer(self, tagList)]
+            return [browsermodel.TagLayer(tagList)]
         else: return []
 
     def closeEvent(self, event):

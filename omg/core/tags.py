@@ -410,7 +410,7 @@ def get(identifier, addDialogIfNew=False):
             return _tagsByName[identifier]
         else:
             if not isValidTagName(identifier):
-                raise ValueError("'{}' is not a valid tagname".format(identifier))
+                raise ValueError("'{}' is not a valid name for a tag-type".format(identifier))
             newTag = Tag(identifier)
             _tagsByName[identifier] = newTag
             if addDialogIfNew:

@@ -319,8 +319,7 @@ class TagLayer(Layer):
           VariousNode (if a container has no artist-tag the reason is most likely that its children have
           different artists).
     """
-    def __init__(self, browser, tagList=None, state=None):
-        self.browser = browser
+    def __init__(self, tagList=None, state=None):
         if tagList is None:
             assert state is not None
             tagList = [tags.get(name) for name in state]
@@ -396,14 +395,11 @@ class TagLayer(Layer):
         # Make sure to use as single TagNode for equal values in different tags 
         nodes = collections.defaultdict(functools.partial(TagNode, layerIndex))
         idFilter = db.csList(toplevel)
-        if db.type == 'sqlite':
-            collate = 'COLLATE NOCASE'
-        else: collate = ''
         result = db.query("""
             SELECT DISTINCT t.tag_id, v.id, v.value, v.hide, v.sort_value
             FROM {p}tags AS t JOIN {p}values_varchar AS v ON t.tag_id = v.tag_id AND t.value_id = v.id
             WHERE t.tag_id IN ({tagFilter}) AND t.element_id IN ({idFilter})
-            """, tagFilter=tagFilter, idFilter=idFilter, collate=collate)
+            """, tagFilter=tagFilter, idFilter=idFilter)
         for tagId, valueId, value, hide, sortValue in result:
             if db.isNull(sortValue):
                 sortValue = None
@@ -511,7 +507,7 @@ class TagLayer(Layer):
                 QtGui.QMessageBox.error(parent, translate("TagLayer", "Invalid value"),
                         translate("TagLayer", "Only varchar-tags registered in the database may be used."))
             else:
-                return TagLayer(model, tagList)
+                return TagLayer(tagList)
         return None
 
 
@@ -715,7 +711,7 @@ class TagNode(CriterionNode):
         if (tagId, valueId) not in self.tagIds:
             self.tagIds.add((tagId, valueId))
             self._addValue(self.values, value, matching)
-            self._addValue(self.sortValues, value, matching)
+            self._addValue(self.sortValues, sortValue if sortValue is not None else value, matching)
             self.hide = self.hide and hide # node.hide <=> all values are hidden
             if matching:
                 self.matching = True
