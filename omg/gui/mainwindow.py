@@ -155,12 +155,11 @@ class MainWindow(QtGui.QMainWindow):
         mainWindow = self
 
         # Resize and move the widget to the size and position it had when the program was closed
-        if "mainwindow_maximized" in config.binary and config.binary["mainwindow_maximized"]:
+        if config.binary.gui.mainwindow_maximized:
             self.showMaximized()
         else:
-            if "mainwindow_geometry" in config.binary \
-                  and isinstance(config.binary["mainwindow_geometry"],bytearray):
-                success = self.restoreGeometry(config.binary["mainwindow_geometry"])
+            if config.binary.gui.mainwindow_geometry is not None:
+                success = self.restoreGeometry(config.binary.gui.mainwindow_geometry)
             else: success = False
             if not success:  # Default geometry
                 screen = QtGui.QDesktopWidget().availableGeometry()
@@ -433,8 +432,8 @@ class MainWindow(QtGui.QMainWindow):
 
         # Restore dock widget positions
         success = False
-        if 'mainwindow_state' in config.binary and name in config.binary['mainwindow_state']:
-            success = self.restoreState(config.binary['mainwindow_state'][name])
+        if config.binary.gui.mainwindow_state is not None and name in config.binary.gui.mainwindow_state:
+            success = self.restoreState(config.binary.gui.mainwindow_state[name])
         if not success:
             for widgets in dockWidgets:
                 super().addDockWidget(widget.widgetData.preferredDockArea,widget)
@@ -472,10 +471,9 @@ class MainWindow(QtGui.QMainWindow):
         config.storage.gui.perspectives[name] = perspective
 
         # Copy the bytearray to avoid memory access errors
-        if 'mainwindow_state' not in config.binary \
-                    or not isinstance(config.binary["mainwindow_state"],dict):
-            config.binary['mainwindow_state'] = {}
-        config.binary['mainwindow_state'][name] = bytearray(self.saveState())
+        if config.binary.gui.mainwindow_state is None:
+            config.binary.gui.mainwindow_state = {}
+        config.binary.gui.mainwindow_state[name] = bytearray(self.saveState())
 
     def createDefaultWidgets(self):
         """Create the default set of central and dock widgets. Use this method if no widgets can be loaded
@@ -582,8 +580,8 @@ class MainWindow(QtGui.QMainWindow):
             widget.close()
         for widget in self.dockWidgets():
             widget.close()
-        config.binary["mainwindow_maximized"] = self.isMaximized()
-        config.binary["mainwindow_geometry"] = bytearray(self.saveGeometry())
+        config.binary.gui.mainwindow_maximized = self.isMaximized()
+        config.binary.gui.mainwindow_geometry = bytearray(self.saveGeometry())
 
 
 class CentralTabWidget(QtGui.QTabWidget):

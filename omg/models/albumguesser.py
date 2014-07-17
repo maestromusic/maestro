@@ -210,7 +210,7 @@ profileCategory = profiles.TypedProfileCategory(
     title = translate('Albumguesser','Album guesser'),
     description = translate("Albumguesser", "Configure how the editor tries to guess album structure "
                             "when files are dropped into it."),
-    storageOption = config.storageObject.editor.albumguesser_profiles
+    storageOption = config.getOption(config.storage, 'editor.albumguesser_profiles')
 )
 
 profileCategory.addType(profiles.ProfileType('standard',

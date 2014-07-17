@@ -106,9 +106,8 @@ class PreferencesDialog(QtGui.QDialog):
         self.finished.connect(self._handleFinished)
 
         # Restore geometry
-        if ("preferences_geometry" in config.binary and
-                isinstance(config.binary["preferences_geometry"], bytearray)):
-            success = self.restoreGeometry(config.binary["preferences_geometry"])
+        if config.binary.gui.preferences_geometry is not None:
+            success = self.restoreGeometry(config.binary.gui.preferences_geometry)
         else:
             success = False
         if not success: # Default geometry
@@ -231,7 +230,7 @@ class PreferencesDialog(QtGui.QDialog):
         """Handle the close button."""
         PreferencesDialog._dialog = None
         # Copy the bytearray to avoid memory access errors
-        config.binary["preferences_geometry"] = bytearray(self.saveGeometry())
+        config.binary.gui.preferences_geometry = bytearray(self.saveGeometry())
 
 
 class PanelWidget(QtGui.QWidget):

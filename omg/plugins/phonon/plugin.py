@@ -51,7 +51,7 @@ def disable():
     
     
 def defaultStorage():
-    return {"SECTION:phonon": {
+    return {"phonon": {
             "current": None,
             "playlist": ""
         }}

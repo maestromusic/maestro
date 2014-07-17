@@ -29,7 +29,7 @@ _runningBackends = {}
 profileCategory = profiles.TypedProfileCategory(
     name = 'playback',
     title = translate('PlayerBackend','Playback'),
-    storageOption = config.storageObject.player.profiles,
+    storageOption = config.getOption(config.storage, 'player.profiles'),
     description = translate("PlayerBackend",
                             "OMG can control more than one audio backend. To easily switch between them, "
                             "their configuration is stored in profiles."),

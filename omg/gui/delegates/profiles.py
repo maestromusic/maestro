@@ -38,7 +38,7 @@ class DelegateProfileCategory(profiles.TypedProfileCategory):
 category = DelegateProfileCategory(
        name = "delegates",
        title = translate("Delegates","Item display"),
-       storageOption = config.storageObject.gui.delegates,
+       storageOption = config.getOption(config.storage, 'gui.delegates'),
        description = translate("Delegates",
                 "Configure how elements are rendered in treeviews like browser, editor and playlist."),
        iconPath = ':omg/icons/preferences/delegates_small.png',

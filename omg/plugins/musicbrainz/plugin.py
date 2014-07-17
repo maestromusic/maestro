@@ -24,7 +24,7 @@ from omg.core import tags, domains
 translate = QtCore.QCoreApplication.translate
 
 def defaultStorage():
-    return {"SECTION:musicbrainz": {'tagmap': {},
+    return {"musicbrainz": {'tagmap': ({},),
                                 }
             }
 

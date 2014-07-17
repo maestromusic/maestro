@@ -97,8 +97,8 @@ class ProfileCategory(QtCore.QObject):
     
         ⁻ name: internal name of this category,
         - title: displayed to the user,
-        - storageOption: an option from config.storageObject. All profiles of this category will be saved
-          into this option.
+        - storageOption: an option from config.storage (use config.getOption!). All profiles of this
+          category will be saved into this option.
         - profileClass: Python class used for profiles in this category.
         - defaultProfileName: default name for new profiles (defaults to the category title).
         - description: Informative text that is displayed in profile configuration dialogs.

@@ -55,7 +55,7 @@ def disable():
 
 
 def defaultStorage():
-    return {"SECTION:dbanalyzer": {
+    return {"dbanalyzer": {
             "size": (800,600),
             "pos": None # Position of the window as tuple or None to center the window
         }}
@@ -325,7 +325,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
 def run():
     """Run the DBAnalyzer as separate application."""
     app = application.init()
-    config.storageObject.loadPlugins(defaultStorage())
+    config.getFile(config.storage).loadPlugins(defaultStorage())
         
     _openDialog()
     returnValue = app.exec_()

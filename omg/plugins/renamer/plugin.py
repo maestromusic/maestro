@@ -27,9 +27,9 @@ from ... import config, profiles
 
     
 def defaultStorage():
-    return {"SECTION:renamer": {'profiles': [],
-                                'current_profile': None
-                                }
+    return {"renamer": {'profiles': [],
+                        'current_profile': None
+                        }
             }
 
 def defaultConfig():
@@ -45,7 +45,7 @@ def enable():
     global profileCategory
     profileCategory = profiles.ProfileCategory("renamer",
                                                translate("Renamer","Renamer"),
-                                               config.storageObject.renamer.profiles,
+                                               config.getOption(config.storage, 'renamer.profiles'),
                                                profileClass=GrammarRenamer)
     profiles.manager.addCategory(profileCategory)
     

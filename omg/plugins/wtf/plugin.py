@@ -45,7 +45,7 @@ def enable():
     profileCategory = profiles.ProfileCategory(
                             name = "wtf",
                             title = translate("wtf", "Export"),
-                            storageOption = config.storageObject.wtf.profiles,
+                            storageOption = config.getOption(config.storage, 'wtf.profiles'),
                             profileClass = Profile
                             )
     profiles.manager.addCategory(profileCategory)
@@ -70,10 +70,10 @@ def disable():
 
 
 def defaultStorage():
-    return {"SECTION:wtf": {
+    return {"wtf": {
             "size": (800,600),
             "pos": None, # Position of the window as tuple or None to center the window
-            "profiles": {}
+            "profiles": ({},),
         }}
 
 
@@ -370,10 +370,14 @@ def exportSQLite():
         for query in table.createQueries['sqlite']:
             print(query)
             dbNew.query(query)
+    for table in tables.sortedList():
+        unprefixedTableName = table.name[len(db.prefix):]
+        dbNew.query("ALTER TABLE {} RENAME TO {}".format(table.name, unprefixedTableName))
         columns = ','.join(table.columns)
         result = list(db.query("SELECT {columns} FROM {table}", columns=columns, table=table.name))
         print("INSERT INTO {table} ({columns}) VALUES ({qm})"\
-                        .format(table=table.name, columns=columns, qm=','.join(['?']*len(table.columns))))
+                        .format(table=unprefixedTableName, columns=columns,
+                                qm=','.join(['?']*len(table.columns))))
         dbNew.multiQuery("INSERT INTO {table} ({columns}) VALUES ({qm})",
                          result,
-                         table=table.name, columns=columns, qm=','.join(['?']*len(table.columns)))
+                         table=unprefixedTableName, columns=columns, qm=','.join(['?']*len(table.columns)))

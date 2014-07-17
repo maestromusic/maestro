@@ -33,7 +33,7 @@ def enable():
         title = translate("ConfigEditor", "Configuration Editor"),
         callable = PreferencesDialog,
         description = translate("ConfigEditor", "Edit the configuration file <i>{}</i>.")
-                                .format(config.getPath('config')),
+                                .format(config.getFile(config.options).path),
     )
 
 
@@ -129,7 +129,7 @@ class ConfigSectionWidget(QtGui.QTableWidget):
         self.setHorizontalHeaderLabels([self.tr('Option'), self.tr('value')])
         if isinstance(section, str):
             parts = section.split('.')[1:]
-            s = config.optionObject
+            s = config.getFile(config.options).section
             for p in parts:
                 s = s.members[p]
             section = s
@@ -150,7 +150,7 @@ class ConfigSectionWidget(QtGui.QTableWidget):
         for row in range(self.rowCount()):
             item = self.item(row, 1)
             item.save()
-        config.optionObject.write()
+        config.getFile(config.options).write()
         self.dirty = False
 
     def contextMenuEvent(self, event):
@@ -167,7 +167,7 @@ class PreferencesDialog(QtGui.QWidget):
         layout = QtGui.QHBoxLayout()
         self.tree = QtGui.QTreeWidget()
         self.tree.setHeaderLabel(self.tr('Section'))
-        options = config.optionObject
+        options = config.getFile(config.options).section
         populateSections(options, self.tree)
         self.sectionWidget = ConfigSectionWidget(self.tr('<Main>'))
         self.tree.currentItemChanged.connect(self._handleCurrentItemChanged)

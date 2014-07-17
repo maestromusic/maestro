@@ -57,9 +57,11 @@ class Plugin(object):
         if not self.enabled:
             logging.info(__name__, "Enabling plugin '{}'...".format(self.name))
             if hasattr(self.module,'defaultConfig'):
-                config.optionObject.loadPlugins(self.module.defaultConfig())
+                config.getFile(config.options).addSections(self.module.defaultConfig())
             if hasattr(self.module,'defaultStorage'):
-                config.storageObject.loadPlugins(self.module.defaultStorage())
+                config.getFile(config.storage).addSections(self.module.defaultStorage())
+            if hasattr(self.module,'defaultBinary'):
+                config.getFile(config.binary).addSections(self.module.defaultBinary())
             self.module.enable()
             self.enabled = True
             if not self.name in config.options.main.plugins:
@@ -73,9 +75,11 @@ class Plugin(object):
             logging.info(__name__, "Disabling plugin '{}'...".format(self.name))
             self.module.disable()
             if hasattr(self.module,'defaultConfig'):
-                config.optionObject.removePlugins(list(self.module.defaultConfig().keys()))
+                config.getFile(config.options).removeSections(self.module.defaultConfig().keys())
             if hasattr(self.module,'defaultStorage'):
-                config.storageObject.removePlugins(list(self.module.defaultStorage().keys()))
+                config.getFile(config.storage).removeSections(self.module.defaultStorage().keys())
+            if hasattr(self.module,'defaultBinary'):
+                config.getFile(config.binary).removeSections(self.module.defaultBinary().keys())
             if self.name in config.options.main.plugins:
                 config.options.main.plugins = [n for n in config.options.main.plugins if n != self.name]
             self.enabled = False
