@@ -141,6 +141,11 @@ class MPDPlayerBackend(player.PlayerBackend):
         if path != self.path:
             self.path = path
             player.profileCategory.profileChanged.emit(self)
+            # Changing the path probably means that mpd:// urls become file:// urls
+            if self.playlist.root.hasContents():
+                self.playlist.resetFromUrls(self.makeUrls(self.mpdPlaylist),
+                                            updateBackend='never') 
+                self.stack.reset() # avoid trouble
     
     def connectBackend(self):
         """Connect to MPD.

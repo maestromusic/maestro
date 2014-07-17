@@ -228,7 +228,7 @@ class RealLevel(levels.Level):
                 raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
             id = levels.idFromUrl(url, create=True)
             from .. import filesystem
-            folder = filesystem.folderByPath(url.path)
+            folder = filesystem.sourceByPath(url.path)
             domain = folder.domain if folder is not None else None
             elem = elements.File(domain, level, id, url=url, length=fLength, tags=fTags)
             elem.specialTags = backendFile.specialTags           
