@@ -209,7 +209,7 @@ class ArrayResult:
     def __init__(self, result):
         self.rows = result.fetchall()
         self.rowcount = result.rewcount
-        self.inserted_primary_key = result.inserted_primary_key
+        self.lastrowid = result.lastrowid
         self._index = 0
         
     def fetchone(self):
@@ -256,7 +256,7 @@ class SqlResult:
         """Return the last value which was used in an 'AUTO_INCREMENT'-column when this AbstractSqlResult
         was created. This method must not be used for result sets produced by multiqueries (different drivers
         would return different values)."""
-        return self._result.inserted_primary_key
+        return self._result.lastrowid
     
     def getSingle(self):
         """Return the first value from the first row of the result set. Use this as a shorthand method if
