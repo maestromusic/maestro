@@ -131,14 +131,14 @@ configOptions = collections.OrderedDict((
 
 ("database", {
     "type": (str, "sqlite", 'Database type, usually "sqlite" or "mysql".'),
-    "prefix":  (str, "", "Prefix which will be prepended to the table names."),
+    "driver": (str, '', "(Optional) database driver to use, e.g. 'mysqldb', 'mysqlconnector'."),
     "name": (str, "omg", "Name of the database"),
     "user": (str, "", "User name"),
     "password": (str, "", "Password"),
     "host": (str, "localhost", "Host name of the database server"),
-    "port": (int, 0, "Port of the database server"),
-    
-    "sqlite_path": (str, "config:omg.db", "Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory.")
+    "port": (int, 0, "Port of the database server"),    
+    "sqlite_path": (str, "config:omg.db", "Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory."),
+    "prefix":  (str, "", "Prefix which will be prepended to the table names."),
 }),
 
 #TODO move these into the plugin

@@ -94,11 +94,19 @@ class FlexiDateType(sqlalchemy.types.TypeDecorator):
 def createEngine(**kwargs):
     if kwargs['type'] == 'sqlite':
         url = 'sqlite:///'+kwargs['path'] # absolute paths will have 4 slashes
-    elif kwargs['port'] == 0:
-        # let SqlAlchemy figure out the default port
-        url = '{type}://{user}:{password}@{host}/{name}'.format(**kwargs)
-    else: url = '{type}://{user}:{password}@{host}:{port}/{name}'.format(**kwargs)
-    engine = sqlalchemy.create_engine(url, poolclass=sqlalchemy.pool.SingletonThreadPool)
+        engine = sqlalchemy.create_engine(url)
+    else:
+        # full url: {type}+{driver}://{user}:{password}@{host}:{port}/{name}
+        # leave out driver and port parts if not specified
+        url = '{type}'
+        if kwargs['driver'] not in ['', None]:
+            url += '+{driver}'
+        url += '://{user}:{password}@{host}'
+        if kwargs['port'] != 0:
+            url += ':{port}'
+        url += '/{name}'
+        url = url.format(**kwargs)
+        engine = sqlalchemy.create_engine(url, poolclass=sqlalchemy.pool.SingletonThreadPool)
     return engine
 
 
@@ -109,12 +117,15 @@ def connect(**kwargs):
 def init(**kwargs):
     # connect to default database with args from config
     global type, prefix, engine, driver
-    if 'type' not in kwargs:
-        kwargs['type'] = config.options.database.type
-    if '+' in kwargs['type']:
-        type, driver = kwargs['type'].split('+')
-    else: type, driver = kwargs['type'], None
+    type = kwargs['type'] = kwargs.get('type', config.options.database.type)
     prefix = kwargs.get('prefix', config.options.database.prefix)
+    driver = kwargs.get('driver', config.options.database.driver)
+    if driver == '':
+        driver = None
+    # SqlAlchemy's default MySQL driver 'mysqldb' is not available for Python 3. Use mysql-connector instead.
+    if type == 'mysql' and driver is None:
+        driver = 'mysqlconnector'
+    kwargs['driver'] = driver
     
     if type == 'sqlite':
         path = kwargs.get('path', config.options.database.sqlite_path).strip()
@@ -226,29 +237,19 @@ class ArrayResult:
         if self._index < len(self.rows):
             row = self.rows[self._index]
             self._index += 1
-            return tuple(row)
+            return row
         else: return None
         
     def __iter__(self):
         return self.rows.__iter__()
-        
-    
-class ResultIterator:
-    def __init__(self, result):
-        self._iter = iter(result)
-        
-    def __iter__(self):
-        return self
-    
-    def __next__(self):
-        return tuple(next(self._iter))
-    
+
+
 class SqlResult:
     def __init__(self, result):
         self._result = result
             
     def __iter__(self):
-        return ResultIterator(self._result)
+        return self._result.__iter__()
         
     def __len__(self):
         return self.size()
@@ -263,7 +264,7 @@ class SqlResult:
     def next(self):
         row = self._result.fetchone()
         if row is not None:
-            return tuple(row)
+            return row
         else: raise StopIteration()
         
     def affectedRows(self):
@@ -302,7 +303,7 @@ class SqlResult:
         not contain any rows. Use this as a shorthand if there is only one row in the result set."""
         row = self._result.fetchone()
         if row is not None:
-            return tuple(row)
+            return row
         else: raise EmptyResultException()
     
 # contents-table

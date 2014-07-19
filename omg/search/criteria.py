@@ -541,7 +541,8 @@ class TagCriterion(Criterion):
         # Store values that match
         #=================================================
         if db.query("SELECT COUNT(*) FROM {help}", help=TT_HELP).getSingle() <= MAX_MATCHING_TAGS:
-            self.matchingTags = set(db.query("SELECT tag_id, value_id FROM {help}", help=TT_HELP))
+            self.matchingTags = set(tuple(r) for r in db.query("SELECT tag_id, value_id FROM {help}",
+                                                               help=TT_HELP))
         yield
         
         # Select elements which have these values (or not)
