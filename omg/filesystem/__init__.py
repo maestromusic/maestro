@@ -525,7 +525,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             return None
         logger.debug('checking track {}...'.format(basename(track.url.path)))
         newHash = self.idProvider(track.url)
-        if track.id is None:
+        if track.id is None: # not in database
             track.verified = modified
             if newHash != track.hash:
                 logger.debug("... and updating hash in newfiles")

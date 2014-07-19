@@ -77,7 +77,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self.level = levels.real # this is used by the selection-module
         self.layers = layers
         self.filter = filter
-        self.worker = utils.worker.Worker(dbConnection=True)
+        self.worker = utils.worker.Worker()
         self.worker.done.connect(self._loaded)
         self.worker.start()
         self._startLoading(self.root)

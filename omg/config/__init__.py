@@ -60,6 +60,7 @@ import os, sys, collections, functools
 from .config import *
 from .. import constants, logging
 
+# Directory of the configuration files.
 CONFDIR = None
 
 # These are the access objects.
@@ -129,15 +130,13 @@ configOptions = collections.OrderedDict((
 }),
 
 ("database", {
-    "type": (str, "sqlite", 'Either "mysql" or "sqlite".'),
+    "type": (str, "sqlite", 'Database type, usually "sqlite" or "mysql".'),
     "prefix":  (str, "", "Prefix which will be prepended to the table names."),
-    
-    "mysql_drivers": (list, ["qtsql"], "List of drivers OMG will use to try to connect to a MySQL database."),
-    "mysql_db": (str, "omg", "Name of the database"),
-    "mysql_user": (str, "", "MySQL user name"),
-    "mysql_password": (str, "", "MySQL password"),
-    "mysql_host": (str, "localhost", "MySQL host name"),
-    "mysql_port": (int, 3306, "MySQL port"),
+    "name": (str, "omg", "Name of the database"),
+    "user": (str, "", "User name"),
+    "password": (str, "", "Password"),
+    "host": (str, "localhost", "Host name of the database server"),
+    "port": (int, 0, "Port of the database server"),
     
     "sqlite_path": (str, "config:omg.db", "Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory.")
 }),

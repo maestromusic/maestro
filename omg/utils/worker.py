@@ -104,16 +104,13 @@ class Worker(QtCore.QObject):
     """A worker thread that processes tasks. Tasks should be added with the 'submit' method. When a task
     is finished, the done-signal is emitted with the task as argument. The signal is emitted from the 
     thread, that created the worker, so it is usually not necessary to use a queued connection.
-    If *dbConnection* is True, the worker thread will establish a database connection so that Tasks can use
-    database.query and the like.
     """
     done = QtCore.pyqtSignal(Task)
     _done = QtCore.pyqtSignal(Task)
     
-    def __init__(self, dbConnection=False):
+    def __init__(self):
         super().__init__()
         self.state = STATE_INIT
-        self.dbConnection = dbConnection
         self._resetCount = 0
         self._done.connect(self._handleDone, Qt.QueuedConnection)
         self._queue = Queue()
@@ -154,15 +151,11 @@ class Worker(QtCore.QObject):
             
     def runInit(self):
         """Called at the beginning of the worker thread. Subclasses might reimplement it."""
-        if self.dbConnection:
-            from .. import database
-            database.connect()
+        pass
     
     def runShutdown(self):
         """Called at the end of the worker thread. Subclasses might reimplement it."""
-        if self.dbConnection:
-            from .. import database
-            database.close()
+        pass
     
     def run(self):
         self.state = STATE_RUNNING

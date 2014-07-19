@@ -116,7 +116,7 @@ def loadTagTypesFromDB():
     
     try:
         result = db.query("SELECT id, tagname, tagtype, title, icon, private FROM {p}tagids ORDER BY sort")
-    except db.sql.DBException:
+    except db.DBException:
         logging.error(__name__, "Could not fetch tags from tagids table.")
         raise RuntimeError()
         

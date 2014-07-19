@@ -190,8 +190,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     try:
         if type == 'gui':
             splash.showMessage(translate("Splash", "Connecting to database"))
-        database.connect()
-    except database.sql.DBException as e:
+        database.init()
+    except database.DBException as e:
         logger.error("I cannot connect to the database. Did you provide the correct information in the"
                      " config file? SQL error: {}".format(e.message))
         if type == 'gui':
@@ -293,7 +293,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     plugins.shutdown()
     covers.shutdown()
     profiles.manager.save()
-    database.close()
+    database.shutdown()
     config.shutdown()
     logging.shutdown()
     sys.exit(returnValue)

@@ -18,437 +18,131 @@
 
 """Module to manage the database tables used by OMG."""
 
-import re
+from . import prefix, FlexiDateType
+from sqlalchemy import *
 
-from .sql import DBException
-from .. import constants, database as db
-  
-  
-class SQLTable:
-    """A table in the database.
-    
-    This class contains methods to create, check and drop a table in an SQL database. Note that instantiating
-    SQLTable does not create an actual table or modify the database in any way. The class has three public
-    attributes:
+metadata = MetaData()
 
-        * createQueries: maps db type to a list of queries necessary to create the table and associated 
-        indexes and triggers. The first query must be a 'CREATE TABLE' query.
-        * name: contains the name of the table including the optional prefix. This is extracted from the
-          first createQuery.
-        * columns: the names of the columns
-    """
-    def __init__(self, createQueries):
-        # replace {p} by db.prefix
-        self.createQueries = {key: [query.format(p=db.prefix) for query in queries]
-                              for key, queries in createQueries.items()}
-        result = re.match("\s*CREATE\s*TABLE\s*(\w+)\s*\((.*)\)", self.createQueries[db.type][0], re.I|re.S)
-        if result is None:
-            raise DBException("First create query must be a 'CREATE TABLE' query: {}"
-                              .format(self.createQueries[db.type][0]))
-        self.name = result.group(1)
-        lines = result.group(2).split('\n')
-        columns = [line.split()[0] for line in lines if len(line.split()) > 0]
-        # Filter out definitions of keys, indexes etc.
-        # See https://dev.mysql.com/doc/refman/5.5/en/create-table.html
-        # or  https://www.sqlite.org/lang_createtable.html
-        specialWords = ["CONSTRAINT","PRIMARY","KEY","INDEX","UNIQUE","FULLTEXT","SPATIAL","FOREIGN","CHECK"]
-        self.columns = [c for c in columns if c not in specialWords]
+# Maximum length of encoded(!) names of tags/flags/domains. Also used for tag-titles.
+TAG_NAME_LENGTH = 63
+FLAG_NAME_LENGTH = 63
+DOMAIN_NAME_LENGTH = 63
 
-    def exists(self):
-        """Return whether this table exists in the database."""
-        return self.name in db.listTables()
-        
-    def create(self):
-        """Create this table by executing its createQuery."""
-        if self.exists():
-            raise DBException("Table '{}' does already exist.".format(self.name))
-        print("Creating", self.name)
-        for query in self.createQueries[db.type]:
-            print(query)
-            db.query(query)
-    
-    def reset(self):
-        """Drop this table and create it without data again. All table rows will be lost!"""
-        if self.exists():
-            # Indexes and triggers are deleted automatically
-            db.query("DROP TABLE {}".format(self.name))
-                
-        self.create()
+# Maximum length of encoded(!) values for varchar-tags
+TAG_VARCHAR_LENGTH = 255
 
 
-tables = []
-
-def _addMySQL(*queries):
-    tables.append({'mysql': queries})
-        
-def _addSQLite(*queries):
-    assert 'sqlite' not in tables[-1]
-    tables[-1]['sqlite'] = queries
-
-#----------#
-# elements #
-#----------#
-_addMySQL("""
-CREATE TABLE {p}elements (
-    id          MEDIUMINT UNSIGNED  NOT NULL,
-    domain      SMALLINT  UNSIGNED  NOT NULL,
-    file        BOOLEAN             NOT NULL,
-    type        TINYINT   UNSIGNED  NOT NULL DEFAULT 0,
-    elements    SMALLINT  UNSIGNED  NOT NULL DEFAULT 0,
-    PRIMARY KEY(id),
-    FOREIGN KEY(domain) REFERENCES {p}domains(id)
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}elements (
-    id          INTEGER PRIMARY KEY,
-    domain      INTEGER             NOT NULL,
-    file        BOOLEAN             NOT NULL DEFAULT 0,
-    type        INTEGER             NOT NULL DEFAULT 0,
-    elements    INTEGER             NOT NULL DEFAULT 0,
-    FOREIGN KEY(domain) REFERENCES {p}domains(id)
-)
-""")
-
-#----------#
-# contents #
-#----------#
-_addMySQL("""
-CREATE TABLE {p}contents (
-    container_id MEDIUMINT UNSIGNED NOT NULL,
-    position     SMALLINT  UNSIGNED NOT NULL,
-    element_id   MEDIUMINT UNSIGNED NOT NULL,
-    PRIMARY KEY(container_id,position),
-    INDEX element_idx(element_id),
-    FOREIGN KEY(container_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}contents (
-    container_id MEDIUMINT UNSIGNED NOT NULL,
-    position     SMALLINT  UNSIGNED NOT NULL,
-    element_id   MEDIUMINT UNSIGNED NOT NULL,
-    PRIMARY KEY(container_id,position),
-    FOREIGN KEY(container_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
-)
-""",
-"CREATE INDEX {p}contents_element_idx ON {p}contents (element_id)"
+domains = Table(prefix+'domains', metadata,
+    Column('id', SmallInteger, primary_key=True),
+    Column('name', String(DOMAIN_NAME_LENGTH), unique=True),
+    mysql_engine='InnoDB'
 )
 
-#-------#
-# files #
-#-------#
-_addMySQL("""
-CREATE TABLE {p}files (
-    element_id MEDIUMINT UNSIGNED NOT NULL,
-    url        VARCHAR(511)       NOT NULL,
-    hash       VARCHAR(63),
-    verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    length     MEDIUMINT UNSIGNED NOT NULL,
-    PRIMARY KEY(element_id),
-    INDEX url_idx(url(333)),
-    INDEX hash_idx(hash),
-    INDEX length_idx(length),
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}files (
-    element_id MEDIUMINT UNSIGNED NOT NULL,
-    url        VARCHAR(511)       NOT NULL,
-    hash       VARCHAR(63),
-    verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    length     MEDIUMINT UNSIGNED NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
-)
-""",
-"CREATE INDEX {p}files_url_idx ON {p}files (url)",
-"CREATE INDEX {p}files_hash_idx ON {p}files (hash)",
-"CREATE INDEX {p}files_length_idx ON {p}files (length)",
-"""
-CREATE TRIGGER {p}files_timestamp_trg AFTER UPDATE ON {p}files
-BEGIN
-UPDATE {p}files SET verified = CURRENT_TIMESTAMP WHERE element_id = new.element_id;
-END
-"""
+elements = Table(prefix+'elements', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('domain', SmallInteger, ForeignKey(prefix+'domains.id'), nullable=False),
+    Column('file', Boolean, nullable=False),
+    Column('type', SmallInteger, nullable=False),
+    Column('elements', SmallInteger, nullable=False),
+    mysql_engine='InnoDB'
 )
 
-#--------#
-# tagids #
-#--------#
-_addMySQL("""
-CREATE TABLE {p}tagids (
-    id       SMALLINT UNSIGNED             NOT NULL AUTO_INCREMENT,
-    tagname  VARCHAR(63)                   NOT NULL,
-    tagtype  ENUM('varchar','date','text') NOT NULL DEFAULT 'varchar',
-    title    VARCHAR(63)                   DEFAULT NULL,
-    icon     VARCHAR(255)                  DEFAULT NULL,
-    private  BOOLEAN                       NOT NULL,
-    sort     SMALLINT UNSIGNED             NOT NULL,
-    PRIMARY KEY(id),
-    UNIQUE INDEX(tagname)
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}tagids (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    tagname  VARCHAR(63)                   NOT NULL UNIQUE,
-    tagtype  VARCHAR(7)                    NOT NULL DEFAULT 'varchar',
-    title    VARCHAR(63)                   DEFAULT NULL,
-    icon     VARCHAR(255)                  DEFAULT NULL,
-    private  BOOLEAN                       NOT NULL DEFAULT 0,
-    sort     INTEGER                       NOT NULL DEFAULT -1
-)
-""")
-
-#------#
-# tags #
-#------#
-_addMySQL("""
-CREATE TABLE {p}tags (
-    element_id MEDIUMINT UNSIGNED NOT NULL,
-    tag_id     SMALLINT  UNSIGNED NOT NULL,
-    value_id   MEDIUMINT UNSIGNED NOT NULL,
-    INDEX tag_value_idx(tag_id,value_id),
-    INDEX element_idx(element_id),
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}tags (
-    element_id MEDIUMINT UNSIGNED NOT NULL,
-    tag_id     SMALLINT  UNSIGNED NOT NULL,
-    value_id   MEDIUMINT UNSIGNED NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
-)
-""",
-"CREATE INDEX {p}tags_tag_value_idx ON {p}tags (tag_id,value_id)",
-"CREATE INDEX {p}tags_element_idx ON {p}tags (element_id)")
-
-#----------------#
-# values_varchar #
-#----------------#
-_addMySQL("""
-CREATE TABLE {0}values_varchar (
-    id              MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    tag_id          SMALLINT  UNSIGNED NOT NULL,
-    value           VARCHAR({1})       NOT NULL,
-    sort_value      VARCHAR({1}),
-    search_value    VARCHAR({1}),
-    hide            BOOLEAN            NOT NULL,
-    PRIMARY KEY(id),
-    INDEX tag_value_idx(tag_id,value),
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix, constants.TAG_VARCHAR_LENGTH))
-_addSQLite("""
-CREATE TABLE {0}values_varchar (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    tag_id          SMALLINT  UNSIGNED NOT NULL,
-    value           VARCHAR({1})       NOT NULL,
-    sort_value      VARCHAR({1}),
-    search_value    VARCHAR({1}),
-    hide            BOOLEAN            NOT NULL DEFAULT 0,
-    FOREIGN KEY(tag_id) REFERENCES {0}tagids(id) ON DELETE CASCADE
-)
-""".format(db.prefix, constants.TAG_VARCHAR_LENGTH),
-"CREATE INDEX {p}values_varchar_idx ON {p}values_varchar (value)")
-
-#-------------#
-# values_text #
-#-------------#
-_addMySQL("""
-CREATE TABLE {p}values_text (
-    id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    tag_id SMALLINT  UNSIGNED NOT NULL,
-    value  TEXT               NOT NULL,
-    PRIMARY KEY(id),
-    INDEX tag_value_idx(tag_id,value(10)),
-    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}values_text (
-    id     INTEGER PRIMARY KEY AUTOINCREMENT,
-    tag_id SMALLINT  UNSIGNED NOT NULL,
-    value  TEXT               NOT NULL,
-    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
-)
-""",
-"CREATE INDEX {p}values_text_idx ON {p}values_text (value)")
-
-#-------------#
-# values_date #
-#-------------#
-_addMySQL("""
-CREATE TABLE {p}values_date (
-    id     MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    tag_id SMALLINT  UNSIGNED NOT NULL,
-    value  INT       UNSIGNED NOT NULL,
-    PRIMARY KEY(id),
-    INDEX tag_value_idx(tag_id,value),
-    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}values_date (
-    id     INTEGER PRIMARY KEY AUTOINCREMENT,
-    tag_id SMALLINT  UNSIGNED NOT NULL,
-    value  INT       UNSIGNED NOT NULL,
-    FOREIGN KEY(tag_id) REFERENCES {p}tagids(id) ON DELETE CASCADE
-)
-""",
-"CREATE INDEX {p}values_date_idx ON {p}values_date (value)")
-
-#------------#
-# flag_names #
-#------------#
-_addMySQL("""
-CREATE TABLE {}flag_names (
-    id      SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    name    VARCHAR({})       NOT NULL,
-    icon    VARCHAR(255)      DEFAULT NULL,
-    PRIMARY KEY(id)
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""".format(db.prefix, constants.FLAG_VARCHAR_LENGTH))
-_addSQLite("""
-CREATE TABLE {}flag_names (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    name    VARCHAR({})       NOT NULL,
-    icon    VARCHAR(255)      DEFAULT NULL
-)
-""".format(db.prefix, constants.FLAG_VARCHAR_LENGTH))
-
-#-------#
-# flags #
-#-------#
-_addMySQL("""
-CREATE TABLE {p}flags (
-    element_id      MEDIUMINT UNSIGNED NOT NULL,
-    flag_id         SMALLINT UNSIGNED NOT NULL,
-    UNIQUE INDEX flag_idx(element_id,flag_id),
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(flag_id) REFERENCES {p}flag_names(id) ON DELETE CASCADE
-) ENGINE InnoDB
-""")
-_addSQLite("""
-CREATE TABLE {p}flags (
-    element_id      MEDIUMINT UNSIGNED NOT NULL,
-    flag_id         SMALLINT UNSIGNED NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE,
-    FOREIGN KEY(flag_id) REFERENCES {p}flag_names(id) ON DELETE CASCADE
-)
-""",
-"CREATE UNIQUE INDEX {p}flags_idx ON {p}flags (element_id,flag_id)")
-
-#---------#
-# folders #
-#---------#
-_addMySQL("""
-CREATE TABLE {p}folders (
-    path         VARCHAR(511)    NOT NULL,
-    state        TINYINT NOT NULL DEFAULT 0
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}folders (
-    path         VARCHAR(511)    NOT NULL,
-    state        INTEGER NOT NULL DEFAULT 0
-)
-""")
-
-#----------#
-# newfiles #
-#----------#
-_addMySQL("""
-CREATE TABLE {p}newfiles (
-    url        VARCHAR(511)       NOT NULL,
-    hash       VARCHAR(63),
-    verified   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX url_idx(url(333)),
-    INDEX hash_idx(hash)
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}newfiles (
-    url        VARCHAR(511)       NOT NULL,
-    hash       VARCHAR(63),
-    verified   INTEGER DEFAULT CURRENT_TIMESTAMP
-)
-""",
-"CREATE INDEX {p}newfiles_url_idx ON {p}newfiles (url)",
-"CREATE INDEX {p}newfiles_hash_idx ON {p}newfiles (hash)",
-"""
-CREATE TRIGGER {p}newfiles_timestamp_trg AFTER UPDATE ON {p}newfiles
-BEGIN
-UPDATE {p}newfiles SET verified = CURRENT_TIMESTAMP WHERE url = new.url;
-END
-"""
+contents = Table(prefix+'contents', metadata,
+    Column('container_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), primary_key=True),
+    Column('position', SmallInteger, primary_key=True),
+    Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'),
+           nullable=False, index=True),
+    mysql_engine='InnoDB'
 )
 
-#----------#
-# stickers #
-#----------#
-_addMySQL("""
-CREATE TABLE {p}stickers (
-    element_id  MEDIUMINT UNSIGNED  NOT NULL,
-    type        VARCHAR(255)        NOT NULL,
-    sort        SMALLINT UNSIGNED   NOT NULL,
-    data        TEXT                NOT NULL,
-    INDEX stickers_idx(element_id,type,sort),
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}stickers (
-    element_id  INTEGER         NOT NULL,
-    type        VARCHAR(255)    NOT NULL,
-    sort        INTEGER         NOT NULL,
-    data        TEXT            NOT NULL,
-    FOREIGN KEY(element_id) REFERENCES {p}elements(id) ON DELETE CASCADE
-)
-""",
-"CREATE INDEX {p}stickers_idx ON {p}stickers (element_id,type,sort)"
+files = Table(prefix+'files', metadata,
+    Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), primary_key=True),
+    Column('url', String(500), nullable=False, index=True),
+    Column('hash', String(63), index=True),
+    Column('verified', TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP')),
+    Column('length', Integer, nullable=False),
+    mysql_engine='InnoDB'
 )
 
-#---------#
-# domains #
-#---------#
-_addMySQL("""
-CREATE TABLE {p}domains (
-    id    SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    name  VARCHAR(64),   
-    PRIMARY KEY(id),
-    UNIQUE INDEX(name)
-) ENGINE InnoDB, CHARACTER SET 'utf8'
-""")
-_addSQLite("""
-CREATE TABLE {p}domains (
-    id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    name  VARCHAR(64) NOT NULL UNIQUE
+tagids = Table(prefix+'tagids', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('tagname', String(TAG_NAME_LENGTH), nullable=False, index=True, unique=True),
+    Column('tagtype', Enum('varchar', 'date', 'text'), default='varchar', nullable=False),
+    Column('title', String(TAG_NAME_LENGTH)),
+    Column('icon', String(255)),
+    Column('private', Boolean, nullable=False),
+    Column('sort', SmallInteger, nullable=False),
+    mysql_engine='InnoDB'
 )
-""")
 
+tags = Table(prefix+'tags', metadata,
+    Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'),
+           nullable=False, index=True),
+    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('value_id', Integer, nullable=False),
+    mysql_engine='InnoDB'
+)
+Index(prefix+'tags_tag_value_idx', tags.c.tag_id, tags.c.value_id)
 
-tables = [SQLTable(queryDict) for queryDict in tables]
+values_varchar = Table(prefix+'values_varchar', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('value', String(TAG_VARCHAR_LENGTH), nullable=False),
+    Column('sort_value', String(TAG_VARCHAR_LENGTH)),
+    Column('search_value', String(TAG_VARCHAR_LENGTH)),
+    Column('hide', Boolean, nullable=False),
+    mysql_engine='InnoDB'
+)
+Index(prefix+'values_varchar_idx', values_varchar.c.tag_id, values_varchar.c.value)
 
-def byName(name):
-    """Return the table with the given name, which must include the database prefix."""
-    for table in tables:
-        if name == table.name:
-            return table
-    else: return None
-    
-    
-def sortedList():
-    """Get all tables in an order such that each table only references tables that appeared earlier
-    in the list."""
-    # Some tables are referenced by other tables and must therefore be dropped last and created first.
-    # The order is important!
-    referencedTables = [byName(db.prefix+name) for name in ["domains", "elements", "tagids", "flag_names"]]
-    otherTables = [table for table in tables if table not in referencedTables]
-    return referencedTables + otherTables
+values_text = Table(prefix+'values_text', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('value', Text, nullable=False),
+    mysql_engine='InnoDB'
+)
+Index(prefix+'values_text_idx', values_text.c.tag_id, values_text.c.value)
+   
+values_date = Table(prefix+'values_date', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('value', FlexiDateType, nullable=False),
+    mysql_engine='InnoDB'
+)
+Index(prefix+'values_date_idx', values_date.c.tag_id, values_date.c.value)
+   
+flag_names = Table(prefix+'flag_names', metadata,
+    Column('id', SmallInteger, primary_key=True),
+    Column('name', String(FLAG_NAME_LENGTH), nullable=False, unique=True),
+    Column('icon', String(255)),
+    mysql_engine='InnoDB'
+)
+
+flags = Table(prefix+'flags', metadata,
+    Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), nullable=False),
+    Column('flag_id', SmallInteger, ForeignKey(prefix+'flag_names.id', ondelete='CASCADE'), nullable=False),
+    mysql_engine='InnoDB'
+)
+Index(prefix+'flags_idx', flags.element_id, flags.flag_id, unique=True)
+
+folders = Table(prefix+'folders', metadata,
+    Column('path', String(500), nullable=False),
+    Column('state', SmallInteger, nullable=False),
+    mysql_engine='InnoDB'
+)
+
+newfiles = Table(prefix+'newfiles', metadata,
+    Column('url', String(500), nullable=False, index=True),
+    Column('hash', String(63), index=True),
+    Column('verified', TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP')),
+    mysql_engine='InnoDB'
+)
+
+stickers = Table(prefix+'stickers', metadata,
+    Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), nullable=False),
+    Column('type', String(255), nullable=False),
+    Column('sort', SmallInteger, nullable=False),
+    Column('data', Text, nullable=False),
+    mysql_engine='InnoDB'
+)
+Index(prefix+'stickers_idx', stickers.c.element_d, stickers.c.type, stickers.c.sort)

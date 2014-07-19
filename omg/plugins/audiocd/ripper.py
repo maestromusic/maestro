@@ -137,7 +137,7 @@ class Ripper(QtCore.QObject):
                            .format(db.prefix, self.discid, tracknumber)).getSingle()
             elem = levels.real.collect(ans)
             levels.real.stack.push(InsertRippedFileCommand(elem, flacPath))
-        except db.sql.EmptyResultException:
+        except db.EmptyResultException:
             finishedTracks.append((self.discid, tracknumber, flacPath))
         if tracknumber == self.toTrack:
             mainwindow.mainWindow.statusBar().removeWidget(self.statusWidget)

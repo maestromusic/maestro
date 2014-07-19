@@ -53,73 +53,82 @@ each thread and use a 'with' statement to ensure the connection is finally close
 
 \ """
 
-import os, threading, functools
+import os, threading
+import sqlalchemy
 
-from PyQt4 import QtCore
-
-from . import sql
-from .. import config, logging, utils, constants
+from .. import config, utils
 from ..core import tags as tagsModule
 
-# Table type and prefix
 type = None
 prefix = None
-
-logger = logging.getLogger(__name__)
-
-# Each thread must have its own connection object. This maps thread identifiers to the connection object
-connections = {}
-
+engine = None # engine to the main database (other databases may be used during synchronization)
+driver = None
 
 # Next id that will be returned by nextId() and lock to make that method threadsafe
 _nextId = None
 _nextIdLock = threading.Lock()
 
-# Connection and maintenance methods
-#=======================================================================
-class ConnectionContextManager:
-    """Connection manager that ensures that connections in threads other than the main thread are closed and
-    removed from the dict 'connections' when the thread terminates.
-    """
-    def __enter__(self):
-        return None
 
-    def __exit__(self,exc_type, exc_value, traceback):
-        close()
-        return False # If the suite was stopped by an exception, don't stop that exception
-    
-    @property
-    def connection(self):
-        """The connection of the current thread."""
-        return connections[threading.current_thread().ident]
+DBException = sqlalchemy.exc.DBAPIError
+
+class EmptyResultException(Exception):
+    """This exception is executed if getSingle, getSingleRow or getSingleColumn are
+    performed on a result which does not contain any row.
+    """
+
+
+class FlexiDateType(sqlalchemy.types.TypeDecorator):
+    impl = sqlalchemy.types.Integer
+
+    def process_bind_param(self, value, dialect):
+        return value.toSql()
+
+    def process_result_value(self, value, dialect):
+        return utils.FlexiDate.fromSql(value)
+
+    def copy(self):
+        return FlexiDateDecorator()
+
+
+
+def createEngine(**kwargs):
+    if kwargs['type'] == 'sqlite':
+        url = 'sqlite:///'+kwargs['path'] # absolute paths will have 4 slashes
+    elif kwargs['port'] == 0:
+        # let SqlAlchemy figure out the default port
+        url = '{type}://{user}:{password}@{host}/{name}'.format(**kwargs)
+    else: url = '{type}://{user}:{password}@{host}:{port}/{name}'.format(**kwargs)
+    engine = sqlalchemy.create_engine(url, poolclass=sqlalchemy.pool.SingletonThreadPool)
+    return engine
 
 
 def connect(**kwargs):
-    """Connect to the database server with information from the config file. This method must be called 
-    exactly once for each thread that wishes to access the database. If successful, it returns a
-    ConnectionContextManager that will automatically close the connection if used in a 'with'
-    statement. If the connection fails, it will raise a DBException.
-    
-    Keyword arguments are passed to the connect-method of the new connection.
-    """
-    threadId = threading.current_thread().ident
-    if threadId in connections:
-        logger.warning(
-            "database.connect has been called although a connection for this thread was already open.")
-        return ConnectionContextManager()
-    global type, prefix
-    type = config.options.database.type
-    prefix = config.options.database.prefix
+    return createEngine(**kwargs).connect()
+
+
+def init(**kwargs):
+    # connect to default database with args from config
+    global type, prefix, engine, driver
+    if 'type' not in kwargs:
+        kwargs['type'] = config.options.database.type
+    if '+' in kwargs['type']:
+        type, driver = kwargs['type'].split('+')
+    else: type, driver = kwargs['type'], None
+    prefix = kwargs.get('prefix', config.options.database.prefix)
     
     if type == 'sqlite':
+        path = kwargs.get('path', config.options.database.sqlite_path).strip()
         # Replace 'config:' prefix in path
-        path = config.options.database.sqlite_path.strip()
         if path.startswith('config:'):
-            path = os.path.join(config.CONFDIR,path[len('config:'):])
-        contextManager = _connect(['sqlite'],[path], **kwargs)
-    else: 
-        authValues = [config.options.database["mysql_"+key] for key in sql.AUTH_OPTIONS]
-        contextManager = _connect(config.options.database.mysql_drivers, authValues)
+            path = os.path.join(config.CONFDIR, path[len('config:'):])
+        kwargs['path'] = path
+    else:
+        args = ["user", "password", "name", "host", "port"]
+        for arg in args:
+            if arg not in kwargs:
+                kwargs[arg] = config.options.database[arg]
+
+    engine = createEngine(**kwargs)
     
     # Initialize nextId-stuff when the first connection is created
     with _nextIdLock:
@@ -130,30 +139,13 @@ def connect(**kwargs):
                 if isNull(_nextId): # this happens when elements is empty
                     _nextId = 1
                 else: _nextId += 1    
-            except sql.DBException: # table does not exist yet (in the install tool, test scripts...)
+            except DBException: # table does not exist yet (in the install tool, test scripts...)
                 _nextId = 1         
-    return contextManager
+    return engine
 
 
-def _connect(drivers,authValues, **kwargs):
-    """Connect to the database using the given parameters which are submitted to the connect method of the
-    driver. Throw a DBException if connection fails."""
-    connection = sql.newConnection(drivers)
-    connection.connect(*authValues, **kwargs)
-    connections[threading.current_thread().ident] = connection
-    return ConnectionContextManager()
-    
-
-def close():
-    """Close the database connection of this thread, if present. If you use the context manager returned by
-    'connect', this method is called automatically.
-    """
-    threadId = threading.current_thread().ident
-    if threadId in connections:
-        connection = connections[threadId]
-        del connections[threadId]
-        connection.close()
-
+def shutdown():
+    engine.dispose()
 
 def nextId():
     """Reserve the next free element id and return it."""
@@ -173,9 +165,11 @@ def nextIds(count):
 
 def listTables():
     """Return a list of all table names in the database."""
-    if type == 'mysql':
-        return list(query("SHOW TABLES").getSingleColumn())
-    else: return list(query("SELECT name FROM sqlite_master WHERE type = 'table'").getSingleColumn())
+    return engine.table_names()
+
+
+
+
 
 
 def resetDatabase():
@@ -198,50 +192,118 @@ def createTables(ignoreExisting=False):
             table.create()
 
 
-# Standard methods which are redirected to this thread's connection object (see sql.AbstractSql)
-#===============================================================================================
-def query(*args, **kwargs):
-    try:
-        return connections[threading.current_thread().ident].query(*args, **kwargs)
-    except KeyError:
-        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+def query(queryString, *args, **kwargs):
+    kwargs['p'] = prefix
+    queryString = queryString.format(**kwargs)
+    #print(queryString)
+    #print(args)
+    if len(args) > 0 and driver == 'mysqlconnector':
+        queryString = queryString.replace('?', '%s')
+    result = engine.execute(queryString, *args)
+    return SqlResult(result)
 
-def multiQuery(queryString, argSets, **kwargs):
-    try:
-        return connections[threading.current_thread().ident].multiQuery(queryString, argSets, **kwargs)
-    except KeyError:
-        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+multiQuery = query # just submit tuples as *args
 
 def transaction():
-    try:
-        connections[threading.current_thread().ident].transaction()
-    except KeyError:
-        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
-
-def commit():
-    try:
-        connections[threading.current_thread().ident].commit()
-    except KeyError:
-        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
-
-def rollback():
-    try:
-        connections[threading.current_thread().ident].rollback()
-    except KeyError:
-        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+    return engine.begin()
 
 def isNull(value):
-    try:
-        return connections[threading.current_thread().ident].isNull(value)
-    except KeyError:
-        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+    return value is None
 
 def getDate(value):
-    try:
-        return connections[threading.current_thread().ident].getDate(value)
-    except KeyError:
-        raise RuntimeError("Cannot access database before a connection for this thread has been opened.")
+    return value.replace(tzinfo=datetime.timezone.utc)
 
+
+
+class ArrayResult:
+    def __init__(self, result):
+        self.rows = result.fetchall()
+        self.rowcount = result.rewcount
+        self.inserted_primary_key = result.inserted_primary_key
+        self._index = 0
+        
+    def fetchone(self):
+        if self._index < len(self.rows):
+            row = self.rows[self._index]
+            self._index += 1
+            return tuple(row)
+        else: return None
+        
+    def __iter__(self):
+        return self.rows.__iter__()
+        
+    
+class ResultIterator:
+    def __init__(self, result):
+        self._iter = iter(result)
+        
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        return tuple(next(self._iter))
+    
+class SqlResult:
+    def __init__(self, result):
+        self._result = result
+            
+    def __iter__(self):
+        return ResultIterator(self._result)
+        
+    def __len__(self):
+        return self.size()
+    
+    def size(self):
+        """Returns the number of rows selected in a select query. You can also use the built-in
+        'len'-method.
+        """
+        self._result = ArrayResult(self._result)
+        return len(self._result.rows)
+    
+    def next(self):
+        row = self._result.fetchone()
+        if row is not None:
+            return tuple(row)
+        else: raise StopIteration()
+        
+    def affectedRows(self):
+        """Return the number of rows affected by the query producing this AbstracSqlResult.
+        This method must not be used for result sets produced by multiqueries (different drivers would return
+        different values)."""
+        return self._result.rowcount
+    
+    def insertId(self):
+        """Return the last value which was used in an 'AUTO_INCREMENT'-column when this AbstractSqlResult
+        was created. This method must not be used for result sets produced by multiqueries (different drivers
+        would return different values)."""
+        return self._result.inserted_primary_key
+    
+    def getSingle(self):
+        """Return the first value from the first row of the result set. Use this as a shorthand method if
+        the result contains only one value. If the result set does not contain any row, an
+        EmptyResultException is raised.
+        """
+        row = self._result.fetchone()
+        if row is not None:
+            return row[0]
+        else: raise EmptyResultException()
+        
+    def getSingleColumn(self):
+        """Return a generator for the first column of the result set. Use this as a shorthand method if the
+        result contains only one column. Contrary to getSingeRow, this method does not raise an
+        EmptyResultException if the result set is empty."""
+        row = self._result.fetchone()
+        while row is not None:
+            yield row[0]
+            row = self._result.fetchone()
+        
+    def getSingleRow(self):
+        """Return the first row of the result set or raise an EmptyResultException if the result does
+        not contain any rows. Use this as a shorthand if there is only one row in the result set."""
+        row = self._result.fetchone()
+        if row is not None:
+            return tuple(row)
+        else: raise EmptyResultException()
     
 # contents-table
 #=======================================================================
@@ -299,12 +361,12 @@ def isToplevel(elid):
         """, elid).getSingle())
     
 def elementCount(elid):
-    """Return the number of children of the element with id *elid* or raise an sql.EmptyResultException if
+    """Return the number of children of the element with id *elid* or raise an EmptyResultException if
     that element does not exist."""
     return query("SELECT elements FROM {p}elements WHERE id = ?", elid).getSingle()
 
 def elementType(elid):
-    """Return the type of the element with id *elid* or raise an sql.EmptyResultException if
+    """Return the type of the element with id *elid* or raise an EmptyResultException if
     that element does not exist."""
     return query("SELECT type FROM {p}elements WHERE id = ?", elid).getSingle()
 
@@ -330,22 +392,22 @@ def updateElementsCounter(elids=None):
 # Files-Table
 #================================================
 def url(elid):
-    """Return the url of the file with id *elid* or raise an sql.EmptyResultException if that element does 
+    """Return the url of the file with id *elid* or raise an EmptyResultException if that element does 
     not exist."""
     try:
         return query("SELECT url FROM {p}files WHERE element_id=?", elid).getSingle()
-    except sql.EmptyResultException:
-        raise sql.EmptyResultException(
+    except EmptyResultException:
+        raise EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 
 def hash(elid):
-    """Return the hash of the file with id *elid* or raise an sql.EmptyResultException if that element does
+    """Return the hash of the file with id *elid* or raise an EmptyResultException if that element does
     not exist.""" 
     try:
         return query("SELECT hash FROM {p}files WHERE element_id=?", elid).getSingle()
-    except sql.EmptyResultException:
-        raise sql.EmptyResultException(
+    except EmptyResultException:
+        raise EmptyResultException(
                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 
@@ -356,7 +418,7 @@ def idFromUrl(url):
     with that URL exists."""
     try:
         return query("SELECT element_id FROM {p}files WHERE url=?", str(url)).getSingle()
-    except sql.EmptyResultException:
+    except EmptyResultException:
         return None
 
 
@@ -386,7 +448,7 @@ def cacheTagValues():
       
 
 def valueFromId(tagSpec, valueId):
-    """Return the value from the tag *tagSpec* with id *valueId* or raise an sql.EmptyResultException if
+    """Return the value from the tag *tagSpec* with id *valueId* or raise an EmptyResultException if
     that id does not exist. Date tags will be returned as FlexiDate.
     """
     tag = tagsModule.get(tagSpec)
@@ -401,7 +463,7 @@ def valueFromId(tagSpec, valueId):
     try:
         value = query("SELECT value FROM {}values_{} WHERE tag_id = ? AND id = ?"
                         .format(prefix, tag.type.name), tag.id,valueId).getSingle()
-    except sql.EmptyResultException:
+    except EmptyResultException:
         raise KeyError("There is no value of tag '{}' for id {}".format(tag,valueId))
                     
     # Store value in cache
@@ -416,7 +478,7 @@ def valueFromId(tagSpec, valueId):
 
 def idFromValue(tagSpec, value, insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
-    raise an sql.EmptyResultException, unless the optional parameter *insert* is set to True. In that case
+    raise an EmptyResultException, unless the optional parameter *insert* is set to True. In that case
     insert the value into the table and return its id.
     """
     tag = tagsModule.get(tagSpec)
@@ -436,7 +498,7 @@ def idFromValue(tagSpec, value, insert=False):
                  .format(prefix, tag.type.name)
         else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
         id = query(q,tag.id,value).getSingle()
-    except sql.EmptyResultException:
+    except EmptyResultException:
         if insert:
             if tag.type is tagsModule.TYPE_VARCHAR:
                 searchValue = utils.strings.removeDiacritics(value)

@@ -75,7 +75,7 @@ def aliasFromDB(entity, mbid):
         return db.query("SELECT alias, sortname FROM {}musicbrainzaliases "
                         "WHERE entity=? AND mbid=?".format(db.prefix),
                         entity, mbid).getSingleRow()
-    except db.sql.EmptyResultException:
+    except db.EmptyResultException:
         return None
     
 def updateDBAliases(entities):
