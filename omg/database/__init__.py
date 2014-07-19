@@ -107,6 +107,11 @@ def createEngine(**kwargs):
         url += '/{name}'
         url = url.format(**kwargs)
         engine = sqlalchemy.create_engine(url, poolclass=sqlalchemy.pool.SingletonThreadPool)
+        
+        # standard decorator style
+        @sqlalchemy.event.listens_for(engine, 'connect')
+        def receive_connect(dbapi_connection, connection_record):
+            print("CONNECT")
     return engine
 
 

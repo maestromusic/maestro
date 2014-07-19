@@ -455,6 +455,7 @@ class TagCriterion(Criterion):
         return not self.__eq__(other)
     
     def process(self, fromTable, domain):
+        import time
         # First handle the case where we search only for existence or non-existence of a given tag
         if self.value is None:
             joinClause = "{}tags AS t ON el.id = t.element_id AND t.tag_id IN ({})"\
@@ -525,6 +526,7 @@ class TagCriterion(Criterion):
                     continue
                 whereClause = self.interval.toDateSql().queryPart()
                 args = []
+            perf = time.perf_counter()
             db.query("""
                     INSERT INTO {help} (value_id, tag_id)
                         SELECT id, tag_id
@@ -532,7 +534,7 @@ class TagCriterion(Criterion):
                         WHERE tag_id IN({tags}) AND {where}
                     """, *args, help=TT_HELP, type=valueType.name,
                                 tags=db.csIdList(tagList), where=whereClause)
-                
+            print("1: "+str(time.perf_counter()-perf))
             if pragmaNecessary:
                 db.query('PRAGMA case_sensitive_like = 0')
                 
@@ -548,6 +550,7 @@ class TagCriterion(Criterion):
         # Select elements which have these values (or not)
         #=================================================
         domainWhereClause = "el.domain={}".format(domain.id) if domain is not None else "1"
+        perf = time.perf_counter()
         if not self.negate:
             self.result = set(db.query("""
                 SELECT DISTINCT el.id
@@ -566,6 +569,7 @@ class TagCriterion(Criterion):
                 GROUP BY el.id
                 HAVING COUNT(h.value_id) = 0
                 """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColumn())
+        print("2: "+str(time.perf_counter()-perf))
     
     def _escapeParameter(self, parameter):
         """Escape parameter for use in LIKE expression."""

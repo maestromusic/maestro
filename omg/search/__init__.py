@@ -61,6 +61,8 @@ class SearchTask(utils.worker.Task):
         self.domain = domain
         
     def process(self):
+        import time
+        start = time.perf_counter()
         for criterion in self.criterion.getCriteriaDepthFirst():
             if not isinstance(criterion, criteria.MultiCriterion):
                 generator = criterion.process(db.prefix+"elements", self.domain)
@@ -82,4 +84,6 @@ class SearchTask(utils.worker.Task):
                     allElements = set(db.query(query).getSingleColumn())
                     criterion.result = allElements - criterion.result
                 yield
+        end = time.perf_counter()
+        print(end-start)
                 

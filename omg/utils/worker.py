@@ -135,6 +135,7 @@ class Worker(QtCore.QObject):
             
     def reset(self):
         """Reset the worker thread, i.e. stop and remove all submitted tasks."""
+        print("RESET")
         if self.state != STATE_QUIT:
             self._resetCount += 1
             self._queue.put(None) # wake up worker if it is blocking in queue.get
@@ -169,9 +170,13 @@ class Worker(QtCore.QObject):
                     if task is None or task._resetCount != self._resetCount:
                         raise ResetException() # None is inserted to wake up the thread in reset/quit
                     generator = task.process()
+                    i=1
                     if generator is not None: # tasks yields None between each major step...
                         for n in generator:   # ...to give us the chance to abort in between.
+                            print(i)
+                            i+=1
                             if task._resetCount != self._resetCount:
+                                print("ABORT")
                                 raise ResetException()
                     self._done.emit(task)
                 except ResetException:
