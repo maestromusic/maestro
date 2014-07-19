@@ -27,6 +27,8 @@ from ..application import ChangeEvent
 _flagsById = None
 _flagsByName = None
 
+# Maximum length of encoded flag names.
+MAX_NAME_LENGTH = 63
 
 # This separator is used to separate flag names from each other. It must not be part of a flag name.
 FLAG_SEPARATOR = '|'
@@ -109,8 +111,7 @@ def exists(name):
 
 def isValidFlagname(name):
     """Return whether *name* is a valid name for a flagtype."""
-    return 0 < len(name.encode()) <= constants.FLAG_VARCHAR_LENGTH \
-                and not name.isspace() and FLAG_SEPARATOR not in name 
+    return 0 < len(name.encode()) <= MAX_NAME_LENGTH and not name.isspace() and FLAG_SEPARATOR not in name 
 
 
 def allFlags():

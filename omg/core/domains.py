@@ -27,9 +27,11 @@ from ..application import ChangeEvent
 
 domains = []
     
+# Maximum length of encoded domain names.
+MAX_NAME_LENGTH = 63
 
 def isValidName(name):
-    return name == name.strip() and 0 < len(name.encode()) <= constants.DOMAIN_VARCHAR_LENGTH 
+    return name == name.strip() and 0 < len(name.encode()) <= MAX_NAME_LENGTH 
 
 
 def exists(name):

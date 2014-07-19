@@ -18,23 +18,15 @@
 
 """Module to manage the database tables used by OMG."""
 
-from . import prefix, FlexiDateType
 from sqlalchemy import *
+from . import prefix, FlexiDateType, engine
+from ..core import domains, flags, tags
 
 metadata = MetaData()
-
-# Maximum length of encoded(!) names of tags/flags/domains. Also used for tag-titles.
-TAG_NAME_LENGTH = 63
-FLAG_NAME_LENGTH = 63
-DOMAIN_NAME_LENGTH = 63
-
-# Maximum length of encoded(!) values for varchar-tags
-TAG_VARCHAR_LENGTH = 255
-
-
+    
 domains = Table(prefix+'domains', metadata,
     Column('id', SmallInteger, primary_key=True),
-    Column('name', String(DOMAIN_NAME_LENGTH), unique=True),
+    Column('name', String(domains.MAX_NAME_LENGTH), unique=True),
     mysql_engine='InnoDB'
 )
 
@@ -66,9 +58,9 @@ files = Table(prefix+'files', metadata,
 
 tagids = Table(prefix+'tagids', metadata,
     Column('id', Integer, primary_key=True),
-    Column('tagname', String(TAG_NAME_LENGTH), nullable=False, index=True, unique=True),
+    Column('tagname', String(tags.MAX_NAME_LENGTH), nullable=False, index=True, unique=True),
     Column('tagtype', Enum('varchar', 'date', 'text'), default='varchar', nullable=False),
-    Column('title', String(TAG_NAME_LENGTH)),
+    Column('title', String(tags.MAX_NAME_LENGTH)),
     Column('icon', String(255)),
     Column('private', Boolean, nullable=False),
     Column('sort', SmallInteger, nullable=False),
@@ -87,9 +79,9 @@ Index(prefix+'tags_tag_value_idx', tags.c.tag_id, tags.c.value_id)
 values_varchar = Table(prefix+'values_varchar', metadata,
     Column('id', Integer, primary_key=True),
     Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
-    Column('value', String(TAG_VARCHAR_LENGTH), nullable=False),
-    Column('sort_value', String(TAG_VARCHAR_LENGTH)),
-    Column('search_value', String(TAG_VARCHAR_LENGTH)),
+    Column('value', String(tags.TAG_VARCHAR_LENGTH), nullable=False),
+    Column('sort_value', String(tags.TAG_VARCHAR_LENGTH)),
+    Column('search_value', String(tags.TAG_VARCHAR_LENGTH)),
     Column('hide', Boolean, nullable=False),
     mysql_engine='InnoDB'
 )
@@ -113,7 +105,7 @@ Index(prefix+'values_date_idx', values_date.c.tag_id, values_date.c.value)
    
 flag_names = Table(prefix+'flag_names', metadata,
     Column('id', SmallInteger, primary_key=True),
-    Column('name', String(FLAG_NAME_LENGTH), nullable=False, unique=True),
+    Column('name', String(flags.MAX_NAME_LENGTH), nullable=False, unique=True),
     Column('icon', String(255)),
     mysql_engine='InnoDB'
 )

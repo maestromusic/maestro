@@ -184,35 +184,9 @@ def listTables():
     return engine.table_names()
 
 
-
-
-
-
-def resetDatabase():
-    """Drop all tables and create them without data again. All table rows will be lost!"""
-    from . import tables
-    tableList = tables.sortedList()
-    for table in reversed(tableList):
-        if table.exists():
-            query("DROP TABLE {name}", name=table.name)
-    for table in tableList:
-        table.create()
-
-
-def createTables(ignoreExisting=False):
-    """Create all tables in an empty database (without inserting any data). If *ignoreExisting* is True,
-    only missing tables will be created."""
-    from . import tables
-    for table in tables.sortedList():
-        if not ignoreExisting or not table.exists():
-            table.create()
-
-
 def query(queryString, *args, **kwargs):
     kwargs['p'] = prefix
     queryString = queryString.format(**kwargs)
-    #print(queryString)
-    #print(args)
     if len(args) > 0 and driver == 'mysqlconnector':
         queryString = queryString.replace('?', '%s')
     result = engine.execute(queryString, *args)

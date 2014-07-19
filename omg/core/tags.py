@@ -81,6 +81,11 @@ tagList = None
 TITLE = None
 ALBUM = None
 
+# Maximum length of encoded names and titles of tags
+MAX_NAME_LENGTH = 63
+# Maximum length of encoded values for varchar-tags
+TAG_VARCHAR_LENGTH = 255
+
 
 class TagValueError(ValueError):
     """This error is emitted by Tag.convertValue and ValueType.convertValue if a value cannot be converted
@@ -158,7 +163,7 @@ class ValueType:
     def isValid(self, value):
         """Return whether the given value is a valid tag-value for tags of this type."""
         if self.name == 'varchar':
-            return isinstance(value, str) and 0 < len(value.encode()) <= constants.TAG_VARCHAR_LENGTH
+            return isinstance(value, str) and 0 < len(value.encode()) <= TAG_VARCHAR_LENGTH
         elif self.name == 'text':
             return isinstance(value, str) and len(value) > 0
         elif self.name == 'date':
@@ -174,7 +179,7 @@ class ValueType:
             string = str(value)
             if len(string) == 0:
                 raise TagValueError("varchar tags must have length > 0")
-            if len(string.encode()) > constants.TAG_VARCHAR_LENGTH:
+            if len(string.encode()) > TAG_VARCHAR_LENGTH:
                 if crop:
                     if logCropping:
                         logging.warning(__name__,
@@ -182,7 +187,7 @@ class ValueType:
                                        .format(string[:30]))
                     # Of course this might split in the middle of a unicode character. But errors='ignore'
                     # will silently remove the fragments 
-                    encoded = string.encode()[:constants.TAG_VARCHAR_LENGTH]
+                    encoded = string.encode()[:TAG_VARCHAR_LENGTH]
                     return encoded.decode(errors='ignore')
                 else: raise TagValueError("String is too long for a varchar tag: {}...".format(string[:30]))
             return string
@@ -215,10 +220,10 @@ class ValueType:
     def sqlFormat(self, value):
         """Convert *value* into a string that can be inserted into database queries."""
         if self.name == 'varchar':
-            if len(value.encode()) > constants.TAG_VARCHAR_LENGTH:
+            if len(value.encode()) > TAG_VARCHAR_LENGTH:
                 logging.error(__name__,
                               "Attempted to encode the following string for a varchar column although its "
-                              "encoded size exceeds constants.TAG_VARCHAR_LENGTH. The string will be "
+                              "encoded size exceeds TAG_VARCHAR_LENGTH. The string will be "
                               "truncated: '{}'.".format(value))
             return value
         elif self.name == 'text':
@@ -383,7 +388,7 @@ def isValidTagName(name):
         return False
     try:
         encoded = name.encode('ascii')
-        return 0 < len(encoded) < 64 and all(0x20 <= c <= 0x7D and c != 0x3D for c in encoded)
+        return 0 < len(encoded) <= MAX_NAME_LENGTH and all(0x20 <= c <= 0x7D and c != 0x3D for c in encoded)
     except UnicodeEncodeError:
         return False
 
