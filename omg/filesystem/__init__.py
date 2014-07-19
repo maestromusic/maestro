@@ -506,9 +506,8 @@ class FileSystemSynchronizer(QtCore.QThread):
         dir = Directory(path, parent)
         self.directories[path] = dir
         if storeNew:
-            db.transaction()
-            self.storeDirectories(new + [dir])
-            db.commit()
+            with db.transaction():
+                self.storeDirectories(new + [dir])
         return dir, new + [dir]
         
     def checkTrack(self, track):
@@ -606,11 +605,11 @@ class FileSystemSynchronizer(QtCore.QThread):
         #  to improve database performance. 
         newDirectories, modifiedDirectories, newTracks = set(), set(), set()
         def storeChanges():
-            db.transaction()
-            self.storeDirectories(newDirectories)
-            self.updateDirectories(modifiedDirectories)
-            self.storeNewTracks(newTracks)
-            db.commit()
+            with db.transaction():
+                self.storeDirectories(newDirectories)
+                self.updateDirectories(modifiedDirectories)
+                self.storeNewTracks(newTracks)
+
         THRESHOLD = 100  # number of updates before database is called
         self.timer.stop()
         self.modifiedTags = {}
@@ -755,65 +754,64 @@ class FileSystemSynchronizer(QtCore.QThread):
     @QtCore.pyqtSlot(object)
     def handleRealFileEvent(self, event):
         """Handle an event issued by levels.real if something has affected the filesystem."""
-        db.transaction()
+        with db.transaction():
         
-        for oldURL, newURL in event.renamed:
-            if oldURL in self.tracks:
-                if self.tracks[oldURL].id is None:
-                    db.query("DELETE FROM {p}newfiles WHERE url=?", str(oldURL))                        
-                self.moveTrack(self.tracks[oldURL], newURL)
-        
-        newHashes = []
-        for url in event.modified:
-            if url not in self.tracks:
-                continue
-            track = self.tracks[url]
-            track.verified = utils.files.mTimeStamp(url)
-            if track.id is None:
-                db.query("UPDATE {p}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?", str(url))
-            else:
-                newHashes.append(track)
-    
-        modifiedDirs = []
-        if len(event.added) > 0:
-            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?",
-                          [ (str(elem.url),) for elem in event.added ])
-            for elem in event.added:
-                url = elem.url
+            for oldURL, newURL in event.renamed:
+                if oldURL in self.tracks:
+                    if self.tracks[oldURL].id is None:
+                        db.query("DELETE FROM {p}newfiles WHERE url=?", str(oldURL))                        
+                    self.moveTrack(self.tracks[oldURL], newURL)
+            
+            newHashes = []
+            for url in event.modified:
                 if url not in self.tracks:
-                    dir = self.getDirectory(dirname(url.path), storeNew=True)[0]
-                    track = self.addTrack(dir, url, computeHash=False)
-                    logger.info("adding url not in self.tracks: {}".format(url))
-                else:
-                    dir = self.directories[dirname(url.path)]
-                    track = self.tracks[url]
-                if track.hash is None:
-                    track.hash = self.idProvider(url)
-                    if track.hash is not None:
-                        newHashes.append(track)
-                track.id = elem.id
-                modifiedDirs += dir.updateState(True, False, True, self.folderStateChanged)
-                self.fileStateChanged.emit(url)
-        if len(newHashes) > 0:
-            self._requestHelper.emit("updateFileHashes", (newHashes,))
-        
-        if len(event.removed) > 0:
-            newTracks = []
-            for url in event.removed:
-                if url not in self.tracks:
-                    continue # happens after removals in a LostFilesDialog
+                    continue
                 track = self.tracks[url]
-                newTracks.append(track)
-                track.id = None
-                modifiedDirs += track.directory.updateState(True, False, True,
-                                                            self.folderStateChanged)
-            self.storeNewTracks(newTracks)
-        self.updateDirectories(modifiedDirs)
+                track.verified = utils.files.mTimeStamp(url)
+                if track.id is None:
+                    db.query("UPDATE {p}newfiles SET verified=CURRENT_TIMESTAMP WHERE url=?", str(url))
+                else:
+                    newHashes.append(track)
         
-        if len(event.deleted) > 0:
-            tracks = [ self.tracks[url] for url in event.deleted if url in self.tracks ]
-            self.removeTracks(tracks)
-        db.commit()
+            modifiedDirs = []
+            if len(event.added) > 0:
+                db.multiQuery("DELETE FROM {p}newfiles WHERE url=?",
+                              [ (str(elem.url),) for elem in event.added ])
+                for elem in event.added:
+                    url = elem.url
+                    if url not in self.tracks:
+                        dir = self.getDirectory(dirname(url.path), storeNew=True)[0]
+                        track = self.addTrack(dir, url, computeHash=False)
+                        logger.info("adding url not in self.tracks: {}".format(url))
+                    else:
+                        dir = self.directories[dirname(url.path)]
+                        track = self.tracks[url]
+                    if track.hash is None:
+                        track.hash = self.idProvider(url)
+                        if track.hash is not None:
+                            newHashes.append(track)
+                    track.id = elem.id
+                    modifiedDirs += dir.updateState(True, False, True, self.folderStateChanged)
+                    self.fileStateChanged.emit(url)
+            if len(newHashes) > 0:
+                self._requestHelper.emit("updateFileHashes", (newHashes,))
+            
+            if len(event.removed) > 0:
+                newTracks = []
+                for url in event.removed:
+                    if url not in self.tracks:
+                        continue # happens after removals in a LostFilesDialog
+                    track = self.tracks[url]
+                    newTracks.append(track)
+                    track.id = None
+                    modifiedDirs += track.directory.updateState(True, False, True,
+                                                                self.folderStateChanged)
+                self.storeNewTracks(newTracks)
+            self.updateDirectories(modifiedDirs)
+            
+            if len(event.deleted) > 0:
+                tracks = [ self.tracks[url] for url in event.deleted if url in self.tracks ]
+                self.removeTracks(tracks)
         
     @QtCore.pyqtSlot(str)
     def recheck(self, directory):

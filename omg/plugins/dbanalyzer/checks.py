@@ -155,26 +155,25 @@ class EmptyContainerCheck(Check):
 
     def _fix(self):
         # Set file=1 for empty containers which appear in the files-table
-        db.transaction()
-        # Note: SQLite does not support JOIN in UPDATE or DELETE queries.
-        ids = list(db.query("""
-                SELECT id
-                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
-                                 LEFT JOIN {p}files ON id = {p}files.element_id
-                WHERE file = 0 AND container_id IS NULL AND {p}files.element_id IS NOT NULL
-                """))
-        if len(ids):
-            db.multiQuery("UPDATE {p}elements SET file=1 WHERE id=?", ids)
-            
-        # Delete remaining empty containers
-        ids = list(db.query("""
-                SELECT id
-                FROM {p}elements LEFT JOIN {p}contents ON id = container_id
-                WHERE file = 0 AND container_id IS NULL
-                """))
-        if len(ids):
-            db.multiQuery("DELETE FROM {p}elements WHERE id=?", ids)
-        db.commit()
+        with db.transaction():
+            # Note: SQLite does not support JOIN in UPDATE or DELETE queries.
+            ids = list(db.query("""
+                    SELECT id
+                    FROM {p}elements LEFT JOIN {p}contents ON id = container_id
+                                     LEFT JOIN {p}files ON id = {p}files.element_id
+                    WHERE file = 0 AND container_id IS NULL AND {p}files.element_id IS NOT NULL
+                    """))
+            if len(ids):
+                db.multiQuery("UPDATE {p}elements SET file=1 WHERE id=?", ids)
+                
+            # Delete remaining empty containers
+            ids = list(db.query("""
+                    SELECT id
+                    FROM {p}elements LEFT JOIN {p}contents ON id = container_id
+                    WHERE file = 0 AND container_id IS NULL
+                    """))
+            if len(ids):
+                db.multiQuery("DELETE FROM {p}elements WHERE id=?", ids)
 
 
 class SuperfluousTagValuesCheck(Check):
@@ -287,10 +286,9 @@ class DoubleTagsCheck(Check):
             HAVING COUNT(*) > 1
             """)
         values = list(result)
-        db.transaction()
-        db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?", values)
-        db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)", values)
-        db.commit()
+        with db.transaction():
+            db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?", values)
+            db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)", values)
 
 
 class WithoutTagsCheck(Check):

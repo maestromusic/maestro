@@ -350,60 +350,59 @@ class RealLevel(levels.Level):
                 self.elements[element.id] = element
             else: assert element.isFile() 
         
-        db.transaction()
-        
-        data = [(element.domain.id if element.domain is not None else None,
-                 element.id,
-                 element.isFile(),
-                 element.type if element.isContainer() else 0,
-                 len(element.contents) if element.isContainer() else 0)
-                        for element in elements]
-        db.multiQuery("INSERT INTO {p}elements (domain, id, file, type, elements) VALUES (?,?,?,?,?)", data)
-
-        # Do this early, otherwise e.g. setFlags might raise a ConsistencyError)
-        _dbIds.update(element.id for element in elements)
-            
-        for element in elements:
-            # Set tags
-            db.query("DELETE FROM {p}tags WHERE element_id = ?", element.id)
-            for tag in element.tags:
-                db.multiQuery("INSERT INTO {p}tags (element_id,tag_id,value_id) VALUES (?,?,?)",
-                      [(element.id, tag.id, db.idFromValue(tag, value, insert=True))
-                       for value in element.tags[tag]])
-            
-            # Set flags
-            db.query("DELETE FROM {p}flags WHERE element_id = ?", element.id)
-            if len(element.flags) > 0:
-                db.multiQuery("INSERT INTO {p}flags (element_id, flag_id) VALUES (?,?)",
-                              [(element.id, flag.id) for flag in element.flags])
-
-            # Set stickers
-            db.query("DELETE FROM {p}stickers WHERE element_id = ?", element.id)
-            for type, values in element.stickers.items():
-                db.multiQuery("INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
-                              [(element.id, type, i, val) for i, val in enumerate(values)])
+        with db.transcation():
+            data = [(element.domain.id if element.domain is not None else None,
+                     element.id,
+                     element.isFile(),
+                     element.type if element.isContainer() else 0,
+                     len(element.contents) if element.isContainer() else 0)
+                            for element in elements]
+            db.multiQuery("INSERT INTO {p}elements (domain, id, file, type, elements) VALUES (?,?,?,?,?)",
+                          data)
+    
+            # Do this early, otherwise e.g. setFlags might raise a ConsistencyError)
+            _dbIds.update(element.id for element in elements)
                 
-        newFiles = [element for element in elements if element.isFile()]
-        if len(newFiles) > 0:
-            from .. import filesystem
-            db.multiQuery("INSERT INTO {p}files (element_id, url, hash, length) VALUES (?,?,?,?)",
-                          ((element.id, str(element.url), filesystem.getNewfileHash(element.url),
-                            element.length) for element in newFiles))
-            self.emitFilesystemEvent(added=(f for f in newFiles if f.url.scheme == "file"))
-        
-        contentData = []
-        for element in elements:
-            if element.isContainer():
-                contentData.extend((element.id, item[0], item[1]) for item in element.contents.items())
-                for childId in element.contents:
-                    if element.id not in self[childId].parents:
-                        self[childId].parents.append(element.id)
+            for element in elements:
+                # Set tags
+                db.query("DELETE FROM {p}tags WHERE element_id = ?", element.id)
+                for tag in element.tags:
+                    db.multiQuery("INSERT INTO {p}tags (element_id,tag_id,value_id) VALUES (?,?,?)",
+                          [(element.id, tag.id, db.idFromValue(tag, value, insert=True))
+                           for value in element.tags[tag]])
+                
+                # Set flags
+                db.query("DELETE FROM {p}flags WHERE element_id = ?", element.id)
+                if len(element.flags) > 0:
+                    db.multiQuery("INSERT INTO {p}flags (element_id, flag_id) VALUES (?,?)",
+                                  [(element.id, flag.id) for flag in element.flags])
+    
+                # Set stickers
+                db.query("DELETE FROM {p}stickers WHERE element_id = ?", element.id)
+                for type, values in element.stickers.items():
+                    db.multiQuery("INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
+                                  [(element.id, type, i, val) for i, val in enumerate(values)])
+                    
+            newFiles = [element for element in elements if element.isFile()]
+            if len(newFiles) > 0:
+                from .. import filesystem
+                db.multiQuery("INSERT INTO {p}files (element_id, url, hash, length) VALUES (?,?,?,?)",
+                              ((element.id, str(element.url), filesystem.getNewfileHash(element.url),
+                                element.length) for element in newFiles))
+                self.emitFilesystemEvent(added=(f for f in newFiles if f.url.scheme == "file"))
+            
+            contentData = []
+            for element in elements:
+                if element.isContainer():
+                    contentData.extend((element.id, item[0], item[1]) for item in element.contents.items())
+                    for childId in element.contents:
+                        if element.id not in self[childId].parents:
+                            self[childId].parents.append(element.id)
                         
-        if len(contentData) > 0:
-            db.multiQuery("INSERT INTO {p}contents (container_id, position, element_id) VALUES (?,?,?)",
-                          contentData)
-                                      
-        db.commit()
+            if len(contentData) > 0:
+                db.multiQuery("INSERT INTO {p}contents (container_id, position, element_id) VALUES (?,?,?)",
+                              contentData)
+
         self.emit(levels.LevelChangeEvent(dbAddedIds=[el.id for el in elements]))
                 
     def _removeFromDb(self, elements):
@@ -452,55 +451,56 @@ class RealLevel(levels.Level):
         
         dbChanges = {el: diffs for el, diffs in changes.items() if el.isInDb()}
         if len(dbChanges) > 0:
-            db.transaction()
-            dbRemovals = [(el.id, tag.id, db.idFromValue(tag, value))
-                          for el, diff in dbChanges.items()
-                          for tag, value in diff.getRemovals() if tag.isInDb()]
-            if len(dbRemovals):
-                db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?",
-                              dbRemovals)
-                
-            dbAdditions = [(el.id, tag.id, db.idFromValue(tag, value, insert=True))
-                           for el, diff in dbChanges.items()
-                           for tag, value in diff.getAdditions() if tag.isInDb()]
-            if len(dbAdditions):
-                db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)",
-                              dbAdditions)
-            files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
-            if len(files) > 0:
-                db.multiQuery("UPDATE {p}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?",
-                              files)
-            db.commit()
+            with db.transaction():
+                dbRemovals = [(el.id, tag.id, db.idFromValue(tag, value))
+                              for el, diff in dbChanges.items()
+                              for tag, value in diff.getRemovals() if tag.isInDb()]
+                if len(dbRemovals):
+                    db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?",
+                                  dbRemovals)
+                    
+                dbAdditions = [(el.id, tag.id, db.idFromValue(tag, value, insert=True))
+                               for el, diff in dbChanges.items()
+                               for tag, value in diff.getAdditions() if tag.isInDb()]
+                if len(dbAdditions):
+                    db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)",
+                                  dbAdditions)
+                files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
+                if len(files) > 0:
+                    db.multiQuery("UPDATE {p}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?",
+                                  files)
+
         super()._changeTags(changes)
         
     def _changeFlags(self, changes):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding tags.")
-        db.transaction()
-        dbRemovals = [(el.id, flag.id) for el, diff in changes.items() for flag in diff.getRemovals()]
-        if len(dbRemovals):
-            db.multiQuery("DELETE FROM {p}flags WHERE element_id = ? AND flag_id = ?",
-                          dbRemovals)
-        dbAdditions = [(el.id, flag.id) for el, diff in changes.items() for flag in diff.getAdditions()]
-        if len(dbAdditions):
-            db.multiQuery("INSERT INTO {p}flags (element_id, flag_id) VALUES(?,?)",
-                          dbAdditions)
-        db.commit()
+        with db.transaction():
+            dbRemovals = [(el.id, flag.id) for el, diff in changes.items() for flag in diff.getRemovals()]
+            if len(dbRemovals):
+                db.multiQuery("DELETE FROM {p}flags WHERE element_id = ? AND flag_id = ?",
+                              dbRemovals)
+            dbAdditions = [(el.id, flag.id) for el, diff in changes.items() for flag in diff.getAdditions()]
+            if len(dbAdditions):
+                db.multiQuery("INSERT INTO {p}flags (element_id, flag_id) VALUES(?,?)",
+                              dbAdditions)
+
         super()._changeFlags(changes)
             
     def _changeStickers(self, changes):
         if not all(element.isInDb() for element in changes.keys()):
             raise levels.ConsistencyError("Elements on real must be added to the DB before adding stickers.")
-        db.transaction()
-        for element, diff in changes.items():
-            for type, (a, b) in diff.diffs.items():
-                if a is not None:
-                    db.query("DELETE FROM {p}stickers WHERE type=? AND element_id=?",
-                             type, element.id)
-                if b is not None:
-                    db.multiQuery("INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
-                                  [(element.id, type, i, val) for i, val in enumerate(b)])
-        db.commit()
+        with db.transaction():
+            for element, diff in changes.items():
+                for type, (a, b) in diff.diffs.items():
+                    if a is not None:
+                        db.query("DELETE FROM {p}stickers WHERE type=? AND element_id=?",
+                                 type, element.id)
+                    if b is not None:
+                        db.multiQuery(
+                            "INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
+                            [(element.id, type, i, val) for i, val in enumerate(b)])
+
         super()._changeStickers(changes)
                 
     def _setStickers(self, type, elementToStickers):
@@ -510,13 +510,13 @@ class RealLevel(levels.Level):
         for element, stickers in elementToStickers.items():
             if stickers is not None:
                 values.extend((element.id, type, i, s) for i, s in enumerate(stickers))
-        db.transaction()
-        db.query("DELETE FROM {}stickers WHERE type = ? AND element_id IN ({})"
-                 .format(db.prefix, db.csIdList(elementToStickers.keys())), type)
-        if len(values) > 0:
-            db.multiQuery("INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
-                          values)
-        db.commit()
+        with db.transaction():
+            db.query("DELETE FROM {}stickers WHERE type = ? AND element_id IN ({})"
+                     .format(db.prefix, db.csIdList(elementToStickers.keys())), type)
+            if len(values) > 0:
+                db.multiQuery("INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
+                              values)
+
         super()._setStickers(type, elementToStickers)
         
     def _setTypes(self, containerTypes):
@@ -526,38 +526,38 @@ class RealLevel(levels.Level):
             super()._setTypes(containerTypes)
     
     def _setContents(self, parent, contents):
-        db.transaction()
-        db.query("DELETE FROM {p}contents WHERE container_id = ?", parent.id)
-        #Note: This checks skips elements which are not loaded on real. This should rarely happen and
-        # due to foreign key constraints...
-        if not all(self[childId].isInDb() for childId in contents if childId in self):
-            raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
-        
-        if len(contents) > 0:
-            # ...the following query will fail anyway (but with a DBException)
-            # if some contents are not in the database yet.
-            db.multiQuery("INSERT INTO {p}contents (container_id, position, element_id) VALUES (?,?,?)",
-                          [(parent.id, pos, childId) for pos, childId in contents.items()])
-        db.updateElementsCounter((parent.id,))
-        db.commit()
+        with db.transaction():
+            db.query("DELETE FROM {p}contents WHERE container_id = ?", parent.id)
+            #Note: This checks skips elements which are not loaded on real. This should rarely happen and
+            # due to foreign key constraints...
+            if not all(self[childId].isInDb() for childId in contents if childId in self):
+                raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
+            
+            if len(contents) > 0:
+                # ...the following query will fail anyway (but with a DBException)
+                # if some contents are not in the database yet.
+                db.multiQuery("INSERT INTO {p}contents (container_id, position, element_id) VALUES (?,?,?)",
+                              [(parent.id, pos, childId) for pos, childId in contents.items()])
+            db.updateElementsCounter((parent.id,))
+
         super()._setContents(parent, contents)
 
     def _insertContents(self, parent, insertions):
         if not all(element.isInDb() for _, element in insertions):
             raise levels.ConsistencyError("Elements must be in the DB before being added to a container.")
-        db.transaction()
-        db.multiQuery("INSERT INTO {p}contents (container_id, position, element_id) VALUES (?,?,?)",
-                      [(parent.id, pos, child.id) for pos, child in insertions])
-        db.updateElementsCounter((parent.id,))
-        db.commit()
+        with db.transaction():
+            db.multiQuery("INSERT INTO {p}contents (container_id, position, element_id) VALUES (?,?,?)",
+                          [(parent.id, pos, child.id) for pos, child in insertions])
+            db.updateElementsCounter((parent.id,))
+
         super()._insertContents(parent, insertions)
         
     def _removeContents(self, parent, positions):
-        db.transaction()
-        db.multiQuery("DELETE FROM {p}contents WHERE container_id=? AND position=?",
-                      [(parent.id, pos) for pos in positions])
-        db.updateElementsCounter((parent.id,))
-        db.commit()
+        with db.transaction():
+            db.multiQuery("DELETE FROM {p}contents WHERE container_id=? AND position=?",
+                          [(parent.id, pos) for pos in positions])
+            db.updateElementsCounter((parent.id,))
+
         super()._removeContents(parent, positions)
     
     def _changePositions(self, parent, changes):

@@ -90,11 +90,17 @@ class FlexiDateType(sqlalchemy.types.TypeDecorator):
         return FlexiDateDecorator()
 
 
-
 def createEngine(**kwargs):
     if kwargs['type'] == 'sqlite':
         url = 'sqlite:///'+kwargs['path'] # absolute paths will have 4 slashes
-        engine = sqlalchemy.create_engine(url)
+        def creator():
+            import sqlite3, re
+            connection = sqlite3.connect(kwargs['path'])
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.create_function('regexp', 2, lambda p, s: re.search(p, s) is not None)
+            return connection
+        
+        return sqlalchemy.create_engine(url, creator=creator)
     else:
         # full url: {type}+{driver}://{user}:{password}@{host}:{port}/{name}
         # leave out driver and port parts if not specified
@@ -106,13 +112,7 @@ def createEngine(**kwargs):
             url += ':{port}'
         url += '/{name}'
         url = url.format(**kwargs)
-        engine = sqlalchemy.create_engine(url, poolclass=sqlalchemy.pool.SingletonThreadPool)
-        
-        # standard decorator style
-        @sqlalchemy.event.listens_for(engine, 'connect')
-        def receive_connect(dbapi_connection, connection_record):
-            print("CONNECT")
-    return engine
+        return sqlalchemy.create_engine(url, poolclass=sqlalchemy.pool.SingletonThreadPool)
 
 
 def connect(**kwargs):
@@ -205,6 +205,10 @@ def getDate(value):
 
 
 class SqlResult:
+    """Query and multiQuery return instances of this class to encapsulate SqlAlchemy ProxyResult objects.
+    Be careful not to mix different access methods like getSingle, getSingleColumn and iterator methods
+    (e.g. next) since they all may change internal cursors and could interfere with each other.
+    """
     def __init__(self, result):
         self._result = result
             
@@ -212,6 +216,7 @@ class SqlResult:
         return self._result.__iter__()
 
     def next(self):
+        """Yields the next row from the result set or raises a StopIteration if there is no such row."""
         row = self._result.fetchone()
         if row is not None:
             return row
