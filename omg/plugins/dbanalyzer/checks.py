@@ -267,12 +267,12 @@ class DoubleTagsCheck(Check):
     _name = translate("DBAnalyzerChecks", "Double tags")
     
     def check(self, data):
-        result = db.query("""
+        result = list(db.query("""
             SELECT element_id, tag_id, value_id
             FROM {p}tags
             GROUP BY element_id, tag_id, value_id
             HAVING COUNT(*) > 1
-            """)
+            """))
         if not data:
             return len(result)
         else:

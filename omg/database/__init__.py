@@ -204,42 +204,13 @@ def getDate(value):
     return value.replace(tzinfo=datetime.timezone.utc)
 
 
-
-class ArrayResult:
-    def __init__(self, result):
-        self.rows = result.fetchall()
-        self.rowcount = result.rewcount
-        self.lastrowid = result.lastrowid
-        self._index = 0
-        
-    def fetchone(self):
-        if self._index < len(self.rows):
-            row = self.rows[self._index]
-            self._index += 1
-            return row
-        else: return None
-        
-    def __iter__(self):
-        return self.rows.__iter__()
-
-
 class SqlResult:
     def __init__(self, result):
         self._result = result
             
     def __iter__(self):
         return self._result.__iter__()
-        
-    def __len__(self):
-        return self.size()
-    
-    def size(self):
-        """Returns the number of rows selected in a select query. You can also use the built-in
-        'len'-method.
-        """
-        self._result = ArrayResult(self._result)
-        return len(self._result.rows)
-    
+
     def next(self):
         row = self._result.fetchone()
         if row is not None:
@@ -404,10 +375,10 @@ def idFromUrl(url):
 
 def idFromHash(hash):
     """Return the element_id of a file from its hash, or None if it is not found."""
-    result = query("SELECT element_id FROM {p}files WHERE hash=?", hash)
-    if len(result)==1:
-        return result.getSingle()
-    elif len(result)==0:
+    result = list(query("SELECT element_id FROM {p}files WHERE hash=?", hash))
+    if len(result) == 1:
+        return result[0][0]
+    elif len(result) == 0:
         return None
     else: raise RuntimeError("Hash not unique upon filenames!")
 
