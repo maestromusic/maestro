@@ -235,7 +235,21 @@ class PointAtInfinity:
         return "{}{}".format('+' if self.plus else '-', '∞')
 
 
-def rfind(aList,item):
+def search(sequence, f):
+  """Return the first item in *sequence* where f(item) is True."""
+  for item in sequence:
+      if f(item): 
+          return item
+  return None
+  
+def find(aList, item):
+    """Return the index of the first occurrence of *item* in *aList*. Return -1 if *item* is not found."""
+    for i,x in enumerate(aList):
+        if x == item:
+            return i
+    else: return -1  
+    
+def rfind(aList, item):
     """Return the index of the last occurrence of *item* in *aList*. Return -1 if *item* is not found."""
     for i,x in enumerate(reversed(aList)):
         if x == item:

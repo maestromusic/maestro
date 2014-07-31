@@ -50,6 +50,13 @@ def warning(title,text,parent=None):
     QtGui.QMessageBox.warning(parent, title, text)
 
 
+def getText(title, text, parent=None):
+    result, ok = QtGui.QInputDialog.getText(parent, title, text)
+    if ok:
+        return result
+    else: return None
+
+
 class WaitingDialog(QtGui.QDialog):
     def __init__(self, title, text, cancelButton=True):
         from . import mainwindow

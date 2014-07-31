@@ -16,265 +16,162 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-
-from ... import application, database as db, utils, stack
-from ...core import flags
-from .. import misc, dialogs
-from ..misc import iconbuttonbar
-
 translate = QtCore.QCoreApplication.translate
 
+from ... import application, database as db, utils, stack, constants
+from ...core import flags
+from .. import dialogs, flexform
 
-class FlagManager(QtGui.QWidget):
-    """The FlagManager allows to add, edit and delete flagtypes."""
-    def __init__(self, dialog, panel):
-        super().__init__(panel)
-        self.setLayout(QtGui.QVBoxLayout())
-        self.layout().setContentsMargins(0,0,0,0)
-        self.layout().setSpacing(0)
-        
-        buttonBar = QtGui.QToolBar()
-        self.layout().addWidget(buttonBar)
-                
-        addButton = QtGui.QToolButton()
-        addButton.setIcon(utils.getIcon("add.png"))
-        addButton.setToolTip("Add flag...")
-        addButton.clicked.connect(self._handleAddButton)
-        buttonBar.addWidget(addButton)
-        self.undoButton = QtGui.QToolButton()
-        self.undoButton.setIcon(utils.getIcon("undo.png"))
-        self.undoButton.clicked.connect(stack.undo)
-        buttonBar.addWidget(self.undoButton)
-        self.redoButton = QtGui.QToolButton()
-        self.redoButton.setIcon(utils.getIcon("redo.png"))
-        self.redoButton.clicked.connect(stack.redo)
-        buttonBar.addWidget(self.redoButton)
-        self.showInBrowserButton = QtGui.QToolButton()
-        self.showInBrowserButton.setIcon(utils.getIcon("preferences/goto.png"))
-        self.showInBrowserButton.setToolTip(self.tr("Show in browser"))
-        self.showInBrowserButton.setEnabled(False)
-        self.showInBrowserButton.clicked.connect(self._handleShowInBrowserButton)
-        buttonBar.addWidget(self.showInBrowserButton)
-        self.deleteButton = QtGui.QToolButton()
-        self.deleteButton.setIcon(utils.getIcon("delete.png"))
-        self.deleteButton.setToolTip(self.tr("Delete flag"))
-        self.deleteButton.setEnabled(False)
-        self.deleteButton.clicked.connect(self._handleDeleteButton)
-        buttonBar.addWidget(self.deleteButton)
-        
-        self.columns = [
-                ("icon",   self.tr("Icon")),
-                ("name",   self.tr("Name")),
-                ("number", self.tr("# of elements"))
-                ]
-        
-        self.tableWidget = QtGui.QTableWidget()
-        self.tableWidget.setColumnCount(len(self.columns))
-        self.tableWidget.verticalHeader().hide()
-        self.tableWidget.setSortingEnabled(True)
-        self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
-        self.tableWidget.itemChanged.connect(self._handleItemChanged)
-        self.tableWidget.cellDoubleClicked.connect(self._handleCellDoubleClicked)
-        self.tableWidget.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.tableWidget.customContextMenuRequested.connect(self._handleCustomContextMenuRequested)
-        self.tableWidget.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self.tableWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-        self.tableWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
-        self.layout().addWidget(self.tableWidget)
-        self._loadFlags()
-        
-        self._checkUndoRedoButtons()
-        stack.indexChanged.connect(self._checkUndoRedoButtons)
-        stack.undoTextChanged.connect(self._checkUndoRedoButtons)
-        stack.redoTextChanged.connect(self._checkUndoRedoButtons)
+
+class FlagModel(flexform.FlexTableModel):
+    """Data model for the FlagManager."""
+    def __init__(self, parent):
+        super().__init__(parent=parent)
+        self.addField('icon', self.tr("Icon"), 'image', folders=[':omg/flags', ':omg/tags'])
+        self.addField('name', self.tr("Name"), 'string')
+        self.addField('number', self.tr("# of elements"), 'fixed')
+        self.items = list(flags.allFlags())
+        # Cache the element counts (we assume that they never change while this model is used)
+        self.elementCounts = dict(db.query("SELECT flag_id, COUNT(*) FROM {p}flags GROUP BY flag_id"))
         application.dispatcher.connect(self._handleDispatcher)
         
     def _handleDispatcher(self, event):
-        """React to FlagTypeChangeEvents from the dispatcher."""
         if isinstance(event, flags.FlagTypeChangeEvent):
-            self._loadFlags()
-            
-    def _loadFlags(self):
-        """Load flags information from flags-module to GUI."""
-        self._flagTypes = sorted(flags.allFlags(), key=lambda f: f.name)
-        self.tableWidget.clear()
-        self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
-        self.tableWidget.setRowCount(len(self._flagTypes))
+            if event.action == constants.ADDED:
+                row = flags.allFlags().index(event.flagType)
+                self.insertItem(row, event.flagType)
+            elif event.action == constants.DELETED:
+                self.removeItem(event.flagType)
+            else: self.itemChanged(event.flagType)
+                
+    def getItemData(self, flag, field):
+        if field.name == 'icon':
+            if flag.iconPath is not None:
+                return flag.iconPath
+            else: return None
+        elif field.name == 'name':
+            return flag.name
+        else: return self.elementCounts.get(flag.id, 0)
+
+    def setItemData(self, flag, field, value):
+        if field.name == 'name':
+            oldName = flag.name
+            newName = value
+            if oldName == newName:
+                return False
         
-        NumericSortItem = misc.createSortingTableWidgetClass('NumericSortItem', misc.leadingInt)
+            if not flags.isValidFlagname(newName):
+                dialogs.warning(self.tr("Cannot change flag"),
+                                self.tr("'{}' is not a valid flagname.").format(newName),
+                                self.parent())
+                return False
         
-        for row, flagType in enumerate(self._flagTypes):
-            column = self._getColumnIndex("icon")
-            label = QtGui.QLabel()       
-            label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-            index = self.tableWidget.model().index(row, column)   
-            self.tableWidget.setIndexWidget(index, label)
-            if flagType.iconPath is not None:
-                label.setPixmap(QtGui.QPixmap(flagType.iconPath))
-                label.setToolTip(flagType.iconPath)           
+            if flags.exists(newName):
+                dialogs.warning(self.tr("Cannot change flag"),
+                                self.tr("A flag named '{}' does already exist.").format(newName),
+                                self.parent())
+                return False
             
-            column = self._getColumnIndex("name")
-            item = QtGui.QTableWidgetItem(flagType.name)
-            item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-            self.tableWidget.setItem(row, column, item)
-            
-            column = self._getColumnIndex("number")
-            item = NumericSortItem('{}    '.format(self._getElementCount(flagType)))
-            item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-            self.tableWidget.setItem(row, column, item)
-            
-        self.tableWidget.resizeColumnsToContents()
+            flags.changeFlagType(flag, name=newName)
+            return True
+        elif field.name == 'icon':
+            flags.changeFlagType(flag, iconPath=value)
+            return True
+        else: assert False
     
-    def _getElementCount(self, flagType):
+    def getElementCount(self, flag):
         """Return the number of elements having the given flag."""
-        return db.query("SELECT COUNT(*) FROM {p}flags WHERE flag_id = ?", flagType.id).getSingle()
-                        
-    def _handleAddButton(self):
-        """Create a new flag (querying the user for the flag's name)."""
-        createNewFlagType(self) # FlagManager will be reloaded via the dispatcher event
+        return db.query("SELECT COUNT(*) FROM {p}flags WHERE flag_id = ?", flag.id).getSingle()
+
+
+class FlagManager(flexform.FlexTable):
+    """The FlagManager allows to add, edit and delete flagtypes."""
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
+        self.setModel(FlagModel(self))
+        self.addAction(NewFlagAction(self))
+        self.addAction(stack.createUndoAction())
+        self.addAction(stack.createRedoAction())
+        self.addAction(DeleteFlagAction(self))
+        self.addAction(ShowInBrowserAction(self))
+
+
+class NewFlagAction(QtGui.QAction):
+    """Ask the user for a name and add a new flag to the database."""
+    def __init__(self, parent):
+        super().__init__(utils.getIcon('add.png'), translate("NewFlagAction", "Create new flag..."), parent)
+        self.triggered.connect(self._triggered)
+        
+    def _triggered(self):
+        newFlag = createNewFlagType(self.parent())
+        if newFlag is not None:
+            self.parent().selectItems([newFlag])
+
+
+class DeleteFlagAction(QtGui.QAction):
+    """Confirm and delete a flag from the database."""
+    def __init__(self, parent):
+        super().__init__(utils.getIcon('delete.png'), translate("DeleteFlagAction", "Delete flag"), parent)
+        self.triggered.connect(self._triggered)
+        parent.selectionChanged.connect(self._selectionChanged)
     
-    def _handleShowInBrowserButton(self):
-        """Load all elements containing the selected flag into the default browser."""
-        from .. import browser
-        rows = self.tableWidget.selectionModel().selectedRows()
-        if len(rows) == 1 and browser.defaultBrowser is not None:
-            flag = self._flagTypes[rows[0].row()]
-            browser.defaultBrowser.search('{flag='+flag.name+'}')
-            
-    def _handleDeleteButton(self):
-        """Ask the user if he really wants this and if so, delete the flag."""
-        rows = self.tableWidget.selectionModel().selectedRows()
-        if len(rows) == 1:
-            flagType = self._flagTypes[rows[0].row()]
-            number = self._getElementCount(flagType)
+    def _selectionChanged(self):
+        self.setEnabled(len(self.parent().selectedItems()) == 1)
+        
+    def _triggered(self):
+        if len(self.parent().selectedItems()) == 1:
+            flag = self.parent().selectedItems()[0]
+            number = self.parent().model.getElementCount(flag)
             if number > 0:
                 question = self.tr("Do you really want to delete the flag '{}'? "
-                                   "It will be deleted from %n element(s).", None, number)
-            flags.deleteFlagType(flagType)
+                                   "It will be deleted from %n element(s).", None, number).format(flag.name)
+                if not dialogs.question(self.tr("Delete flag?"), question, self.parent()):
+                    return
+            flags.deleteFlagType(flag)
 
-    def _handleItemChanged(self, item):
-        """When the name of a flag has been changed, ask the user if he really wants this and if so perform
-        the change in the database and reload."""
-        if item.column() != self._getColumnIndex("name"): # Only the name column is editable
-            return
-        flagType = self._flagTypes[item.row()]
-        oldName = flagType.name
-        newName = item.text()
-        if oldName == newName:
-            return
-        
-        if not flags.isValidFlagname(newName):
-            QtGui.QMessageBox(self, self.tr("Cannot change flag"),
-                              self.tr("'{}' is not a valid flagname.").format(newName))
-            item.setText(oldName)
-            return
-        
-        if flags.exists(newName):
-            QtGui.QMessageBox.warning(self, self.tr("Cannot change flag"),
-                                      self.tr("A flag named '{}' does already exist.").format(newName))
-            item.setText(oldName)
-            return
-                      
-        number = self._getElementCount(flagType)          
-        if number > 0:
-            question = self.tr("Do you really want to change the flag '{}'?"
-                               " It will be changed in %n element(s).",
-                               None, number).format(oldName)
-            if (QtGui.QMessageBox.question(self, self.tr("Change flag?"), question,
-                                   QtGui.QMessageBox.Yes | QtGui.QMessageBox.No,
-                                   QtGui.QMessageBox.Yes)
-                        != QtGui.QMessageBox.Yes):
-                item.setText(oldName)
-                return
-        flags.changeFlagType(flagType, name=newName)
+
+class ShowInBrowserAction(QtGui.QAction):
+    """Load all elements containing the selected flag into the default browser."""
+    def __init__(self, parent):
+        super().__init__(utils.getIcon('preferences/goto.png'),
+                         translate("ShowInBrowserAction", "Show in browser"),
+                         parent)
+        parent.selectionChanged.connect(self._selectionChanged)
+        self.triggered.connect(self._triggered)
+        self._selectionChanged()
     
-    def _checkUndoRedoButtons(self):
-        """Enable or disable the undo and redo buttons depending on stack state."""
-        self.undoButton.setEnabled(stack.canUndo())
-        self.undoButton.setToolTip(self.tr("Undo: {}").format(stack.undoText()))
-        self.redoButton.setEnabled(stack.canRedo())
-        self.redoButton.setToolTip(self.tr("Redo: {}").format(stack.redoText()))
-        
-    def _handleSelectionChanged(self):
-        rows = self.tableWidget.selectionModel().selectedRows()
+    def _selectionChanged(self):
         from .. import browser
-        self.showInBrowserButton.setEnabled(len(rows) == 1 and browser.defaultBrowser is not None)
-        self.deleteButton.setEnabled(len(rows) == 1)
-        
-    def _handleCellDoubleClicked(self, row, column):
-        """Handle double clicks on the first column containing icons. A click will open a file dialog to
-        change the icon."""
-        if column == 0:
-            flagType = self._flagTypes[row]
-            self._openIconDialog(flagType)
+        self.setEnabled(len(self.parent().selectedItems()) == 1 and browser.defaultBrowser is not None)
     
-    def _handleCustomContextMenuRequested(self, pos):
-        """React to customContextMenuRequested signals."""
-        row = self.tableWidget.rowAt(pos.y())
-        column = self.tableWidget.columnAt(pos.x())
-        if column == 0 and row != -1:
-            flagType = self._flagTypes[row]
-            menu = QtGui.QMenu(self.tableWidget)
-            if flagType.iconPath is None:
-                changeAction = QtGui.QAction(self.tr("Add icon..."), menu)
-            else: changeAction = QtGui.QAction(self.tr("Change icon..."), menu)
-            changeAction.triggered.connect(lambda: self._openIconDialog(flagType))
-            menu.addAction(changeAction)
-            removeAction = QtGui.QAction(self.tr("Remove icon"), menu)
-            removeAction.setEnabled(flagType.iconPath is not None)
-            removeAction.triggered.connect(lambda: self._setIcon(flagType, None))
-            menu.addAction(removeAction)
-            menu.exec_(self.tableWidget.viewport().mapToGlobal(pos))
+    def _triggered(self):
+        from .. import browser
+        if len(self.parent().selectedItems()) == 1 and browser.defaultBrowser is not None:
+            flag = self.parent().selectedItems()[0]
+            browser.defaultBrowser.search('{flag='+flag.name+'}') 
     
-    def _openIconDialog(self, flagType):
-        """Open a file dialog so that the user may choose an icon for the given flag."""
-        # Choose a sensible directory as starting point
-        from ..misc import iconchooser
-        result = iconchooser.IconChooser.getIcon([':omg/flags', ':omg/tags'], flagType.iconPath, self)
-        
-        if result and result[1] != flagType.iconPath:
-            self._setIcon(flagType, result[1])
-            
-    def _setIcon(self, flagType, iconPath):
-        """Set the icon(-path) of *flagType* to *iconPath* and update the GUI.""" 
-        flags.changeFlagType(flagType, iconPath=iconPath)
-        # Update the widget
-        row = self._flagTypes.index(flagType)
-        index = self.tableWidget.model().index(row, 0)                     
-        label = self.tableWidget.indexWidget(index)
-        # Both works also if iconPath is None
-        label.setPixmap(QtGui.QPixmap(flagType.iconPath))
-        label.setToolTip(flagType.iconPath)
-        
-    def _getColumnIndex(self, columnKey):
-        """Return the index of the column with the given key (i.e. the first part of the corresponding tuple
-        in self.columns."""
-        for i in range(len(self.columns)):
-            if self.columns[i][0] == columnKey:
-                return i
-        raise ValueError("Invalid key {}".format(columnKey))
     
-
 def createNewFlagType(parent=None):
     """Ask the user to supply a name and then create a new flag with this name. Return the new flag or None
-    if no flag was created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
-    name, ok = QtGui.QInputDialog.getText(parent, translate("FlagManager", "New Flag"),
-                                          translate("FlagManager", "Please enter the name of the new flag:"))
-    if not ok:
+    if no flag was created (e.g. if the user aborted the dialog or the supplied name was invalid).
+    """
+    name = dialogs.getText(translate("FlagManager", "New Flag"),
+                           translate("FlagManager", "Please enter the name of the new flag:"),
+                           parent)
+    if name is None:
         return None
     
     if flags.exists(name):
-        QtGui.QMessageBox.warning(parent, translate("FlagManager", "Cannot create flag"),
-                                  translate("FlagManager", "This flag does already exist."))
+        dialogs.warning(translate("FlagManager", "Cannot create flag"),
+                        translate("FlagManager", "This flag does already exist."),
+                        parent)
         return None
     elif not flags.isValidFlagname(name):
-        QtGui.QMessageBox.warning(parent, translate("FlagManager", "Invalid flagname"),
-                                  translate("FlagManager", "This is not a valid flagname."))
+        dialogs.warning(translate("FlagManager", "Invalid flagname"),
+                        translate("FlagManager", "This is not a valid flagname."),
+                        parent)
         return None
     
     return flags.addFlagType(name)
