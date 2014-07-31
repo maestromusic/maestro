@@ -116,7 +116,7 @@ def isValidFlagname(name):
 
 def allFlags():
     """Return a list containing all flags in the database."""
-    return _flagsById.values()
+    return list(_flagsById.values())
 
 
 def addFlagType(name, **data):
