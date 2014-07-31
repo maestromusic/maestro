@@ -64,14 +64,12 @@ class FlagModel(flexform.FlexTableModel):
         
             if not flags.isValidFlagname(newName):
                 dialogs.warning(self.tr("Cannot change flag"),
-                                self.tr("'{}' is not a valid flagname.").format(newName),
-                                self.parent())
+                                self.tr("'{}' is not a valid flagname.").format(newName))
                 return False
         
             if flags.exists(newName):
                 dialogs.warning(self.tr("Cannot change flag"),
-                                self.tr("A flag named '{}' does already exist.").format(newName),
-                                self.parent())
+                                self.tr("A flag named '{}' does already exist.").format(newName))
                 return False
             
             flags.changeFlagType(flag, name=newName)

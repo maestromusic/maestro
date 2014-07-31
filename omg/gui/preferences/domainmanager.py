@@ -16,104 +16,27 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-
-from ... import application, database as db, utils, stack
-from ...core import domains
-from .. import misc, dialogs
-from ..misc import iconbuttonbar
-
 translate = QtCore.QCoreApplication.translate
 
+from ... import application, database as db, utils, stack, constants
+from ...core import domains
+from .. import dialogs, flexform
 
-class DomainManager(QtGui.QWidget):
-    """The DomainManager allows to add, edit and delete domains."""
-    def __init__(self, dialog, panel):
-        super().__init__(panel)
-        self.setLayout(QtGui.QVBoxLayout())
-        self.layout().setContentsMargins(0,0,0,0)
-        self.layout().setSpacing(0)
-        
-        buttonBar = QtGui.QToolBar()
-        self.layout().addWidget(buttonBar)
-                
-        addButton = QtGui.QToolButton()
-        addButton.setIcon(utils.getIcon("add.png"))
-        addButton.setToolTip("Add domain...")
-        addButton.clicked.connect(self._handleAddButton)
-        buttonBar.addWidget(addButton)
-        self.undoButton = QtGui.QToolButton()
-        self.undoButton.setIcon(utils.getIcon("undo.png"))
-        self.undoButton.clicked.connect(stack.undo)
-        buttonBar.addWidget(self.undoButton)
-        self.redoButton = QtGui.QToolButton()
-        self.redoButton.setIcon(utils.getIcon("redo.png"))
-        self.redoButton.clicked.connect(stack.redo)
-        buttonBar.addWidget(self.redoButton)
-        self.deleteButton = QtGui.QToolButton()
-        self.deleteButton.setIcon(utils.getIcon("delete.png"))
-        self.deleteButton.setToolTip(self.tr("Delete domain"))
-        self.deleteButton.setEnabled(False)
-        self.deleteButton.clicked.connect(self._handleDeleteButton)
-        buttonBar.addWidget(self.deleteButton)
-        
-        self.columns = [
-                ("name",   self.tr("Name")),
-                ("number_elements", self.tr("# of elements")),
-                ("number_files", self.tr("# of files")),
-                ("number_containers", self.tr("# of containers"))
-                ]
-        
-        self.tableWidget = QtGui.QTableWidget()
-        self.tableWidget.setColumnCount(len(self.columns))
-        self.tableWidget.verticalHeader().hide()
-        self.tableWidget.setSortingEnabled(True)
-        self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
-        self.tableWidget.itemChanged.connect(self._handleItemChanged)
-        self.tableWidget.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self.tableWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
-        self.tableWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
-        self.layout().addWidget(self.tableWidget)
-        self._loadDomains()
-        
-        self._checkUndoRedoButtons()
-        stack.indexChanged.connect(self._checkUndoRedoButtons)
-        stack.undoTextChanged.connect(self._checkUndoRedoButtons)
-        stack.redoTextChanged.connect(self._checkUndoRedoButtons)
+
+class DomainModel(flexform.FlexTableModel):
+    """Data model for the domain manager."""
+    def __init__(self, parent):
+        super().__init__(parent=parent)
+        self.addField('name', self.tr("Name"), 'string')
+        self.addField('number', self.tr("# of elements"), 'fixed')
+        self.addField('number_files', self.tr("# of files"), 'fixed')
+        self.addField('number_containers', self.tr("# of containers"), 'fixed')
+        self.items = list(domains.domains)
+        # Cache the element counts (we assume that they never change while this model is used)
+        self.elementCounts = {domain: self._getCounts(domain) for domain in self.items}
         application.dispatcher.connect(self._handleDispatcher)
-        
-    def _handleDispatcher(self, event):
-        """React to DomainChangeEvent from the dispatcher."""
-        if isinstance(event, domains.DomainChangeEvent):
-            self._loadDomains()
-            
-    def _loadDomains(self):
-        """Load domain information from domains-module to GUI."""
-        self._domains = sorted(domains.domains, key=lambda d: d.name)
-        self.tableWidget.clear()
-        self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
-        self.tableWidget.setRowCount(len(self._domains))
-        
-        NumericSortItem = misc.createSortingTableWidgetClass('NumericSortItem', misc.leadingInt)
-        
-        for row, domain in enumerate(self._domains):
-            column = self._getColumnIndex("name")
-            item = QtGui.QTableWidgetItem(domain.name)
-            item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-            self.tableWidget.setItem(row, column, item)
-            
-            for column, count in zip(["number_elements", "number_files", "number_containers"],
-                                     self._getCounts(domain)):
-                column = self._getColumnIndex(column)
-                item = NumericSortItem('{}    '.format(count))
-                item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-                self.tableWidget.setItem(row, column, item)
-            
-        self.tableWidget.resizeColumnsToContents()
     
     def _getCounts(self, domain):
         """Return (as a tuple) the number of elements, files, containers in the given domain."""
@@ -124,72 +47,94 @@ class DomainManager(QtGui.QWidget):
                 containers = row[1]
             else: files += row[1]
         return (files+containers, files, containers)
-                        
-    def _handleAddButton(self):
-        """Create a new domain (querying the user for its name)."""
-        createNewDomain(self) # DomainManager will be reloaded via the dispatcher event
-            
-    def _handleDeleteButton(self):
-        """Delete the selected domain."""
-        rows = self.tableWidget.selectionModel().selectedRows()
-        if len(rows) == 1:
+    
+    def _handleDispatcher(self, event):
+        if isinstance(event, domains.DomainChangeEvent):
+            if event.action == constants.ADDED:
+                row = domains.domains.index(event.domain)
+                self.insertItem(row, event.domain)
+            elif event.action == constants.DELETED:
+                self.removeItem(event.domain)
+            else: self.itemChanged(event.domain)
+    
+    def getItemData(self, domain, field):
+        if field.name == 'name':
+            return domain.name
+        else:
+            fields = ['number', 'number_files', 'number_containers']
+            return self.elementCounts[domain][fields.index(field.name)]
+
+    def setItemData(self, domain, field, value):
+        assert field.name == 'name'
+        oldName = domain.name
+        newName = value
+        if oldName == newName:
+            return False
+        
+        if not domains.isValidName(newName):
+            dialogs.warning(self.tr("Cannot change domain"),
+                            self.tr("'{}' is not a valid domain name.").format(newName))
+            return False
+        
+        if domains.exists(newName):
+            dialogs.warning(self.tr("Cannot change domain"),
+                            self.tr("A domain named '{}' already exists.").format(newName))
+            return False
+              
+        domains.changeDomain(domain, name=newName)
+    
+    
+class DomainManager(flexform.FlexTable):
+    """The DomainManager allows to add, edit and delete domains."""
+    def __init__(self, dialog, panel):
+        super().__init__(panel)
+        self.setModel(DomainModel(self))
+        self.addAction(NewDomainAction(self))
+        self.addAction(stack.createUndoAction())
+        self.addAction(stack.createRedoAction())
+        self.addAction(DeleteDomainAction(self))
+        
+        
+class NewDomainAction(QtGui.QAction):
+    """Ask the user for a name and create a new domain."""
+    def __init__(self, parent):
+        super().__init__(utils.getIcon('add.png'), translate("NewDomainAction", "Create new domain..."),
+                         parent)
+        self.triggered.connect(self._triggered)
+                   
+    def _triggered(self):
+        newDomain = createNewDomain(self.parent())
+        if newDomain is not None:
+            self.parent().selectItems([newDomain])
+
+
+class DeleteDomainAction(QtGui.QAction):
+    """Delete an empty domain."""
+    def __init__(self, parent):
+        super().__init__(utils.getIcon('delete.png'), translate("DeleteDomainAction", "Delete domain"),
+                         parent)
+        self.triggered.connect(self._triggered)
+        parent.selectionChanged.connect(self._selectionChanged)
+    
+    def _selectionChanged(self):
+        self.setEnabled(len(self.parent().selectedItems()) == 1)
+        
+    def _triggered(self):
+        if len(self.parent().selectedItems()) == 1:
             if len(domains.domains) == 1:
                 dialogs.warning(self.tr("Cannot delete domain"),
                                 self.tr("Cannot delete the last domain."),
-                                self)
+                                self.parent())
                 return
-            domain = self._domains[rows[0].row()]
-            number = self._getCounts(domain)[0]
+            domain = self.parent().selectedItems()[0]
+            number = self.parent().model._getCounts(domain)[0]
             if number > 0:
                 dialogs.warning(self.tr("Cannot delete domain"),
                                 self.tr("Cannot delete a domain that contains elements."),
-                                self)
+                                self.parent())
                 return
             domains.deleteDomain(domain)
 
-    def _handleItemChanged(self, item):
-        """Change a domain's name after the user edited it."""
-        if item.column() != self._getColumnIndex("name"): # Only the name column is editable
-            return
-        domain = self._domains[item.row()]
-        oldName = domain.name
-        newName = item.text().strip()
-        if oldName == newName:
-            return
-        
-        if not domains.isValidName(newName):
-            QtGui.QMessageBox(self, self.tr("Cannot change domain"),
-                              self.tr("'{}' is not a valid domain name.").format(newName))
-            item.setText(oldName)
-            return
-        
-        if domains.exists(newName):
-            QtGui.QMessageBox.warning(self, self.tr("Cannot change domain"),
-                                      self.tr("A domain named '{}' already exists.").format(newName))
-            item.setText(oldName)
-            return
-              
-        domain.changeDomain(domain, name=newName)
-    
-    def _checkUndoRedoButtons(self):
-        """Enable or disable the undo and redo buttons depending on stack state."""
-        self.undoButton.setEnabled(stack.canUndo())
-        self.undoButton.setToolTip(self.tr("Undo: {}").format(stack.undoText()))
-        self.redoButton.setEnabled(stack.canRedo())
-        self.redoButton.setToolTip(self.tr("Redo: {}").format(stack.redoText()))
-        
-    def _handleSelectionChanged(self):
-        rows = self.tableWidget.selectionModel().selectedRows()
-        self.deleteButton.setEnabled(len(rows) == 1)
-        
-    def _getColumnIndex(self, columnKey):
-        """Return the index of the column with the given key (i.e. the first part of the corresponding tuple
-        in self.columns."""
-        for i in range(len(self.columns)):
-            if self.columns[i][0] == columnKey:
-                return i
-        raise ValueError("Invalid key {}".format(columnKey))
-    
 
 def createNewDomain(parent=None):
     """Ask the user to supply a name and then create a new domain with this name. Return the new domain or
@@ -200,12 +145,14 @@ def createNewDomain(parent=None):
         return None
     
     if domains.exists(name):
-        QtGui.QMessageBox.warning(parent, translate("DomainManager", "Cannot create domain"),
-                                  translate("DomainManager", "This domain does already exist."))
+        dialogs.warning(translate("DomainManager", "Cannot create domain"),
+                        translate("DomainManager", "This domain does already exist."),
+                        parent)
         return None
     elif not domains.isValidName(name):
-        QtGui.QMessageBox.warning(parent, translate("DomainManager", "Invalid domain name"),
-                                  translate("DomainManager", "This is not a valid domain name."))
+        dialogs.warning(translate("DomainManager", "Invalid domain name"),
+                        translate("DomainManager", "This is not a valid domain name."),
+                        parent)
         return None
     
     return domains.addDomain(name)
