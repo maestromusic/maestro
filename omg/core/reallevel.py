@@ -379,9 +379,9 @@ class RealLevel(levels.Level):
     
                 # Set stickers
                 db.query("DELETE FROM {p}stickers WHERE element_id = ?", element.id)
-                for type, values in element.stickers.items():
+                for stickerType, values in element.stickers.items():
                     db.multiQuery("INSERT INTO {p}stickers (element_id, type, sort, data) VALUES (?,?,?,?)",
-                                  [(element.id, type, i, val) for i, val in enumerate(values)])
+                                  [(element.id, stickerType, i, val) for i, val in enumerate(values)])
                     
             newFiles = [element for element in elements if element.isFile()]
             if len(newFiles) > 0:
