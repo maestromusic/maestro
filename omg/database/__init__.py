@@ -260,7 +260,8 @@ class SqlResult:
         if row is not None:
             return row
         else: raise EmptyResultException()
-    
+
+
 # contents-table
 #=======================================================================
 def contents(elids,recursive=False):
