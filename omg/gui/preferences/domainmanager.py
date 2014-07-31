@@ -62,7 +62,9 @@ class DomainManager(QtGui.QWidget):
         
         self.columns = [
                 ("name",   self.tr("Name")),
-                ("number", self.tr("# of elements"))
+                ("number_elements", self.tr("# of elements")),
+                ("number_files", self.tr("# of files")),
+                ("number_containers", self.tr("# of containers"))
                 ]
         
         self.tableWidget = QtGui.QTableWidget()
@@ -103,17 +105,25 @@ class DomainManager(QtGui.QWidget):
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
             
-            column = self._getColumnIndex("number")
-            item = NumericSortItem('{}    '.format(self._getElementCount(domain)))
-            item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-            self.tableWidget.setItem(row, column, item)
+            for column, count in zip(["number_elements", "number_files", "number_containers"],
+                                     self._getCounts(domain)):
+                column = self._getColumnIndex(column)
+                item = NumericSortItem('{}    '.format(count))
+                item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                self.tableWidget.setItem(row, column, item)
             
         self.tableWidget.resizeColumnsToContents()
     
-    def _getElementCount(self, domain):
-        """Return the number of elements in the given domain."""
-        return db.query("SELECT COUNT(*) FROM {p}elements WHERE domain = ?", domain.id).getSingle()
+    def _getCounts(self, domain):
+        """Return (as a tuple) the number of elements, files, containers in the given domain."""
+        result = db.query("SELECT file,COUNT(*) FROM {p}elements WHERE domain=? GROUP BY file", domain.id)
+        files = containers = 0
+        for row in result:
+            if row[0] == 0:
+                containers = row[1]
+            else: files += row[1]
+        return (files+containers, files, containers)
                         
     def _handleAddButton(self):
         """Create a new domain (querying the user for its name)."""
@@ -129,7 +139,7 @@ class DomainManager(QtGui.QWidget):
                                 self)
                 return
             domain = self._domains[rows[0].row()]
-            number = self._getElementCount(domain)
+            number = self._getCounts(domain)[0]
             if number > 0:
                 dialogs.warning(self.tr("Cannot delete domain"),
                                 self.tr("Cannot delete a domain that contains elements."),
