@@ -350,7 +350,7 @@ class RealLevel(levels.Level):
                 self.elements[element.id] = element
             else: assert element.isFile() 
         
-        with db.transcation():
+        with db.transaction():
             data = [(element.domain.id if element.domain is not None else None,
                      element.id,
                      element.isFile(),
