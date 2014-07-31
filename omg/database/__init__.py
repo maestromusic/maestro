@@ -192,7 +192,8 @@ def query(queryString, *args, **kwargs):
     result = engine.execute(queryString, *args)
     return SqlResult(result)
 
-multiQuery = query # just submit tuples as *args
+def multiQuery(queryString, args, **kwargs):
+    return query(queryString, *args, **kwargs)# = query # just submit tuples as *args
 
 def transaction():
     return engine.begin()
