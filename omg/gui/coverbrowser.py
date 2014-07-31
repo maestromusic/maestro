@@ -92,6 +92,7 @@ class CoverBrowser(dockwidget.DockWidget):
                     logging.exception(__name__, "Could not parse the cover browser's filter criterion.")
         
         self.worker = utils.worker.Worker()
+        self.worker.done.connect(self._loaded)
         self.worker.start()
                     
         widget = QtGui.QWidget()
@@ -207,8 +208,7 @@ class CoverBrowser(dockwidget.DockWidget):
         
     def activateFilter(self):
         """Activate and update filter in all views and reload."""
-        filter = self.getFilter()
-        self.filterButton.setEnabled(filter is not None)
+        self.filterButton.setEnabled(self.getFilter() is not None)
         self.reload()
 
     def search(self):
@@ -236,13 +236,19 @@ class CoverBrowser(dockwidget.DockWidget):
             
     def reload(self):
         """Clear everything and rebuilt it from the database."""
-        criteria = []
+        criterion = None
         if self.filterButton.active:
-            criteria.append(self.getFilter)
-        criterion = search.criteria.combine('AND', criteria)
+            criterion = self.getFilter()
         
         if criterion is not None:
-            elids = search.search(criterion, domain=self.domain)
+            self.worker.submit(search.SearchTask(criterion, domain=self.domain))
+        else: self._loaded(None)
+            
+    def _loaded(self, task):
+        """Load covers after search for elements has finished. If no search was necessary, *task* is None.
+        """
+        if task is not None:
+            elids = task.criterion.result
             if len(elids):
                 filterClause = " AND el.id IN ({})".format(db.csList(elids))
             else:
@@ -253,10 +259,10 @@ class CoverBrowser(dockwidget.DockWidget):
     
         result = db.query("""
             SELECT el.id, st.data
-            FROM {0}elements AS el
-                JOIN {0}stickers AS st ON el.id = st.element_id
-            WHERE st.type = 'COVER' {1}
-            """.format(db.prefix, filterClause))
+            FROM {p}elements AS el
+                JOIN {p}stickers AS st ON el.id = st.element_id
+            WHERE st.type = 'COVER' {filter}
+            """, filter=filterClause)
         coverPaths = {id: path for id, path in result}
         ids = list(coverPaths.keys())
         levels.real.collectMany(ids)
