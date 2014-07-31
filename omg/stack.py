@@ -19,7 +19,7 @@
 """Improved QUndoStack."""
 
 from PyQt4 import QtCore, QtGui
-from . import logging
+from . import logging, utils
 
 # The main application stack.
 # Note that it is possible to access all methods and attributes of stack directly via the module.
@@ -563,12 +563,14 @@ class UndoRedoAction(QtGui.QAction):
         if redo:
             self._prefix = self.tr("Redo")
             self.setShortcut(self.tr('Ctrl+Y'))
+            self.setIcon(utils.getIcon('redo.png'))
             stack.canRedoChanged.connect(self.setEnabled)
             stack.redoTextChanged.connect(self.setText)
             self.triggered.connect(stack.redo)
         else:
             self._prefix = self.tr("Undo")
             self.setShortcut(self.tr('Ctrl+Z'))
+            self.setIcon(utils.getIcon('undo.png'))
             stack.canUndoChanged.connect(self.setEnabled)
             stack.undoTextChanged.connect(self.setText)
             self.triggered.connect(stack.undo)
