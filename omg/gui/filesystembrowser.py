@@ -22,9 +22,9 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, filebackends, filesystem, config, utils, constants
+from .. import application, filebackends, filesystem, utils, constants
 from . import mainwindow, selection, dockwidget, widgets
-from ..core import levels, domains
+from ..core import levels
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -87,21 +87,20 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         if role == Qt.DecorationRole or role == Qt.ToolTipRole:
             info = self.fileInfo(index)
             if os.path.isdir(info.absoluteFilePath()):
-                dir = info.absoluteFilePath()
-                if dir == '..':
+                dirpath = info.absoluteFilePath()
+                if dirpath == '..':
                     return super().data(index, role)
-                status = filesystem.folderState(dir)
+                status = self.source.dirState(dirpath)
                 if role == Qt.DecorationRole:
                     return self.folderIcons[status]
                 else:
-                    return dir + '\n' + self.descriptions[status]
+                    return dirpath + '\n' + self.descriptions[status]
             else:
-                url = filebackends.filesystem.FileURL(info.absoluteFilePath())
-                status = filesystem.fileState(url)
+                status = self.source.fileState(info.absoluteFilePath())
                 if role == Qt.DecorationRole:
                     return self.fileIcons[status]
                 else:
-                    return str(url) + '\n' + self.descriptions[status]
+                    return str(info.absoluteFilePath()) + '\n' + self.descriptions[status]
         return super().data(index, role) 
 
 

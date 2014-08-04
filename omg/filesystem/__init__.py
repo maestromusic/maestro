@@ -90,6 +90,12 @@ class Source:
         path = os.path.normpath(path)
         return path.startswith(os.path.normpath(self.path))
 
+    def dirState(self, path):
+        return 'unsynced'
+
+    def fileState(self, path):
+        return 'unsynced'
+
 
 def sourceByName(name):
     for source in sources:
@@ -147,24 +153,6 @@ class SourceChangeEvent(application.ChangeEvent):
         self.action = action
         self.source = source
         
-def folderState(path):
-    """Return the state of a given folder, or 'unknown' if it can't be obtained. """
-    if enabled:
-        try:
-            return synchronizer.directories[path].simpleState()
-        except KeyError: pass
-    return 'unknown'
-
-
-def fileState(url):
-    """Return the state of a given file (one of 'problem', 'ok', 'unsynced', 'unknown').
-    """
-    if enabled:
-        try:
-            return synchronizer.tracks[url].simpleState()
-        except KeyError: pass
-    return 'unknown'
-
 
 def getNewfileHash(url):
     """Return the hash of a file specified by *url* which is not yet in the database.
