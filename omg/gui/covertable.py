@@ -66,7 +66,7 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
         sizeSliderLayout = QtGui.QHBoxLayout()
         sizeSlider = QtGui.QSlider(Qt.Horizontal) 
         sizeSlider.setMinimum(20)
-        sizeSlider.setMaximum(100)
+        sizeSlider.setMaximum(200)
         sizeSlider.setValue(self.getCoverSize())
         sizeSlider.valueChanged.connect(self.setCoverSize)
         sizeSliderLayout.addWidget(sizeSlider)
@@ -286,13 +286,30 @@ class CoverItem(QtGui.QGraphicsItem):
         return QtCore.QRectF(0, 0, self.scene.coverSize+2, self.scene.coverSize+2)
     
     def paint(self, painter, option, widget):
-        if self.cover.loaded:
-            if not self.cover.pixmap.isNull():
-                pixmap = self.cover.pixmap
-            else: pixmap = QtGui.QPixmap(':omg/cover_missing.png')
-            painter.drawPixmap(1, 1, self.scene.coverSize, self.scene.coverSize, pixmap)
-        elif self._oldCover is not None:
-            painter.drawPixmap(1, 1, self.scene.coverSize, self.scene.coverSize, self._oldCover.pixmap)
+        size = self.scene.coverSize
+        if self.cover.loaded or self._oldCover is not None:
+            # Find pixmap to draw
+            if self.cover.loaded:
+                if not self.cover.pixmap.isNull():
+                    pixmap = self.cover.pixmap
+                else: pixmap = QtGui.QPixmap(':omg/cover_missing.png')
+            else: pixmap = self._oldCover.pixmap
+
+            # Scale correctly
+            w, h = pixmap.width(), pixmap.height()
+            if w == h:
+                painter.drawPixmap(1, 1, size, size, pixmap)
+                borderRect = QtCore.QRect(0, 0, size+1, size+1)
+            elif w > h:
+                height = int(size/w * h)
+                offset = int((size-height) / 2) 
+                painter.drawPixmap(1, 1 + offset, size, height, pixmap)
+                borderRect = QtCore.QRect(0, offset, size+1, height+1)
+            else:
+                width = int(size/h * w)
+                offset = int((size-width) / 2)
+                painter.drawPixmap(1 + offset, 1, width, size, pixmap)
+                borderRect = QtCore.QRect(offset, 0, width+1, size+1)
         else:
             if self.scene.coverSize >= 32:
                 destXY = (self.scene.coverSize-32) // 2 + 1 # +1: adjust for border
@@ -305,13 +322,14 @@ class CoverItem(QtGui.QGraphicsItem):
             painter.drawPixmap(destXY, destXY, destSize, destSize,
                                self.scene.loadingPixmap,
                                srcX, srcY, 32, 32)
+            borderRect = QtCore.QRect(0, 0, size+1, size+1)
         pen = painter.pen()
         if option.state & QtGui.QStyle.State_Selected:
             pen.setColor(QtGui.QColor(0,0,255))
         else: pen.setColor(QtGui.QColor(0,0,0))
         painter.setPen(pen)
-        painter.drawRect(0, 0, self.scene.coverSize+1, self.scene.coverSize+1)
-        
+        painter.drawRect(borderRect)
+
     def mouseMoveEvent(self, event):
         if QtCore.QLineF(QtCore.QLine(event.screenPos(), event.buttonDownScreenPos(Qt.LeftButton))).length() \
                 > QtGui.QApplication.startDragDistance():

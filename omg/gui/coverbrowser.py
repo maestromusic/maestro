@@ -248,6 +248,8 @@ class CoverBrowser(dockwidget.DockWidget):
         """Load covers after search for elements has finished. If no search was necessary, *task* is None.
         """
         if task is not None:
+            if not isinstance(task, search.SearchTask): # subclasses might submit over tasks
+                return
             elids = task.criterion.result
             if len(elids):
                 filterClause = " AND el.id IN ({})".format(db.csList(elids))

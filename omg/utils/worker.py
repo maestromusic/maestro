@@ -235,13 +235,13 @@ class LoadImageTask(Task):
             self._image = None # save memory
             return self._pixmap
         else: None
-        
+
     def process(self):
         # QPixmap may only be used in the GUI thread. Thus we have to load the images as QImage and
         # transform them later in the GUI thread (see FutureImage.pixmap).
         image = QtGui.QImage(self.path)
         if not image.isNull() and self.size is not None and image.size() != self.size:
-            image = image.scaled(self.size, transformMode=Qt.SmoothTransformation)
+            image = image.scaled(self.size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self._image = image
 
     def merge(self, other):
