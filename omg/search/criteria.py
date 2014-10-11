@@ -524,9 +524,9 @@ class TagCriterion(Criterion):
             elif valueType == tags.TYPE_DATE:
                 if self.interval is None:
                     continue
-                whereClause = self.interval.toDateSql().queryPart()
+                whereClause = "value " + self.interval.toDateSql().queryPart()
                 args = []
-            perf = time.perf_counter()
+            #perf = time.perf_counter()
             db.query("""
                     INSERT INTO {help} (value_id, tag_id)
                         SELECT id, tag_id
@@ -534,7 +534,7 @@ class TagCriterion(Criterion):
                         WHERE tag_id IN({tags}) AND {where}
                     """, *args, help=TT_HELP, type=valueType.name,
                                 tags=db.csIdList(tagList), where=whereClause)
-            print("1: "+str(time.perf_counter()-perf))
+            #print("1: "+str(time.perf_counter()-perf))
             if pragmaNecessary:
                 db.query('PRAGMA case_sensitive_like = 0')
                 
@@ -550,7 +550,7 @@ class TagCriterion(Criterion):
         # Select elements which have these values (or not)
         #=================================================
         domainWhereClause = "el.domain={}".format(domain.id) if domain is not None else "1"
-        perf = time.perf_counter()
+        #perf = time.perf_counter()
         if not self.negate:
             self.result = set(db.query("""
                 SELECT DISTINCT el.id
@@ -569,7 +569,7 @@ class TagCriterion(Criterion):
                 GROUP BY el.id
                 HAVING COUNT(h.value_id) = 0
                 """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColumn())
-        print("2: "+str(time.perf_counter()-perf))
+        #print("2: "+str(time.perf_counter()-perf))
     
     def _escapeParameter(self, parameter):
         """Escape parameter for use in LIKE expression."""
@@ -725,6 +725,7 @@ class DateCriterion(TagCriterion):
         if tagList is None:
             tagList = SEARCH_TAGS
         self.tagList = [tag for tag in tagList if tag.type == tags.TYPE_DATE]
+        self.matchingTags = None
         
     @staticmethod
     def parse(string, certainlyDate=False):
@@ -733,14 +734,27 @@ class DateCriterion(TagCriterion):
         you can set *certainlyDate* to True, to change this behavior: Then all valid ranges are accepted
         and a ParseException is emitted when no date is found.
         """
-        prefix, string = _splitPrefixes(string, PREFIX_NEGATE) 
-        interval = Interval.parse(string)
+        prefix, string = _splitPrefixes(string, PREFIX_NEGATE)
+        for i,c in enumerate(string):
+            if c in '=<>':
+                break
+        else: return None
+        tagNames, value = string[:i], string[i:]
+        tagNames = [name.strip() for name in tagNames.split(',') if len(name) > 0]
+        try:
+            tagList = [tags.get(name) for name in tagNames] # raises ValueError if a name is invalid
+            if any(not tag.isInDb() for tag in tagList):
+                raise ValueError()
+        except ValueError:
+            raise ParseException("TagCriterion can only use tags which are in the database.")
+        
+        interval = Interval.parse(value)
         if interval is not None and interval.isValid():
             if not certainlyDate and not all(number is None or 1000 <= number <= 9999
                                              for number in (interval.start, interval.end)):
                 # To avoid false positives, restrict DateCriteria to 4-digit numbers
                 return None
-            criterion = DateCriterion(interval)
+            criterion = DateCriterion(interval, tagList=tagList if len(tagList) else None)
             if PREFIX_NEGATE in prefix:
                 criterion.negate = not criterion.negate
             return criterion
