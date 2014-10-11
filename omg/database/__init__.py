@@ -189,6 +189,8 @@ def query(queryString, *args, **kwargs):
     queryString = queryString.format(**kwargs)
     if len(args) > 0 and driver == 'mysqlconnector':
         queryString = queryString.replace('?', '%s')
+    if 'print' in kwargs:
+        print(queryString, args)
     result = engine.execute(queryString, *args)
     return SqlResult(result)
 
