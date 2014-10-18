@@ -22,8 +22,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt 
 
 from ... import logging as omglogging
-from ...gui import mainwindow, dockwidget
-from . import resources
+from ...gui import mainwindow
 
 _signaller = None
 
@@ -31,16 +30,16 @@ _signaller = None
 def enable():
     global _signaller    
     _signaller = StreamSignaller()
-    mainwindow.addWidgetData(mainwindow.WidgetData(
+    mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "loggerdock",
         name = QtGui.QApplication.translate("LoggerDock","Logger"),
         icon = QtGui.QIcon(":/omg/plugins/loggerdock/loggerdock.png"),
         theClass = LoggerDock,
-        preferredDockArea = Qt.BottomDockWidgetArea))
+        preferredDockArea = 'bottom'))
 
 
 def disable():
-    mainwindow.removeWidgetData("loggerdock")
+    mainwindow.removeWidgetClass("loggerdock")
 
 
 class StreamSignaller(QtCore.QObject):
@@ -61,12 +60,12 @@ class StreamSignaller(QtCore.QObject):
         pass
 
 
-class LoggerDock(dockwidget.DockWidget):
-    def __init__(self, parent=None, **args):
-        super().__init__(parent, **args)
+class LoggerDock(mainwindow.Widget):
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        layout = QtGui.QVBoxLayout(self)
         
-        layout = QtGui.QVBoxLayout()
-        self.area = QtGui.QTextBrowser(self)
+        self.textBrowser = QtGui.QTextBrowser(self)
         dropdown = QtGui.QComboBox()
         dropdown.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
         self.handler = logging.StreamHandler(_signaller)
@@ -77,14 +76,11 @@ class LoggerDock(dockwidget.DockWidget):
                                 lambda levelStr : self.handler.setLevel(getattr(logging, levelStr.upper())))
         self.handler.setLevel(logging.DEBUG)
         layout.addWidget(dropdown)
-        layout.addWidget(self.area)
+        layout.addWidget(self.textBrowser)
         _signaller.textReceived.connect(self.updateArea)
-        widget = QtGui.QWidget()
-        widget.setLayout(layout)
-        self.setWidget(widget)
 
     def updateArea(self, newText):
-        self.area.insertPlainText(newText)
-        self.area.ensureCursorVisible()
+        self.textBrowser.insertPlainText(newText)
+        self.textBrowser.ensureCursorVisible()
 
         

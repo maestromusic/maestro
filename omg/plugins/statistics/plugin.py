@@ -24,7 +24,7 @@ translate = QtCore.QCoreApplication.translate
 
 from ... import database as db
 from ...core import tags, elements, levels
-from ...gui import mainwindow, dockwidget
+from ...gui import mainwindow
 
 try:
     import matplotlib.pyplot as pyplot
@@ -36,7 +36,7 @@ except ImportError as e:
 
 
 def enable():
-    mainwindow.addWidgetData(mainwindow.WidgetData(
+    mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "statistics",
         name = QtGui.QApplication.translate("Statistics", "Statistics"),
         theClass = StatisticsWidget,
@@ -45,22 +45,23 @@ def enable():
 
 
 def disable():
-    mainwindow.removeWidgetData("statistics")
+    mainwindow.removeWidgetClass("statistics")
     
 
-class StatisticsWidget(dockwidget.DockWidget):
+class StatisticsWidget(mainwindow.Widget):
     """Widget that displays some statistics (or an error message if matplotlib cannot be loaded)."""
-    def __init__(self, parent=None, **kwargs):
-        super().__init__(parent, **kwargs)
+    def __init__(self, state=None, **kwargs):
+        super().__init__(**kwargs)
+        layout = QtGui.QHBoxLayout(self)
         if pyplot is None:
             errorLabel = QtGui.QLabel(pyplotError)
             errorLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-            self.setWidget(errorLabel)
+            layout.addWidget(errorLabel)
             return
         
         self.scrollArea = QtGui.QScrollArea()
         self.updateCharts()
-        self.setWidget(self.scrollArea)
+        layout.addWidget(self.scrollArea)
         levels.real.connect(self.updateCharts)
         
     def updateCharts(self):

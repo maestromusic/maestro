@@ -23,30 +23,35 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ... import utils
-from ...gui import mainwindow, dockwidget
-from . import resources
+from ...gui import mainwindow
 
 
 def enable():
-    mainwindow.addWidgetData(mainwindow.WidgetData(
+    mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "logodock",
         name = QtGui.QApplication.translate("LogoDock","Logo"),
         icon = QtGui.QIcon(":/omg/plugins/logodock/omg.png"),
         theClass = LogoDock,
-        central = False,
-        preferredDockArea=Qt.RightDockWidgetArea))
+        areas = 'dock',
+        preferredDockArea = 'right'))
 
 
 def disable():
-    mainwindow.removeWidgetData("logodock")
+    mainwindow.removeWidgetClass("logodock")
 
 
-class LogoDock(dockwidget.DockWidget):
-    def __init__(self, parent=None, **args):
-        super().__init__(parent, **args)
-        self.setWindowTitle('')  # Do not show a title and icon in the title bar of this dock widget.
-        self.setWindowIcon(None)
+class LogoDock(mainwindow.Widget):
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        layout = QtGui.QHBoxLayout(self)
         label = QtGui.QLabel()
         label.setPixmap(QtGui.QPixmap(':/omg/omg.png'))
         label.setAlignment(Qt.AlignCenter)
-        self.setWidget(label)
+        layout.addWidget(label)
+
+    def initialize(self, state):
+        # initialize is called when the LogoDock has been added to its dockwidget
+        dock = self.getContainingWidget()
+        # Do not show a title and icon in the title bar of this dock widget.
+        dock.setWindowTitle('')
+        dock.setWindowIcon(None)

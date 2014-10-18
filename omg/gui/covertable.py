@@ -32,7 +32,7 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
     def __init__(self, state, coverBrowser):
         super().__init__(coverBrowser)
         layout = QtGui.QHBoxLayout(self)
-        self.view = QtGui.QGraphicsView(CoverTableScene(coverBrowser.worker,
+        self.view = QtGui.QGraphicsView(CoverTableScene(self, coverBrowser.worker,
                                                         state.get('size') if state is not None else 80))
         self.view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.view.setDragMode(QtGui.QGraphicsView.ScrollHandDrag)
@@ -88,8 +88,8 @@ class CoverTableScene(QtGui.QGraphicsScene):
     shadowFactor = 1./15. # fraction of coverSize that is used for shadows
     outerSpace = 15 # constant outer space
     
-    def __init__(self, worker, size):
-        super().__init__()
+    def __init__(self, parent, worker, size):
+        super().__init__(parent)
         self.worker = worker
         self.columnCount = 0
         

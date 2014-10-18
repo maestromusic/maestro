@@ -29,19 +29,13 @@ renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
 ICON_SIZE = 16
 
 
-class PlaybackWidget(dockwidget.DockWidget):
+class PlaybackWidget(mainwindow.Widget):
     """A dock widget providing playback controls for the selected player backend.
     """
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)
-        widget = QtGui.QWidget()
-        self.setWidget(widget)
-
-        if state is not None:
-            backend = player.profileCategory.get(state) # may be None
-        elif len(player.profileCategory.profiles()) > 0:
-            backend = player.profileCategory.profiles()[0]
-        else: backend = None
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        self.hasOptionDialog = True
+        self.backend = None
         
         topLayout = QtGui.QHBoxLayout()    
         self.titleLabel = QtGui.QLabel(self)
@@ -72,16 +66,21 @@ class PlaybackWidget(dockwidget.DockWidget):
         self.seekSlider = SeekSlider(self)
         bottomLayout.addWidget(self.seekSlider)
         bottomLayout.addWidget(self.seekLabel)
-        mainLayout = QtGui.QVBoxLayout(widget)
+        mainLayout = QtGui.QVBoxLayout(self)
         mainLayout.addLayout(topLayout)
         mainLayout.addLayout(bottomLayout)
         self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
         
-        self.backend = None
-        self.setBackend(backend)
-        
         levels.real.connect(self.handleLevelChange)
         
+    def initialize(self, state):
+        if state is not None:
+            backend = player.profileCategory.get(state) # may be None
+        elif len(player.profileCategory.profiles()) > 0:
+            backend = player.profileCategory.profiles()[0]
+        else: backend = None
+        self.setBackend(backend)
+    
     def createOptionDialog(self, parent):
         return OptionDialog(parent, self)
     
@@ -205,13 +204,20 @@ class PlaybackWidget(dockwidget.DockWidget):
         return self.backend.name if self.backend is not None else None
     
     
-data = mainwindow.WidgetData(id="playback",
-                             name=translate("Playback", "playback"),
-                             icon=utils.images.icon('widgets/playback.png'),
-                             theClass=PlaybackWidget,
-                             central=False,
-                             preferredDockArea=Qt.LeftDockWidgetArea)
-mainwindow.addWidgetData(data)
+def playPauseShortcut():
+    backends = [w.backend for w in mainwindow.mainWindow.getWidgets('playback') if w.backend is not None]
+    newState = player.PLAY if not any(b.state() == player.PLAY for b in backends) else player.PAUSE
+    for backend in backends:
+        backend.setState(newState)
+            
+    
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
+        id = "playback",
+        name = translate("Playback", "playback"),
+        icon = utils.images.icon('widgets/playback.png'),
+        theClass = PlaybackWidget,
+        areas = 'dock',
+        preferredDockArea = 'left'))
 
 
 class OptionDialog(dialogs.FancyPopup):
@@ -235,8 +241,6 @@ class PlayPauseButton(QtGui.QToolButton):
     are emitted when the button is clicked and the button shows different icons."""
     
     # Signals and icons used for the two states
-    play = QtCore.pyqtSignal()
-    pause = QtCore.pyqtSignal()
     playIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_start", ICON_SIZE, ICON_SIZE))
     pauseIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_pause", ICON_SIZE, ICON_SIZE))
     stateChanged = QtCore.pyqtSignal(int)
@@ -246,9 +250,7 @@ class PlayPauseButton(QtGui.QToolButton):
         super().__init__(parent)
         self.setIcon(self.playIcon)
         self.playing = False
-        self.clicked.connect(lambda: self.pause.emit() if self.playing else self.play.emit() )
-        self.pause.connect(lambda: self.stateChanged.emit(player.PAUSE))
-        self.play.connect(lambda: self.stateChanged.emit(player.PLAY))
+        self.clicked.connect(lambda: self.stateChanged.emit(player.PAUSE if self.playing else player.PLAY))
 
     def setPlaying(self, playing):
         """Set the state of this button to play if *playing* is true or pause otherwise."""

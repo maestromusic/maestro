@@ -80,14 +80,13 @@ class EditorTreeView(treeview.DraggingTreeView):
         
 
     
-class EditorWidget(dockwidget.DockWidget):
+class EditorWidget(mainwindow.Widget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)
-        widget = QtGui.QWidget()
-        self.setWidget(widget)
-        layout = QtGui.QVBoxLayout(widget)
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        self.hasOptionDialog = True
+        layout = QtGui.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
@@ -139,11 +138,11 @@ class EditorWidget(dockwidget.DockWidget):
                 'delegate': self.editor.itemDelegate().profile.name # a delegate's profile is never None
                 }
     
-    def okToClose(self):
+    def canClose(self):
         if self.editor.model().containsUncommitedData():
             return dialogs.question(self.tr("Unsaved changes"),
                                     self.tr("The editor contains uncommited changes. Really close?"))
-        return True
+        else: return True
 
 
 class OptionDialog(dialogs.FancyPopup):
@@ -273,10 +272,9 @@ class ExternalTagsWidget(QtGui.QScrollArea):
             self.editor.selectionModel().select(itemSelection,QtGui.QItemSelectionModel.ClearAndSelect)       
 
 
-# register this widget in the main application
-widgetData = mainwindow.WidgetData(id = "editor",
-                             name = translate("Editor","editor"),
-                             icon = utils.getIcon('widgets/editor.png'),
-                             theClass = EditorWidget,
-                             preferredDockArea = Qt.RightDockWidgetArea)
-mainwindow.addWidgetData(widgetData)
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
+        id = "editor",
+        name = translate("Editor", "editor"),
+        icon = utils.getIcon('widgets/editor.png'),
+        theClass = EditorWidget,
+        preferredDockArea = 'right'))

@@ -171,27 +171,29 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
             selection.setGlobalSelection(s) 
     
         
-class FileSystemBrowser(dockwidget.DockWidget):
+class FileSystemBrowser(mainwindow.Widget):
     """A DockWidget wrapper for the FileSystemBrowser."""
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)
-        widget = QtGui.QWidget()
-        layout = QtGui.QVBoxLayout(widget)
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        self.hasOptionDialog = True
+        layout = QtGui.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         application.dispatcher.connect(self._handleDispatcher)
-        source = None
-        if state is not None and 'source' in state:
-            source = filesystem.sourceByName(state['source'])
-        if source is None and len(filesystem.sources) > 0:
-            source = filesystem.sources[0]
         self.sourceChooser = widgets.SourceBox()
         self.sourceChooser.sourceChanged.connect(self._handleSourceChanged)
         layout.addWidget(self.sourceChooser)
         
         self.treeView = FileSystemBrowserTreeView()
         layout.addWidget(self.treeView, 1)
-        self.setWidget(widget)
+        
+    def initialize(self, state):
+        super().initialize(state)
+        source = None
+        if state is not None and 'source' in state:
+            source = filesystem.sourceByName(state['source'])
+        if source is None and len(filesystem.sources) > 0:
+            source = filesystem.sources[0]
         self._handleSourceChanged(source) # initialize
         
     def saveState(self):
@@ -199,7 +201,7 @@ class FileSystemBrowser(dockwidget.DockWidget):
         if source is not None:
             return {'source': source.name}
         else: return None
-        
+    
     def createOptionDialog(self, parent):
         from . import preferences
         preferences.show("main/filesystem")
@@ -238,10 +240,10 @@ class FileSystemSelection(selection.Selection):
         
         
 # register this widget in the main application
-widgetData = mainwindow.WidgetData(id = "filesystembrowser",
-                                   name = translate("FileSystemBrowser", "File System Browser"),
-                                   icon = utils.images.icon('widgets/filesystembrowser.png'),
-                                   theClass = FileSystemBrowser,
-                                   central = False,
-                                   preferredDockArea = QtCore.Qt.RightDockWidgetArea)
-mainwindow.addWidgetData(widgetData)
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
+        id = "filesystembrowser",
+        name = translate("FileSystemBrowser", "File System Browser"),
+        icon = utils.images.icon('widgets/filesystembrowser.png'),
+        theClass = FileSystemBrowser,
+        areas = 'dock',
+        preferredDockArea = 'right'))

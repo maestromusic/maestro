@@ -79,13 +79,14 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         filterCriterionLine = searchgui.CriterionLineEdit(self.browser.filterCriterion)
         filterCriterionLine.criterionChanged.connect(self.browser.setFilterCriterion)
         filterCriterionLine.criterionCleared.connect(functools.partial(self.browser.setFilterCriterion,None))
+
         filterCriterionLayout.addWidget(filterCriterionLine)
         filterTab.layout().addLayout(filterCriterionLayout)
         
         self.optionTab = QtGui.QWidget()
         self.optionTab.setLayout(QtGui.QVBoxLayout())
         self.tabWidget.addTab(self.optionTab,self.tr("Options"))
-        
+
         # Option tab is filled in subclasses
 
 
@@ -101,7 +102,6 @@ class BrowserDialog(AbstractBrowserDialog):
                                                      restrictToType=profileType,
                                                      default=self.browser.delegateProfile)
         profileChooser.profileChosen.connect(self._handleProfileChosen)
-
         lineLayout.addWidget(profileChooser)
         
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))

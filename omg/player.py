@@ -24,8 +24,6 @@ from . import config, profiles
 STOP, PLAY, PAUSE = range(3)
 DISCONNECTED, CONNECTING, CONNECTED = range(3)
 
-_runningBackends = {}
-
 profileCategory = profiles.TypedProfileCategory(
     name = 'playback',
     title = translate('PlayerBackend','Playback'),

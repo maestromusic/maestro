@@ -19,43 +19,32 @@
 """
 This module implements OMG's flexible widget system. It consists of mainwindow.MainWindow which is the
 toplevel window of OMG and a flexible amount of central widgets (which are displayed as tabs in the center)
-and dock widgets. This module manages a list of all available widget types (confer WidgetData). Plugins may
-add their own widgets using addWidgetData. From this list a View menu is created that allows the user to
-show/hide central widgets and add new dock widgets. While there can be only at most one instance of each
-central widget, dock widgets can have many instances (unless the unique-flag in the corresponding WidgetData
-is set to True). At the end of the application the state and position of each widget is saved and at
-application start it will be restored again.
+and docked widgets. This module manages a list of all available widget classes (confer WidgetClass).
+Plugins may add their own widgets using addWidgetClass. From this list a View menu is created that allows the
+user to add widgets. At the end of the application the state and position of each widget is saved
+and at application start it will be restored again.
 
-To work with this system central widgets or dock widget must follow some rules:
+To work with this system central widgets or docked widgets must follow some rules:
 
-    - Data about them must be registered using addWidgetData.
-    - The widget must provide a constructor which takes a parent as first parameter, has a keyword parameter
-    'location' and has default values for all other parameters. When invoked 'location' will be a
-    DockLocation object storing the last location of the dock. Note that the location will be restored after
-    the widget has been initialized and thus methods like isFloating do not provide valid information.
-    - Dock widgets must be subclasses of QDockWidget.
+    - A corresponding WidgetClass about them must be registered using addWidgetClass.
+    - The widget must be a subclass of mainwindow.Widget.
     - Of course the generic system can only store the position and not the inner state of each widget. If a
-    widget wants to store its state, it must provide the method saveState to return a state object to be
-    saved and a keyword parameter 'state' in the constructor (with default value None) to restore the state
-    again. The state object may be anything that can be stored in a variable in config.storage (i.e. any
-    combination of standard Python types including lists and dicts).
+    widget wants to store its state, it must reimplement the method saveState to return an object that
+    will be passed to the constructor on the next startup.
 
 """
 
-import functools,itertools,collections
+import functools
 
-from PyQt4 import QtCore,QtGui
+from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 QWIDGETSIZE_MAX = 16777215
 
-from .. import config,constants,logging,utils,stack
-from . import selection,dialogs
+from .. import config, constants, logging, utils, stack
+from . import selection, dialogs
 
 # This will contain the single instance of MainWindow once it is initialized
 mainWindow = None
-
-# Data about the available widgets
-_widgetData = []
 
 # Global selection
 _globalSelectionLevel = None
@@ -65,85 +54,235 @@ _globalSelection = None
 DEFAULT_PERSPECTIVE = ''
 
 
-def addWidgetData(data):
-    """Add widget data to the list of registered widgets."""
-    if data in _widgetData:
-        logging.warning(__name__, "Attempt to add widget data twice: {}".format(data))
-    else: _widgetData.append(data)
+# Widget Class Management
+#============================================================================================================
+_widgetClasses = [] # registered WidgetClass-instances
+
+def addWidgetClass(widgetClass):
+    """Register a WidgetClass instance. Afterwards the user may add widgets of this class to the GUI."""
+    if widgetClass in _widgetClasses:
+        logging.warning(__name__, "Attempt to add widget class twice: {}".format(widgetClass))
+    else: _widgetClasses.append(widgetClass)
     if mainWindow is not None:
-        mainWindow._widgetDataAdded(data)
+        mainWindow._widgetClassAdded(widgetClass)
 
 
-def removeWidgetData(id):
-    """Remove the WidgetData instance with the given id from the list of registered widgets."""
-    data = WidgetData.fromId(id)
-    if data is None:
-        logging.warning(__name__, "Attempt to remove nonexistent widget data: {}".format(id))
-    else: _widgetData.remove(data)
+def removeWidgetClass(id):
+    """Remove a registered WidgetClass instance with the given id from the list of registered widget
+    classes."""
+    widgetClass = getWidgetClass(id)
+    if widgetClass is None:
+        logging.warning(__name__, "Attempt to remove nonexistent widget class: {}".format(id))
+    else: _widgetClasses.remove(widgetClass)
     if mainWindow is not None:
-        mainWindow._widgetDataRemoved(data)
+        mainWindow._widgetClassRemoved(widgetClass)
 
 
-class WidgetData:
-    """A WidgetData instance stores information about one type of widget (central and/or dock). It contains
-    the following information:
+class WidgetClass:
+    """A WidgetClass instance stores information about one class of widgets (central and/or docked).
+    It contains the following information:
 
-        - id: a unique string to identify the WidgetData. This string is used to store the widgets
+        - id: a unique string to identify the WidgetClass. This string is used to store the widgets
           persistently.
         - name: a nice name which will be displayed in the View menu.
-        - theClass: the class that must be instantiated to create a widget of this type. Remember that this
-          must be a subclass of QDockWidget if dock is true.
-        - central: Whether this widget may be used in the center.
-        - dock: Whether this widget may be used as dock widget.
-        - unique: Only relevant for dock widgets. It stores whether there may be more than one instance of
-          this widget.
-        - preferredDockArea: Only relevant for dock widgets. Contains the dock area where this widget will be
-          placed when it is newly created. One of the values of Qt.DockWidgetAreas.
+        - theClass: the class that must be instantiated to create a widget of this type.
+        - areas: Specifies where a widget may be used. Must be a list or a comma-separated string
+          containing some of the values
+          ['top', 'bottom', 'left', 'right', 'central', 'dock', 'all']
+          The last two are combinations of the first five. Defaults to ['all'].
+        - preferredDockArea: The default dock area (Omit if this widget may only be used in the center).
+        - unique: If set, there may be only one widget of this class.
         - icon: Optional. An icon which is displayed in tabs or docks for this widget.
 
     """
-    def __init__(self,id,name,theClass,central=True,dock=True,
-                 unique=False,preferredDockArea=None,icon=None):
-        if not (central or dock):
-            raise ValueError("Either central or dock must be True.")
+    _areaFlags = {
+            'top': Qt.TopDockWidgetArea,
+            'bottom': Qt.BottomDockWidgetArea,
+            'left': Qt.LeftDockWidgetArea,
+            'right': Qt.RightDockWidgetArea,
+        }
+    
+    def __init__(self, id, name, theClass, areas=None, preferredDockArea=None, unique=False, icon=None):
         self.id = id
         self.name = name
         self.theClass = theClass
-        self.central = central
-        self.dock = dock
+        if areas is None or len(areas) == 0:
+            areas = ['all']
+        elif isinstance(areas, str):
+            areas = [s.strip() for s in areas.split(',')]
+        self.areas = []
+        # note that the following order determines the default preferredDockArea
+        for area in ['bottom', 'left', 'right', 'top', 'central']:
+            if area in areas or 'all' in areas or (area != 'central' and 'dock' in areas):
+                self.areas.append(area)
+        if len(self.areas) == 0:
+            raise ValueError("No valid area identifier given: {}".format(areas))
+        self.preferredDockArea = preferredDockArea
+        if preferredDockArea is None and self.areas[0] != 'central':
+            self.preferredDockArea = self.areas[0]
         self.unique = unique
-        self.preferredDockArea = preferredDockArea or Qt.BottomDockWidgetArea
         self.icon = icon
+        
+    def allowedDockAreas(self):
+        """Return the allowed dock areas as Qt::DockWidgetAreas flags."""
+        result = Qt.NoDockWidgetArea
+        for area in self.areas:
+            if area != 'central':
+                result |= self._areaFlags[area]
+        return result
+    
+    def preferredDockAreaFlag(self):
+        """Return the preferred dock area as Qt::DockWidgetAreas flag."""
+        return self._areaFlags.get(self.preferredDockArea, Qt.NoDockWidgetArea)
 
-    def __eq__(self,other):
+    def __eq__(self, other):
         return self.id == other.id
 
-    def __ne__(self,other):
+    def __ne__(self, other):
         return self.id != other.id
 
     def __hash__(self):
         return hash(self.id)
 
     def __repr__(self):
-        return "<WidgetData({},{},{})>".format(self.id,self.name,self.theClass.__name__)
-
-    @staticmethod
-    def fromId(id):
-        """Get the registered WidgetData with the given id. Return None if such data cannot be found."""
-        for data in _widgetData:
-            if data.id == id:
-                return data
-        else: return None
+        return "<WidgetClass({}, {}, {})>".format(self.id, self.name, self.theClass.__name__)
 
 
+def getWidgetClass(id):
+    """Get the registered WidgetClass with the given id (or None)."""
+    for c in _widgetClasses:
+        if c.id == id:
+            return c
+    else: return None
+
+
+class Widget(QtGui.QWidget):
+    """This is the superclass of all widgets that can be used as central and/or docked widgets.
+    The constructor of subclasses must take one argument *state* which is either None or what was returned
+    by saveState on the last shutdown. It may have additional arguments and must pass all remaining
+    keyword-arguments to the superclass constructor.
+    
+    Widget has three public attributes:
+        - widgetClass: The Widget class this widget belongs to.
+        - hasOptionDialog: If this is set to True in a subclass dockwidgets and the central tab widget
+          will offer a button to open a option dialog (subclasses must also implement createOptionDialog).
+        - area: The current area of the widget. A string from
+          ['top', 'bottom', 'left', 'right', 'central', 'dock', 'all']
+    """
+    areaChanged = QtCore.pyqtSignal(str) # emitted when the widget is moved from one dock area to another
+        
+    def __init__(self, widgetClass, area=None):
+        super().__init__()
+        self.widgetClass = widgetClass
+        self.hasOptionDialog = False
+        self.area = area
+        self._dialog = None          # The option dialog if it is open,
+        self._lastDialogTabIndex = 0 # and the index of the tab that was active when the dialog was closed.
+        if self.widgetClass.unique:
+            mainWindow._setUniqueWidgetActionEnabled(self.widgetClass.id, False)
+    
+    def initialize(self, state=None):
+        """This method is called after the widget has been added to its dock widget or to the central 
+        tab widget. Thus methods like getContainingWidget().setWindowTitle can be used here (but not
+        in the constructor. Remember to call the base implementation!
+        """
+        if self.area != 'central':
+            self.getContainingWidget().dockLocationChanged.connect(self._handleDockLocationChanged)
+    
+    def canClose(self):
+        """Return whether this widget may be closed. Subclasses should reimplement this function to ask
+        the user in case of unsaved data.
+        Do NOT use this method for tidy-up tasks, even if it returns True. When the main window is closed
+        other widgets might abort the closing. For such tasks use the closeEvent-method. Note that you must
+        not ignore CloseEvents, because they are only sent after this method has returned True.
+        """
+        # Because MainWindow.closeEvent has to ask many different widgets whether they can close, before
+        # starting to really close them, there must be two methods: one that only checks and one that really
+        # closes (including tidy up tasks). We use canClose for the former and close/closeEvent for the
+        # latter.
+        return True
+        # Debug code
+        #return QtGui.QMessageBox.question(self, "Close?", "Close {}".format(self.widgetClass.id),
+        #                                QtGui.QMessageBox.Yes|QtGui.QMessageBox.No) == QtGui.QMessageBox.Yes
+        
+    def _handleDockLocationChanged(self, location):
+        area = {Qt.LeftDockWidgetArea: 'left', Qt.RightDockWidgetArea: 'right',
+                Qt.TopDockWidgetArea: 'top', Qt.BottomDockWidgetArea: 'bottom'}[location]
+        if area != self.area:
+            self.area = area
+            self.areaChanged.emit(area) 
+            
+    def getContainingWidget(self):
+        """Return the DockWidget or the central TabWidget containing this widget."""
+        if self.area == 'central':
+            return mainWindow.centralWidget()
+        else: return self.parent() # the QDockWidget
+        
+    def saveState(self):
+        """Return something (usually a dict) that can be encoded as JSON and stores the state of this widget.
+        The next time the application is started, it will be passed as argument 'state' to the constructor.
+        """
+        return None
+    
+    def createOptionDialog(self, button=None):
+        """Subclasses can reimplement this to return a custom option dialog (such subclasses must
+        additionally set the attribute 'hasOptionDialog' to True).
+        If not None, *button* is the button that triggered the dialog and may be used to position the
+        dialog.
+        """
+        raise NotImplementedError()
+    
+    def toggleOptionDialog(self, button=None):
+        """Open/close the option dialog. Call self.createOptionDialog to create the dialog (must be
+        implemented in all subclasses that use option dialogs). If the result is a FancyPopup, take care of
+        it. If *button* is not None, it may be used to position the dialog.
+        """
+        if self._dialog is None:
+            self._dialog = self.createOptionDialog(button)
+            # The window title is not visible within the application, but might be visible in the taskbar.
+            self._dialog.setWindowTitle(self.tr("{} Options").format(self.widgetClass.name))
+            if self._dialog is not None:
+                self._dialog.installEventFilter(self)
+                if isinstance(self._dialog, dialogs.FancyTabbedPopup):
+                    self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
+                self._dialog.show()
+        else:
+            self._dialog.close()
+        
+    def eventFilter(self, object, event):
+        if event.type() == QtCore.QEvent.Close and self._dialog is not None:
+            if isinstance(self._dialog, dialogs.FancyTabbedPopup):
+                self._lastDialogTabIndex = self._dialog.tabWidget.currentIndex()
+            self._dialog = None
+        return False # do not filter the event out
+        
+    def setWindowTitle(self, title):
+        """Change the title of this widget, or rather of its containing widget (dock or central tabwidget).
+        """
+        if self.area == 'central':
+            tabWidget = self.getContainingWidget()
+            tabWidget.setTabText(tabWidget.indexOf(self), title)
+        else:
+            self.getContainingWidget().setWindowTitle(title)
+        
+    def setWindowIcon(self, icon):
+        """Change the icon of this widget, or rather of its containing widget (dock or central tabwidget)."""
+        if self.area == 'central':
+            tabWidget = self.getContainingWidget()
+            tabWidget.setTabIcon(tabWidget.indexOf(self), icon)
+        else:
+            self.getContainingWidget().setWindowIcon(icon)
+        
+        
 class MainWindow(QtGui.QMainWindow):
     """The main window of OMG. It contains a CentralTabWidget as actual central widget (in Qt sense) so that
     several widgets (in tabs) can be displayed as central widgets (in OMG's sense)."""
-    # Use gui.selection.changed instead
+    # Do not use this! Use gui.selection.changed instead. We just need a QObject to put the signal in.
     _globalSelectionChanged = QtCore.pyqtSignal(selection.Selection)
 
-    def __init__(self,parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
+        self._isClosing = False
 
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
@@ -153,6 +292,9 @@ class MainWindow(QtGui.QMainWindow):
 
         global mainWindow
         mainWindow = self
+    
+        # dicts that are indexed by WidgetClass-ids
+        self._currentWidgets = {}
 
         # Resize and move the widget to the size and position it had when the program was closed
         if config.binary.gui.mainwindow_maximized:
@@ -163,46 +305,277 @@ class MainWindow(QtGui.QMainWindow):
             else: success = False
             if not success:  # Default geometry
                 screen = QtGui.QDesktopWidget().availableGeometry()
-                self.resize(min(1000,screen.width()),min(800,screen.height()))
+                self.resize(min(1000, screen.width()), min(800, screen.height()))
                 # Center the window
                 screen = QtGui.QDesktopWidget().screenGeometry()
                 size = self.geometry()
-                self.move((screen.width() - size.width()) / 2,(screen.height() - size.height()) / 2)
+                self.move((screen.width() - size.width()) / 2, (screen.height() - size.height()) / 2)
 
         self.setCentralWidget(CentralTabWidget())
         self.initMenus()
+
         if DEFAULT_PERSPECTIVE in config.storage.gui.perspectives:
             try:
                 self.restorePerspective()
             except Exception:
                 logging.exception(__name__, "Exception when restoring perspective.")
                 self.createDefaultWidgets()
-        else: self.createDefaultWidgets()
+        else:
+            self.createDefaultWidgets()
+        
         self.updateWidgetMenus()  # view menu can only be initialized after all widgets have been created
-
-
-        # TODO: Replace this hack by something clever.
-        browserShortcut = QtGui.QShortcut(QtGui.QKeySequence(self.tr("Ctrl+F")),self,
-                                          self._handleBrowserShortcut)
+        
+        QtGui.QApplication.instance().focusChanged.connect(self._handleFocusChanged)
         self.show()
-                    
 
-    def centralWidgets(self):
-        return [self.centralWidget().widget(i) for i in range(self.centralWidget().count())]
+    def closeEvent(self, event):
+        # When the window is closed in a usual way this method is first called when the close icon is
+        # clicked and a second time when the main shutdown code in application.py calls mainWindow.close.
+        if self._isClosing:
+            return
+        self._isClosing = True
+        for widget in self.getWidgets():
+            if not widget.canClose():
+                event.ignore()
+                self._isClosing = False
+                return  
+        event.accept()
+        self.savePerspective()
+        for widget in self.getWidgets():
+            self.closeWidget(widget, ask=False)
+        config.binary.gui.mainwindow_maximized = self.isMaximized()
+        config.binary.gui.mainwindow_geometry = bytearray(self.saveGeometry())
+                   
+    # Dock Widget handling
+    #=======================================================================================================
+    def centralWidgets(self, id=None):
+        """Return all central widgets. If *id* is given return only those with this widgetClass-id."""
+        widgets = [self.centralWidget().widget(i) for i in range(self.centralWidget().count())]
+        return [w for w in widgets if id is None or w.widgetClass.id == id]
 
-    def dockWidgets(self,includeHidden=False):
-        # Get all dock widgets except those in the central widget.
-        # When dock widgets are closed, they are actually only hidden and marked for later deletion
-        # (via QObject.deleteLater). For this reason we skip hidden widgets.
-        return [w for w in self.findChildren(QtGui.QDockWidget)
-                if (includeHidden or w.isVisible()) and not self.centralWidget().isAncestorOf(w)]
+    def dockedWidgets(self, id=None):
+        """Return all docked widgets. These are not the DockWidgets, but their contents.
+        If *id* is given return only those with this widgetClass-id."""
+        return [w.widget() for w in self.dockWidgets(id)]
+        
+    def dockWidgets(self, id=None):
+        """Return all dock widgets. If *id* is given return only those with this widgetClass-id."""
+        from . import dockwidget
+        return [w for w in self.findChildren(dockwidget.DockWidget)
+                if w.objectName() != '' # dock wigdets without object name have been deleted
+                    and (id is None or w.widget().widgetClass.id == id) 
+                    and not self.centralWidget().isAncestorOf(w)]
 
-    def widgetExists(self,data):
-        """Return whether any widget for the given WidgetData exists (either as dock widget or as central
-        widget)."""
-        return any(w.widgetData == data for w in itertools.chain(self.centralWidgets(),
-                                                                 self.dockWidgets()))
+    def getWidgets(self, id=None):
+        """Return all widgets (central and docked). If *id* is given return only those with this 
+        widgetClass-id."""
+        return self.centralWidgets(id) + self.dockedWidgets(id)
 
+    def widgetExists(self, id):
+        """Return whether any widget of the WidgetClass identified by *id* exists (either as docked widget
+        or as central widget).
+        """
+        return len(self.getWidgets(id)) > 0
+
+    def addCentralWidget(self, widgetClass, state=None):
+        """Add a central widget corresponding to the given WidgetClass. *state* will be passed to the
+        constructor. Return the widget."""
+        if isinstance(widgetClass, str):
+            widgetClass = getWidgetClass(widgetClass)
+        if 'central' not in widgetClass.areas:
+            raise ValueError("Widget '{}' is not allowed in central area".format(widgetClass.id))
+        if widgetClass.unique and self.widgetExists(widgetClass.id):
+            raise ValueError("There can be at most one widget of class '{}'.".format(widgetClass.id))
+        widget = widgetClass.theClass(state=state, widgetClass=widgetClass, area='central')
+        self._currentWidgets[widgetClass.id] = widget
+        if widgetClass.icon is not None:
+            self.centralWidget().addTab(widget, widgetClass.icon, widgetClass.name)
+        else: self.centralWidget().addTab(widget, widgetClass.name)
+        self.centralWidget().setCurrentWidget(widget)
+        widget.initialize(state)
+        return widget
+
+    def addDockWidget(self, widgetClass):
+        """Add a dock widget corresponding to the given WidgetClass and return it."""
+        # The difference between _createDockWidget and addDockWidget is that the latter really adds the
+        # widget to the MainWindow. The former is also used by restoreLayout and there dockwidgets are added
+        # by QMainWindow.restoreState.
+        if isinstance(widgetClass, str):
+            widgetClass = getWidgetClass(widgetClass)
+        if widgetClass.allowedDockAreas() == Qt.NoDockWidgetArea:
+            raise ValueError("Widget '{}' is not allowed as dock widget.".format(widgetClass.id))
+        frozen = self.isLayoutFrozen()
+        if frozen:
+            self.setLayoutFrozen(False)
+        area = widgetClass.preferredDockArea
+        dock = self._createDockWidget(widgetClass, area)
+        super().addDockWidget(widgetClass.preferredDockAreaFlag(), dock)
+        if frozen:
+            # Wait until updated dockwidgets sizes are available
+            QtCore.QTimer.singleShot(0, functools.partial(self.setLayoutFrozen, True))
+        return dock
+
+    def _createDockWidget(self, widgetClass, area, objectName=None, state=None):
+        """Create a new dock widget for the given WidgetClass and set its objectName to *objectName*.
+        If that is None, compute an unused objectName."""
+        if widgetClass.unique and self.widgetExists(widgetClass.id):
+            raise ValueError("There can be at most one widget of class '{}'.".format(widgetClass.id))
+
+        # For the unique object name required by QMainWindow.restoreState compute the first string of the
+        # form widgetClass.id+<int> that is not already in use. Unique dock widgets get simply their
+        # widgetClass.id as object name. This is also used by the event filter to find and enable the
+        # corresponding action in the view menu if the dock is closed.
+        if objectName is None:
+            if widgetClass.unique:
+                objectName = widgetClass.id
+            else:
+                existingNames = [widget.objectName() for widget in self.dockWidgets()]
+                i = 1
+                while widgetClass.id + str(i) in existingNames:
+                    i += 1
+                objectName = widgetClass.id + str(i)
+
+        widget = widgetClass.theClass(state=state, widgetClass=widgetClass, area=area)
+        self._currentWidgets[widgetClass.id] = widget
+        from . import dockwidget
+        dock = dockwidget.DockWidget(widget, title=widgetClass.name, icon=widgetClass.icon)
+        dock.setObjectName(objectName)
+        dock.setAllowedAreas(widgetClass.allowedDockAreas())
+        widget.initialize(state)
+        return dock
+    
+    def closeWidget(self, widget, ask=True):
+        """Close the given widget (central or docked). If *ask* is true (default) call the widget's
+        canClose-method first and do not close the widget if it returns False.
+        """
+        if ask and not widget.canClose():
+            return
+        container = widget.getContainingWidget()
+        if container is self.centralWidget():
+            index = self.centralWidget().indexOf(widget)
+            widget.close()
+            self.centralWidget().removeTab(index)
+        else:
+            # Dock widgets have the Qt.WA_DeleteOnClose flag. However, they are not directly deleted, but
+            # when control returns to the event loop (QObject.deleteLater).
+            # In restorePerspective this causes old widgets to still exist when QMainWindow.restoreState
+            # is called. This may lead to errors when old and new widgets have the same object name.
+            # Hence we clear those names here.
+            widget.setObjectName('')
+            container.setObjectName('')
+            container.close() # closing the dock will also close the widget
+            
+        if widget.widgetClass.unique:
+            self._setUniqueWidgetActionEnabled(widget.widgetClass.id, True)
+            
+    def _widgetClassAdded(self, widgetClass):
+        """This is called when a new widgetClass has been added."""
+        self.updateWidgetMenus()
+
+    def _widgetClassRemoved(self, widgetClass):
+        """This is called when a widgetClass has been removed."""
+        for widget in self.getWidgets(widgetClass.id):
+            self.closeWidget(widget, ask=False)
+        self.updateWidgetMenus()
+       
+    # Perspectives
+    #========================================================================================================
+    def _handleSavePerspective(self):
+        """Ask the user for a name and store the current widget layout and state under this name."""
+        name, ok = QtGui.QInputDialog.getText(self, self.tr("Save perspective"),
+                            self.tr("Save the layout and state of the current widgets as a perspective."
+                                    "Please specify a name for the new perspective:"))
+        if ok and len(name) > 0 and name != DEFAULT_PERSPECTIVE:
+            self.savePerspective(name)
+            self.updatePerspectiveMenu()
+
+    def restorePerspective(self, name=DEFAULT_PERSPECTIVE):
+        """Restore the layout and state of all central and dock widgets from the perspective with the given
+        name. If no *name* is given, use the default perspective."""
+        perspective = config.storage.gui.perspectives[name]
+        for widget in self.getWidgets():
+            if not widget.canClose():
+                return
+        for widget in self.getWidgets():
+            self.closeWidget(widget, ask=False)
+        # Restore central widgets
+        for id, state in perspective['central']:
+            widgetClass = getWidgetClass(id)
+            # It may happen that widgetClass is None
+            # (for example if it belongs to a widget from a plugin and this plugin has been removed
+            # since the last application shutdown). Simply do not load this widget
+            if widgetClass is not None:
+                widget = self.addCentralWidget(widgetClass, state)
+            else: logging.info(__name__, "Could not load central widget '{}'".format(widgetClass.id))
+        if perspective['centralTabIndex'] < self.centralWidget().count():
+            self.centralWidget().setCurrentIndex(perspective['centralTabIndex'])
+
+        # Restore dock widgets (create them with correct object names and use QMainWindow.restoreState)
+        dockWidgets = []
+        for id, objectName, area, state in perspective['dock']:
+            widgetClass = getWidgetClass(id)
+            if widgetClass is not None:  # As above it may happen that widgetClass is None.
+                widget = self._createDockWidget(widgetClass, area, objectName, state)
+                widget.setParent(self) # necessary for QMainWindow.restoreState
+                dockWidgets.append(widget)
+            else: logging.info(__name__, "Could not load dock widget '{}' with object name '{}'"
+                                         .format(widgetClass.id, objectName))
+
+        self.hideTitleBarsAction.setChecked(perspective['hideTitleBars'])
+
+        # Restore dock widget positions
+        success = False
+        if config.binary.gui.mainwindow_state is not None and name in config.binary.gui.mainwindow_state:
+            success = self.restoreState(config.binary.gui.mainwindow_state[name])
+        if not success:
+            for widgets in dockWidgets:
+                super().addDockWidget(widget.widgetClass.preferredDockAreaFlag, widget)
+
+        if self.isLayoutFrozen():
+            # self.dockWidgets() does not work until event queue is reentered.
+            QtCore.QTimer.singleShot(0, functools.partial(self.setLayoutFrozen, True, force=True))
+
+    def savePerspective(self, name=DEFAULT_PERSPECTIVE):
+        """Save the layout and state of all central and dock widgets. If no *name* is given, the default
+        perspective will be overwritten."""
+        # Store central widgets
+        centralWidgetList = []
+        for widget in self.centralWidgets():
+            centralWidgetList.append((widget.widgetClass.id, widget.saveState()))
+
+        dockedWidgetList = []
+        for dock in self.dockWidgets():
+            if dock.objectName() == '': # docks with empty object name have been deleted
+                continue
+            widget = dock.widget()
+            dockedWidgetList.append((widget.widgetClass.id, dock.objectName(),
+                                     widget.area, widget.saveState()))
+
+        perspective = {'central': centralWidgetList,
+                       'dock': dockedWidgetList,
+                       'centralTabIndex': self.centralWidget().currentIndex(),
+                       'hideTitleBars': self.hideTitleBarsAction.isChecked()
+                       }
+
+        config.storage.gui.perspectives[name] = perspective
+
+        # Copy the bytearray to avoid memory access errors
+        if config.binary.gui.mainwindow_state is None:
+            config.binary.gui.mainwindow_state = {}
+        config.binary.gui.mainwindow_state[name] = bytearray(self.saveState())
+
+    def createDefaultWidgets(self):
+        """Create the default set of central and dock widgets. Use this method if no widgets can be loaded
+        from the storage file."""
+        self.setLayoutFrozen(False)
+        for id in 'playlist', 'editor':
+            self.addCentralWidget(id)
+        self.centralWidget().setCurrentIndex(0)
+        for id in 'playback', 'browser', 'tageditor', 'filesystembrowser':
+            self.addDockWidget(id)
+    
+    # Menus
+    #=======================================================================================================         
     def initMenus(self):
         """Initialize menus except the view menu which cannot be initialized before all widgets have been
         loaded."""
@@ -229,282 +602,145 @@ class MainWindow(QtGui.QMainWindow):
         self.updatePerspectiveMenu()
         self.menus['view'].addSeparator()
 
-        self.hideTitleBarsAction = QtGui.QAction(self.tr("Hide title bars"),self)
+        self.hideTitleBarsAction = QtGui.QAction(self.tr("Hide title bars"), self)
         self.hideTitleBarsAction.setCheckable(True)
         self.menus['view'].addAction(self.hideTitleBarsAction)
 
-        self.freezeLayoutAction = QtGui.QAction(self.tr("Freeze layout"),self)
+        self.freezeLayoutAction = QtGui.QAction(self.tr("Freeze layout"), self)
         self.freezeLayoutAction.setCheckable(True)
         self.freezeLayoutAction.setChecked(self.isLayoutFrozen())
         self.freezeLayoutAction.toggled.connect(self.setLayoutFrozen)
         self.menus['view'].addAction(self.freezeLayoutAction)
 
-        self.fullscreenAction = QtGui.QAction(self.tr("&Fullscreen"),self)
+        self.fullscreenAction = QtGui.QAction(self.tr("&Fullscreen"), self)
         self.fullscreenAction.setCheckable(True)
         self.fullscreenAction.setChecked(False)
-        self.fullscreenAction.setShortcut(self.tr("F12"))
+        self.fullscreenAction.setShortcut(QtGui.QKeySequence(Qt.Key_F12))
         self.fullscreenAction.toggled.connect(self._handleFullscreen)
         self.menus['view'].addAction(self.fullscreenAction)
 
+        # Playback
+        self.menus['playback'] = self.menuBar().addMenu(self.tr("Playback"))
+        self.playPauseAction = QtGui.QAction(self.tr("Play / Pause"), self)
+        self.playPauseAction.setShortcut(QtGui.QKeySequence(Qt.Key_Space))
+        self.playPauseAction.triggered.connect(self._handlePlayPause)
+        self.menus['playback'].addAction(self.playPauseAction)
+        self.stopAction = QtGui.QAction(self.tr("Stop"), self)
+        self.stopAction.triggered.connect(self._handleStop)
+        self.menus['playback'].addAction(self.stopAction)
+        
+        self.skipBackwardAction = QtGui.QAction(self.tr("Previous"), self)
+        self.skipBackwardAction.triggered.connect(self._handleSkipBackward)
+        self.menus['playback'].addAction(self.skipBackwardAction)
+        
+        self.skipForwardAction = QtGui.QAction(self.tr("Next"), self)
+        self.skipForwardAction.triggered.connect(self._handleSkipForward)
+        self.menus['playback'].addAction(self.skipForwardAction)
+        
         # EXTRAS
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
 
         # HELP
         self.menus['help'] = self.menuBar().addMenu(self.tr("&Help"))
 
-        action = QtGui.QAction(self.tr("&About"),self)
+        action = QtGui.QAction(self.tr("&About"), self)
         action.triggered.connect(self.showAboutDialog)
-        self.menus['help'].addAction(action)
-
-    def _handleFullscreen(self,state):
-        """React to the 'Fullscreen' option in the view menu."""
-        if state:
-            self.showFullScreen()
-        else: self.showNormal()
-
-    def isLayoutFrozen(self):
-        """When the layout is frozen, it is impossible to resize the window or dockwidgets. Also, it is
-        impossible to move or close dockwidgets."""
-        return config.storage.gui.layoutFrozen
-
-    def setLayoutFrozen(self,frozen,force=False):
-        """Freeze/unfreeze layout. When the layout is frozen, it is impossible to resize the window or
-        dockwidgets. Also, it is impossible to move or close dockwidgets."""
-        frozen = bool(frozen)
-        if force or frozen != config.storage.gui.layoutFrozen:
-            config.storage.gui.layoutFrozen = frozen
-            if frozen:
-                self.setFixedSize(self.size())
-            else: self.setFixedSize(QWIDGETSIZE_MAX,QWIDGETSIZE_MAX)
-            self.centralWidget().closeButton.setVisible(not frozen)
-            for widget in self.dockWidgets():
-                widget.setFrozen(frozen)
+        self.menus['help'].addAction(action) 
 
     def updateWidgetMenus(self):
         """Update the central/dock widget menus whenever the list of registered widgets has changed."""
-        def _updateMenu(widgetData,menu,method):
+        def _updateMenu(widgetClasses, menu, method):
             menu.clear()
-            for data in widgetData:
-                action = QtGui.QAction(data.name,menu)
+            for wClass in widgetClasses:
+                action = QtGui.QAction(wClass.name, menu)
                 # Choose the signal without "checked" argument because *method* may accept optional arguments.
-                action.triggered[tuple()].connect(functools.partial(method,data))
-                if data.icon is not None:
-                    action.setIcon(data.icon)
-                if data.unique:
-                    action.setObjectName(data.id)
-                    if self.widgetExists(data):
+                action.triggered[tuple()].connect(functools.partial(method, wClass))
+                if wClass.icon is not None:
+                    action.setIcon(wClass.icon)
+                if wClass.unique:
+                    action.setObjectName(wClass.id)
+                    if self.widgetExists(wClass.id):
                         action.setEnabled(False)
                 menu.addAction(action)
 
-        _updateMenu([data for data in _widgetData if data.central],
+        _updateMenu([wClass for wClass in _widgetClasses if 'central' in wClass.areas],
                     self.menus['centralwidgets'],
                     self.addCentralWidget)
-        _updateMenu([data for data in _widgetData if data.dock],
+        _updateMenu([wClass for wClass in _widgetClasses if wClass.allowedDockAreas() != Qt.NoDockWidgetArea],
                     self.menus['dockwidgets'],
                     self.addDockWidget)
 
     def updatePerspectiveMenu(self):
+        """Update the menu that lists available perspectives."""
         menu = self.menus['perspectives']
         menu.clear()
 
-        for name,perspective in config.storage.gui.perspectives.items():
+        for name, perspective in config.storage.gui.perspectives.items():
             if name == DEFAULT_PERSPECTIVE:
                 continue
-            action = QtGui.QAction(name,self)
-            action.triggered.connect(functools.partial(self.restorePerspective,name))
+            action = QtGui.QAction(name, self)
+            action.triggered.connect(functools.partial(self.restorePerspective, name))
             menu.addAction(action)
         if len(menu.actions()) > 0:
             menu.addSeparator()
-        action = QtGui.QAction(self.tr("Save perspective..."),self)
+        action = QtGui.QAction(self.tr("Save perspective..."), self)
         action.triggered.connect(self._handleSavePerspective)
         menu.addAction(action)
 
-    def addCentralWidget(self,data,state=None):
-        """Add a central widget corresponding to the given WidgetData. If a widget of this type existed and
-        was hidden once, simply show it again. Otherwise create a new widget. In this case *state* will be
-        passed to the constructor, if the class has a 'saveState'-method. Return the widget."""
-        if data.unique and self.widgetExists(data):
-            raise ValueError("There can be at most one widget of type '{}'.".format(data.id))
-        if hasattr(data.theClass,'saveState'):
-            widget = data.theClass(self,state)
-        else: widget = data.theClass(self)
-        widget.widgetData = data
-        if data.icon is not None:
-            self.centralWidget().addTab(widget,data.icon,data.name)
-        else: self.centralWidget().addTab(widget,data.name)
-        self.centralWidget().setCurrentWidget(widget)
-        if data.unique:
-            self._setUniqueWidgetActionEnabled(data.id,False)
-            widget.installEventFilter(self)
-        return widget
+    def _setUniqueWidgetActionEnabled(self, id, enabled):
+        """Enable/disable the menu actions for a unique widget type. *id* is the id of a registered
+        WidgetClass-instance having the 'unique'-flag.
+        """
+        for menuId in 'centralwidgets', 'dockwidgets':
+            action = self.menus[menuId].findChild(QtGui.QAction, id)
+            if action is not None:
+                action.setEnabled(enabled)
 
-    def addDockWidget(self,data):
-        """Add a dock widget corresponding to the given WidgetData and return it."""
-        # The difference between _createDockWidget and addDockWidget is that the latter really adds the
-        # widget to the MainWindow. The former is also used by restoreLayout and there dockwidgets are added
-        # by QMainWindow.restoreState.
-        frozen = self.isLayoutFrozen()
-        if frozen:
-            self.setLayoutFrozen(False)
-        widget = self._createDockWidget(data,DockLocation(data.preferredDockArea,False))
-        super().addDockWidget(data.preferredDockArea,widget)
-        if frozen:
-            # Wait until updated dockwidgets sizes are available
-            QtCore.QTimer.singleShot(0,functools.partial(self.setLayoutFrozen,True))
-
-    def _createDockWidget(self,data,location,objectName=None,state=None):
-        """Create a new dock widget for the given WidgetData and set its objectName to *objectName*. If that
-        is None, compute an unused objectName."""
-        if data.unique and self.widgetExists(data):
-            raise ValueError("There can be at most one widget of type '{}'.".format(data.id))
-
-        # For the unique object name required by QMainWindow.restoreState compute the first string of the
-        # form data.id+<int> that is not already in use. Unique dock widgets get simply their data.id as
-        # object name. This is also used by the event filter to find and enable the corresponding action in
-        # the view menu if the dock is closed.
-        if objectName is None:
-            if data.unique:
-                objectName = data.id
-            else:
-                existingNames = [widget.objectName() for widget in self.dockWidgets()]
-                i = 1
-                while data.id + str(i) in existingNames:
-                    i += 1
-                objectName = data.id + str(i)
-
-        args = {'location': location,'title': data.name}
-        if hasattr(data.theClass,'saveState'):
-            args['state'] = state
-        if data.icon is not None:
-            args['icon'] = data.icon
-        widget = data.theClass(self,**args)
-        widget.setObjectName(objectName)
-        widget.widgetData = data
-        if data.unique:
-            self._setUniqueWidgetActionEnabled(data.id,False)
-            widget.installEventFilter(self)
-        return widget
-
-    def _handleSavePerspective(self):
-        """Ask the user for a name and store the current widget layout and state under this name."""
-        name,ok = QtGui.QInputDialog.getText(self,self.tr("Save perspective"),
-                            self.tr("Save the layout and state of the current widgets as a perspective."
-                                    "Please specify a name for the new perspective:"))
-        if ok and len(name) > 0 and name != DEFAULT_PERSPECTIVE:
-            self.savePerspective(name)
-            self.updatePerspectiveMenu()
-
-    def restorePerspective(self,name=DEFAULT_PERSPECTIVE):
-        """Restore the layout and state of all central and dock widgets from the perspective with the given
-        name. If no *name* is given, use the default perspective."""
-        perspective = config.storage.gui.perspectives[name]
-        self.centralWidget().clear()
-        for widget in self.dockWidgets():
-            # Dock widgets have the Qt.WA_DeleteOnClose flag. However, they are not directly deleted, but
-            # when control returns to the event loop (QObject.deleteLater). Thus the widgets do still exist
-            # when QMainWindow.restoreState is called. This may lead to errors when old and new widgets have
-            # the same object name. Hence we clear those names here.
-            widget.setObjectName('')
-            widget.close()
-
-        # Restore central widgets
-        for id,state in perspective['central']:
-            data = WidgetData.fromId(id)
-            # It may happen that data is None (for example if it belongs to a widget from a plugin and this
-            # plugin has been removed since the last application shutdown). Simply do not load this widget
-            if data is not None:
-                widget = self.addCentralWidget(data,state)
-            else: logging.info(__name__, "Could not load central widget '{}'".format(data))
-        if perspective['centralTabIndex'] < self.centralWidget().count():
-            self.centralWidget().setCurrentIndex(perspective['centralTabIndex'])
-
-        # Restore dock widgets (create them with correct object names and use QMainWindow.restoreState)
-        dockWidgets = []
-        for id,objectName,location,state in perspective['dock']:
-            data = WidgetData.fromId(id)
-            if data is not None:  # As above it may happen that data is None.
-                widget = self._createDockWidget(data,DockLocation(*location),objectName,state)
-                dockWidgets.append(widget)
-            else: logging.info(__name__, "Could not load dock widget '{}' with object name '{}'"
-                                         .format(data,objectName))
-
-        self.hideTitleBarsAction.setChecked(perspective['hideTitleBars'])
-
-        # Restore dock widget positions
-        success = False
-        if config.binary.gui.mainwindow_state is not None and name in config.binary.gui.mainwindow_state:
-            success = self.restoreState(config.binary.gui.mainwindow_state[name])
-        if not success:
-            for widgets in dockWidgets:
-                super().addDockWidget(widget.widgetData.preferredDockArea,widget)
-
-        if self.isLayoutFrozen():
-            # self.dockWidgets() does not work until event queue is reentered.
-            QtCore.QTimer.singleShot(0,functools.partial(self.setLayoutFrozen,True,force=True))
-
-    def savePerspective(self,name=DEFAULT_PERSPECTIVE):
-        """Save the layout and state of all central and dock widgets. If no *name* is given, the default
-        perspective will be overwritten."""
-        # Store central widgets
-        centralWidgetList = []
-        for widget in self.centralWidgets():
-            if hasattr(widget,"saveState"):
-                state = widget.saveState()
-            else: state = None
-            centralWidgetList.append((widget.widgetData.id,state))
-
-        # Store dock widgets that are visible and remove the rest so saveState won't store their position
-        dockWidgetList = []
-        for widget in self.dockWidgets(includeHidden=True):
-            if hasattr(widget,"saveState"):
-                state = widget.saveState()
-            else: state = None
-            location = (self.dockWidgetArea(widget),widget.isFloating())
-            dockWidgetList.append((widget.widgetData.id,widget.objectName(),location,state))
-
-        perspective = {'central': centralWidgetList,
-                       'dock': dockWidgetList,
-                       'centralTabIndex': self.centralWidget().currentIndex(),
-                       'hideTitleBars': self.hideTitleBarsAction.isChecked()
-                       }
-
-        config.storage.gui.perspectives[name] = perspective
-
-        # Copy the bytearray to avoid memory access errors
-        if config.binary.gui.mainwindow_state is None:
-            config.binary.gui.mainwindow_state = {}
-        config.binary.gui.mainwindow_state[name] = bytearray(self.saveState())
-
-    def createDefaultWidgets(self):
-        """Create the default set of central and dock widgets. Use this method if no widgets can be loaded
-        from the storage file."""
-        self.setLayoutFrozen(False)
-        for id in 'playlist','editor':
-            data = WidgetData.fromId(id)
-            self.addCentralWidget(data)
-        self.centralWidget().setCurrentIndex(1)
-        for id in 'playback', 'browser', 'tageditor', 'filesystembrowser':
-            data = WidgetData.fromId(id)
-            self.addDockWidget(data)
-
+    def _handleFullscreen(self, state):
+        """React to the 'Fullscreen' option in the view menu."""
+        if state:
+            self.showFullScreen()
+        else: self.showNormal()
+        
+    def _handlePlayPause(self):
+        from .. import player
+        backends = player.profileCategory.profiles()
+        if any(backend.state() == player.PLAY for backend in backends):
+            # When a single backend is playing, stop all
+            for backend in backends:
+                backend.setState(player.PAUSE)
+        else:
+            # otherwise start only the current one
+            if 'playback' in self._currentWidgets:
+                backend = self._currentWidgets['playback'].backend
+                if backend is not None:
+                    backend.setState(player.PLAY)
+                    
+    def _handleStop(self):
+        from .. import player
+        for backend in player.profileCategory.profiles():
+            backend.setState(player.STOP)
+            
+    def _handleSkipBackward(self):
+        if 'playback' in self._currentWidgets:
+            backend = self._currentWidgets['playback'].backend
+            if backend is not None:
+                backend.skipBackward()
+            
+    def _handleSkipForward(self):
+        if 'playback' in self._currentWidgets:
+            backend = self._currentWidgets['playback'].backend
+            if backend is not None:
+                backend.skipForward()
+        
     def showPreferences(self):
         """Open preferences dialog."""
         from . import preferences
         preferences.show("main")
 
-    def showTagManager(self):
-        """Open tag manager within preferences."""
-        from . import preferences
-        preferences.show("main/tagmanager")
-
-    def showFlagManager(self):
-        """Open flag manager within preferences."""
-        from . import preferences
-        preferences.show("main/flagmanager")
-
     def showAboutDialog(self):
         """Display the About dialog."""
-        box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon,self.tr("About OMG"),
+        box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon, self.tr("About OMG"),
                 '<div align="center"><img src=":omg/omg.png" /><br />'
                 + self.tr("This is OMG version {} by Martin Altmayer and Michael Helmling.")
                              .format(constants.VERSION)
@@ -512,85 +748,37 @@ class MainWindow(QtGui.QMainWindow):
                 QtGui.QMessageBox.Ok)
         box.exec_()
 
-    def _widgetDataAdded(self,data):
-        """This is called when new widget data has been added."""
-        self.updateWidgetMenus()
+    # Misc
+    #========================================================================================================
+    def isLayoutFrozen(self):
+        """When the layout is frozen, it is impossible to resize the window or dockwidgets. Also, it is
+        impossible to move or close dockwidgets."""
+        return config.storage.gui.layoutFrozen
 
-    def _widgetDataRemoved(self,data):
-        """This is called when widget data has been removed."""
-        for widget in itertools.chain(self.centralWidgets(),self.dockWidgets()):
-            if widget.widgetData == data:
-                widget.setParent(None)
-        self.updateWidgetMenus()
-
-    def _setUniqueWidgetActionEnabled(self,id,enabled):
-        """Enable/disable the menu actions for a unique widget type. *id* is the id of a registered
-        WidgetData-instance having the 'unique'-flag.
-        """
-        for menuId in 'centralwidgets','dockwidgets':
-            action = self.menus[menuId].findChild(QtGui.QAction,id)
-            if action is not None:
-                action.setEnabled(enabled)
-
-    def eventFilter(self,object,event):
-        if event.type() == QtCore.QEvent.Close:
-            if object.widgetData.unique:
-                # If a unique widget has been closed, enable the corresponding action in the
-                # view menu. The event filter is only installed on unique widgets.
-                self._setUniqueWidgetActionEnabled(object.widgetData.id,True)
-        return False  # don't stop the event
-
-    def _handleBrowserShortcut(self):
-        """Set the focus to the next browser' searchbox (By pressing the browser shortcut repeatedly
-        the focus will run through all browsers).
-        """
-        browserDocks = self.getWidgets('browser')
-        for i,browserDock in enumerate(browserDocks):
-            if browserDock.searchBox.hasFocus():
-                nextIndex = (i + 1) % len(browserDocks)
-                browserDocks[nextIndex].searchBox.setFocus(Qt.OtherFocusReason)
-                return
-        browserDocks[0].searchBox.setFocus(Qt.ShortcutFocusReason)
-
-    def getWidgets(self,id):
-        """Given the id of a WidgetData-instance, return all widgets (central and dock) of that WidgetData."""
-        return [widget for widget in itertools.chain(self.centralWidgets(),self.dockWidgets())
-                        if widget.widgetData.id == id]
-
-    def closeEvent(self,event):
-        # When the window is closed in a usual way this method is first called when the close icon is
-        # clicked and a second time when the main shutdown code in application.py calls mainWindow.close.
-        if hasattr(self, "_closed"):
-            return
-        # If widget.okToClose opens a dialog, we will get a new close event when the dialog is finished.
-        # Use this list to avoid calling okToClose on the same widget twice.
-        if not hasattr(self,'_okClosed'):
-            self._okClosed = []
-        for widget in itertools.chain(self.centralWidgets(),self.dockWidgets()):
-            if hasattr(widget, "okToClose") and widget not in self._okClosed and not widget.okToClose():
-                event.ignore()
-                self._okClosed = [] # do call okToClose again when the user closes the next time
-                return
-            else: self._okClosed.append(widget)
-        
-        self._closed = True    
-        event.accept()
-        self.savePerspective()
-        for widget in self.centralWidgets():
-            widget.close()
-        for widget in self.dockWidgets():
-            widget.close()
-        config.binary.gui.mainwindow_maximized = self.isMaximized()
-        config.binary.gui.mainwindow_geometry = bytearray(self.saveGeometry())
+    def setLayoutFrozen(self, frozen, force=False):
+        """Freeze/unfreeze layout. When the layout is frozen, it is impossible to resize the window or
+        dockwidgets. Also, it is impossible to move or close dockwidgets."""
+        frozen = bool(frozen)
+        if force or frozen != config.storage.gui.layoutFrozen:
+            config.storage.gui.layoutFrozen = frozen
+            if frozen:
+                self.setFixedSize(self.size())
+            else: self.setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
+            self.centralWidget().closeButton.setVisible(not frozen)
+            for widget in self.dockWidgets():
+                widget.setFrozen(frozen)
+                
+    def _handleFocusChanged(self, old, new):
+        """Handle the global QApplication.focusChanged signal to update current widgets."""
+        while new is not self and new is not None and not isinstance(new, Widget):
+            new = new.parent()
+        if isinstance(new, Widget):
+            self._currentWidgets[new.widgetClass.id] = new
 
 
 class CentralTabWidget(QtGui.QTabWidget):
     """This tab widget is used as the main window's central widget. Via the 'View'-menu the user can choose
     which widgets should be inside the tabs."""
-    # The option dialog if it is open, and the index of the tab that was active when the dialog was closed.
-    _dialog = None
-    _lastDialogTabIndex = 0
-
     def __init__(self):
         super().__init__()
         self.setMovable(True)
@@ -615,74 +803,27 @@ class CentralTabWidget(QtGui.QTabWidget):
     def minimumSizeHint(self):
         return QtCore.QSize(0,0)
 
-    def getWidgets(self):
-        return [self.widget(i) for i in range(self.count())]
-
     def _handleCurrentChanged(self):
         widget = self.currentWidget()
-        hasOptionDialog = hasattr(widget,'hasOptionDialog') and widget.hasOptionDialog()
-        self.optionButton.setEnabled(hasOptionDialog)
-
+        self.optionButton.setEnabled(widget is not None and widget.hasOptionDialog)
+        
     def _handleCloseButton(self):
-        """React to the corner widget's close button: Close the current tab."""
-        widget = self.currentWidget()
-        if not hasattr(widget,"okToClose") or widget.okToClose():
-            self.removeTab(self.currentIndex())
-
-    def clear(self):
-        for i in range(self.count()):
-            self.removeTab(0)
-
-    def removeTab(self,index):
-        tab = self.widget(index)
-        super().removeTab(index)
-        tab.close()
-        tab.setParent(None)
+        """React to the corner widget's close button: Close the current widget."""
+        mainWindow.closeWidget(self.currentWidget())
 
     def _handleOptionButton(self):
         """React to the corner widget's option button: Open the option dialog of the current widget."""
-        self._dialog = self.currentWidget().createOptionDialog(self.optionButton)
-        if self._dialog is not None:
-            self._dialog.installEventFilter(self)
-            if isinstance(self._dialog,dialogs.FancyTabbedPopup) \
-                        and self.currentWidget() in self._lastDialogTabIndexes:
-                self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndexes[self.currentWidget()])
-            self._dialog.show()
-
-    def eventFilter(self,object,event):
-        if event.type() == QtCore.QEvent.Close and self._dialog is not None:
-            if isinstance(self._dialog,dialogs.FancyTabbedPopup):
-                self._lastDialogTabIndexes[self.currentWidget()] = self._dialog.tabWidget.currentIndex()
-            self._dialog = None
-        return False  # do not filter the event out
+        self.currentWidget().toggleOptionDialog(self.optionButton)
 
 
 class CentralTabBar(QtGui.QTabBar):
     """This tabbar makes a tab active when a drag enters its tabbutton."""
-    def __init__(self,parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAcceptDrops(True)  # no dragEnterEvents with this line
+        self.setAcceptDrops(True)  # without this line we won't get dragEnterEvents
 
-    def dragEnterEvent(self,event):
+    def dragEnterEvent(self, event):
         tabIndex = self.tabAt(event.pos())
         if tabIndex != -1 and tabIndex != self.currentIndex():
             self.setCurrentIndex(tabIndex)
         return super().dragEnterEvent(event)
-
-
-class DockLocation:
-    """This small class stores location information for dockwidgets when the layout is saved/restored. Note
-    that during restoring the widgets are created before they are placed at their positions. Thus methods
-    like isFloating won't provide valid results. In order to have the location information in the
-    dock's constructor we have to separately store and pass a DockLocation object.
-    
-    Parameters:
-        - area: Qt.DockWidgetArea of the widget
-        - floating: Whether the widget is floating (i.e. using its own window). 
-    """
-    def __init__(self,area,floating):
-        self.area = area
-        self.floating = floating
-
-    def __str__(self):
-        return "<DockLocation {},{}>".format(self.area,self.floating)

@@ -27,181 +27,9 @@ from ..core import tags, levels
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
 from .misc import widgetlist
-
-
-class TagEditorDock(dockwidget.DockWidget):
-    """DockWidget containing the TagEditor."""
-    def __init__(self, parent=None, state=None, location=None, **args):
-        super().__init__(parent, location=location, **args)
-        if location is not None:
-            vertical = location.floating or location.area in [Qt.LeftDockWidgetArea, Qt.RightDockWidgetArea]
-            self.dockLocationChanged.connect(self._handleLocationChanged)
-            self.topLevelChanged.connect(self._handleLocationChanged)
-        else:
-            vertical = True # no dock location => tag editor is used as central widget
-            
-        self.setAcceptDrops(True)
-        
-        self.editorWidget = TagEditorWidget(vertical=vertical)
-        self.setWidget(self.editorWidget)
-        
-        self.editorWidget.includeContents = True
-        if state is not None:
-            if 'includeContents' in state:
-                self.editorWidget.includeContents = bool(state['includeContents'])
-        
-        from . import selection
-        selection.changed.connect(self._handleSelectionChanged)
-        self._handleSelectionChanged(selection.getGlobalSelection())
-        
-    def saveState(self):
-        return {'includeContents': self.editorWidget.includeContents}
-        
-    def _handleLocationChanged(self, area):
-        """Handle changes in the dock's position."""
-        vertical = self.isFloating() or area in [Qt.LeftDockWidgetArea, Qt.RightDockWidgetArea]
-        self.editorWidget.setVertical(vertical)
-    
-    def _handleSelectionChanged(self, selection):
-        """React to changes to the global selection: Load the elements of the selected wrappers
-        into the TagEditorWidget."""
-        if selection is not None and selection.hasElements():
-            self.editorWidget.setElements(selection.level,
-                                          list(selection.elements(recursive=False)),
-                                          list(selection.elements(recursive=True)))
-        
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
-            event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        mimeData = event.mimeData()
-        
-        if mimeData.hasFormat(config.options.gui.mime):
-            allElements = (w.element for w in mimeData.wrappers())
-            level = mimeData.level
-        elif mimeData.hasUrls():
-            allElements = levels.real.collectMany(url for url in event.mimeData().urls()
-                           if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile()))
-            level = levels.real
-        else:
-            logging.warning(__name__, "Invalid drop event (supports only {})"
-                                      .format(", ".join(mimeData.formats())))
-            return
-        
-        elements = []
-        ids = set()
-        for element in allElements:
-            if element.id not in ids:
-                ids.add(element.id)
-                elements.append(element)
-        
-        self.editorWidget.setElements(level, elements)
-        event.acceptProposedAction()
         
         
-mainwindow.addWidgetData(mainwindow.WidgetData(
-        id = "tageditor",
-        name = translate("Tageditor", "Tageditor"),
-        icon = utils.getIcon('widgets/tageditor.png'),
-        theClass = TagEditorDock,
-        unique = True,
-        preferredDockArea = Qt.RightDockWidgetArea))
-    
-    
-class TagEditorDialog(QtGui.QDialog):
-    """The tageditor as dialog. It uses its own level and commits the level when the dialog is accepted."""
-    def __init__(self, includeContents=None, parent=None):
-        QtGui.QDialog.__init__(self, parent)
-        self.setWindowTitle(self.tr("Edit tags"))
-        self.resize(600, 450) #TODO: make this cleverer
-        self.stack = stack.createSubstack(modalDialog=True)
-        self.level = None
-        if includeContents is None:
-            includeContents = config.storage.gui.tag_editor_include_contents
-            
-        self.setLayout(QtGui.QVBoxLayout())
-        self.tagedit = TagEditorWidget(includeContents=includeContents,
-                                       stack=self.stack,
-                                       flagEditorInTitleLine=False)
-        self.layout().addWidget(self.tagedit)
-        
-        style = QtGui.QApplication.style()
-        
-        buttonLayout = QtGui.QHBoxLayout()
-        self.layout().addLayout(buttonLayout)
-        
-        undoButton = QtGui.QPushButton(self.tr("Undo"))
-        undoButton.clicked.connect(self.stack.undo)
-        self.stack.canUndoChanged.connect(undoButton.setEnabled)
-        undoButton.setEnabled(False)
-        buttonLayout.addWidget(undoButton)
-        redoButton = QtGui.QPushButton(self.tr("Redo"))
-        redoButton.clicked.connect(self.stack.redo)
-        self.stack.canRedoChanged.connect(redoButton.setEnabled)
-        redoButton.setEnabled(False)
-        buttonLayout.addWidget(redoButton)
-        
-        resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
-                                             self.tr("Reset"))
-        resetButton.clicked.connect(self._handleReset)
-        cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
-                                             self.tr("Cancel"))
-        cancelButton.clicked.connect(self.reject)
-        commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
-                                         self.tr("OK"))
-        commitButton.clicked.connect(self.accept)
-        buttonLayout.addWidget(resetButton)
-        buttonLayout.addStretch()
-        buttonLayout.addWidget(cancelButton)
-        buttonLayout.addWidget(commitButton)
-        
-    def setElements(self, level, elements, elementsWithContents=None):
-        """Set the elements in the tageditor. See TagEditorWidget.setElements."""
-        if elementsWithContents is not None and elementsWithContents != elements:
-            self.level = levels.Level("TagEditor", level, elements=elementsWithContents, stack=self.stack)
-            # Get the copies on the new level
-            elements = [self.level[element.id] for element in elements]
-            elementsWithContents = self.level.elements.values()
-        else:
-            self.level = levels.Level("TagEditor", level, elements=elements, stack=self.stack)
-            # Get the copies on the new level
-            elements = self.level.elements.values()
-            elementsWithContents = None
-        self.tagedit.setElements(self.level, elements, elementsWithContents)
-       
-    def useElementsFromSelection(self, selection):
-        """Use the elements in the given Selection in the tageditor."""
-        self.setElements(selection.level,
-                         selection.elements(recursive=False),
-                         selection.elements(recursive=True))
-        
-    def reject(self):
-        self.stack.closeSubstack(self.stack)
-        super().reject()
-        
-    def accept(self):
-        try:
-            self.stack.closeSubstack(self.stack)
-            # make sure that the commit is added via the application stack
-            self.level.stack = stack.stack
-            self.level.commit()
-            super().accept()
-            config.storage.gui.tag_editor_include_contents = self.tagedit.includeContentsButton.isChecked()
-        except filebackends.TagWriteError as e:
-            e.displayMessage()
-            self.level.stack = self.stack
-    
-    def _handleReset(self):
-        """Handle clicks on the reset button: Reload all elements and clear the stack."""
-        ids = list(self.level.elements.keys())
-        self.level.elements = {}
-        elements = self.level.collectMany(ids)
-        self.stack.resetSubstack(self.stack)
-        self.tagedit.setElements(self.level, elements)
-        
-        
-class TagEditorWidget(QtGui.QWidget):
+class TagEditorWidget(mainwindow.Widget):
     """A TagEditorWidget contains of a row of buttons, a TagEditorLayout forming the actual tageditor and
     a flageditor. The TagEditorLayout displays pairs of a TagTypeBox and a SingleTagEditor - one for each
     tag present in the tageditor. The displays the tagtype while the SingleTagEditor shows all records for
@@ -219,14 +47,16 @@ class TagEditorWidget(QtGui.QWidget):
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self, vertical=False, includeContents=True, 
-                 flagEditorInTitleLine=True, stack=None):
-        QtGui.QWidget.__init__(self)
+    def __init__(self, state=None, vertical=False,
+                 flagEditorInTitleLine=True, stack=None, useGlobalSelection=True, **args):
+        super().__init__(**args)
         self.level = None
         self.elements = None
         self.elementsWithContents = None
         self.vertical = None # will be set in setVertical below
         self.flagEditorInTitleLine = flagEditorInTitleLine
+        self.areaChanged.connect(self._handleAreaChanged)
+        self.setAcceptDrops(True)
         
         self.model = tageditormodel.TagEditorModel(stack=stack)
         self.model.tagInserted.connect(self._handleTagInserted)
@@ -266,7 +96,7 @@ class TagEditorWidget(QtGui.QWidget):
         
         self.includeContentsButton = QtGui.QPushButton()
         self.includeContentsButton.setCheckable(True)
-        self.includeContentsButton.setChecked(includeContents)
+        self.includeContentsButton.setChecked(state is not None and state.get('includeContents', False))
         self.includeContentsButton.setToolTip(self.tr("Include all contents"))
         self.includeContentsButton.setIcon(utils.getIcon('recursive.png'))
         self.includeContentsButton.toggled.connect(self._updateElements)
@@ -297,7 +127,12 @@ class TagEditorWidget(QtGui.QWidget):
         self.singleTagEditors = {}
         self.tagBoxes = {}
         
-        self.setVertical(vertical)
+        self.setVertical(self.area in ['left', 'right'])
+        
+        if useGlobalSelection:
+            from . import selection
+            selection.changed.connect(self._handleSelectionChanged)
+            self._handleSelectionChanged(selection.getGlobalSelection())
     
     def setVertical(self, vertical):
         """Set whether this tageditor should be displayed in vertical model."""
@@ -319,6 +154,50 @@ class TagEditorWidget(QtGui.QWidget):
         self.verticalFlagEditor.setVisible(not self.flagEditorInTitleLine or vertical)
             
         self.vertical = vertical
+        
+    def _handleAreaChanged(self, area):
+        """Handle changes in the dock's position."""
+        self.setVertical(self.area in ['left', 'right'])
+        
+    def saveState(self):
+        return {'includeContents': self.includeContents}
+        
+    def _handleSelectionChanged(self, selection):
+        """React to changes to the global selection: Load the elements of the selected wrappers
+        into the TagEditorWidget."""
+        if selection is not None and selection.hasElements():
+            self.setElements(selection.level,
+                            list(selection.elements(recursive=False)),
+                            list(selection.elements(recursive=True)))
+        
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        mimeData = event.mimeData()
+        
+        if mimeData.hasFormat(config.options.gui.mime):
+            allElements = (w.element for w in mimeData.wrappers())
+            level = mimeData.level
+        elif mimeData.hasUrls():
+            allElements = levels.real.collectMany(url for url in event.mimeData().urls()
+                           if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile()))
+            level = levels.real
+        else:
+            logging.warning(__name__, "Invalid drop event (supports only {})"
+                                      .format(", ".join(mimeData.formats())))
+            return
+        
+        elements = []
+        ids = set()
+        for element in allElements:
+            if element.id not in ids:
+                ids.add(element.id)
+                elements.append(element)
+        
+        self.setElements(level, elements)
+        event.acceptProposedAction()
         
     def setElements(self, level, elements, elementsWithContents=None):
         """Set the elements that are edited in the tageditor. *level* is the level that contains the
@@ -632,6 +511,16 @@ class TagEditorWidget(QtGui.QWidget):
         self.includeContentsButton.setChecked(value)
 
 
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
+        id = "tageditor",
+        name = translate("Tageditor", "Tageditor"),
+        icon = utils.getIcon('widgets/tageditor.png'),
+        theClass = TagEditorWidget,
+        unique = True,
+        areas = 'dock',
+        preferredDockArea = 'right'))
+
+
 class RecordDialog(QtGui.QDialog):
     """Dialog to edit a single record. Parameters are:
     
@@ -730,6 +619,99 @@ class RecordDialog(QtGui.QDialog):
         """Change the tag of the ValueEditor."""
         self.valueEditor.setTag(tag)
         
+    
+class TagEditorDialog(QtGui.QDialog):
+    """The tageditor as dialog. It uses its own level and commits the level when the dialog is accepted."""
+    def __init__(self, includeContents=None, parent=None):
+        QtGui.QDialog.__init__(self, parent)
+        self.setWindowTitle(self.tr("Edit tags"))
+        self.resize(600, 450) #TODO: make this cleverer
+        self.stack = stack.createSubstack(modalDialog=True)
+        self.level = None
+        if includeContents is None:
+            includeContents = config.storage.gui.tag_editor_include_contents
+            
+        self.setLayout(QtGui.QVBoxLayout())
+        self.tagedit = TagEditorWidget(state={'includeContents': includeContents},
+                                       stack=self.stack,
+                                       flagEditorInTitleLine=False,
+                                       useGlobalSelection=False)
+        self.layout().addWidget(self.tagedit)
+        
+        style = QtGui.QApplication.style()
+        
+        buttonLayout = QtGui.QHBoxLayout()
+        self.layout().addLayout(buttonLayout)
+        
+        undoButton = QtGui.QPushButton(self.tr("Undo"))
+        undoButton.clicked.connect(self.stack.undo)
+        self.stack.canUndoChanged.connect(undoButton.setEnabled)
+        undoButton.setEnabled(False)
+        buttonLayout.addWidget(undoButton)
+        redoButton = QtGui.QPushButton(self.tr("Redo"))
+        redoButton.clicked.connect(self.stack.redo)
+        self.stack.canRedoChanged.connect(redoButton.setEnabled)
+        redoButton.setEnabled(False)
+        buttonLayout.addWidget(redoButton)
+        
+        resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
+                                             self.tr("Reset"))
+        resetButton.clicked.connect(self._handleReset)
+        cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
+                                             self.tr("Cancel"))
+        cancelButton.clicked.connect(self.reject)
+        commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
+                                         self.tr("OK"))
+        commitButton.clicked.connect(self.accept)
+        buttonLayout.addWidget(resetButton)
+        buttonLayout.addStretch()
+        buttonLayout.addWidget(cancelButton)
+        buttonLayout.addWidget(commitButton)
+        
+    def setElements(self, level, elements, elementsWithContents=None):
+        """Set the elements in the tageditor. See TagEditorWidget.setElements."""
+        if elementsWithContents is not None and elementsWithContents != elements:
+            self.level = levels.Level("TagEditor", level, elements=elementsWithContents, stack=self.stack)
+            # Get the copies on the new level
+            elements = [self.level[element.id] for element in elements]
+            elementsWithContents = self.level.elements.values()
+        else:
+            self.level = levels.Level("TagEditor", level, elements=elements, stack=self.stack)
+            # Get the copies on the new level
+            elements = self.level.elements.values()
+            elementsWithContents = None
+        self.tagedit.setElements(self.level, elements, elementsWithContents)
+       
+    def useElementsFromSelection(self, selection):
+        """Use the elements in the given Selection in the tageditor."""
+        self.setElements(selection.level,
+                         selection.elements(recursive=False),
+                         selection.elements(recursive=True))
+        
+    def reject(self):
+        self.stack.closeSubstack(self.stack)
+        super().reject()
+        
+    def accept(self):
+        try:
+            self.stack.closeSubstack(self.stack)
+            # make sure that the commit is added via the application stack
+            self.level.stack = stack.stack
+            self.level.commit()
+            super().accept()
+            config.storage.gui.tag_editor_include_contents = self.tagedit.includeContentsButton.isChecked()
+        except filebackends.TagWriteError as e:
+            e.displayMessage()
+            self.level.stack = self.stack
+    
+    def _handleReset(self):
+        """Handle clicks on the reset button: Reload all elements and clear the stack."""
+        ids = list(self.level.elements.keys())
+        self.level.elements = {}
+        elements = self.level.collectMany(ids)
+        self.stack.resetSubstack(self.stack)
+        self.tagedit.setElements(self.level, elements)
+
 
 class SmallTagTypeBox(tagwidgets.TagTypeBox):
     """Special TagTypeBox for the tageditor. Contrary to regular StackedWidgets it will consume only the

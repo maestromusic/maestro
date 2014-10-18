@@ -27,10 +27,10 @@ from .. import logging, utils
 from ..core import levels, tags, elements
 
 
-class DetailsView(dockwidget.DockWidget):
+class DetailsView(mainwindow.Widget):
     """A widget that lists all known information about a single element."""
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)        
+    def __init__(self, state=None, **args):
+        super().__init__(**args)        
         
         self.element = None
         self.tagsVisible = True
@@ -55,7 +55,8 @@ class DetailsView(dockwidget.DockWidget):
         #layout.addLayout(buttonBar)
         
         scrollArea = QtGui.QScrollArea()
-        self.setWidget(scrollArea)
+        layout = QtGui.QHBoxLayout(self)
+        layout.addWidget(scrollArea)
         scrollArea.setWidgetResizable(True)
         #layout.addWidget(scrollArea, 1)
         self.label = QtGui.QLabel()
@@ -111,8 +112,9 @@ class DetailsView(dockwidget.DockWidget):
             dialog = CoverDialog(self.element, self)
             dialog.exec_()
         elif href.startswith('{'):
-            if browser.defaultBrowser is not None:
-                browser.defaultBrowser.search(href)
+            browser = mainwindow.mainWindow.defaultWidget('browser')
+            if browser is not None:
+                browser.search(href)
     
     def _update(self):
         """Update the HTML contents."""
@@ -249,12 +251,12 @@ class DetailsView(dockwidget.DockWidget):
         self.label.setText(''.join(text))
 
 
-mainwindow.addWidgetData(mainwindow.WidgetData(
-                    id = "details",
-                    name = translate("DetailsView", "Details"),
-                    theClass = DetailsView,
-                    icon = utils.images.icon('widgets/details.png'),
-                    preferredDockArea = Qt.RightDockWidgetArea))
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
+        id = "details",
+        name = translate("DetailsView", "Details"),
+        theClass = DetailsView,
+        icon = utils.images.icon('widgets/details.png'),
+        preferredDockArea = 'right'))
 
 
 class CoverDialog(QtGui.QDialog):

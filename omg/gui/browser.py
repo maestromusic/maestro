@@ -30,9 +30,6 @@ from .delegates import browser as browserdelegate
 from ..models import browser as browsermodel
 
 
-defaultBrowser = None
-
-
 class CompleteContainerAction(treeactions.TreeAction):
     """This action replaces the contents of a container wrapper by all contents of the corresponding element.
     """ 
@@ -59,7 +56,7 @@ class CompleteContainerAction(treeactions.TreeAction):
                 model.endInsertRows()
 
 
-class Browser(dockwidget.DockWidget):
+class Browser(mainwindow.Widget):
     """Browser to search the music collection. The browser contains a searchbox and one or more views.
     The browser displays all elements or a subset defined by three different criteria (combined with AND):
         - the search criterion entered in the search box ('searchCriterion'),
@@ -96,11 +93,10 @@ class Browser(dockwidget.DockWidget):
     selectionChanged = QtCore.pyqtSignal(QtGui.QItemSelectionModel,
                                          QtGui.QItemSelection, QtGui.QItemSelection)
     
-    def __init__(self, parent=None, state=None, **args):
+    def __init__(self, state=None, **args):
         """Initialize a new Browser with the given parent."""
-        super().__init__(parent, **args)
-        widget = QtGui.QWidget()
-        self.setWidget(widget)
+        super().__init__(**args)
+        self.hasOptionDialog = True
         
         self.views = [] # List of treeviews
         self.domain = domains.domains[0]
@@ -112,7 +108,7 @@ class Browser(dockwidget.DockWidget):
         self.searchCriterion = None  # Used by the search box
 
         # Layout
-        layout = QtGui.QVBoxLayout(widget)
+        layout = QtGui.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
@@ -338,9 +334,8 @@ class Browser(dockwidget.DockWidget):
                 self.setFlagFilter(flagList)
         self.reload()
     
-    def createOptionDialog(self, parent):
-        """Open the configuration popup."""
-        return browserdialog.BrowserDialog(parent, self)
+    def createOptionDialog(self, button=None):
+        return browserdialog.BrowserDialog(button, self)
     
     def _handleHideTitleBarAction(self, checked):
         """React to the 'Hide title bar' action in the view menu."""
@@ -364,16 +359,16 @@ class Browser(dockwidget.DockWidget):
     def closeEvent(self, event):
         for view in self.views:
             view.model().shutdown()
-        return super().closeEvent(event)
+        super().closeEvent(event)
 
 
-mainwindow.addWidgetData(mainwindow.WidgetData(
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "browser",
         name = translate("Browser","Browser"),
         icon = utils.getIcon('widgets/browser.png'),
         theClass = Browser,
-        central = False,
-        preferredDockArea = Qt.LeftDockWidgetArea))
+        areas = 'dock',
+        preferredDockArea = 'left'))
 
 
 class BrowserTreeView(treeview.TreeView):
@@ -417,11 +412,6 @@ class BrowserTreeView(treeview.TreeView):
         # The expander will decide which nodes to load/expand after the view is reset. Because each loading
         # might perform a search, Expanders work asynchronously.
         self.expander = VisibleLevelsExpander(self)
-
-    def focusInEvent(self, event):
-        global defaultBrowser
-        defaultBrowser = self.browser
-        super().focusInEvent(event)
         
     def resetToTable(self, table):
         """Reset the view and its model so that it displays elements from *table*."""

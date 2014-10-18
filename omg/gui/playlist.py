@@ -127,9 +127,10 @@ class PlaylistTreeView(treeview.DraggingTreeView):
 
 
 
-class PlaylistWidget(dockwidget.DockWidget):
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)
+class PlaylistWidget(mainwindow.Widget):
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        self.hasOptionDialog = True
         
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
@@ -143,11 +144,8 @@ class PlaylistWidget(dockwidget.DockWidget):
             delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'), profileType)
         
         self.treeview = PlaylistTreeView(delegateProfile)
- 
-        widget = QtGui.QWidget() 
-        self.setWidget(widget)
-        
-        layout = QtGui.QVBoxLayout(widget)
+         
+        layout = QtGui.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
@@ -193,17 +191,16 @@ class PlaylistWidget(dockwidget.DockWidget):
             self.errorLabel.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.errorLabel)
             self.errorLabel.show()
-            
+    
     def createOptionDialog(self, parent):
         return OptionDialog(parent, self)
         
         
-mainwindow.addWidgetData(mainwindow.WidgetData(
-                    id = "playlist",
-                    name = translate("Playlist", "Playlist"),
-                    icon = utils.getIcon('widgets/playlist.png'),
-                    theClass = PlaylistWidget,
-                    preferredDockArea = Qt.RightDockWidgetArea))
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
+        id = "playlist",
+        name = translate("Playlist", "Playlist"),
+        icon = utils.getIcon('widgets/playlist.png'),
+        theClass = PlaylistWidget))
 
 
 class OptionDialog(dialogs.FancyPopup):

@@ -37,11 +37,11 @@ def enable():
     _action = QtGui.QAction(application.mainWindow)
     _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"))
     _action.triggered.connect(_openDialog)
-    mainwindow.addWidgetData(mainwindow.WidgetData(
+    mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "dbanalyzer",
         name = QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
-        theClass = DBAnalyzerDialog,
-        dock = False,
+        theClass = DBAnalyzer,
+        areas = 'central',
         icon = QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png")))
 
 
@@ -51,7 +51,7 @@ def mainWindowInit():
 
 def disable():
     application.mainWindow.menus['extras'].removeAction(_action)
-    mainwindow.removeWidgetData("dbanalyzer")
+    mainwindow.removeWidgetClass("dbanalyzer")
 
 
 def defaultStorage():
@@ -59,36 +59,18 @@ def defaultStorage():
             "size": (800,600),
             "pos": None # Position of the window as tuple or None to center the window
         }}
+    
 
-
-def _openDialog():
-    """Open the DBAnalyzer as a dialog."""
-    global _widget # store the widget in a variable or it will immediately destroyed
-    _widget = DBAnalyzerDialog(dialog=True)
-    _widget.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
-    _widget.setWindowIcon(QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png"))
-
-    # TODO: use restoreGeometry
-    screen = QtGui.QDesktopWidget().screenGeometry()
-    size = QtCore.QSize(*config.storage.dbanalyzer.size)
-    _widget.resize(size)
-    pos = config.storage.dbanalyzer.pos
-    if pos is None:
-        _widget.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
-    else: _widget.move(*pos)
-    _widget.show()
-
-
-class DBAnalyzerDialog(QtGui.QDialog):
-    """A dialog that displays statistics about the database, finds errors in it and allows the user to
+class DBAnalyzer(mainwindow.Widget):
+    """This widget displays statistics about the database, finds errors in it and allows the user to
     correct them."""
     currentCheck = None # The check that is currently displayed in the details view.
     
-    def __init__(self,parent=None,dialog=False):
-        QtGui.QDialog.__init__(self,parent)
-        self.setLayout(QtGui.QHBoxLayout())
+    def __init__(self, state=None, dialog=False, **args):
+        super().__init__(**args)
+        layout = QtGui.QHBoxLayout(self)
         splitter = QtGui.QSplitter()
-        self.layout().addWidget(splitter)
+        layout.addWidget(splitter)
         leftWidget = QtGui.QWidget()
         leftLayout = QtGui.QVBoxLayout()
         leftLayout.setContentsMargins(0,0,0,0)
@@ -320,6 +302,33 @@ class DBAnalyzerDialog(QtGui.QDialog):
         config.storage.dbanalyzer.size = (self.width(),self.height())
         config.storage.dbanalyzer.pos = (self.x(),self.y())
         QtGui.QDialog.close(self)
+
+
+def _openDialog():
+    """Open the DBAnalyzer as a dialog."""
+    global _widget # store the widget in a variable or it will immediately destroyed
+    _widget = DBAnalyzerDialog()
+    _widget.show()
+    
+    
+class DBAnalyzerDialog(QtGui.QDialog):
+    """A dialog containing a DBAnalyzer."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
+        self.setWindowIcon(QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png"))
+        layout = QtGui.QVBoxLayout(self)
+        analyzer = DBAnalyzer(dialog=True)
+        layout.addWidget(analyzer)
+        
+        # TODO: use restoreGeometry
+        screen = QtGui.QDesktopWidget().screenGeometry()
+        size = QtCore.QSize(*config.storage.dbanalyzer.size)
+        self.resize(size)
+        pos = config.storage.dbanalyzer.pos
+        if pos is None:
+            self.move((screen.width()-size.width())/2, (screen.height()-size.height())/2)
+        else: self.move(*pos)
 
 
 def run():

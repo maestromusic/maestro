@@ -57,7 +57,7 @@ def removeDisplayClass(key):
         coverBrowser.updateDisplayChooser()
     
 
-class CoverBrowser(dockwidget.DockWidget):
+class CoverBrowser(mainwindow.Widget):
     """A cover browser is similar to the usual browser but shows covers instead of a tree structure of
     elements. Like the browser it has a search box and a configuration widget that allows to set filters.
     
@@ -70,8 +70,9 @@ class CoverBrowser(dockwidget.DockWidget):
     _dialog = None
     _lastDialogTabIndex = 0
     
-    def __init__(self, parent=None, state=None, **args):
-        super().__init__(parent, **args)
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        self.hasOptionDialog = True
         _coverBrowsers.add(self)
         
         self.domain = domains.domains[0]
@@ -94,11 +95,8 @@ class CoverBrowser(dockwidget.DockWidget):
         self.worker = utils.worker.Worker()
         self.worker.done.connect(self._loaded)
         self.worker.start()
-                    
-        widget = QtGui.QWidget()
-        self.setWidget(widget)
         
-        layout = QtGui.QVBoxLayout(widget)
+        layout = QtGui.QVBoxLayout(self)
         
         controlLineLayout = QtGui.QHBoxLayout()
         self.searchBox = searchgui.SearchBox()
@@ -132,7 +130,7 @@ class CoverBrowser(dockwidget.DockWidget):
         if state is not None and 'display' in state and state['display'] in _displayClasses:
             self.setDisplayKey(state['display'])
         else: self.setDisplayKey('table')
-    
+
     def closeEvent(self, event):
         super().closeEvent(event)
         self.worker.quit()
@@ -285,7 +283,7 @@ class CoverBrowser(dockwidget.DockWidget):
         s = self._displayWidgets[self._display].selection()
         if s is not None:
             selection.setGlobalSelection(s)
-        
+
     def createOptionDialog(self, parent):
         return BrowserDialog(parent, self)
             
@@ -322,12 +320,11 @@ class CoverBrowser(dockwidget.DockWidget):
             self.setDisplayKey(key)
         
 
-mainwindow.addWidgetData(mainwindow.WidgetData(
+mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "coverbrowser",
         name = translate("CoverBrowser","Cover Browser"),
         icon = utils.getIcon('widgets/coverbrowser.png'),
-        theClass = CoverBrowser,
-        preferredDockArea = Qt.RightDockWidgetArea))
+        theClass = CoverBrowser))
 
 
 class AbstractCoverWidget(QtGui.QWidget):
@@ -365,6 +362,7 @@ class BrowserDialog(browserdialog.AbstractBrowserDialog):
     the configuration widget provided by AbstractCoverWidget.createConfigWidget."""
     def __init__(self, parent, browser):
         super().__init__(parent, browser)
+        return
         optionLayout = self.optionTab.layout()
                 
         instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))

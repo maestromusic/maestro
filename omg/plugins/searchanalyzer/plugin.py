@@ -22,15 +22,15 @@ table without any fancy grouping as the browser does (it will add titles, though
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ...core import tags
+from ...core import tags, domains
 from ... import search, config, application, database as db, constants, utils
 from ...search import criteria
-from ...gui import mainwindow, dialogs, search as searchgui, dockwidget
+from ...gui import mainwindow, dialogs, search as searchgui, widgets
 from . import resources
 
 
 def enable():
-    mainwindow.addWidgetData(mainwindow.WidgetData(
+    mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "searchanalyzer",
         name = QtGui.QApplication.translate("SearchAnalyzer", "Search Analyzer"),
         icon = QtGui.QIcon(":/omg/plugins/searchanalyzer/searchanalyzer.png"),
@@ -38,25 +38,25 @@ def enable():
 
 
 def disable():
-    mainwindow.removeWidgetData("searchanalyzer")
+    mainwindow.removeWidgetClass("searchanalyzer")
 
 
-class SearchAnalyzer(dockwidget.DockWidget):
+class SearchAnalyzer(mainwindow.Widget):
     """Display search result tables and allow the user to search the database."""
-    searchRequest = None
 
-    def __init__(self, parent=None, **args):
-        super().__init__(parent, **args)
+    def __init__(self, state=None, **args):
+        super().__init__(**args)
+        self.criterion = None
+        self.domain = domains.domains[0]
 
-        self.engine = search.SearchEngine()
-        self.engine.searchFinished.connect(self._handleSearchFinished)
+        self.worker = utils.worker.Worker()
+        self.worker.done.connect(self.updateTable)
+        self.worker.start()
 
         self.flagFilter = []
 
         # Initialize GUI
-        widget = QtGui.QWidget()
-        self.setWidget(widget)
-        layout = QtGui.QVBoxLayout(widget)
+        layout = QtGui.QVBoxLayout(self)
         topLayout = QtGui.QHBoxLayout()
         layout.addLayout(topLayout)
 
@@ -64,29 +64,34 @@ class SearchAnalyzer(dockwidget.DockWidget):
         self.searchBox.criterionChanged.connect(self._handleCriterionChanged)
         topLayout.addWidget(self.searchBox)
 
-        self.optionButton = QtGui.QToolButton(self)
-        self.optionButton.setIcon(utils.getIcon("options.png"))
-        self.optionButton.clicked.connect(self._handleOptionButton)
-        topLayout.addWidget(self.optionButton)
-
         self.instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
         self.instantSearchBox.setChecked(True)
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
         topLayout.addWidget(self.instantSearchBox)
+        
+        self.domainBox = widgets.DomainBox()
+        self.domainBox.domainChanged.connect(self.setDomain)
+        topLayout.addWidget(self.domainBox)
+        
         topLayout.addStretch(1)
 
         self.table = QtGui.QTableWidget()
         layout.addWidget(self.table)
-
-    def _handleSearchFinished(self, searchRequest):
-        """If the search was successful, update the result list."""
-        if searchRequest is self.searchRequest and not searchRequest.stopped:
-            self.updateTable()
+        
+    def closeEvent(self, event):
+        self.worker.quit()
+        super().closeEvent(event)
+        
+    def setDomain(self, domain):
+        """Change the domain that is being searched."""
+        if domain != self.domain:
+            self.domain = domain
+            self._handleCriterionChanged()
 
     def updateTable(self):
         """Update the result table (in the GUI) with data from the result table (in the database)."""
         self.table.clear()
-        rowCount = 0 if self.searchRequest is None else len(self.searchRequest.result)
+        rowCount = 0 if self.criterion is None else len(self.criterion.result)
         self.table.setRowCount(rowCount)
         if rowCount == 0:
             return
@@ -101,7 +106,7 @@ class SearchAnalyzer(dockwidget.DockWidget):
                 """.format(db.prefix,
                            separator='SEPARATOR' if db.type == 'mysql' else ',',
                            titleTag=tags.TITLE.id,
-                           ids=','.join(str(id) for id in self.searchRequest.result)))
+                           ids=','.join(str(id) for id in self.criterion.result)))
         for i, row in enumerate(result):
             if i == 0:
                 self.table.setColumnCount(len(row))
@@ -117,18 +122,16 @@ class SearchAnalyzer(dockwidget.DockWidget):
     def _handleCriterionChanged(self):
         """Reload search criterion. If there is a search criterion, then start search. Otherwise clear the
         result table."""
-        if self.searchRequest is not None:
-            self.searchRequest.stop()
-            self.table.clear()
-            self.table.setRowCount(0)
-            self.table.setColumnCount(0)
-            self.table.setEnabled(True)
-
+        self.worker.reset()
+        self.table.clear()
+        self.table.setRowCount(0)
+        self.table.setColumnCount(0)
         self.table.setEnabled(False)
-        if self.searchBox.criterion is not None:
-            self.searchRequest = self.engine.search("{}elements".format(db.prefix), self.searchBox.criterion)
+        self.criterion = self.searchBox.criterion
+        if self.criterion is not None:
+            task = search.SearchTask(self.criterion, self.domain)
+            self.worker.submit(task)
         else:
-            self.searchRequest = None
             self.updateTable()
 
     def setFlags(self, flagTypes):
@@ -137,20 +140,3 @@ class SearchAnalyzer(dockwidget.DockWidget):
         if set(flagTypes) != set(self.flagFilter):
             self.flagFilter = list(flagTypes)
             self._handleCriterionChanged()
-
-    def _handleOptionButton(self):
-        """Open the option popup."""
-        dialog = OptionPopup(self, self.optionButton)
-        dialog.show()
-
-
-class OptionPopup(dialogs.FancyTabbedPopup):
-    """Small popup which currently only allows to set a list of flags. Only elements with all of these flags
-    will be displayed in the search results."""
-    def __init__(self, searchAnalyzer, parent):
-        dialogs.FancyTabbedPopup.__init__(self, parent, 300, 200)
-
-        from ...gui import browserdialog
-        self.flagView = browserdialog.FlagView(searchAnalyzer.flagFilter)
-        self.flagView.selectionChanged.connect(lambda: searchAnalyzer.setFlags(self.flagView.selectedFlagTypes))
-        self.tabWidget.addTab(self.flagView, "Flags")
