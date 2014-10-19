@@ -613,7 +613,7 @@ class MPDConfigWidget(QtGui.QWidget):
         self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
         formLayout.addRow(self.tr("Password visible?"), self.passwordVisibleBox)
         
-        self.pathEdit = lineedits.PathLineEdit(self.tr("Path to music folder"))
+        self.pathEdit = lineedits.PathLineEdit(self.tr("Path to music folder"), pathType='existingDirectory')
         formLayout.addRow(self.tr("Path to music folder:"), self.pathEdit)
         
         self.saveButton = QtGui.QPushButton(self.tr("Save"))

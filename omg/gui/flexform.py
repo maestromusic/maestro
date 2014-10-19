@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
+import functools, os
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -24,12 +24,21 @@ translate = QtCore.QCoreApplication.translate
 
 
 class FlexFormConfig:
+    """Configuration of a FlexForm. This is a list of fields. Use item-access to read fields and the
+    addField-method to add new ones.
+    If *config* is given, this list will be initialized with the fields from *config* (copy-constructor).
+    """
     def __init__(self, config=None):
         if config is None:
             self.fields = []
         else: self.fields = config.fields[:]
         
     def addField(self, field, title=None, type=None, **kwargs):
+        """Add a new field. Arguments may be either:
+            - a Field-instance,
+            - or a name (*field*), title and type, as well as optional keyword arguments which will be
+              passed to the constructor of the Field-subclass (which is determined by *type*).
+        """
         if not isinstance(field, Field):
             assert title is not None and type is not None
             field = createField(field, title, type, **kwargs)
@@ -73,6 +82,9 @@ class AbstractFlexForm(QtGui.QWidget):
         config = FlexFormConfig()
         config.addField(field, title, type, **kwargs)
         self.addFields(config)
+        
+    def addFields(self, fields):
+        raise NotImplementedError()
     
     def addToolButton(self, name, icon, method, text=None, toolTip=None, enabled=False):
         assert name not in self.buttons
@@ -100,7 +112,6 @@ class AbstractFlexForm(QtGui.QWidget):
         button.clicked.connect(method)
         self.buttons[name] = button
         self.buttonLayout.addWidget(button)
-        
         
     
 class FlexForm(AbstractFlexForm):
@@ -188,9 +199,12 @@ class FlexTableModel(QtCore.QAbstractTableModel):
     
     def flags(self, index):
         field = self.fields[index.column()]
-        if field.editable and not field.clickable: # do not use an editor for clickable fields
-            return Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled
-        else: return Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        flags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        if field.editable and not field.clickable:
+            flags |= Qt.ItemIsEditable
+        if field.checkable:
+            flags |= Qt.ItemIsUserCheckable
+        return flags
     
     def getItemData(self, item, field):
         return getattr(item, field.name)
@@ -204,7 +218,7 @@ class FlexTableModel(QtCore.QAbstractTableModel):
         return True
             
     def data(self, index, role=Qt.DisplayRole):
-        if role not in [Qt.DisplayRole, Qt.EditRole, Qt.DecorationRole, Qt.ToolTipRole]:
+        if role not in [Qt.DisplayRole, Qt.EditRole, Qt.DecorationRole, Qt.ToolTipRole, Qt.CheckStateRole]:
             return None
         
         field = self.fields[index.column()]
@@ -212,7 +226,7 @@ class FlexTableModel(QtCore.QAbstractTableModel):
         if role == Qt.EditRole:
             return data
         elif role == Qt.DisplayRole:
-            if field.type != 'image':
+            if field.type not in ['image', 'check']:
                 return str(data)
         elif role == Qt.DecorationRole:
             if field.type == 'image':
@@ -220,6 +234,9 @@ class FlexTableModel(QtCore.QAbstractTableModel):
         elif role == Qt.ToolTipRole:
             if field.type == 'image':
                 return data
+        elif role == Qt.CheckStateRole:
+            if field.checkable:
+                return Qt.Checked if data else Qt.Unchecked 
         return None
     
     def headerData(self, section, orientation, role=Qt.DisplayRole):
@@ -228,8 +245,12 @@ class FlexTableModel(QtCore.QAbstractTableModel):
         else: return None
         
     def setData(self, index, value, role=Qt.EditRole):
+        item = self.items[index.row()]
+        field = self.fields[index.column()]
         if role == Qt.EditRole:
-            return self.setItemData(self.items[index.row()], self.fields[index.column()], value)
+            return self.setItemData(item, field, value)
+        elif role == Qt.CheckStateRole and field.checkable:
+            return self.setItemData(item, field, value == Qt.Checked)
         else: return False
             
     def addField(self, field, title=None, type=None, **kwargs):
@@ -328,8 +349,17 @@ class FlexTableDelegate(QtGui.QStyledItemDelegate):
         super().__init__()
         self.fields = fields
         
+    def sizeHint(self, option, index):
+        field = self.fields[index.column()]
+        sizeHint = super().sizeHint(option, index)
+        if sizeHint.width() >= field.minColumnWidth:
+            return sizeHint
+        else: return QtCore.QSize(field.minColumnWidth, sizeHint.height())
+        
     def createEditor(self, parent, option, index):
         field = self.fields[index.column()]
+        if field.checkable: #TODO
+            return None
         editor = field.createEditor(parent)
         editor.setAutoFillBackground(True)
         if isinstance(editor, QtGui.QFrame):
@@ -361,11 +391,31 @@ def createField(name, title, type, **kwargs):
 
     
 class Field:
-    default = None
-    methods = ('value', 'setValue', 'valueChanged')
-    editable = True
+    """A field is a piece of data that can be configured for each item in a FlexForm. Possible fields
+    include 'Name', 'Age', 'Path' etc.. There are many subclasses of Field which handle different data types
+    and offer different editors. For example the subclass PathField handles a string, like StringField, but
+    additionally offers a dialog to choose a path.
+    
+    Subclasses must at least implement 'createEditor'.
+    
+    Arguments:
+        - *name*: The internal and unique name for this field.
+        - *title*: A title displayed to the user.
+        - *default*: Default value.
+        - *hint*: Help text displayed with the option (currently only supported for FlexForm).
+    """
+    
+    # Field properties. May be changed in subclasses and instances
+    default = None      # default value for this field
+    editable = True    
     clickable = False
-    contextMenu = False
+    checkable = False
+    contextMenu = False # whether the field offers a context menu
+    minColumnWidth = 0 
+    
+    # The generic implementations of getValue, setValue and connect use these method/signal names to
+    # connect to the editor returned by createEditor. Confer e.g. StringField
+    methods = ('value', 'setValue', 'valueChanged')
     
     def __init__(self, name, title, **options):
         self.name = name
@@ -375,25 +425,32 @@ class Field:
         self.hint = options.get('hint', '')
         
     def getValue(self, editor):
+        """Return the value from the given editor."""
         method = getattr(editor, self.methods[0])
         return method()
     
     def setValue(self, editor, value):
+        """Set the value in the given editor."""
         method = getattr(editor, self.methods[1])
         method(value)
         
     def connect(self, editor, method):
+        """Connect the 'changed'-signal of *editor* to *method*."""
         signal = getattr(editor, self.methods[2])
         signal.connect(method)
         
     def createEditor(self):
+        """Return an editor that can be used to edit values of this field."""
         raise NotImplementedError()
     
     def handleClick(self, value, parent):
+        """React to a click on a clickable field. *value* is the current field value, *parent* the widget
+        that should be used as dialog parent."""
         raise NotImplementedError()
         
     
 class StringField(Field):
+    """Field for simple strings. Supports one option 'maxLength'."""
     type = "string"
     default = ''
     methods = ('text', 'setText', 'editingFinished')
@@ -410,13 +467,19 @@ class StringField(Field):
         
 
 class IntField(Field):
+    """Field for integer values. Options:
+        - widget: Either 'spinbox' or 'lineedit' or 'slider'.
+        - min: Minimal value.
+        - max: Maximal value.
+        - step: Step size (ignored if widget=lineedit).
+    """ 
     type = "integer"
     default = 0
     
     def __init__(self, name, title, **options):
         super().__init__(name, title, **options)
         self.min = options.get('min', 0)
-        self.max = options.get('max', 2**32-1)
+        self.max = options.get('max', 2**31-1)
         self.step = options.get('step', 1)
         self.widget = options.get('widget', 'spinbox')
         assert self.widget in ('spinbox', 'lineedit', 'slider')
@@ -454,6 +517,7 @@ class IntField(Field):
         
 class SelectionField(Field):
     type = "selection"
+    
     def __init__(self, name, title, **options):
         super().__init__(name, title, **options)
         self.values = options.get('values', tuple()) # strings or tuples (data, title); both must be strings
@@ -520,6 +584,7 @@ class RadioButtonGroup(QtGui.QWidget):
 class CheckField(Field):
     type = "check"
     default = False
+    checkable = True
     methods = ('isChecked', 'setChecked', 'toggled')
     
     def createEditor(self, parent=None):
@@ -726,6 +791,54 @@ class TagField(Field):
             value = tags.TITLE
         super().setValue(editor, value)
 
+    
+class PathField(Field):
+    type = "path"
+    default = ''
+    minColumnWidth = 200
+    methods = ('text', 'setText', 'textChanged')
+    
+    def __init__(self, name, title, dialogTitle, pathType='path', **options):
+        super().__init__(name, title, **options)
+        self.dialogTitle = dialogTitle
+        self.pathType = pathType
+    
+    def createEditor(self, parent=None):
+        from .misc.lineedits import PathLineEdit
+        return PathLineEdit(self.dialogTitle, self.pathType, os.path.expanduser('~'), parent)
+    
+    
+class PasswordField(Field):
+    type = "password"
+    default = ''
+    methods = ('text', 'setText', 'textChanged')
+    
+    def createEditor(self, parent=None):
+        return PasswordEditor(parent)
+    
+    
+class PasswordEditor(QtGui.QWidget):
+    textChanged = QtCore.pyqtSignal(str)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QtGui.QHBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
+        self.lineEdit = QtGui.QLineEdit()
+        self.lineEdit.setEchoMode(QtGui.QLineEdit.Password)
+        self.lineEdit.textChanged.connect(self.textChanged)
+        layout.addWidget(self.lineEdit)
+        echoModeBox = QtGui.QCheckBox('Show password')
+        echoModeBox.clicked.connect(lambda checked: self.lineEdit.setEchoMode(
+                                    QtGui.QLineEdit.Normal if checked else QtGui.QLineEdit.Password))
+        layout.addWidget(echoModeBox)
+
+    def text(self):
+        return self.lineEdit.text()
+    
+    def setText(self, text):
+        self.lineEdit.setText(text)
+
 
 if __name__ == "__main__":
     class Item:
@@ -765,4 +878,3 @@ if __name__ == "__main__":
         flexForm.valueChanged.connect(functools.partial(print, "CHANGE:"))
     flexForm.show()
     app.exec_()
-          

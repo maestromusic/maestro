@@ -128,13 +128,21 @@ class LineEditWithHint(QtGui.QLineEdit):
             
 class PathLineEdit(QtGui.QWidget):
     """A line edit together with a small button that opens a file dialog. The user can select an existing
-    directory which will then be inserted into the line edit. *dialogTitle* is the dialog title.
+    directory which will then be inserted into the line edit.
+    
+    Arguments:
+        - *dialogTitle*: title of the dialog,
+        - *pathType*: Determines which paths are accepted. Possible values are 
+                ['path', 'existingFile', 'existingDirectory']
+        - *path*: start value,
+        - *parent*: Qt parent object
     """
     textChanged = QtCore.pyqtSignal(str)
     
-    def __init__(self, dialogTitle, path=None):
-        super().__init__()
+    def __init__(self, dialogTitle, pathType="path", path=None, parent=None):
+        super().__init__(parent)
         self.dialogTitle = dialogTitle
+        self.pathType = pathType
         layout = QtGui.QHBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         self.lineEdit = QtGui.QLineEdit()
@@ -150,7 +158,12 @@ class PathLineEdit(QtGui.QWidget):
         
     def _handleButton(self):
         """Handle the button next to the line edit: Open a file dialog."""
-        result = QtGui.QFileDialog.getExistingDirectory(self, self.dialogTitle, self.lineEdit.text())
+        if self.pathType == 'path':
+            method = QtGui.QFileDialog.getSaveFileName
+        elif self.pathType == 'existingFile':
+            method = QtGui.QFileDialog.getOpenFileName
+        else: method = QtGui.QFileDialog.getExistingDirectory
+        result = method(self, self.dialogTitle, self.lineEdit.text())
         if result:
             self.lineEdit.setText(result)
             
