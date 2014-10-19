@@ -45,7 +45,9 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
         
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.view.scene()._handleResize()
+        # Bugfix: Calling _handleResize directly does not work if the CoverBrowser is hidden at startup.
+        # When it is shown, resizeEvent is called before self.view.vieport.size() is updated.
+        QtCore.QTimer.singleShot(0, self.view.scene()._handleResize)
         
     def setCovers(self, ids, coverPaths):
         self.view.scene().setCovers(ids, coverPaths)
