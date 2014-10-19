@@ -20,28 +20,30 @@
 
 from sqlalchemy import *
 from . import prefix, FlexiDateType, engine
-from ..core import domains, flags, tags
+from ..core import domains as domainsModule, flags as flagsModule, tags as tagsModule
 
-metadata = MetaData()
-    
+metadata = MetaData(engine)
+tables = metadata.tables # mapping keys to sqlalchemy.Table objects
+
+
 domains = Table(prefix+'domains', metadata,
-    Column('id', SmallInteger, primary_key=True),
-    Column('name', String(domains.MAX_NAME_LENGTH), unique=True),
+    Column('id', Integer, primary_key=True),
+    Column('name', String(domainsModule.MAX_NAME_LENGTH), unique=True),
     mysql_engine='InnoDB'
 )
 
 elements = Table(prefix+'elements', metadata,
     Column('id', Integer, primary_key=True),
-    Column('domain', SmallInteger, ForeignKey(prefix+'domains.id'), nullable=False),
+    Column('domain', Integer, ForeignKey(prefix+'domains.id'), nullable=False),
     Column('file', Boolean, nullable=False),
     Column('type', SmallInteger, nullable=False),
-    Column('elements', SmallInteger, nullable=False),
+    Column('elements', Integer, nullable=False),
     mysql_engine='InnoDB'
 )
 
 contents = Table(prefix+'contents', metadata,
     Column('container_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), primary_key=True),
-    Column('position', SmallInteger, primary_key=True),
+    Column('position', Integer, primary_key=True),
     Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'),
            nullable=False, index=True),
     mysql_engine='InnoDB'
@@ -58,9 +60,9 @@ files = Table(prefix+'files', metadata,
 
 tagids = Table(prefix+'tagids', metadata,
     Column('id', Integer, primary_key=True),
-    Column('tagname', String(tags.MAX_NAME_LENGTH), nullable=False, index=True, unique=True),
+    Column('tagname', String(tagsModule.MAX_NAME_LENGTH), nullable=False, index=True, unique=True),
     Column('tagtype', Enum('varchar', 'date', 'text'), default='varchar', nullable=False),
-    Column('title', String(tags.MAX_NAME_LENGTH)),
+    Column('title', String(tagsModule.MAX_NAME_LENGTH)),
     Column('icon', String(255)),
     Column('private', Boolean, nullable=False),
     Column('sort', SmallInteger, nullable=False),
@@ -70,7 +72,7 @@ tagids = Table(prefix+'tagids', metadata,
 tags = Table(prefix+'tags', metadata,
     Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'),
            nullable=False, index=True),
-    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('tag_id', Integer, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
     Column('value_id', Integer, nullable=False),
     mysql_engine='InnoDB'
 )
@@ -78,10 +80,10 @@ Index(prefix+'tags_tag_value_idx', tags.c.tag_id, tags.c.value_id)
 
 values_varchar = Table(prefix+'values_varchar', metadata,
     Column('id', Integer, primary_key=True),
-    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
-    Column('value', String(tags.TAG_VARCHAR_LENGTH), nullable=False),
-    Column('sort_value', String(tags.TAG_VARCHAR_LENGTH)),
-    Column('search_value', String(tags.TAG_VARCHAR_LENGTH)),
+    Column('tag_id', Integer, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('value', String(tagsModule.TAG_VARCHAR_LENGTH), nullable=False),
+    Column('sort_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
+    Column('search_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
     Column('hide', Boolean, nullable=False, default=0),
     mysql_engine='InnoDB'
 )
@@ -89,7 +91,7 @@ Index(prefix+'values_varchar_idx', values_varchar.c.tag_id, values_varchar.c.val
 
 values_text = Table(prefix+'values_text', metadata,
     Column('id', Integer, primary_key=True),
-    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('tag_id', Integer, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
     Column('value', Text, nullable=False),
     mysql_engine='InnoDB'
 )
@@ -97,25 +99,25 @@ Index(prefix+'values_text_idx', values_text.c.tag_id, values_text.c.value)
    
 values_date = Table(prefix+'values_date', metadata,
     Column('id', Integer, primary_key=True),
-    Column('tag_id', SmallInteger, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
+    Column('tag_id', Integer, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
     Column('value', FlexiDateType, nullable=False),
     mysql_engine='InnoDB'
 )
 Index(prefix+'values_date_idx', values_date.c.tag_id, values_date.c.value)
    
 flag_names = Table(prefix+'flag_names', metadata,
-    Column('id', SmallInteger, primary_key=True),
-    Column('name', String(flags.MAX_NAME_LENGTH), nullable=False, unique=True),
+    Column('id', Integer, primary_key=True),
+    Column('name', String(flagsModule.MAX_NAME_LENGTH), nullable=False, unique=True),
     Column('icon', String(255)),
     mysql_engine='InnoDB'
 )
 
 flags = Table(prefix+'flags', metadata,
     Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), nullable=False),
-    Column('flag_id', SmallInteger, ForeignKey(prefix+'flag_names.id', ondelete='CASCADE'), nullable=False),
+    Column('flag_id', Integer, ForeignKey(prefix+'flag_names.id', ondelete='CASCADE'), nullable=False),
     mysql_engine='InnoDB'
 )
-Index(prefix+'flags_idx', flags.element_id, flags.flag_id, unique=True)
+Index(prefix+'flags_idx', flags.c.element_id, flags.c.flag_id, unique=True)
 
 folders = Table(prefix+'folders', metadata,
     Column('path', String(500), nullable=False),
@@ -137,4 +139,4 @@ stickers = Table(prefix+'stickers', metadata,
     Column('data', Text, nullable=False),
     mysql_engine='InnoDB'
 )
-Index(prefix+'stickers_idx', stickers.c.element_d, stickers.c.type, stickers.c.sort)
+Index(prefix+'stickers_idx', stickers.c.element_id, stickers.c.type, stickers.c.sort)
