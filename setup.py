@@ -19,9 +19,8 @@
 
 import sys
 
-if sys.version_info.major <= 2:
-    print("OMG runs with Python 3.x only. "
-          "Please re-run setup.py with a Python3 interpreter.")
+if sys.version_info <= (3,3):
+    print("OMG runs with Python 3.3+ only.")
     sys.exit(1)
 
 import glob, os.path, subprocess
@@ -117,7 +116,7 @@ setup(name='omg',
       license='GPL3',
       packages=find_packages(),
       include_package_data=True,
-      install_requires=["pytaglib>=0.3.0", "pyparsing"],
+      install_requires=["pytaglib>=0.3.0", "pyparsing", "sqlalchemy"],
       extras_require={ 'mpd': ["python-mpd2>=0.5.3"] },
       entry_points={
           'gui_scripts': ['omg = omg.application:run',
