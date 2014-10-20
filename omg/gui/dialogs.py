@@ -50,8 +50,8 @@ def warning(title,text,parent=None):
     QtGui.QMessageBox.warning(parent, title, text)
 
 
-def getText(title, text, parent=None):
-    result, ok = QtGui.QInputDialog.getText(parent, title, text)
+def getText(title, text, parent=None, default=''):
+    result, ok = QtGui.QInputDialog.getText(parent, title, text, QtGui.QLineEdit.Normal, default)
     if ok:
         return result
     else: return None

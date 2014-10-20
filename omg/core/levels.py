@@ -370,6 +370,16 @@ class Level(application.ChangeEventDispatcher):
                             stack.Call(self._setTypes, containerTypes),
                             stack.Call(self._setTypes, oldTypes))
             
+    def setStickers(self, type, elementToStickers, message=''):
+        """Set stickers of a certain type. *elementToStickers* maps elements to list of stickers (strings).
+        Stickers of other types will not be changed. Because most users won't understand the undo-message
+        "Set stickers" you should specify your own type-dependent message as *message*.
+        """
+        oldStickers = {element: element.getStickers(type) for element in elementToStickers}
+        self.stack.push(message,
+                        stack.Call(self._setStickers, type, elementToStickers),
+                        stack.Call(self._setStickers, type, oldStickers))
+        
     def setCovers(self, coverDict):
         """Set the covers for one or more elements.
         
@@ -576,7 +586,7 @@ class Level(application.ChangeEventDispatcher):
     _changeStickers = _applyDiffs
 
     def _setStickers(self, type, elementToStickers):
-        """For each (element, stickerList) tuple in *elementToStickers* change the stickers of the given type
+        """For each element->stickerList map in *elementToStickers* change the stickers of the given type
         of the element to stickerList. Do not change stickers of other types.
         """
         for element, stickers in elementToStickers.items():

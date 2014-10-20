@@ -637,6 +637,10 @@ class MainWindow(QtGui.QMainWindow):
         self.skipForwardAction.triggered.connect(self._handleSkipForward)
         self.menus['playback'].addAction(self.skipForwardAction)
         
+        self.addMarkAction = QtGui.QAction(self.tr("Add mark..."), self)
+        self.addMarkAction.triggered.connect(self._handleAddMark)
+        self.menus['playback'].addAction(self.addMarkAction)
+        
         # EXTRAS
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
 
@@ -733,6 +737,10 @@ class MainWindow(QtGui.QMainWindow):
             backend = self._currentWidgets['playback'].backend
             if backend is not None:
                 backend.skipForward()
+                
+    def _handleAddMark(self):
+        if 'playback' in self._currentWidgets:
+            self._currentWidgets['playback'].seekSlider.addMark()
         
     def showPreferences(self):
         """Open preferences dialog."""

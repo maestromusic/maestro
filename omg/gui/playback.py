@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import functools
+
 from PyQt4 import QtCore, QtGui, QtSvg
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
@@ -23,7 +25,7 @@ translate = QtCore.QCoreApplication.translate
 from . import mainwindow, dialogs, dockwidget
 from .preferences import profiles as profilesgui
 from .. import player, utils
-from ..core import levels
+from ..core import levels, stickers
 
 renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
 ICON_SIZE = 16
@@ -36,13 +38,21 @@ class PlaybackWidget(mainwindow.Widget):
         super().__init__(**args)
         self.hasOptionDialog = True
         self.backend = None
+        self.areaChanged.connect(self._areaChanged)
         
-        topLayout = QtGui.QHBoxLayout()    
-        self.titleLabel = QtGui.QLabel(self)
+        self.topLayout = QtGui.QBoxLayout(QtGui.QBoxLayout.TopToBottom)
+        self._areaChanged(self.area) # the direction of topLayout depends on the area 
+        self.topLayout.setContentsMargins(0,0,0,0)
+        self.titleLabel = QtGui.QLabel()
         self.titleLabel.setTextFormat(Qt.AutoText)
-        self.titleLabel.setSizePolicy(QtGui.QSizePolicy.Ignored, QtGui.QSizePolicy.Ignored)
         self.titleLabel.linkActivated.connect(lambda: self.backend.connectBackend())
-        topLayout.addWidget(self.titleLabel)   
+        self.topLayout.addWidget(self.titleLabel, 1)  
+        
+        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout.setContentsMargins(0,0,0,0)
+        # Do not inhertit spacing from self.topLayout, see self._areaChanged
+        buttonLayout.setSpacing(self.style().pixelMetric(QtGui.QStyle.PM_LayoutHorizontalSpacing))
+        self.topLayout.addLayout(buttonLayout)
         
         self.skipBackwardButton = QtGui.QToolButton()
         self.skipBackwardButton.setIcon(QtGui.QIcon(utils.images.renderSvg(renderer, "media_skip_backward",
@@ -59,7 +69,8 @@ class PlaybackWidget(mainwindow.Widget):
         for button in (self.skipBackwardButton, self.ppButton, self.stopButton,
                        self.skipForwardButton, self.volumeButton):
             button.setAutoRaise(True)
-            topLayout.addWidget(button)
+            buttonLayout.addWidget(button)
+        buttonLayout.addStretch()
             
         bottomLayout = QtGui.QHBoxLayout()
         self.seekLabel = QtGui.QLabel("", self)
@@ -67,19 +78,29 @@ class PlaybackWidget(mainwindow.Widget):
         bottomLayout.addWidget(self.seekSlider)
         bottomLayout.addWidget(self.seekLabel)
         mainLayout = QtGui.QVBoxLayout(self)
-        mainLayout.addLayout(topLayout)
+        mainLayout.addLayout(self.topLayout)
         mainLayout.addLayout(bottomLayout)
         self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
         
         levels.real.connect(self.handleLevelChange)
         
     def initialize(self, state):
+        super().initialize(state)
         if state is not None:
             backend = player.profileCategory.get(state) # may be None
         elif len(player.profileCategory.profiles()) > 0:
             backend = player.profileCategory.profiles()[0]
         else: backend = None
         self.setBackend(backend)
+        
+    def _areaChanged(self, area):
+        """Handle changes in the dock's position."""
+        if self.area in ['left', 'right']:
+            self.topLayout.setDirection(QtGui.QBoxLayout.TopToBottom)
+            self.topLayout.setSpacing(self.style().pixelMetric(QtGui.QStyle.PM_LayoutVerticalSpacing))
+        else:
+            self.topLayout.setDirection(QtGui.QBoxLayout.RightToLeft)
+            self.topLayout.setSpacing(30 + self.style().pixelMetric(QtGui.QStyle.PM_LayoutHorizontalSpacing))
     
     def createOptionDialog(self, parent):
         return OptionDialog(parent, self)
@@ -116,6 +137,15 @@ class PlaybackWidget(mainwindow.Widget):
             if current is not None:
                 self.titleLabel.setText(current.getTitle())
             else: self.titleLabel.setText('')
+        
+    def updateMarks(self):
+        """Create and use SliderMarks for the stickers of type 'MARK' of the current song."""
+        marks = []
+        if self.backend is not None and self.backend.current() is not None:
+            stickers = self.backend.current().element.getStickers('MARK')
+            if stickers is not None:
+                marks = [SliderMark.fromSticker(sticker) for sticker in stickers]
+        self.seekSlider.setMarks(marks)
     
     def handleStateChange(self, state):
         """Update labels, buttons etc. when the playback state has changed."""
@@ -137,6 +167,7 @@ class PlaybackWidget(mainwindow.Widget):
             self.titleLabel.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
         else:
             self.updateTitleLabel()
+            self.updateMarks()
             self.updateSlider(self.backend.elapsed())
             self.handleStateChange(self.backend.state())
             self.volumeButton.setVolume(self.backend.volume())
@@ -146,6 +177,7 @@ class PlaybackWidget(mainwindow.Widget):
         current = self.backend.current()
         if current is not None and current.element.id in event.dataIds:
             self.updateTitleLabel() # title may have changed
+            self.updateMarks()
             
     def handlePlaylistChange(self, *args):
         """Enable or disable play and stop buttons when the playlist becomes empty / is filled."""
@@ -164,6 +196,7 @@ class PlaybackWidget(mainwindow.Widget):
                 ("self.backend.volumeChanged", "self.volumeButton.setVolume"),
                 ("self.backend.stateChanged", "self.handleStateChange"),
                 ("self.backend.currentChanged", "self.updateTitleLabel"),
+                ("self.backend.currentChanged", "self.updateMarks"),
                 ("self.backend.connectionStateChanged", "self.handleConnectionChange"),
                 ("self.backend.playlist.rowsInserted", "self.handlePlaylistChange"),
                 ("self.backend.playlist.rowsRemoved", "self.handlePlaylistChange"),
@@ -202,14 +235,7 @@ class PlaybackWidget(mainwindow.Widget):
         
     def saveState(self):
         return self.backend.name if self.backend is not None else None
-    
-    
-def playPauseShortcut():
-    backends = [w.backend for w in mainwindow.mainWindow.getWidgets('playback') if w.backend is not None]
-    newState = player.PLAY if not any(b.state() == player.PLAY for b in backends) else player.PAUSE
-    for backend in backends:
-        backend.setState(newState)
-            
+
     
 mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "playback",
@@ -234,7 +260,6 @@ class OptionDialog(dialogs.FancyPopup):
         hLayout.addStretch()
         layout.addStretch()
     
-
 
 class PlayPauseButton(QtGui.QToolButton):
     """Special button with two states. Depending on the state different signals (play and pause)
@@ -401,12 +426,27 @@ class SeekSlider(QtGui.QSlider):
         self.setRange(0, 1000)
         self.setFocusPolicy(Qt.NoFocus)
         self.backend = None # backend is necessary to get current track
+        self.marks = []
+    
+    def currentElement(self):
+        """Return the currently playing element or None."""
+        if self.backend is not None and self.backend.current() is not None:
+            return self.backend.current().element
+        else: return None
+            
+    def _posToSeconds(self, pos):
+        """Convert from position (0 <= pos < self.width) to seconds."""
+        current = self.currentElement()
+        return pos / self.width() * current.length if current is not None else None
+        
+    def _secondsToPos(self, seconds):
+        """Convert from seconds to position (0 <= pos < self.width)."""
+        current = self.currentElement()
+        return int(seconds / current.length * self.width()) if current is not None else None
         
     def mouseReleaseEvent(self, event):
-        if not self.isSliderDown():
-            val = QtGui.QStyle.sliderValueFromPosition(self.minimum(),
-                    self.maximum(), event.x(), self.width())
-            self.sliderMoved.emit(val)
+        if event.button() == Qt.LeftButton and not self.isSliderDown():
+            self.sliderMoved.emit(int(event.x() / self.width() * self.maximum()))
         return super().mouseReleaseEvent(event)
     
     def paintEvent(self, event):
@@ -458,9 +498,152 @@ class SeekSlider(QtGui.QSlider):
         p.end()
         
     def event(self, event):
-        if event.type() == QtCore.QEvent.ToolTip and self.backend is not None \
-                and self.backend.current() is not None:
-            seconds = int(event.x() / self.width() * self.backend.current().element.length)
-            self.setToolTip(self.tr("Jump to {}").format(utils.strings.formatLength(seconds)))
+        if event.type() == QtCore.QEvent.ToolTip:
+            seconds = self._posToSeconds(event.x())
+            if seconds is not None:
+                self.setToolTip(self.tr("Jump to {}").format(utils.strings.formatLength(seconds)))
             
         return super().event(event)
+        
+    def setMarks(self, marks):
+        """Set the SliderMarks that are displayed on this slider."""
+        for widget in self.marks:
+            widget.hide()
+            widget.setParent(None)
+        self.marks = [SliderMarkWidget(mark, self) for mark in marks]
+        for widget in self.marks:
+            widget.show()
+        self._updateMarks()
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._updateMarks()
+         
+    def _updateMarks(self):
+        """Move the SliderMarkWidgets to the correct position."""
+        if self.currentElement() is not None:
+            for widget in self.marks:
+                widget.move(self._secondsToPos(widget.mark.seconds) - SliderMarkWidget.SIZE.width() // 2, 0)
+                    
+    def contextMenuEvent(self, event):
+        if self.currentElement() is not None:
+            menu = QtGui.QMenu(self)
+            markAction = QtGui.QAction(self.tr("Add mark..."), menu)
+            markAction.triggered.connect(functools.partial(self.addMark, self._posToSeconds(event.x())))
+            menu.addAction(markAction)
+            removeAllAction = QtGui.QAction(self.tr("Remove all marks"), menu)
+            removeAllAction.triggered.connect(self.removeAllMarks)
+            removeAllAction.setEnabled(len(self.marks) > 0)
+            menu.addAction(removeAllAction)
+            menu.exec_(event.globalPos())
+        event.accept()
+        
+    def addMark(self, seconds=None):
+        """Add a mark to the given position within the current song."""
+        current = self.currentElement()
+        if current is None:
+            return
+        if seconds is None:
+            seconds = self.backend.elapsed()
+        if any(widget.mark.seconds == seconds for widget in self.marks):
+            return # do not add two marks at the same time
+            
+        text = dialogs.getText(self.tr("Mark text"), self.tr("Enter the mark's text:"), self)
+        if text is not None:
+            data = str(SliderMark(int(seconds), text))
+            stickers = current.getStickers('MARK')
+            if stickers is not None: # stickers are tuples!
+                stickers = stickers + (data, )
+            else: stickers = (data, )
+            levels.real.setStickers('MARK', {current: stickers}, message=self.tr("Add mark"))
+        
+    def changeMark(self, seconds):
+        """Ask the user to submit a new text for the mark at the given number of seconds."""
+        current = self.currentElement()
+        if current is None:
+            return
+        marks = [widget.mark for widget in self.marks]
+        for mark in marks:
+            if mark.seconds == seconds:
+                text = dialogs.getText(self.tr("Mark text"), self.tr("Enter the mark's text:"), self,
+                                       default=mark.text)
+                if text is not None and text != mark.text:
+                    marks = [mark if mark.seconds != seconds else SliderMark(seconds, text)
+                             for mark in marks]
+                    stickers = [str(mark) for mark in marks]
+                    levels.real.setStickers('MARK', {current: stickers}, message=self.tr("Change mark"))
+                return
+            
+    def removeMark(self, seconds):
+        """Remove the mark at the given number of seconds."""
+        current = self.currentElement()
+        if current is None:
+            return
+        marks = [widget.mark for widget in self.marks if widget.mark.seconds != seconds]
+        if len(marks) < len(self.marks):
+            stickers = [str(mark) for mark in marks]
+            levels.real.setStickers('MARK', {current: stickers}, message=self.tr("Remove mark"))       
+        
+    def removeAllMarks(self):
+        """Remove all marks from the current song."""
+        current = self.currentElement()
+        if current is not None:
+            levels.real.setStickers('MARK', {current: None}, message=self.tr("Remove all marks"))
+
+
+class SliderMark:
+    """A SliderMark is a small text that is displayed (using SliderMarkWidget) at a certain position
+    on the SeekSlider."""
+    def __init__(self, seconds, text):
+        self.seconds = seconds
+        self.text = text
+        
+    def __str__(self):
+        return "{};{}".format(self.seconds, self.text)
+    
+    @staticmethod
+    def fromSticker(sticker):
+        args, text = sticker.split(';', 1)
+        return SliderMark(int(args), text)
+
+
+class SliderMarkWidget(QtGui.QWidget):
+    """This widget is used to display SliderMarks on the SeekSlider."""
+    SIZE = QtCore.QSize(8, 8)
+    
+    def __init__(self, mark, parent=None):
+        super().__init__(parent)
+        self.mark = mark
+        self.setToolTip(mark.text + ' ({})'.format(utils.strings.formatLength(mark.seconds)))
+        
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.drawPixmap(0, 0, utils.images.renderSvg(renderer, "blue_triangle",
+                                                        self.SIZE.width(), self.SIZE.height()))
+
+    def sizeHint(self):
+        return self.SIZE
+        
+    def minimumSizeHint(self):
+        return self.SIZE
+    
+    def sizePolicy(self):
+        return QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+    
+    def mouseDoubleClickEvent(self, event):
+        if self.parent().backend is not None:
+            self.parent().backend.setElapsed(self.mark.seconds)
+        event.accept()
+        
+    def contextMenuEvent(self, event):
+        backend = self.parent().backend
+        if backend is not None and backend.current() is not None:
+            menu = QtGui.QMenu(self)
+            changeAction = QtGui.QAction(self.tr("Change text"), menu)
+            changeAction.triggered.connect(functools.partial(self.parent().changeMark, self.mark.seconds))
+            menu.addAction(changeAction)
+            removeAction = QtGui.QAction(self.tr("Remove mark"), menu)
+            removeAction.triggered.connect(functools.partial(self.parent().removeMark, self.mark.seconds))
+            menu.addAction(removeAction)
+            menu.exec_(event.globalPos())
+        event.accept()
