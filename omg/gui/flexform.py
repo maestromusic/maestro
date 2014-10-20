@@ -287,6 +287,15 @@ class FlexTableModel(QtCore.QAbstractTableModel):
         self.endRemoveRows()
 
 
+class FlexTableTupleModel(FlexTableModel):
+    def getItemData(self, item, field):
+        return item[self.fields.index(field)]
+
+    def setItemData(self, item, field, value):
+        item[self.fields.index(field)] = value
+        return True
+
+
 class FlexTable(AbstractFlexForm):
     selectionChanged = QtCore.pyqtSignal()
     

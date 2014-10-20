@@ -42,9 +42,7 @@ from omg import config, logging, database as db
 from omg.application import loadTranslators
 from omg.core.tags import isValidTagName
 from omg.core.domains import isValidName as isValidDomainName
-from omg.gui.misc import iconchooser
 from omg.gui import flexform
-from omg.utils import getIcon
 
 logger = logging.getLogger("Install tool")
 
@@ -97,10 +95,6 @@ class InstallToolWindow(QtGui.QWidget):
         self.stateWidgets['language'] = LanguageWidget(self, 1)
         self.stackedLayout.addWidget(self.stateWidgets['language'])
         # All other widgets are not created until the language is chosen
-        
-        
-        #self.createOtherWidgets()
-        #self.showState('audio') #TODO remove
         
     def createOtherWidgets(self):
         """Create all settings widgets except for the language widget."""
@@ -159,6 +153,7 @@ class InstallToolWindow(QtGui.QWidget):
         else: self.finish()
         
     def _shouldSkip(self, state):
+        """Some states should be skipped, when the database already contains the corresponding values."""
         if state == 'domains':
             return db.query("SELECT COUNT(*) FROM {p}domains").getSingle() > 0
         elif state == 'tags':
@@ -181,9 +176,16 @@ class SettingsWidget(QtGui.QWidget):
         self.titleLabel.setStyleSheet('QLabel {font-size: 16px; font-weight: bold}')
         layout.addWidget(self.titleLabel)
         
+        self.textLabel = QtGui.QLabel()
+        self.textLabel.setWordWrap(True)
+        layout.addWidget(self.textLabel)
+        
     def setTitle(self, title):
         """Set the title displayed in the title label."""
         self.titleLabel.setText("{}. {}".format(self.titleNumber, title))
+        
+    def setText(self, text):
+        self.textLabel.setText(text)
         
     def finish(self):
         """Check the settings in this widget. If they are ok, do necessary actions (like updating config
@@ -226,7 +228,7 @@ class DatabaseWidget(SettingsWidget):
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
         self.setTitle(self.tr("Database settings"))
-        #self.layout().addWidget(QtGui.QLabel(self.tr("Choose the type of database.")))
+        self.setText(self.tr("Choose a database type and enter the necessary connection parameters."))
         groupBox = QtGui.QGroupBox(self.tr("Database type"))
         layout = QtGui.QVBoxLayout(groupBox)
         self.sqliteButton = QtGui.QRadioButton(self.tr("SQLite"))
@@ -333,36 +335,25 @@ class DatabaseWidget(SettingsWidget):
             return False 
         return True
     
-
-class DomainModel(flexform.FlexTableModel):
-    """Data model for the domain manager."""
-    def __init__(self, parent):
-        super().__init__(parent=parent)
-        self.addField('enabled', self.tr("Enabled"), 'check')
-        self.addField('name', self.tr("Name"), 'string')
-        self.addField('path', self.tr("Path"), 'path', dialogTitle=self.tr("Choose source directory"))
-        self.items = []#TODO
-    
-    def getItemData(self, domain, field):
-        return domain[self.fields.index(field)]
-
-    def setItemData(self, domain, field, value):
-        domain[self.fields.index(field)] = value
-        return True
-        
         
 class DomainWidget(SettingsWidget):
+    """Let the user create at least one domain. Also create one source for each domain."""
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
         self.setTitle(self.tr("Domain settings"))
-        
-        self.layout().addWidget(QtGui.QLabel(self.tr(
+        self.setText(self.tr(
             "OMG separates different types of media into domains like \"Music\", \"Movies\".\n"
             "Enable / create one or more domains that you want to use."
-            )))
+            ))
         
         self.domainManager = flexform.FlexTable(self)
-        self.domainManager.setModel(DomainModel(self))
+        model = flexform.FlexTableTupleModel(parent=self)
+        model.addField('enabled', self.tr("Enabled"), 'check')
+        model.addField('name', self.tr("Name"), 'string')
+        model.addField('path', self.tr("Path"), 'path',
+                       dialogTitle = self.tr("Choose source directory"),
+                       pathType = 'existingDirectory')
+        self.domainManager.setModel(model)
         newDomainAction = QtGui.QAction(getIcon('add.png'), self.tr("Add domain"), self)
         newDomainAction.triggered.connect(self._addDomain)
         self.domainManager.addAction(newDomainAction)
@@ -380,7 +371,7 @@ class DomainWidget(SettingsWidget):
 
     def _addDomain(self, enabled=True, title=None, path=''):
         if title is None:
-            title = self.tr("New domain") #TODO add numbers to make unique
+            title = self.tr("New domain")
         newDomain = [enabled, title, path]
         self.domainManager.model.addItem(newDomain)
         
@@ -393,58 +384,21 @@ class DomainWidget(SettingsWidget):
         items = [item for item in self.domainManager.model.items if item[0]] # enabled items
         if len(items) == 0:
             QtGui.QMessageBox.warning(self, self.tr("No domain"),
-                                      self.tr("Pleas create and activate at least one domain."))
+                                      self.tr("Please create and activate at least one domain."))
+            return False
+        if any(len(set(item[i] for item in items)) < len(items) for i in (1,2)):
+            QtGui.QMessageBox.warning(self, self.tr("Names not unique"),
+                                      self.tr("Please give each domain a unique name and path."))
             return False
         
         db.multiQuery("INSERT INTO {p}domains (name) VALUES (?)", [(item[1],) for item in items])
-        #TODO create sources
-        return True
         
-
-class AudioWidget(SettingsWidget):
-    def __init__(self, installTool, titleNumber):
-        super().__init__(installTool, titleNumber)
-        self.setTitle(self.tr("Audio settings"))
-        audioBackendLayout = self.layout()
-        
-        audioBackendFound = False
-        try:
-            from PyQt4.phonon import Phonon
-            self.phononBox = QtGui.QCheckBox(self.tr("Phonon"))
-            self.phononBox.setChecked(True)
-            audioBackendFound = True
-        except ImportError:
-            self.phononBox = QtGui.QCheckBox(self.tr("Phonon (cannot find PyQt4.phonon)"))
-            self.phononBox.setEnabled(False)
-        audioBackendLayout.addWidget(self.phononBox)
-        try:
-            import mpd
-            self.mpdBox = QtGui.QCheckBox(self.tr("MPD"))
-            self.mpdBox.setChecked(True)
-            audioBackendFound = True
-        except ImportError:
-            self.mpdBox = QtGui.QCheckBox(self.tr("MPD (cannot find python-mpd2)"))
-            self.mpdBox.setEnabled(False)
-        audioBackendLayout.addWidget(self.mpdBox)
-        if not audioBackendFound:
-            noBackendBox = QtGui.QRadioButton(self.tr("No backend"))
-            noBackendBox.setChecked(True)
-            audioBackendLayout.addWidget(noBackendBox)
-            label = QtGui.QLabel(self.tr(
-                "You will not be able to play music. Please install one of the missing packages. "
-                "If you continue, you will also need to enable the corresponding plugin in the preferences."
-                ))
-            label.setWordWrap(True)
-            audioBackendLayout.addWidget(label)
-        
-        self.layout().addStretch()
-        
-    def finish(self):
-        """Store user input in config variables."""
-        if self.phononBox.isChecked() and "phonon" not in config.options.main.plugins:
-            config.options.main.plugins.append("phonon")
-        elif self.mpdBox.isChecked() and "mpd" not in config.options.main.plugins:
-            config.options.main.plugins.append("mpd")
+        # Create one source for each domain
+        config.storage.filesystem.sources = [
+                {'name': item[1], 'path': item[2], 'domain': item[0], 'enabled': True}
+                for item in items
+            ]
+                                             
         return True
          
     
@@ -455,12 +409,10 @@ class TagWidget(SettingsWidget):
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
         self.setTitle(self.tr("Tag settings (optional)"))
-        label = QtGui.QLabel(self.tr("Uncheck tags that you do not want to be created. "
-                                     "The first two tags play a special role: "
-                                     "They are used for songtitles and albumtitles. "
-                                     "Do not change their names unless you really know what you do!"))
-        label.setWordWrap(True)
-        self.layout().addWidget(label)
+        self.setText(self.tr("Uncheck tags that you do not want to be created. "
+                             "The first two tags play a special role: "
+                             "They are used for songtitles and albumtitles. "
+                             "Do not change their names unless you really know what you do!"))
         
         self.columns = [
                 ("name",    self.tr("Name")),
@@ -612,6 +564,58 @@ class TagWidget(SettingsWidget):
                 return i
         raise ValueError("Invalid key {}".format(columnKey))
         
+
+class AudioWidget(SettingsWidget):
+    """Check which audio backend plugins are available (i.e. the third-party library can be imported) and
+    let the user choose one or more."""
+    def __init__(self, installTool, titleNumber):
+        super().__init__(installTool, titleNumber)
+        self.setTitle(self.tr("Audio settings"))
+        self.setText(self.tr(
+            "OMG can play music using various backends. All of them require third-party libraries "
+            "to be installed and a plugin to be enabled. "
+            "Please choose the backends that you want to enable."))
+        
+        audioBackendFound = False
+        try:
+            from PyQt4.phonon import Phonon
+            self.phononBox = QtGui.QCheckBox(self.tr("Phonon"))
+            self.phononBox.setChecked(True)
+            audioBackendFound = True
+        except ImportError:
+            self.phononBox = QtGui.QCheckBox(self.tr("Phonon (cannot find PyQt4.phonon)"))
+            self.phononBox.setEnabled(False)
+        self.layout().addWidget(self.phononBox)
+        try:
+            import mpd
+            self.mpdBox = QtGui.QCheckBox(self.tr("MPD"))
+            self.mpdBox.setChecked(True)
+            audioBackendFound = True
+        except ImportError:
+            self.mpdBox = QtGui.QCheckBox(self.tr("MPD (cannot find python-mpd2)"))
+            self.mpdBox.setEnabled(False)
+        self.layout().addWidget(self.mpdBox)
+        if not audioBackendFound:
+            noBackendBox = QtGui.QRadioButton(self.tr("No backend"))
+            noBackendBox.setChecked(True)
+            self.layout().addWidget(noBackendBox)
+            label = QtGui.QLabel(self.tr(
+                "You will not be able to play music. Please install one of the missing packages. "
+                "If you continue, you will also need to enable the corresponding plugin in the preferences."
+                ))
+            label.setWordWrap(True)
+            self.layout().addWidget(label)
+        
+        self.layout().addStretch()
+        
+    def finish(self):
+        """Store user input in config variables."""
+        if self.phononBox.isChecked() and "phonon" not in config.options.main.plugins:
+            config.options.main.plugins.append("phonon")
+        elif self.mpdBox.isChecked() and "mpd" not in config.options.main.plugins:
+            config.options.main.plugins.append("mpd")
+        return True
+        
         
 def getIcon(name):
     """Return a QIcon for the icon with the given name."""
@@ -650,6 +654,7 @@ class IconLabel(QtGui.QLabel):
         menu.exec_(event.globalPos())
         
     def mouseDoubleClickEvent(self, event):
+        from omg.gui.misc import iconchooser
         result = iconchooser.IconChooser.getIcon([':omg/tags'], self)
         if result:
             self.setPath(result[1])
