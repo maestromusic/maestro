@@ -469,7 +469,6 @@ class TagLayer(Layer):
         
         if len(variousNodeElements) > 0:
             node = VariousNode(layerIndex, self.tagList)
-            node.elids = variousNodeElements
             visibleNodes.append(node)
             
         if len(hiddenNodes) > 0:
