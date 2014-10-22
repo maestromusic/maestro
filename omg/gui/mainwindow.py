@@ -386,7 +386,11 @@ class MainWindow(QtGui.QMainWindow):
             raise ValueError("Widget '{}' is not allowed in central area".format(widgetClass.id))
         if widgetClass.unique and self.widgetExists(widgetClass.id):
             raise ValueError("There can be at most one widget of class '{}'.".format(widgetClass.id))
-        widget = widgetClass.theClass(state=state, widgetClass=widgetClass, area='central')
+        try:
+            widget = widgetClass.theClass(state=state, widgetClass=widgetClass, area='central')
+        except Exception as e:
+            logging.exception(__name__, "Could not load central widget '{}'".format(widgetClass.id))
+            return None
         self._currentWidgets[widgetClass.id] = widget
         if widgetClass.icon is not None:
             self.centralWidget().addTab(widget, widgetClass.icon, widgetClass.name)
@@ -409,6 +413,8 @@ class MainWindow(QtGui.QMainWindow):
             self.setLayoutFrozen(False)
         area = widgetClass.preferredDockArea
         dock = self._createDockWidget(widgetClass, area)
+        if dock is None:
+            return None
         super().addDockWidget(widgetClass.preferredDockAreaFlag(), dock)
         if frozen:
             # Wait until updated dockwidgets sizes are available
@@ -435,7 +441,11 @@ class MainWindow(QtGui.QMainWindow):
                     i += 1
                 objectName = widgetClass.id + str(i)
 
-        widget = widgetClass.theClass(state=state, widgetClass=widgetClass, area=area)
+        try:
+            widget = widgetClass.theClass(state=state, widgetClass=widgetClass, area=area)
+        except Exception as e:
+            logging.exception(__name__, "Could not load docked widget '{}'".format(widgetClass.id))
+            return None
         self._currentWidgets[widgetClass.id] = widget
         from . import dockwidget
         dock = dockwidget.DockWidget(widget, title=widgetClass.name, icon=widgetClass.icon)
@@ -516,6 +526,8 @@ class MainWindow(QtGui.QMainWindow):
             widgetClass = getWidgetClass(id)
             if widgetClass is not None:  # As above it may happen that widgetClass is None.
                 widget = self._createDockWidget(widgetClass, area, objectName, state)
+                if widget is None:
+                    continue
                 widget.setParent(self) # necessary for QMainWindow.restoreState
                 dockWidgets.append(widget)
             else: logging.info(__name__, "Could not load dock widget '{}' with object name '{}'"
