@@ -502,22 +502,21 @@ class MPDPlayerBackend(player.PlayerBackend):
         with self.getClient() as client:
             inserted = []
             try:
+                urls = list(urls)
                 isEnd = (pos == len(self.mpdPlaylist))
                 for position, url in enumerate(urls, start=pos):
-                    print(url.path, self.path)
                     if url.path.startswith(self.path):
                         path = os.path.relpath(url.path, self.path)
                     else: path = url.path
-                    print(path)
                     if isEnd:
                         client.add(path)
                         self.playlistVersion += 1
                     else:
-                        client.addid(url.path, position)
+                        client.addid(path, position)
                         self.playlistVersion += 2
                     self.mpdPlaylist[position:position] = [path]
                     inserted.append(url)
-            except mpd.CommandError:
+            except mpd.CommandError as e:
                 raise player.InsertError('Could not insert all files', inserted)
     
     def removeFromPlaylist(self, begin, end):
