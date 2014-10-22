@@ -222,7 +222,7 @@ class Browser(mainwindow.Widget):
                                 functools.partial(self.selectionChanged.emit, newView.selectionModel()))
         self.splitter.insertWidget(index, newView)
         if reset:
-            newView.resetToTable(self.table)
+            newView.model().reset()
         return newView
         
     def removeView(self, index):
@@ -412,10 +412,6 @@ class BrowserTreeView(treeview.TreeView):
         # The expander will decide which nodes to load/expand after the view is reset. Because each loading
         # might perform a search, Expanders work asynchronously.
         self.expander = VisibleLevelsExpander(self)
-        
-    def resetToTable(self, table):
-        """Reset the view and its model so that it displays elements from *table*."""
-        self.model().reset(table)
     
     def _handleNodeLoaded(self, node):
         """When a node has loaded in the model, allow the expander to expand it or load another node."""

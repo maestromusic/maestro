@@ -50,7 +50,8 @@ selectableLayers = utils.mapRecursively(functools.partial(tags.get, addDialogIfN
 
 
 class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
-    """Popup dialog that allows to configure the Browser."""
+    """Popup dialog that allows to configure the Browser. Browser and CoverBrowser each use their own
+    subclasses of this abstract class."""
     def __init__(self, parent, browser):
         super().__init__(parent, 300, 200)
         self.browser = browser
@@ -91,6 +92,7 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
 
 
 class BrowserDialog(AbstractBrowserDialog):
+    """This is the subclass of AbstractBrowserDialog used for the browser."""
     def __init__(self, parent, browser):
         super().__init__(parent, browser)
         optionLayout = self.optionTab.layout()
@@ -115,7 +117,7 @@ class BrowserDialog(AbstractBrowserDialog):
         optionLayout.addWidget(hideInBrowserBox)
         
         viewConfigButton = QtGui.QPushButton(self.tr("Configure Views..."))
-        viewConfigButton.clicked.connect(lambda: ViewConfigurationDialog(self.browser).exec_())
+        viewConfigButton.clicked.connect(self._handleViewConfigButton)
         viewConfigButton.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed))
         optionLayout.addWidget(viewConfigButton)
         
@@ -124,6 +126,10 @@ class BrowserDialog(AbstractBrowserDialog):
     def _handleProfileChosen(self, profile):
         for view in self.browser.views:
             view.itemDelegate().setProfile(profile)
+            
+    def _handleViewConfigButton(self):
+        self.close()
+        ViewConfigurationDialog(self.browser).exec_()
             
         
 class ViewConfigurationDialog(QtGui.QDialog):
@@ -184,9 +190,6 @@ class SingleViewConfiguration(QtGui.QWidget):
         
         self.table = QtGui.QTableWidget()
         self.table.horizontalHeader().setVisible(False)
-        #TODO: Does not work
-        self.table.horizontalHeader().setResizeMode(0, QtGui.QHeaderView.Stretch)
-        self.table.horizontalHeader().setResizeMode(1, QtGui.QHeaderView.Fixed)
         self.table.verticalHeader().setMovable(True)
         self.table.verticalHeader().sectionMoved.connect(self._handleSectionMoved)
         # Note: only the first column contains an item
