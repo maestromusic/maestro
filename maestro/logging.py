@@ -32,7 +32,7 @@ Before logging is configured everything will be printed to the console, so call 
 possible (but after the config module has been initialized).
 """
 
-import sys, functools
+import sys, functools, os
 import logging, logging.config
 
 configured = False # Whether logging has been configured (i.e. init has been successfully called).
@@ -43,6 +43,9 @@ def init():
     must initialize the config module first.
     """
     from . import config
+    
+    # Typically log files are created within this directory, so make sure it exists.
+    os.makedirs(os.path.join(os.path.expanduser("~"), ".config", "maestro"), exist_ok=True)
     
     logging.config.dictConfig(config.storage.main.logging)
     
