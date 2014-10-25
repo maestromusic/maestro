@@ -27,7 +27,7 @@ from .. import config, search, database as db, logging, utils, search
 from ..core import tags, levels, elements
 from ..core.elements import Element
 from ..core.nodes import Node, RootNode, Wrapper, TextNode
-from ..gui import selection
+from ..gui import selection, dialogs
 
 
 # Registered layer classes. Maps names -> (title, class)
@@ -503,8 +503,10 @@ class TagLayer(Layer):
                         or not all(tag.isInDb() and tag.type == tags.TYPE_VARCHAR for tag in tagList):
                     raise ValueError()
             except:
-                QtGui.QMessageBox.error(parent, translate("TagLayer", "Invalid value"),
-                        translate("TagLayer", "Only varchar-tags registered in the database may be used."))
+                dialogs.warning(
+                        translate("TagLayer", "Invalid value"),
+                        translate("TagLayer", "Only varchar-tags registered in the database may be used."),
+                        parent)
             else:
                 return TagLayer(tagList)
         return None
