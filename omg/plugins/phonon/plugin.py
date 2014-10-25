@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -144,7 +144,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     def checkPlaying(self):
         if self.state() != player.PLAY:
-            from omg.gui.dialogs import warning
+            from ...gui.dialogs import warning
             warning(self.tr("Error Playing Song"),
                     self.tr("Phonon could not play back the selected file."))
             self.stateChanged.emit(self.state())

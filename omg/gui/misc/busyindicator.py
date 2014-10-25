@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -33,7 +33,7 @@ class BusyIndicator(QtGui.QWidget):
         self._frame = None
         
         # Have a look at that image to understand this code  
-        self._pixmap = QtGui.QPixmap(':omg/process-working.png')
+        self._pixmap = QtGui.QPixmap(':maestro/process-working.png')
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(50)
         self._timer.timeout.connect(self._handleTimer)

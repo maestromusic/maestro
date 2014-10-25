@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -26,27 +26,28 @@ from .. import logging, config, constants
 
 class Plugin(object):
     """A plugin that is available somewhere on the filesystem. May or may not be compatible with the
-    current omg version, and may or may not be loaded."""
+    current Maestro version, and may or may not be loaded."""
     
     def __init__(self, name):
         self.name = name
         self.enabled = False
         self.loaded = False 
-        self.package = importlib.import_module('.'+self.name,'omg.plugins')
+        self.package = importlib.import_module('.'+self.name,'maestro.plugins')
         
         self.versionOk = True
-        if (hasattr(self.package,'MINOMGVERSION')):
-            if constants.compareVersion(self.package.MINOMGVERSION) < 0:
+        if (hasattr(self.package,'MINVERSION')):
+            if constants.compareVersion(self.package.MINVERSION) < 0:
                 self.versionOk = False
-        if (hasattr(self.package,'MAXOMGVERSION')):
-            if constants.compareVersion(self.package.MAXOMGVERSION) > 0:
+        if (hasattr(self.package,'MAXVERSION')):
+            if constants.compareVersion(self.package.MAXVERSION) > 0:
                 self.versionOk = False
     
     def load(self):
-        """Imports the module, if it is compatible with the current OMG version.Otherwise an error is thrown.
+        """Imports the module, if it is compatible with the current Maestro version.
+        Otherwise an error is thrown.
         """
         if self.versionOk:
-            self.module = importlib.import_module('.'+self.name+'.plugin', 'omg.plugins')
+            self.module = importlib.import_module('.'+self.name+'.plugin', 'maestro.plugins')
             self.loaded = True
         else:
             raise RuntimeError("Unsupported module version: {}".format(self.name))
@@ -107,9 +108,9 @@ def init():
     plugins = {}
 
     from pkg_resources import resource_listdir, resource_exists, resource_isdir
-    for plugindir in resource_listdir('omg', 'plugins'):
+    for plugindir in resource_listdir('maestro', 'plugins'):
         try:
-            if resource_isdir('omg.plugins', plugindir) and plugindir != '__pycache__':
+            if resource_isdir('maestro.plugins', plugindir) and plugindir != '__pycache__':
                 plugins[plugindir] = Plugin(plugindir)
         except ImportError:
             if plugindir != '__pycache__':

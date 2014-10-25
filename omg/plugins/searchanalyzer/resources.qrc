@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/omg/plugins/searchanalyzer">
+    <qresource prefix="/maestro/plugins/searchanalyzer">
         <file>searchanalyzer.png</file>
     </qresource>
 </RCC>

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 #
     
 """
-This package handles OMG's configuration. There are five sources where configuration may come from:
+This package handles Maestro's configuration. There are five sources where configuration may come from:
 Three files in the configuration directory, the default options which are hard coded into this module
 (and into plugins) and finally the command line where arbitrary config options may be overwritten using
 the -c option.
@@ -49,7 +49,7 @@ The three files are:
 All files can only contain options which are defined in the corresponding dicts in this module or in the
 configuration of a plugin that is returned by the methods 'defaultConfig', 'defaultStorage' or
 'defaultBinary' within the module. (To be precise the first level of each file may contain
-sections which are not defined. OMG will assume that they belong to a plugin that is not loaded).
+sections which are not defined. Maestro will assume that they belong to a plugin that is not loaded).
 
 Call 'init' at application start to read options and call 'shutdown' at the end to write the
 options. Use 'loadPlugins' and 'removePlugins' to add or remove plugin configuration.
@@ -79,7 +79,7 @@ def init(cmdConfig=[], testMode=False):
     
     # Find the config directory and ensure that it exists
     global CONFDIR
-    CONFDIR = defaultConfigDirectory('omg')
+    CONFDIR = defaultConfigDirectory('maestro')
     fileData = [('options', 'config', 'config' if not testMode else 'testconfig', 'configOptions'),
                 ('storage', 'json',   'storage' if not testMode else None, 'storageOptions'),
                 ('binary',  'pickle', 'binary' if not testMode else None, 'binaryOptions')
@@ -120,24 +120,24 @@ def shutdown():
 # No use to translate strings here, as this is executed before any translators have been loaded.
 configOptions = collections.OrderedDict((
 ("main", {
-    "plugins": (list, [], "List of plugin names (i.e. the name of the corresponding directory in /omg/plugins/."),
+    "plugins": (list, [], "List of plugin names (i.e. the name of the corresponding directory in /maestro/plugins/."),
     "music_extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "music file extensions")
 }),
     
 ("i18n", {
     # An empty locale will start the install tool
-    "locale": (str, '', "The locale used by OMG (e.g. de_DE)."),
+    "locale": (str, '', "The locale used by Maestro (e.g. de_DE)."),
 }),
 
 ("database", {
     "type": (str, "sqlite", 'Database type, usually "sqlite" or "mysql".'),
     "driver": (str, '', "(Optional) database driver to use, e.g. 'mysqldb', 'mysqlconnector'."),
-    "name": (str, "omg", "Name of the database"),
+    "name": (str, "maestro", "Name of the database"),
     "user": (str, "", "User name"),
     "password": (str, "", "Password"),
     "host": (str, "localhost", "Host name of the database server"),
     "port": (int, 0, "Port of the database server"),    
-    "sqlite_path": (str, "config:omg.db", "Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory."),
+    "sqlite_path": (str, "config:maestro.db", "Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory."),
     "prefix":  (str, "", "Prefix which will be prepended to the table names."),
 }),
 
@@ -158,7 +158,7 @@ configOptions = collections.OrderedDict((
 }),
 
 ("gui", {
-    "mime": (str, "application/x-omgelementlist", "Mime-type used to copy and paste data within OMG."),
+    "mime": (str, "application/x-maestroelementlist", "Mime-type used to copy and paste data within Maestro."),
     "iconsize": (int, 16, "Size of various icons."),
     "flageditor": {
                 "animation": (bool, True, "Enable/disable animations in the flageditor."),
@@ -172,11 +172,11 @@ configOptions = collections.OrderedDict((
     "scan_interval": (int, 1800, "Interval (in seconds) in which the filesystem will be rescanned for changes"),
     "disable": (bool, False, "completely disable filesystem synchronization"),
     "acoustid_apikey": (str, "8XaBELgH", "API key for AcoustID web service"),
-    #TODO: get a real API key for OMG
+    #TODO: get a real API key for Maestro
 }),
 ("misc", {
-    "show_ids": (bool, False, "Whether OMG should display element IDs"),
-    "cover_path": (str, "covers", "Path where OMG stores and caches covers. Relative paths are interpreted as relative to the config directory."),
+    "show_ids": (bool, False, "Whether Maestro should display element IDs"),
+    "cover_path": (str, "covers", "Path where Maestro stores and caches covers. Relative paths are interpreted as relative to the config directory."),
     "cover_extension": (str, "png", "Extension that is used to save covers. Must be supported by Qt. Note that Last.fm, which is where covers are downloaded by default, uses png's."),
     "consoleLogLevel": (str, "",
                         "Log-messages of this loglevel and higher are additionally printed to stderr. Leave it empty to use the configuration specified in the logging configuration (storage.options.main.logging)."),
@@ -207,7 +207,7 @@ storageOptions = collections.OrderedDict((
                 "class": "logging.handlers.RotatingFileHandler",
                 "level": "DEBUG",
                 "formatter": "formatter",
-                "filename": os.path.join(os.path.expanduser("~"), ".config", "omg", "omg.log"),
+                "filename": os.path.join(os.path.expanduser("~"), ".config", "maestro", "maestro.log"),
                 "mode": 'a',
                 "maxBytes": 2000,
                 "backupCount": 2

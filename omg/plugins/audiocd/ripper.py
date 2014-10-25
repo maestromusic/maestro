@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -24,10 +24,10 @@ from os.path import dirname, exists,join
 import subprocess
 from PyQt4 import QtCore, QtGui
 
-from omg import utils, database as db, logging, config
-from omg.core import levels
-from omg.gui import mainwindow
-from omg.filebackends.filesystem import RealFile, FileURL
+from ... import utils, database as db, logging, config
+from ...core import levels
+from ...gui import mainwindow
+from ...filebackends.filesystem import RealFile, FileURL
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class Ripper(QtCore.QObject):
         super().__init__()
         self.device = device
         self.discid = discid
-        self.tmpdir = tempfile.mkdtemp(prefix='omg_rip')
+        self.tmpdir = tempfile.mkdtemp(prefix='maestro_rip')
         self.encodingProcess = self.ripProcess = None
         QtGui.qApp.aboutToQuit.connect(self.cleanup)
         global activeRipper

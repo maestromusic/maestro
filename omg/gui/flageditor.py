@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -38,7 +38,7 @@ class FlagEditor(QtGui.QWidget):
         
         label = QtGui.QLabel() # Text will be set in setVertical
         label.setToolTip(self.tr("Flags"))
-        label.setText('<img src=":omg/icons/flag_blue.png"> '+self.tr("Flags: "))
+        label.setText('<img src=":maestro/icons/flag_blue.png"> '+self.tr("Flags: "))
         self.layout().addWidget(label)
         
         self.addButton = QtGui.QPushButton()

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,9 +18,9 @@
 
 from PyQt4 import QtGui
 
-from omg.gui.delegates.abstractdelegate import *
-from omg.gui.delegates import StandardDelegate
-from omg.gui.delegates.profiles import DelegateProfile
+from ...gui.delegates.abstractdelegate import *
+from ...gui.delegates import StandardDelegate
+from ...gui.delegates.profiles import DelegateProfile
 
 from .elements import MBNode, Medium, Recording
 from .xmlapi import AliasEntity

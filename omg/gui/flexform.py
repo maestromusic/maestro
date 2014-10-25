@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -776,12 +776,12 @@ class DomainField(Field):
     methods = ('currentDomain', 'setCurrentDomain', 'domainChanged')
     
     def createEditor(self, parent=None):
-        from omg.gui import widgets
+        from . import widgets
         return widgets.DomainBox(parent=parent)
     
     def setValue(self, editor, value):
         if value is None:
-            from omg.core import domains
+            from ..core import domains
             value = domains.domains[0]
         super().setValue(editor, value)
 
@@ -791,12 +791,12 @@ class TagField(Field):
     methods = ('getTag', 'setTag', 'tagChanged')
     
     def createEditor(self, parent=None):
-        from omg.gui import tagwidgets
+        from . import tagwidgets
         return tagwidgets.TagTypeBox(parent=parent)
 
     def setValue(self, editor, value):
         if value is None:
-            from omg.core import tags
+            from ..core import tags
             value = tags.TITLE
         super().setValue(editor, value)
 
@@ -854,11 +854,11 @@ if __name__ == "__main__":
         def __init__(self, **values):
             self.__dict__.update(values)
             
-    from omg import application
+    from .. import application
     app = application.init()
     flexForm = FlexForm()
     flexForm.setWindowTitle("FlexForm Test")
-    flexForm.addField("icon", "Icon", "image", folders=[':omg/flags', ':omg/tags'])
+    flexForm.addField("icon", "Icon", "image", folders=[':maestro/flags', ':maestro/tags'])
     flexForm.addField("string", "String", "string", maxLength=20)
     flexForm.addField("spinningint", "Spinning Integer", "integer", min=-10, max=-1)
     flexForm.addField("slidingint", "Sliding Integer", "integer", widget="slider", max=100)

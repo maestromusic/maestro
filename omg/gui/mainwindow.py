@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 #
 
 """
-This module implements OMG's flexible widget system. It consists of mainwindow.MainWindow which is the
-toplevel window of OMG and a flexible amount of central widgets (which are displayed as tabs in the center)
+This module implements Maestro's flexible widget system. It consists of mainwindow.MainWindow which is the
+toplevel window of Maestro and a flexible amount of central widgets (which are displayed as tabs in the center)
 and docked widgets. This module manages a list of all available widget classes (confer WidgetClass).
 Plugins may add their own widgets using addWidgetClass. From this list a View menu is created that allows the
 user to add widgets. At the end of the application the state and position of each widget is saved
@@ -275,8 +275,8 @@ class Widget(QtGui.QWidget):
         
         
 class MainWindow(QtGui.QMainWindow):
-    """The main window of OMG. It contains a CentralTabWidget as actual central widget (in Qt sense) so that
-    several widgets (in tabs) can be displayed as central widgets (in OMG's sense)."""
+    """The main window of Maestro. It contains a CentralTabWidget as actual central widget (in Qt sense)
+    so that several widgets (in tabs) can be displayed as central widgets (in Maestro's sense)."""
     # Do not use this! Use gui.selection.changed instead. We just need a QObject to put the signal in.
     _globalSelectionChanged = QtCore.pyqtSignal(selection.Selection)
 
@@ -285,8 +285,8 @@ class MainWindow(QtGui.QMainWindow):
         self._isClosing = False
 
         self.setDockNestingEnabled(True)
-        self.setWindowTitle(self.tr('OMG version {}').format(constants.VERSION))
-        self.setWindowIcon(QtGui.QIcon(":omg/omg_square.svg"))
+        self.setWindowTitle(self.tr('Maestro version {}').format(constants.VERSION))
+        self.setWindowIcon(QtGui.QIcon(":maestro/omg_square.svg"))
 
         selection.changed = self._globalSelectionChanged
 
@@ -761,9 +761,9 @@ class MainWindow(QtGui.QMainWindow):
 
     def showAboutDialog(self):
         """Display the About dialog."""
-        box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon, self.tr("About OMG"),
-                '<div align="center"><img src=":omg/omg.png" /><br />'
-                + self.tr("This is OMG version {} by Martin Altmayer and Michael Helmling.")
+        box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon, self.tr("About Maestro"),
+                '<div align="center"><img src=":maestro/omg.png" /><br />'
+                + self.tr("This is Maestro version {} by Martin Altmayer and Michael Helmling.")
                              .format(constants.VERSION)
                 + '</div>',
                 QtGui.QMessageBox.Ok)

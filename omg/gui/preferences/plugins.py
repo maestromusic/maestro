@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ from ... import plugins
 translate = QtCore.QCoreApplication.translate
 
 
-PLUGININFO_OPTIONS = ("NAME", "AUTHOR", "VERSION", "DESCRIPTION", "MINOMGVERSION", "MAXOMGVERSION")
+PLUGININFO_OPTIONS = ("NAME", "AUTHOR", "VERSION", "DESCRIPTION", "MINVERSION", "MAXVERSION")
 
 
 COLUMN_HEADERS = [translate("PluginDialog", "Enabled"),
@@ -35,8 +35,8 @@ COLUMN_HEADERS = [translate("PluginDialog", "Enabled"),
                   translate("PluginDialog", "Author"),
                   translate("PluginDialog", "Version"),
                   translate("PluginDialog", "Description"),
-                  translate("PluginDialog", "Minimum OMG version"),
-                  translate("PluginDialog", "Maximum OMG version")
+                  translate("PluginDialog", "Minimum Maestro version"),
+                  translate("PluginDialog", "Maximum Maestro version")
                   ]
 
 

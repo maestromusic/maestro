@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 import sys
 
 if sys.version_info <= (3,3):
-    print("OMG runs with Python 3.3+ only.")
+    print("Maestro runs with Python 3.3+ only.")
     sys.exit(1)
 
 import glob, os.path, subprocess
@@ -45,7 +45,7 @@ if exists(join(dirname(__file__), '.git')):
     def updateTranslations():
         """Create *.qm files from *.ts in i18n folder if necessary."""
         tsFiles = glob.glob("i18n/*.ts")
-        proFile = "i18n/omg.pro"
+        proFile = "i18n/maestro.pro"
         for tsFile in tsFiles:
             qmFile = tsFile[:-2] + "qm"
             if not os.path.exists(qmFile) or getmtime(tsFile) > getmtime(qmFile):
@@ -63,9 +63,9 @@ if exists(join(dirname(__file__), '.git')):
     
     def updateResources():
         """Update resource files with pyrcc4 if necessary."""
-        resources = [ (["images/images.qrc"], "omg/resources.py"),
-                      (["i18n/translations.qrc"] + glob.glob("i18n/*.qm"), "omg/translations.py") ]
-        pluginBaseDir = os.path.join("omg", "plugins")
+        resources = [ (["images/images.qrc"], "maestro/resources.py"),
+                      (["i18n/translations.qrc"] + glob.glob("i18n/*.qm"), "maestro/translations.py") ]
+        pluginBaseDir = os.path.join("maestro", "plugins")
         for subdir in os.listdir(pluginBaseDir):
             pluginDir = os.path.join(pluginBaseDir, subdir)
             if os.path.exists(os.path.join(pluginDir, "resources.qrc")):
@@ -107,21 +107,21 @@ if exists(join(dirname(__file__), '.git')):
         test_run(self)
     test.test.run = wrapped_test_run
 
-setup(name='omg',
+setup(name='maestro',
       version='0.4.0',
-      description='OMG music manager and player',
+      description='Maestro music manager and player',
       author='Martin Altmayer, Michael Helmling',
-      author_email='{altmayer,helmling}@mathematik.uni-kl.de',
-      url='http://omg.mathematik.uni-kl.de',
+      author_email='martin.altmayer@web.de, michaelhelmling@posteo.de',
+      url='https://github.com/maestromusic/maestro',
       license='GPL3',
       packages=find_packages(),
       include_package_data=True,
       install_requires=["pytaglib>=0.3.0", "pyparsing", "sqlalchemy"],
       extras_require={ 'mpd': ["python-mpd2>=0.5.3"] },
       entry_points={
-          'gui_scripts': ['omg = omg.application:run',
-                           'omgsetup = omg.install:run',
-                           'omgdbanalyzer = omg.plugins.dbanalyzer.plugin:run'], 
+          'gui_scripts': ['maestro = maestro.application:run',
+                           'maestrosetup = maestro.install:run',
+                           'maestrodbanalyzer = maestro.plugins.dbanalyzer.plugin:run'], 
           },
       test_loader="test.testloader:TestLoader",
       test_suite="test.all"

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -57,7 +57,7 @@ class LostFilesDelegate(delegates.StandardDelegate):
 class SetPathAction(treeactions.TreeAction):
     """Action to change the URL of a file without any undo/redo.
     
-    Used by the LostFilesDialog to correct URLs of files moved outside of OMG.
+    Used by the LostFilesDialog to correct URLs of files moved outside of Maestro.
     """
     
     def __init__(self, parent, dialog, text=None, shortcut=None):
@@ -121,7 +121,7 @@ class RemoveMissingFilesAction(treeactions.TreeAction):
 class MissingFilesDialog(QtGui.QDialog):
     """A dialog that notifies the user about missing files.
     
-    When OMG detects that files were deleted from outside OMG, this
+    When Maestro detects that files were deleted from outside Maestro, this
     dialog is shown which asks what to do, i.e., decide which of
     the missing elements should also be deleted from the database. If
     this leads to empty containers, the user is asked if they should
@@ -134,7 +134,7 @@ class MissingFilesDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr('Missing Files Detected'))
         layout = QtGui.QVBoxLayout()
         label = QtGui.QLabel(self.tr(
-                    "Some files from OMG's database could not be found anymore in your "
+                    "Some files from Maestro's database could not be found anymore in your "
                     "filesystem. They are shown in red below. For each file, you can either "
                     "provide a new path manually or delete it from the database."))
         label.setWordWrap(True)

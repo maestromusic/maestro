@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 import unittest
 
 class TestLoader(unittest.TestLoader):
-    """Custom test loader that initializes OMG's framework before starting tests and works better with
+    """Custom test loader that initializes Maestro's framework before starting tests and works better with
     parametrized tests.
     
     When loading tests from a module, the default test loader will first create an instance of each class 
@@ -39,8 +39,8 @@ class TestLoader(unittest.TestLoader):
     See http://packages.python.org/distribute/setuptools.html#test-loader 
     """
     def __init__(self):
-        from omg import application
-        from omg.core import tags
+        from maestro import application
+        from maestro.core import tags
         # Save the app from the garbage collector
         self.app = application.init(cmdConfig=['main.collection=/'],type="test",exitPoint='noplugins')
         for name,type in  [("artist","varchar"),("title","varchar"),("album","varchar"),("date","date"),

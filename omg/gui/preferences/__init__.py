@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -62,7 +62,7 @@ class Panel:
         self.title = title
         self._callable = callable
         self.iconPath = iconPath
-        self.pixmapPath = pixmapPath or ':omg/icons/preferences/preferences.png'
+        self.pixmapPath = pixmapPath or ':maestro/icons/preferences/preferences.png'
         self.description = description
         self.subPanels = utils.OrderedDict()
         
@@ -73,7 +73,7 @@ class Panel:
         if isinstance(self._callable, tuple) and isinstance(self._callable[0], str):
             import importlib
             try:
-                module = importlib.import_module('.'+self._callable[0], 'omg')
+                module = importlib.import_module('.'+self._callable[0], 'maestro')
                 self._callable = (getattr(module, self._callable[1]), ) + self._callable[2:]
             except ImportError:
                 logging.exception(__name__, "Cannot import module '{}'".format(self._callable[0]))
@@ -101,7 +101,7 @@ class PreferencesDialog(QtGui.QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(self.tr("Preferences - OMG"))
+        self.setWindowTitle(self.tr("Preferences - Maestro"))
         self.setWindowIcon(utils.getIcon('preferences/preferences_small.png'))
         self.finished.connect(self._handleFinished)
 
@@ -357,14 +357,14 @@ addPanel("main/domainmanager", translate("Preferences", "Domain Manager"),
          callable = ('gui.preferences.domainmanager', 'DomainManager'),
          description = translate("Preferences",
                             'A domain is a big category of elements, like "Music", "Movies", etc..'),
-         iconPath = ':omg/icons/preferences/domains_small.png'
+         iconPath = ':maestro/icons/preferences/domains_small.png'
 )
 addPanel("main/tagmanager", translate("Preferences", "Tag Manager"),
          callable = ('gui.preferences.tagmanager', 'TagManager'),
          description = translate("Preferences", 
                             "Note that you cannot change or remove tags that already appear in elements."
                             "<br />Use drag&drop to change the order in which tags are usually displayed."),
-         iconPath = ':omg/icons/tag_blue.png'
+         iconPath = ':maestro/icons/tag_blue.png'
 )
 addPanel("main/flagmanager", translate("Preferences", "Flag Manager"),
             ('gui.preferences.flagmanager', 'FlagManager'),
@@ -372,10 +372,10 @@ addPanel("main/flagmanager", translate("Preferences", "Flag Manager"),
                                     "favourite songs, CDs that you own, music that should go on your "
                                     "portable music player etc. Flags are not stored in music files, "
                                     "but only in the database."),
-            iconPath = ':omg/icons/flag_blue.png')
+            iconPath = ':maestro/icons/flag_blue.png')
 addPanel("main/filesystem", translate("Preferences", "File system"),
             ('gui.preferences.filesystem', 'FilesystemSettings'),
-            iconPath = ':omg/icons/folder.svg')
+            iconPath = ':maestro/icons/folder.svg')
 
 # Profile panels                   
 def _addProfileCategory(category):
@@ -392,10 +392,10 @@ def _removeProfileCategory(category):
     
 addPanel("profiles", translate("Preferences", "Profiles"),
          description = translate("Preferences",
-                        "To manage groups of configuration OMG uses profiles of various categories."),
+                        "To manage groups of configuration Maestro uses profiles of various categories."),
          callable = ('gui.preferences.profiles', 'CategoryMenu'),
-         iconPath = ':omg/icons/preferences/profiles_small.png',
-         pixmapPath = ':omg/icons/preferences/profiles.png')
+         iconPath = ':maestro/icons/preferences/profiles_small.png',
+         pixmapPath = ':maestro/icons/preferences/profiles.png')
 
 # Bugfix: do not call this profiles, otherwise the submodule is unreachable
 from ... import profiles as profilesModule
@@ -406,6 +406,6 @@ for category in profilesModule.manager.categories:
 
 
 addPanel("plugins", translate("Preferences", "Plugins"), ('gui.preferences.plugins', 'PluginPanel'),
-         iconPath = ':omg/icons/preferences/plugin.png',
+         iconPath = ':maestro/icons/preferences/plugin.png',
          description = translate("Preferences", "Enable or disable plugins.<br />"
                                  "<b>Warning:</b> Changes will be performed immediately!"))

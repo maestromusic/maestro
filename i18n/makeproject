@@ -1,12 +1,12 @@
 #!/bin/bash
 # This script generates a project file for pylupdate4.
 
-echo "SOURCES = \\" > omg.pro
+echo "SOURCES = \\" > maestro.pro
 
-#grep -Rl --include=*.py 'translate(' ../omg | sed 's/^/    /' | sed 's/$/ \\/' >> omg.pro
-find ../omg -name *.py | grep -v translations.py | grep -v resources.py | sed 's/^/    /' | sed 's/$/ \\/' | sort >> omg.pro
+#grep -Rl --include=*.py 'translate(' ../maestro | sed 's/^/    /' | sed 's/$/ \\/' >> maestro.pro
+find ../maestro -name *.py | grep -v translations.py | grep -v resources.py | sed 's/^/    /' | sed 's/$/ \\/' | sort >> maestro.pro
 
 
-echo "" >> omg.pro
-echo "TRANSLATIONS = omg.de.ts omg.en.ts" >> omg.pro
-echo "CODECFORTR = UTF-8" >> omg.pro
+echo "" >> maestro.pro
+echo "TRANSLATIONS = maestro.de.ts maestro.en.ts" >> maestro.pro
+echo "CODECFORTR = UTF-8" >> maestro.pro

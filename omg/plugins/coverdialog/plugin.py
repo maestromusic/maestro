@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -36,12 +36,12 @@ SMALL_COVER_SIZE = 40
 
 
 def enable():
-    from omg.gui import editor, browser
+    from ...gui import editor, browser
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
         
 def disable():
-    from omg.gui import editor, browser
+    from ...gui import editor, browser
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
     browser.BrowserTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
     

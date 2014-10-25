@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -33,7 +33,7 @@ def enable():
     mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "searchanalyzer",
         name = QtGui.QApplication.translate("SearchAnalyzer", "Search Analyzer"),
-        icon = QtGui.QIcon(":/omg/plugins/searchanalyzer/searchanalyzer.png"),
+        icon = QtGui.QIcon(":/maestro/plugins/searchanalyzer/searchanalyzer.png"),
         theClass = SearchAnalyzer))
 
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -99,7 +99,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
         self._setCoverSize(size)
         covers.addCacheSize(self.coverSize)
         
-        self.loadingPixmap = QtGui.QPixmap(':omg/process-working.png')
+        self.loadingPixmap = QtGui.QPixmap(':maestro/process-working.png')
         self.loadingTimer = QtCore.QTimer(self)
         self.loadingTimer.setInterval(50) # Timer for loading animation
         self.reloadCoverTimer = QtCore.QTimer(self)
@@ -294,7 +294,7 @@ class CoverItem(QtGui.QGraphicsItem):
             if self.cover.loaded:
                 if not self.cover.pixmap.isNull():
                     pixmap = self.cover.pixmap
-                else: pixmap = QtGui.QPixmap(':omg/cover_missing.png')
+                else: pixmap = QtGui.QPixmap(':maestro/cover_missing.png')
             else: pixmap = self._oldCover.pixmap
 
             # Scale correctly

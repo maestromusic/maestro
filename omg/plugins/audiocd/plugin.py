@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,10 +21,10 @@ try:
 except ImportError:
     raise ImportError('discid module not installed')
 from PyQt4 import QtCore, QtGui
-from omg import application, database as db, filebackends
-from omg.gui import editor
-from omg import config
-from omg.core import domains
+from ... import application, database as db, filebackends
+from ...gui import editor
+from ... import config
+from ...core import domains
 
 translate = QtCore.QCoreApplication.translate
 
@@ -41,7 +41,7 @@ def enable():
     filebackends.urlTypes["audiocd"] = cdfilebackend.AudioCDURL
     from .gui import ImportAudioCDAction
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'audiocd'),), ImportAudioCDAction)
-    from omg.core.levels import real
+    from ...core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.append(fileChangerHook)
 
@@ -55,13 +55,13 @@ def mainWindowInit():
 def disable():
     del filebackends.urlTypes["audiocd"]
     editor.EditorTreeView.actionConfig.removeActionDefinition( (("plugins", "audiocd"),) )
-    from omg.core.levels import real
+    from ...core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.remove(fileChangerHook)
     application.mainWindow.menus['extras'].removeAction(_action)
 
 def simpleDiscContainer(discid, trackCount, level):
-    from omg.core.elements import TYPE_ALBUM
+    from ...core.elements import TYPE_ALBUM
     
     elems = []
     for i in range(1, trackCount+1):
@@ -73,7 +73,7 @@ def simpleDiscContainer(discid, trackCount, level):
 
 def showRipMissingDialog():
     ans = list(db.query("SELECT url, element_id FROM {p}files WHERE url LIKE 'audiocd://%'"))
-    from omg.gui.dialogs import warning
+    from ...gui.dialogs import warning
     if len(ans) == 0:    
         warning(translate("AudioCD Plugin", "no unripped tracks"),
                 translate("AudioCD Plugin", "Your database does not contain any unripped audio-cd tracks!"))

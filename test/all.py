@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -22,7 +22,7 @@ import unittest
 
 def load_tests(loader, standard_tests, pattern):
     # See http://docs.python.org/py3k/library/unittest.html#load-tests-protocol
-    # Remember that OMG uses its own test loader (see testloader.py)
+    # Remember that Maestro uses its own test loader (see testloader.py)
     suite = unittest.TestSuite()
 
     from . import sql

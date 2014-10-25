@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -29,7 +29,7 @@ class FlagModel(flexform.FlexTableModel):
     """Data model for the FlagManager."""
     def __init__(self, parent):
         super().__init__(parent=parent)
-        self.addField('icon', self.tr("Icon"), 'image', folders=[':omg/flags', ':omg/tags'])
+        self.addField('icon', self.tr("Icon"), 'image', folders=[':maestro/flags', ':maestro/tags'])
         self.addField('name', self.tr("Name"), 'string')
         self.addField('number', self.tr("# of elements"), 'fixed')
         self.items = list(flags.allFlags())

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -23,8 +23,8 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from omg import database as db, application, constants, config, utils
-from omg.gui import mainwindow
+from .. import database as db, application, constants, config, utils
+from ...gui import mainwindow
 from . import resources, checks
 
 
@@ -42,7 +42,7 @@ def enable():
         name = QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
         theClass = DBAnalyzer,
         areas = 'central',
-        icon = QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png")))
+        icon = QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png")))
 
 
 def mainWindowInit():
@@ -124,7 +124,7 @@ class DBAnalyzer(mainwindow.Widget):
         # Buttons
         buttonLayout = QtGui.QHBoxLayout()
         problemsLayout.addLayout(buttonLayout)
-        self.fixButton = QtGui.QPushButton(QtGui.QIcon(":/omg/plugins/dbanalyzer/edit-clear.png"),
+        self.fixButton = QtGui.QPushButton(QtGui.QIcon(":/maestro/plugins/dbanalyzer/edit-clear.png"),
                                            self.tr("Fix problem"))
         self.fixButton.setEnabled(False)
         self.fixButton.clicked.connect(self._handleFixButton)
@@ -315,8 +315,8 @@ class DBAnalyzerDialog(QtGui.QDialog):
     """A dialog containing a DBAnalyzer."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("OMG version {} – Database Analyzer".format(constants.VERSION))
-        self.setWindowIcon(QtGui.QIcon(":/omg/plugins/dbanalyzer/dbanalyzer.png"))
+        self.setWindowTitle("Maestro version {} – Database Analyzer".format(constants.VERSION))
+        self.setWindowIcon(QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
         layout = QtGui.QVBoxLayout(self)
         analyzer = DBAnalyzer(dialog=True)
         layout.addWidget(analyzer)
@@ -339,7 +339,7 @@ def run():
     _openDialog()
     returnValue = app.exec_()
     
-    from omg import logging
+    from maestro import logging
     config.shutdown()
     logging.shutdown()
     import sys

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -137,7 +137,7 @@ class DataPiecesModel(QtCore.QAbstractListModel):
         return Qt.MoveAction
     
     def mimeTypes(self):
-        return ["application/x-omg-datapieces"]
+        return ["application/x-maestro-datapieces"]
     
     def mimeData(self,indexList):
         return MimeData([self.data(index,Qt.EditRole) for index in indexList])
@@ -155,7 +155,7 @@ class MimeData(QtCore.QMimeData):
         self.dataPieces = dataPieces
         
     def formats(self):
-        return ["application/x-omg-datapieces"]
+        return ["application/x-maestro-datapieces"]
         
         
 class DataPiecesEditor(QtGui.QWidget):

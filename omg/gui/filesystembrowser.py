@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -54,8 +54,8 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         'problem'  : utils.getIcon("file_problem.svg") }
     
     descriptions = {
-        'unsynced' : translate("FileSystemBrowserModel", "contains music which is not in OMG's database"),
-        'ok'       : translate("FileSystemBrowserModel", "in sync with OMG's database"),
+        'unsynced' : translate("FileSystemBrowserModel", "contains music which is not in Maestro's database"),
+        'ok'       : translate("FileSystemBrowserModel", "in sync with Maestro's database"),
         'nomusic'  : translate("FileSystemBrowserModel", "does not contain music"),
         'unknown'  : translate("FileSystemBrowserModel", "unknown status"),
         'problem'  : translate("FileSystemBrowserModel", "in conflict with database") }

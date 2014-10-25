@@ -1,18 +1,27 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright 2009 Martin Altmayer
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
+# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 3 as
-# published by the Free Software Foundation
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
 """Unittests for the realfiles-package."""
 
 import unittest, shutil, os
 
-from omg import application, utils, filebackends, database as db
-from omg.core import tags
+from maestro import application, utils, filebackends, database as db
+from maestro.core import tags
     
 PATH_BASE = os.path.join(os.getcwd(),os.path.dirname(__file__))
 PATH_EMPTY = os.path.join(PATH_BASE,'realfiles/empty')

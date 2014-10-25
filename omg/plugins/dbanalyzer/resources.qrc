@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/omg/plugins/dbanalyzer">
+    <qresource prefix="/maestro/plugins/dbanalyzer">
         <file>edit-clear.png</file>
         <file>dbanalyzer.png</file>
     </qresource>

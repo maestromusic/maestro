@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -296,7 +296,7 @@ class SynchronizeHelper(QtCore.QObject):
         """Call when a URL change was detected. Displays a notice and updates the files table."""
         from ..gui.dialogs import warning
         warning(self.tr("Move detected"),
-                self.tr("A file was renamed (or moved) outside OMG:\n"
+                self.tr("A file was renamed (or moved) outside Maestro:\n"
                         "{}".format(str(newUrl))), application.mainWindow)
         db.query('UPDATE {p}files SET url=? WHERE element_id=?', str(newUrl), id)
         if id in levels.real.elements:
@@ -423,7 +423,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         
         Adds them to self.tracks and self.dbTracks, and to the Directory objects in memory.
         It might happen that the folders table does not contain the directory of some DB file (e.g.
-        if OMG was exited unexpectedly). In such a case the folders table is augmented by that
+        if Maestro was exited unexpectedly). In such a case the folders table is augmented by that
         directory.
         
         This method returns a list of Tracks (if any) which are in the files table but have no hash
@@ -658,7 +658,7 @@ class FileSystemSynchronizer(QtCore.QThread):
         Afterwards it is checked if any files remain in self.dbTracks, i.e., they are contained
         in the database but not on the filesystem. For new files they are just removed from the
         database.
-        In case commited files are missing, we first try to detect moves by searching theiry hash
+        In case commited files are missing, we first try to detect moves by searching their hash
         in self.tracks. Otherwise a LostFilesDialog is requested from the helper.
         """
         if len(self.modifiedTags) > 0:
@@ -666,7 +666,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             self.helper.dialogFinished.clear()
             self._requestHelper.emit("showModifiedTagsDialog", (self.modifiedTags,))
             self.helper.dialogFinished.wait()
-        if not all(self.dbTracks.values()): # some files have been (re)moved outside OMG
+        if not all(self.dbTracks.values()): # some files have been (re)moved outside Maestro
             notFound = [url for url, found in self.dbTracks.items() if not found]
             notFoundNew = [url for url in notFound if self.tracks[url].id is None]
             notFoundDB = [url for url in notFound if self.tracks[url].id is not None]

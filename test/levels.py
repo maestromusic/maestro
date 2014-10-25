@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -20,9 +20,9 @@
 
 import unittest
 
-from omg import application, config, database as db, utils
-from omg.core import tags, levels, elements
-from omg.filebackends import BackendFile, BackendURL, urlTypes
+from maestro import application, config, database as db, utils
+from maestro.core import tags, levels, elements
+from maestro.filebackends import BackendFile, BackendURL, urlTypes
 from . import testcase
 from .testlevel import *
 
@@ -70,7 +70,7 @@ class LevelTestCase(testcase.UndoableTestCase):
         self.level.elements = {}
         if self.real:
             db.query("DELETE FROM {}elements".format(db.prefix))
-            from omg.core import reallevel
+            from maestro.core import reallevel
             reallevel._dbIds = set()
 
 
@@ -88,7 +88,7 @@ class CreationTestCase(LevelTestCase):
         containerTags = tags.Storage({tags.TITLE: ['Weird album']})
         if self.real: # On real level createContainer does not work until we added the contents to the db
             self.assertEqual(0, db.query("SELECT COUNT(*) FROM {}elements".format(db.prefix)).getSingle())
-            from omg.core import reallevel
+            from maestro.core import reallevel
             self.assertEqual(reallevel._dbIds,set())
             self.level.addToDb([self.f1, self.f2, self.f3, self.f4])
             self.assertEqual(4, db.query("SELECT COUNT(*) FROM {}elements".format(db.prefix)).getSingle())

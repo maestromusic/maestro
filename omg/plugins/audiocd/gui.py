@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -20,12 +20,12 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
-from omg import config, logging
-from omg.core import levels, tags
-from omg.gui import dialogs, delegates, mainwindow, treeactions, treeview
-from omg.gui.delegates.abstractdelegate import *
-from omg.models import leveltreemodel, rootedtreemodel
-from omg.plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
+from ... import config, logging
+from ...core import levels, tags
+from ...gui import dialogs, delegates, mainwindow, treeactions, treeview
+from ...gui.delegates.abstractdelegate import *
+from ...models import leveltreemodel, rootedtreemodel
+from ...plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -300,14 +300,14 @@ class TagMapWidget(QtGui.QTableWidget):
 
     def __init__(self, newtags):
         super().__init__()
-        self.columns = [self.tr("Import"), self.tr("MusicBrainz Name"), self.tr("OMG Tag")]
+        self.columns = [self.tr("Import"), self.tr("MusicBrainz Name"), self.tr("Maestro Tag")]
         self.setColumnCount(len(self.columns))
         self.verticalHeader().hide()
         self.setHorizontalHeaderLabels(self.columns)
         self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
         self.setRowCount(len(newtags))
         self.tagMapping = mbplugin.tagMap.copy()
-        from omg.gui.tagwidgets import TagTypeBox
+        from ...gui.tagwidgets import TagTypeBox
 
         for row, tagname in enumerate(newtags):
 
@@ -366,10 +366,10 @@ class ImportAudioCDDialog(QtGui.QDialog):
 
         self.mbNode = elements.MBNode(release)
         self.release = release
-        self.omgModel = leveltreemodel.LevelTreeModel(level)
-        self.omgView = treeview.TreeView(level, affectGlobalSelection=False)
-        self.omgView.setModel(self.omgModel)
-        self.omgView.setItemDelegate(CDROMDelegate(self.omgView))
+        self.maestroModel = leveltreemodel.LevelTreeModel(level)
+        self.maestroView = treeview.TreeView(level, affectGlobalSelection=False)
+        self.maestroView.setModel(self.maestroModel)
+        self.maestroView.setItemDelegate(CDROMDelegate(self.maestroView))
 
         # collect alias entities in this release
         entities = set()
@@ -402,7 +402,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         lay = QtGui.QVBoxLayout()
         topLayout = QtGui.QHBoxLayout()
         topLayout.addLayout(configLayout)
-        topLayout.addWidget(self.omgView)
+        topLayout.addWidget(self.maestroView)
         lay.addLayout(topLayout, stretch=5)
         lay.addWidget(QtGui.QLabel(self.tr("Alias handling:")))
         lay.addWidget(self.aliasWidget, stretch=2)
@@ -414,20 +414,20 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.resize(mainwindow.mainWindow.size() * 0.9)
 
     def makeElements(self):
-        self.omgModel.clear()
+        self.maestroModel.clear()
         self.level.removeElements(list(self.level.elements.values()))
         elemConfig = elements.ElementConfiguration(self.newTagWidget.tagMapping)
         elemConfig.searchRelease = self.searchReleaseBox.isChecked()
         elemConfig.mediumContainer = self.mediumContainerBox.isChecked()
         elemConfig.forceMediumContainer = self.forceBox.isChecked()
         self.container = self.release.makeElements(self.level, elemConfig)
-        self.omgModel.insertElements(self.omgModel.root, 0, [self.container])
-        self.omgView.expandAll()
+        self.maestroModel.insertElements(self.maestroModel.root, 0, [self.container])
+        self.maestroView.expandAll()
 
     def finalize(self):
         mbplugin.updateDBAliases(self.aliasWidget.activeEntities())
-        for mbname, omgtag in self.newTagWidget.tagMapping.items():
-            config.storage.musicbrainz.tagmap[mbname] = omgtag.name if omgtag else None
+        for mbname, maestroTag in self.newTagWidget.tagMapping.items():
+            config.storage.musicbrainz.tagmap[mbname] = maestroTag.name if maestroTag else None
         self.level.commit()
         self.accept()
                 

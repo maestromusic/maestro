@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -19,9 +19,9 @@
 from functools import reduce
 from collections import namedtuple
 
-from omg.core import elements, nodes, tags, domains
-from omg import logging, config
-from omg.core.nodes import Wrapper
+from ...core import elements, nodes, tags, domains
+from .. import logging, config
+from ...core.nodes import Wrapper
 
 from .xmlapi import AliasEntity, MBTagStorage, query
 
@@ -64,7 +64,7 @@ class MBNode(nodes.Node):
         
 
 class MBTreeElement:
-    """An item in a tree of MusicBrainz entities (as opposed to OMG elements).
+    """An item in a tree of MusicBrainz entities (as opposed to Maestro elements).
     
     Attributes:
         mbid (str): The MusicBrainz ID. What kind of entity this ID refers to is not fixed.
@@ -72,7 +72,7 @@ class MBTreeElement:
         children (dict): Mapping position to child MBelement.
         parent (MBTreeElement): The parent element, if exists.
         position (int): Position
-        ignore (bool): Whether the element should be ignored when creating OMG elements
+        ignore (bool): Whether the element should be ignored when creating Maestro elements
     """
     def __init__(self, mbid):
         self.mbid = mbid
@@ -112,7 +112,7 @@ class MBTreeElement:
             #yield from child.walk() py3.3 version
     
     def makeElements(self, level, conf):
-        """Creates a tree of OMG elements resembling the calling :class:`MBTreeElement`.
+        """Creates a tree of Maestro elements resembling the calling :class:`MBTreeElement`.
 
         :param levels.Level level: Level in which to create the elements.
         :param ELementConfiguration conf: Configuration influencing the creation.
@@ -127,8 +127,8 @@ class MBTreeElement:
             return 'title' not in mediumChild.tags
         if conf.searchRelease and isinstance(self, Release) and tags.isInDb('musicbrainz_albumid'):
             albumid = self.mbid
-            from omg import search
-            from omg.search.criteria import TagCriterion
+            from ... import search
+            from ...search.criteria import TagCriterion
             tag = tags.get('musicbrainz_albumid')
             criterion = TagCriterion(value=albumid, tagList=[tag])
             search.search(criterion)
@@ -154,7 +154,7 @@ class MBTreeElement:
                         pos = mediumPos
                     level.insertContents(releaseElem, [(pos, mediumChild.makeElements(level, conf))])
                 return releaseElem
-        elTags = self.tags.asOMGTags(conf.tagMap)
+        elTags = self.tags.asMaestroTags(conf.tagMap)
         elTags.add(*self.idTag())
         if isinstance(self, Recording):
             elem = level.collect(self.backendUrl)

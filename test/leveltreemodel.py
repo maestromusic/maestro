@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,7 +21,7 @@
 import sys, unittest, os.path
 sys.path.insert(0,os.path.normpath(os.path.join(os.getcwd(),os.path.dirname(__file__),'../')))
 
-from omg import application, config, database as db, utils
+from maestro import application, config, database as db, utils
 from testlevel import *
 
 
@@ -86,7 +86,7 @@ class InsertTestCase(LevelTestCase):
     
 if __name__ == "__main__":
     application.init(exitPoint='noplugins')
-    from omg.models import leveltreemodel
+    from maestro.models import leveltreemodel
 
     level = TestLevel()
     level.addContainer('A')

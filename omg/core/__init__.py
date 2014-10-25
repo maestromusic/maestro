@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2012-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,5 +16,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""The *core* package contains modules for the core concepts of OMG: Tags, Flags, Elements, Nodes,
+"""The *core* package contains modules for the core concepts of Maestro: Tags, Flags, Elements, Nodes,
 and Levels."""

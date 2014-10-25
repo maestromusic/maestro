@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,8 +18,8 @@
 
 import unittest
 
-from omg.search import criteria
-from omg.search.criteria import *
+from maestro.search import criteria
+from maestro.search.criteria import *
 
 
 # These first test strings are only used to check criteria.parseToWords
@@ -114,12 +114,12 @@ class ParseToWordsTest(unittest.TestCase):
 class ParseWordsTest(unittest.TestCase):
     """Test criteria.parseWords."""
     def setUp(self):
-        from omg.core import flags
+        from maestro.core import flags
         flags.addFlagType('testflag')
         _setupWords()
         
     def tearDown(self):
-        from omg.core import flags
+        from maestro.core import flags
         flags.deleteFlagType(flags.get('testflag'))
         
     def runTest(self):

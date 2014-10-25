@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,7 +21,7 @@ import logging
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt 
 
-from ... import logging as omglogging
+from ... import logging as maestrologging
 from ...gui import mainwindow
 
 _signaller = None
@@ -33,7 +33,7 @@ def enable():
     mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "loggerdock",
         name = QtGui.QApplication.translate("LoggerDock","Logger"),
-        icon = QtGui.QIcon(":/omg/plugins/loggerdock/loggerdock.png"),
+        icon = QtGui.QIcon(":/maestro/plugins/loggerdock/loggerdock.png"),
         theClass = LoggerDock,
         preferredDockArea = 'bottom'))
 
@@ -71,7 +71,7 @@ class LoggerDock(mainwindow.Widget):
         self.handler = logging.StreamHandler(_signaller)
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         self.handler.setFormatter(formatter)
-        omglogging.addHandler(self.handler)
+        maestrologging.addHandler(self.handler)
         dropdown.activated[str].connect(
                                 lambda levelStr : self.handler.setLevel(getattr(logging, levelStr.upper())))
         self.handler.setLevel(logging.DEBUG)

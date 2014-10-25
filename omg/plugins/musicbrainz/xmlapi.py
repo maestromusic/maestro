@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -21,12 +21,11 @@ import urllib.error
 
 from lxml import etree
 
-from omg import config, database as db
-from omg.core import elements, tags
-from omg.core.elements import TYPE_ALBUM
-from omg.utils import FlexiDate
-from omg.filebackends import BackendURL
-from omg import logging
+from ... import config, database as db, logging
+from ...core import elements, tags
+from ...core.elements import TYPE_ALBUM
+from ...utils import FlexiDate
+from ...filebackends import BackendURL
 
 from . import plugin as mbplugin
 
@@ -89,10 +88,10 @@ class MBTagStorage(dict):
         else:
             self[key] = [value]
             
-    def asOMGTags(self, mapping=None):
-        """Convert the MBTagStorage to an omg.tags.Storage object.
+    def asMaestroTags(self, mapping=None):
+        """Convert the MBTagStorage to an maestro.tags.Storage object.
         
-        *mapping* may be a dict mapping strings to OMG tag types.
+        *mapping* may be a dict mapping strings to Maestro tag types.
         """
         ret = tags.Storage()
         for key, values in self.items():

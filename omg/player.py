@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -29,10 +29,10 @@ profileCategory = profiles.TypedProfileCategory(
     title = translate('PlayerBackend','Playback'),
     storageOption = config.getOption(config.storage, 'player.profiles'),
     description = translate("PlayerBackend",
-                            "OMG can control more than one audio backend. To easily switch between them, "
-                            "their configuration is stored in profiles."),
-    iconPath = ':omg/icons/preferences/audiobackends_small.png',
-    pixmapPath = ':omg/icons/preferences/audiobackends.png',
+                    "Maestro can control more than one audio backend. To easily switch between them, "
+                    "their configuration is stored in profiles."),
+    iconPath = ':maestro/icons/preferences/audiobackends_small.png',
+    pixmapPath = ':maestro/icons/preferences/audiobackends.png',
     saveImmediately=False)
 profiles.manager.addCategory(profileCategory)
 

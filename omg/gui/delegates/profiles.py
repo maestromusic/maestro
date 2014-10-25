@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2012-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -41,8 +41,8 @@ category = DelegateProfileCategory(
        storageOption = config.getOption(config.storage, 'gui.delegates'),
        description = translate("Delegates",
                 "Configure how elements are rendered in treeviews like browser, editor and playlist."),
-       iconPath = ':omg/icons/preferences/delegates_small.png',
-       pixmapPath = ':omg/icons/preferences/delegates.png'
+       iconPath = ':maestro/icons/preferences/delegates_small.png',
+       pixmapPath = ':maestro/icons/preferences/delegates.png'
 )
                                    
 profiles.manager.addCategory(category)

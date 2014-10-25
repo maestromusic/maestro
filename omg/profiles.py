@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2012-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-"""This module provides a system to manage configuration profiles in OMG. Profiles are organized in
+"""This module provides a system to manage configuration profiles in Maestro. Profiles are organized in
 categories (e.g. delegates, playback). Profiles of one category may have different types (e.g. MPD
 playback, Phonon playback). Profiles and types are managed by their category. Categories are
 managed by the ProfileManager.""" 

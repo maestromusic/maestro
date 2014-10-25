@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -28,7 +28,7 @@ except ImportError:
 import pkg_resources
 mpd_version = [ int(x) for x in pkg_resources.get_distribution("python-mpd2").version.split(".")]
 if mpd_version < [0,5,1]:
-    raise ImportError("The installed version of python-mpd2 is too old. OMG needs at least "
+    raise ImportError("The installed version of python-mpd2 is too old. Maestro needs at least "
                       "python-mpd2-0.5.1 to function properly.")
 
 from PyQt4 import QtCore, QtGui
@@ -68,7 +68,7 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     The playlist, as reported by MPD, is stored in the attribute *mpdPlaylist" by means of a list
     of strings (paths relative to MPD collection folder). The backend keeps this in sync with MPD,
-    updating it whenever a change is reported by MPD (via the idle command), or the OMG user issues
+    updating it whenever a change is reported by MPD (via the idle command), or the Maestro user issues
     a playlist modification.
     """
     
@@ -137,7 +137,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         player.profileCategory.profileChanged.emit(self)
         
     def setPath(self, path):
-        """Change the path where OMG believes the MPD music folder to be."""
+        """Change the path where Maestro believes the MPD music folder to be."""
         if path != self.path:
             self.path = path
             player.profileCategory.profileChanged.emit(self)
@@ -227,7 +227,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         All changes will be handled accordingly. If """
         self.mpdStatus = self.client.status()
         if 'error' in self.mpdStatus:
-            from omg.gui.dialogs import warning
+            from ...gui.dialogs import warning
             warning('MPD error',
                     self.tr('MPD reported an error:\n{}').format(self.mpdStatus['error']))
             self.client.clearerror()
@@ -449,7 +449,7 @@ class MPDPlayerBackend(player.PlayerBackend):
                 client.update()
     
     def makeUrls(self, paths):
-        """Create OMG URLs for the given paths reported by MPD.
+        """Create Maestro URLs for the given paths reported by MPD.
         
         If an MPD path has the form of a non-default URL (i.e. proto://path), it is tried to load
         an appropriate URL using BackendURL.fromString().

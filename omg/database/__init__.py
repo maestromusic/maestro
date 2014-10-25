@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -20,38 +20,20 @@
 The database module establishes the database connection and provides many functions to fetch data.
 
 The actual database drivers which connect to the database using a third party connector can be found in the
-SQL package. The definitions of OMG's tables can be found in the tables-module.
+SQL package. The definitions of Maestro's tables can be found in the tables-module.
 
 The easiest way to use this package is:
 
-    from omg import database as db
+    from maestro import database as db
     db.connect()
     db.query(...)
 
 or, if the connection was already established in another module:
 
-    from omg import database as db
+    from maestro import database as db
     db.query(...)
 
-
-**Threading**
-
-Each thread must have its own connection object. This module stores all connection objects and methods like
-'query' automatically choose the correct connection. However you have to initialize the connection for
-each thread and use a 'with' statement to ensure the connection is finally closed again. Typically the
-'run'-method of your thread will look like this:
-
-    from omg import database as db
-    
-    class MyThread(threading.Thread):
-        def run(self):
-            with db.connect():
-                # Do stuff in your thread and use the database module as usual:
-                db.query(...) # These methods will use the connection of your thread
-                db.tags(...)
-            # Finally the thread's connection is closed by the context manager
-
-\ """
+"""
 
 import os, threading
 import sqlalchemy

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 #
 
 """
-This module controls the startup and finishing process of OMG. The init method may be used to initialize
-OMG's framework without starting a GUI.
+This module controls the startup and finishing process of Maestro. The init method may be used to initialize
+Maestro's framework without starting a GUI.
 """
 
 import sys, os, fcntl, getopt
@@ -26,7 +26,7 @@ import sys, os, fcntl, getopt
 from PyQt4 import QtCore, QtGui, QtNetwork
 from PyQt4.QtCore import Qt
 
-from omg import config, logging, constants
+from . import config, logging, constants
 
 logger = None # Will be set when logging is initialized
         
@@ -50,7 +50,7 @@ class ChangeEvent:
 
 
 class ModuleStateChangeEvent(ChangeEvent):
-    """Class for the event that the state of a module (a component of OMG) has changed.
+    """Class for the event that the state of a module (a component of Maestro) has changed.
     
     Possible states are "enabled", "initialized", "disabled".
     """
@@ -99,7 +99,7 @@ dispatcher = None
 class Splash(QtGui.QSplashScreen):
     """Splash screen showing a logo and the loading progress."""
     def __init__(self, message):
-        super().__init__(QtGui.QPixmap(":/omg/omg_splash.png"))
+        super().__init__(QtGui.QPixmap(":/maestro/omg_splash.png"))
         self.message = message
         
     def showMessage(self, message):
@@ -115,8 +115,8 @@ class Splash(QtGui.QSplashScreen):
         
     
 def run(cmdConfig=[], type='gui', exitPoint=None):
-    """This is the entry point of OMG. With the default arguments OMG will start the GUI. Use init if you
-    only want to initialize the framework without starting the GUI.
+    """This is the entry point of Maestro. With the default arguments Maestro will start the GUI. Use init
+    if you only want to initialize the framework without starting the GUI.
     
     *cmdConfig* is a list of options given on the command line that will
     overwrite the corresponding option from the file or the default. Each list item has to be a string like
@@ -142,12 +142,12 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
-    app.setApplicationName("OMG")
+    app.setApplicationName("Maestro")
     app.setApplicationVersion(constants.VERSION)
 
     from . import resources
     if type == "gui":
-        splash = Splash("Loading OMG")
+        splash = Splash("Loading Maestro")
         splash.show()
         app.processEvents()
         
@@ -172,7 +172,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     if exitPoint == 'config':
         return app
     
-    # Lock the lockfile to prevent a second OMG-instance from starting.
+    # Lock the lockfile to prevent a second Maestro-instance from starting.
     if type == 'gui':
         lock()
     
@@ -198,7 +198,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
             runInstaller()
             
     if type == 'test':
-        from omg.database import tables
+        from .database import tables
         for table in tables.tables:
             table.create()
             
@@ -246,8 +246,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     search.init()
     covers.init()
     
-    import omg.filebackends.filesystem
-    omg.filebackends.filesystem.init()
+    from .filebackends import filesystem
+    filesystem.init()
     
     global network
     network = QtNetwork.QNetworkAccessManager()
@@ -309,7 +309,7 @@ def handleCommandLineOptions(cmdConfig):
 
     for opt,arg in opts:
         if opt in ('-v','-V', '--version'):
-            print('This is OMG version {}. Nice to meet you.'.format(constants.VERSION))
+            print('This is Maestro version {}. Nice to meet you.'.format(constants.VERSION))
             sys.exit(0)
         elif opt in ('-c','--config'):
             cmdConfig.append(arg)
@@ -338,7 +338,7 @@ def lock():
     
     
 def loadTranslators(app,logger):
-    """Load a translator for Qt's strings and one for OMG's strings."""
+    """Load a translator for Qt's strings and one for Maestro's strings."""
     from . import translations
     # Try up to two different locales
     for translator in _translators:
@@ -364,9 +364,9 @@ def loadTranslators(app,logger):
 
     # Load a translator for our strings
     translator = QtCore.QTranslator(app)
-    translatorDir = os.path.join(":omg/i18n")
+    translatorDir = os.path.join(":maestro/i18n")
     for locale in locales:
-        translatorFile = 'omg.'+locale
+        translatorFile = 'maestro.'+locale
         if translator.load(translatorFile,translatorDir):
             app.installTranslator(translator)
             _translators.append(translator)
@@ -376,12 +376,12 @@ def loadTranslators(app,logger):
 
 
 def init(cmdConfig=[],type='console',exitPoint='noplugins'):
-    """Initialize OMG's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
+    """Initialize Maestro's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
     terminal:
 
-        >>> from omg import application
+        >>> from maestro import application
         >>> application.init()
-        >>> from omg.core import tags
+        >>> from maestro.core import tags
         >>> tags.tagList
         ["title", "artist", "album", ...]
     
@@ -392,18 +392,18 @@ def init(cmdConfig=[],type='console',exitPoint='noplugins'):
 
 
 def executeEntryPoint(name, category='gui_scripts'):
-    """Replace this process by a new one, running one of OMG's entrypoints. *category* and *name* specify
+    """Replace this process by a new one, running one of Maestro's entrypoints. *category* and *name* specify
     the entrypoint, see setup.py."""
     os.execl(sys.executable, os.path.basename(sys.executable), "-c",
         "import sys, pkg_resources;"
-        "sys.exit(pkg_resources.load_entry_point('omg=={}', '{}', '{}')())"
+        "sys.exit(pkg_resources.load_entry_point('maestro=={}', '{}', '{}')())"
             .format(constants.VERSION, category, name)
         )
 
 
 def runInstaller():
     """Run the graphical installer."""
-    executeEntryPoint('omgsetup')
+    executeEntryPoint('maestrosetup')
             
     
 if __name__ == "__main__":

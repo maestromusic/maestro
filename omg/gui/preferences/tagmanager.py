@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@ from ...core import tags
 from .. import tagwidgets, dialogs, misc
 from ..misc import iconbuttonbar
 
-CUSTOM_MIME = 'application/x-omgtagtype'
+CUSTOM_MIME = 'application/x-maestrotagtype'
 
     
 class TagManager(QtGui.QWidget):
@@ -350,7 +350,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         is in the given *row* (depends on current sorting)."""
         # Choose a sensible directory as starting point
         from ..misc import iconchooser
-        result = iconchooser.IconChooser.getIcon([':omg/tags', ':omg/flags'], tag.iconPath, self)
+        result = iconchooser.IconChooser.getIcon([':maestro/tags', ':maestro/flags'], tag.iconPath, self)
         
         if result and result[1] != tag.iconPath:
             self._setIcon(row, tag, result[1])

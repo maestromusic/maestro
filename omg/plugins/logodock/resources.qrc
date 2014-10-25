@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/omg/plugins/logodock">
+    <qresource prefix="/maestro/plugins/logodock">
         <file>omg.png</file>
     </qresource>
 </RCC>

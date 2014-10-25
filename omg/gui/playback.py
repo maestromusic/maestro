@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ from .preferences import profiles as profilesgui
 from .. import player, utils
 from ..core import levels, stickers
 
-renderer = QtSvg.QSvgRenderer(":omg/playback.svg")
+renderer = QtSvg.QSvgRenderer(":maestro/playback.svg")
 ICON_SIZE = 16
 
 

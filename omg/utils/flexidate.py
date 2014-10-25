@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -25,18 +25,17 @@ from . import strings
 
 class FlexiDate:
     """A FlexiDate is a date which can store a date consisting simply of a year or of a year and a month or
-    of year, month and day. OMG uses this class to store tags of type date, where most users will only
+    of year, month and day. Maestro uses this class to store tags of type date, where most users will only
     specify a year, but some may give month and day, too.
 
     Note that while MySQL's DATE type can store dates where day and month may be unspecified, neither
     datetime.date nor QDate can. Thus binding FlexiDates to SQL-queries does not work. For this reason
-    FlexiDates are stored as integers in the DB (confer :meth:`FlexiDate.toSql` and
-    :meth:`FlexiDate.fromSql`).
+    FlexiDates are stored as integers in the DB (confer FlexiDate.toSql and FlexiDate.fromSql).
 
-    The parameters may be anything that can be converted to :func:`int`. *month* and *day* may also be
-    ``None``. If *month* or *day* are 0 or ``None`` they are regarded as unspecified. Note that you must not
-    give a nonzero *day* if *month* is zero or ``None``. This method raises a :exc:`ValueError` if 
-    conversion to :func:`int` fails or if the date is invalid (confer :class:`datetime.date`).
+    The parameters may be anything that can be converted to int. *month* and *day* may also be None.
+    If *month* or *day* are 0 or None they are regarded as unspecified. Note that you must not
+    give a nonzero *day* if *month* is zero or None. This method raises a ValueError if 
+    conversion to int fails or if the date is invalid (confer datetime.date).
     """
     def __init__(self, year, month=None, day=None):
         self.year = int(year)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -38,11 +38,11 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 # This script tries to include as few modules as possible
-from omg import config, logging, database as db
-from omg.application import loadTranslators
-from omg.core.tags import isValidTagName
-from omg.core.domains import isValidName as isValidDomainName
-from omg.gui import flexform
+from maestro import config, logging, database as db
+from maestro.application import loadTranslators
+from maestro.core.tags import isValidTagName
+from maestro.core.domains import isValidName as isValidDomainName
+from maestro.gui import flexform
 
 logger = logging.getLogger("Install tool")
 
@@ -68,7 +68,7 @@ class InstallToolWindow(QtGui.QWidget):
         logging.init()
         
         loadTranslators(app, logger)
-        self.setWindowTitle(self.tr("OMG Install Tool"))
+        self.setWindowTitle(self.tr("Maestro Install Tool"))
         self.resize(630, 550)
         self.move(QtGui.QApplication.desktop().screen().rect().center() - self.rect().center())
         
@@ -120,12 +120,12 @@ class InstallToolWindow(QtGui.QWidget):
         else: self.nextButton.setText(self.tr("Next"))
     
     def finish(self):
-        """Write config file, close the install tool and start OMG."""
+        """Write config file, close the install tool and start Maestro."""
         # Write config values
         config.shutdown()
-        logger.info("Install tool finished. Ready to start OMG.")
-        from omg.application import executeEntryPoint
-        executeEntryPoint('omg')
+        logger.info("Install tool finished. Ready to start Maestro.")
+        from maestro.application import executeEntryPoint
+        executeEntryPoint('maestro')
     
     def _handlePrevButton(self):
         """Handle the previous button."""
@@ -219,7 +219,7 @@ class LanguageWidget(SettingsWidget):
         # Update the texts which already have been translated
         self.installTool.nextButton.setText(self.tr("Next"))
         self.installTool.prevButton.setText(self.tr("Previous"))
-        self.installTool.setWindowTitle(self.tr("OMG Install Tool"))
+        self.installTool.setWindowTitle(self.tr("Maestro Install Tool"))
         self.installTool.createOtherWidgets()
         return True
 
@@ -342,7 +342,7 @@ class DomainWidget(SettingsWidget):
         super().__init__(installTool, titleNumber)
         self.setTitle(self.tr("Domain settings"))
         self.setText(self.tr(
-            "OMG separates different types of media into domains like \"Music\", \"Movies\".\n"
+            "Maestro separates different types of media into domains like \"Music\", \"Movies\".\n"
             "Enable / create one or more domains that you want to use."
             ))
         
@@ -483,7 +483,7 @@ class TagWidget(SettingsWidget):
         self.tableWidget.setItem(row, column, item)
         
         column = self._getColumnIndex('icon')
-        label = IconLabel(':omg/tags/{}.png'.format(name))
+        label = IconLabel(':maestro/tags/{}.png'.format(name))
         self.tableWidget.setIndexWidget(self.tableWidget.model().index(row, column), label)
         
         column = self._getColumnIndex('private')
@@ -572,7 +572,7 @@ class AudioWidget(SettingsWidget):
         super().__init__(installTool, titleNumber)
         self.setTitle(self.tr("Audio settings"))
         self.setText(self.tr(
-            "OMG can play music using various backends. All of them require third-party libraries "
+            "Maestro can play music using various backends. All of them require third-party libraries "
             "to be installed and a plugin to be enabled. "
             "Please choose the backends that you want to enable."))
         
@@ -619,7 +619,7 @@ class AudioWidget(SettingsWidget):
         
 def getIcon(name):
     """Return a QIcon for the icon with the given name."""
-    return QtGui.QIcon(":omg/icons/" + name)
+    return QtGui.QIcon(":maestro/icons/" + name)
 
 
 class IconLabel(QtGui.QLabel):
@@ -654,8 +654,8 @@ class IconLabel(QtGui.QLabel):
         menu.exec_(event.globalPos())
         
     def mouseDoubleClickEvent(self, event):
-        from omg.gui.misc import iconchooser
-        result = iconchooser.IconChooser.getIcon([':omg/tags'], self)
+        from maestro.gui.misc import iconchooser
+        result = iconchooser.IconChooser.getIcon([':maestro/tags'], self)
         if result:
             self.setPath(result[1])
 
@@ -663,7 +663,7 @@ def run():
     """Run the install tool."""
     global app
     app = QtGui.QApplication([])
-    from omg import resources
+    from maestro import resources
     widget = InstallToolWindow()
     widget.show()
     app.exec_()

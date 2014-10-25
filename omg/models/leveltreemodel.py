@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -58,7 +58,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         else: return defaultFlags | Qt.ItemIsDropEnabled
         
     def dropMimeData(self, mimeData, action, row, column, parentIndex):
-        """Drop stuff into a leveltreemodel. Handles OMG mime and text/uri-list.
+        """Drop stuff into a leveltreemodel. Handles Maestro mime and text/uri-list.
         
         If URLs are dropped, they are loaded into the level. If there is an album guesser
         specified, it is run on the URLs before they are inserted.

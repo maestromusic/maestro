@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""This simple plugin adds a dock widget which displays OMG's logo. It played a major role during testing
-OMG's widget system."""
+"""This simple plugin adds a dock widget which displays Maestro's logo. It played a major role during testing
+Maestro's widget system."""
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -29,8 +29,8 @@ from ...gui import mainwindow
 def enable():
     mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "logodock",
-        name = QtGui.QApplication.translate("LogoDock","Logo"),
-        icon = QtGui.QIcon(":/omg/plugins/logodock/omg.png"),
+        name = QtGui.QApplication.translate("LogoDock", "Logo"),
+        icon = QtGui.QIcon(":/maestro/plugins/logodock/omg.png"),
         theClass = LogoDock,
         areas = 'dock',
         preferredDockArea = 'right'))
@@ -45,7 +45,7 @@ class LogoDock(mainwindow.Widget):
         super().__init__(**args)
         layout = QtGui.QHBoxLayout(self)
         label = QtGui.QLabel()
-        label.setPixmap(QtGui.QPixmap(':/omg/omg.png'))
+        label.setPixmap(QtGui.QPixmap(':/maestro/omg.png'))
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)
 

@@ -1,6 +1,6 @@
 <RCC>
-    <qresource prefix="/omg/i18n">
-        <file>omg.de.qm</file>
-        <file>omg.en.qm</file>
+    <qresource prefix="/maestro/i18n">
+        <file>maestro.de.qm</file>
+        <file>maestro.en.qm</file>
     </qresource>
 </RCC>

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -227,7 +227,7 @@ class RemoveFromParentAction(TreeAction):
 class DeleteAction(TreeAction):
     """Action to delete elements from the database and/or filesystem.
 
-    When the selected elements contain files, after the deletion from OMG's database a dialog is
+    When the selected elements contain files, after the deletion from Maestro's database a dialog is
     displayed that asks the user if the files should also be deleted from disk.
 
     In the special case that an "intermediate container" (i.e., container with a parent container)
@@ -284,7 +284,7 @@ class DeleteDialog(QtGui.QDialog):
         self.resize(400,300)
         layout = QtGui.QVBoxLayout(self)
         label = QtGui.QLabel(
-                             self.tr("You have deleted the following %n file(s) from OMG. "
+                             self.tr("You have deleted the following %n file(s) from Maestro. "
                                      "Do you want them deleted completely?<br />\n"
                                      "<b>This cannot be reversed!</b>",
                                      '', len(files)))
@@ -404,7 +404,7 @@ class ChangePositionAction(TreeAction):
         try:
             self.level().shiftPositions(parent, positions, 1 if self.mode == "+1" else -1)
         except levels.ConsistencyError as e:
-            from omg.gui.dialogs import warning
+            from .dialogs import warning
             warning(self.tr('error'), str(e))
 
 

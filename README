@@ -1,20 +1,20 @@
 README
 ============
-OMG is a sophisticated music manager that helps you to organize, browse and play your digital music collection.
+Maestro is a sophisticated music manager that helps you to organize, browse and play your digital music collection.
 
-More information can be found on OMG's website http://omg.mathematik.uni-kl.de
+More information can be found on Maestro website https://github.com/maestromusic/maestro
 
-OMG is copyright of Martin Altmayer <martin.altmayer@web.de> and Michael Helmling <helmling@mathematik.uni-kl.de> and licensed under the GPL v3 (confer the file COPYING).
+Maestro is copyright of Martin Altmayer <martin.altmayer@web.de> and Michael Helmling <michaelhelmling@posteo.de> and licensed under the GPL v3 (confer the file COPYING).
 
 INSTALLATION
 ==============
 Run
 
-# easy_install3 omg
+# easy_install3 maestro
 
-If you want to install OMG as normal user inside your home directory, run
+If you want to install Maestro as normal user inside your home directory, run
 
-$ easy_install3 --user omg
+$ easy_install3 --user maestro
 
 The exact name of the "easy_install for python3" executable may differ on your system. If you have pip, you can also use that.
 
@@ -22,7 +22,7 @@ DEVELOPMENT
 =============
 To contribute in development, get the current HEAD from the git repository:
 
-git clone git://omg.mathematik.uni-kl.de/omg.git
+git clone https://github.com/maestromusic/maestro.git
 
 In order to get a working copy of the current development status, use the command
 
@@ -33,17 +33,17 @@ you use the "develop" mode instead in some directory which is not in your normal
 
 python setup.py develop -d ~/python-stage
 
-you can simultaneously work with an installed version of OMG.
+you can simultaneously work with an installed version of Maestro.
 
 
 
 ATTRIBUTIONS
 ==============
 
-OMG uses icons from the following software / free icon sets:
+Maestro uses icons from the following software / free icon sets:
 Tango       http://tango.freedesktop.org/            released as public domain.
 Silk        http://www.famfamfam.com/lab/icons/silk/ by Mark James licensed under CC BY 3.0.
 Fugue Icons http://p.yusukekamiyamane.com/           by Yusuke Kamiyamane licensed under CC BY 3.0.
 Amarok      http://amarok.kde.org/                   licensed under GPL v3.
 
-OMG uses some code (VolumeButton, TimeSlider) of Amarok 2.7.1 (http://amarok.kde.org/) licensed under GPL v3.
+Maestro uses some code (VolumeButton, TimeSlider) of Amarok 2.7.1 (http://amarok.kde.org/) licensed under GPL v3.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -40,7 +40,7 @@ def enable():
         id = "statistics",
         name = QtGui.QApplication.translate("Statistics", "Statistics"),
         theClass = StatisticsWidget,
-        icon = QtGui.QIcon(":/omg/plugins/statistics/statistics.png")
+        icon = QtGui.QIcon(":/maestro/plugins/statistics/statistics.png")
         ))
 
 

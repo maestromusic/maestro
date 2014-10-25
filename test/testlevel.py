@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,10 +18,10 @@
 
 import functools
 
-from omg.core import levels, tags
-from omg.core.elements import Container, File, Element
-from omg.core.nodes import Wrapper
-from omg import filebackends
+from maestro.core import levels, tags
+from maestro.core.elements import Container, File, Element
+from maestro.core.nodes import Wrapper
+from maestro import filebackends
 
 
 class TestLevel(levels.Level):

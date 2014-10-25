@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -99,7 +99,7 @@ def init():
     correct tags and their IDs. Raise a RuntimeError when tags cannot be fetched from the database correctly.
     """
     global TITLE, ALBUM, db
-    from omg import database as db
+    from .. import database as db
     
     if db.prefix+'tagids' not in db.listTables():
         logging.error(__name__, "tagids-table is missing")
@@ -378,7 +378,7 @@ class Tag:
 
 
 def isValidTagName(name):
-    """Return whether *name* is a valid tag name. OMG uses the restrictions imposed by the
+    """Return whether *name* is a valid tag name. Maestro uses the restrictions imposed by the
     Vorbis-specification: ASCII 0x20 through 0x7D, 0x3D ('=') excluded.
     Confer http://xiph.org/vorbis/doc/v-comment.html.
     
@@ -697,7 +697,7 @@ class TagTypeOrderChangeEvent(ChangeEvent):
 
 
 class TagValueList(list):
-    """List to store tags in a :class:`omg.tags.Storage`-object. The only difference to a usual python list
+    """List to store tags in a Storage-object. The only difference to a usual python list
     is that a TagValueList stores a reference to the Storage-object and will notify the storage if the list
     is empty. The storage will then remove the list.
     """
@@ -815,16 +815,15 @@ class Storage(dict):
         else: self.add(tag, newValue)
     
     def merge(self, other):
-        """Add all tags from *other* to this storage. *other* may be another :class:`omg.tags.Storage`
-        instance or a :func:`dict` mapping tags to value-lists. This method won't add already existing
-        values again.
+        """Add all tags from *other* to this storage. *other* may be another Storage-instance
+        or a dict mapping tags to value-lists. This method won't add already existing values again.
         """
         for tag, valueList in other.items():
             self.addUnique(tag, *valueList)
                 
     def removeTags(self, other):
-        """Remove all values from *other* from this storage. *other* may be another :class:`omg.tags.Storage`
-        instance or a :func:`dict` mapping tags to value-lists. If *other* contains tags and values which are
+        """Remove all values from *other* from this storage. *other* may be another Storage-instance
+        or a dict mapping tags to value-lists. If *other* contains tags and values which are
         not contained in this storage, they will be skipped.
         """
         for tag, valueList in other.items():

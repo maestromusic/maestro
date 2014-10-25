@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -31,8 +31,8 @@ from . import profiles
 
 class StandardDelegate(AbstractDelegate):
     """While still abstract, this class implements almost all of the features used by the usual delegates in
-    OMG. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default values
-    for these options."""
+    Maestro. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default
+    values for these options."""
     
     def layout(self,index,availableWidth):
         node = self.model.data(index)

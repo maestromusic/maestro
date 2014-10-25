@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -24,11 +24,11 @@ _staticImages = {}
 
 def icon(name):
     """Return a QIcon for the icon with the given name."""
-    return QtGui.QIcon(":omg/icons/" + name)
+    return QtGui.QIcon(":maestro/icons/" + name)
 
 def pixmap(name):
     """Return a QPixmap for the icon with the given name."""
-    return QtGui.QPixmap(":omg/icons/" + name)
+    return QtGui.QPixmap(":maestro/icons/" + name)
 
 
 def standardIcon(name):

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -209,9 +209,9 @@ class Selection:
 
 class MimeData(QtCore.QMimeData):
     """Subclass of QMimeData specialized to transport a tree of nodes. It supports two MimeTypes: The first
-    one is used internally by omg and stores the tree-structure. Its name is stored in the config variable 
-    "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the tree. This
-    type is used by applications like Amarok and Dolphin.
+    one is used internally by Maestro and stores the tree-structure. Its name is stored in the config 
+    variable "gui->mime". The second one is "text/uri-list" and contains a list of URLs to all files in the
+    tree. This type is used by applications like Amarok and Dolphin.
         
     Use the attribute 'level' to check whether the wrappers in the MimeData are on the level used by the
     widget/model where they are dropped. If not, they might contain elements that do not exist on the second

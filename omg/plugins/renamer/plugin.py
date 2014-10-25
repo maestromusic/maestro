@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -50,13 +50,13 @@ def enable():
     profiles.manager.addCategory(profileCategory)
     
     from .gui import RenameFilesAction
-    from omg.gui import editor, browser
+    from ...gui import editor, browser
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
 
 
 def disable():
-    from omg.gui import editor, browser
+    from ...gui import editor, browser
     from .gui import RenameFilesAction
     editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'renamer'),))
     browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)

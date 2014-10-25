@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  https://github.com/maestromusic/maestro
 # Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,11 +17,11 @@
 #
 
 from PyQt4 import QtCore, QtGui
-
-from omg import database as db
-from omg import config
-from omg.core import tags, domains
 translate = QtCore.QCoreApplication.translate
+
+from ... import database as db
+from ... import config
+from ...core import tags, domains
 
 def defaultStorage():
     return {"musicbrainz": {'tagmap': ({},),
@@ -56,11 +56,11 @@ def enable():
 
     global tagMap
     confMap = config.storage.musicbrainz.tagmap
-    for mbtag, omgname in confMap.items():
-        if omgname:
-            omgtag = tags.get(omgname)
-            if omgtag.isInDb():
-                tagMap[mbtag] = omgtag
+    for mbtag, maestroName in confMap.items():
+        if maestroName:
+            maestroTag = tags.get(maestroName)
+            if maestroTag.isInDb():
+                tagMap[mbtag] = maestroTag
         else:
             tagMap[mbtag] = None
     

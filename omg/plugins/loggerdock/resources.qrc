@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/omg/plugins/loggerdock">
+    <qresource prefix="/maestro/plugins/loggerdock">
         <file>loggerdock.png</file>
     </qresource>
 </RCC>

@@ -1,5 +1,5 @@
 NAME="Configeditor"
 AUTHOR="Michael Helmling"
 VERSION="0.0.1"
-DESCRIPTION="Provides a dialog to edit OMG's main configuration file."
-MINOMGVERSION="0.2.0"
+DESCRIPTION="Provides a dialog to edit Maestro's main configuration file."
+MINVERSION="0.2.0"
