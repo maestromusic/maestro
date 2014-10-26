@@ -23,7 +23,7 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import database as db, application, constants, config, utils
+from ... import database as db, application, constants, config, utils
 from ...gui import mainwindow
 from . import resources, checks
 
@@ -37,12 +37,7 @@ def enable():
     _action = QtGui.QAction(application.mainWindow)
     _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"))
     _action.triggered.connect(_openDialog)
-    mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "dbanalyzer",
-        name = QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
-        theClass = DBAnalyzer,
-        areas = 'central',
-        icon = QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png")))
+    mainwindow.addWidgetClass(_getWidgetClass())
 
 
 def mainWindowInit():
@@ -59,6 +54,15 @@ def defaultStorage():
             "size": (800,600),
             "pos": None # Position of the window as tuple or None to center the window
         }}
+    
+    
+def _getWidgetClass():
+    return mainwindow.WidgetClass(
+        id = "dbanalyzer",
+        name = QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
+        theClass = DBAnalyzer,
+        areas = 'central',
+        icon = QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
     
 
 class DBAnalyzer(mainwindow.Widget):
@@ -313,12 +317,12 @@ def _openDialog():
     
 class DBAnalyzerDialog(QtGui.QDialog):
     """A dialog containing a DBAnalyzer."""
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self):
+        super().__init__()
         self.setWindowTitle("Maestro version {} – Database Analyzer".format(constants.VERSION))
         self.setWindowIcon(QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
         layout = QtGui.QVBoxLayout(self)
-        analyzer = DBAnalyzer(dialog=True)
+        analyzer = DBAnalyzer(widgetClass=_getWidgetClass())
         layout.addWidget(analyzer)
         
         # TODO: use restoreGeometry
@@ -334,7 +338,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
 def run():
     """Run the DBAnalyzer as separate application."""
     app = application.init()
-    config.getFile(config.storage).loadPlugins(defaultStorage())
+    config.getFile(config.storage).addSections(defaultStorage())
         
     _openDialog()
     returnValue = app.exec_()

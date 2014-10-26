@@ -120,8 +120,8 @@ setup(name='maestro',
       extras_require={ 'mpd': ["python-mpd2>=0.5.3"] },
       entry_points={
           'gui_scripts': ['maestro = maestro.application:run',
-                           'maestrosetup = maestro.install:run',
-                           'maestrodbanalyzer = maestro.plugins.dbanalyzer.plugin:run'], 
+                          'maestro-setup = maestro.install:run',
+                          'maestro-dbanalyzer = maestro.plugins.dbanalyzer.plugin:run'], 
           },
       test_loader="test.testloader:TestLoader",
       test_suite="test.all"
