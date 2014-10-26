@@ -404,7 +404,3 @@ def executeEntryPoint(name, category='gui_scripts'):
 def runInstaller():
     """Run the graphical installer."""
     executeEntryPoint('maestro-setup')
-            
-    
-if __name__ == "__main__":
-    run()
