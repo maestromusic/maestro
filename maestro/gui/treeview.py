@@ -194,6 +194,9 @@ class TreeView(QtGui.QTreeView):
     
     def setModel(self, model):
         super().setModel(model)
+        from . import delegates
+        if isinstance(self.itemDelegate(), delegates.abstractdelegate.AbstractDelegate):
+            self.itemDelegate().model = model
         self.updateSelection()
     
     def focusInEvent(self, event):
