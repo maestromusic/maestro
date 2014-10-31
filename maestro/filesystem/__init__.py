@@ -74,7 +74,7 @@ def shutdown():
 class Source:
     def __init__(self, name, path, domain, enabled):
         self.name = name
-        self.path = path
+        self.path = os.path.normpath(path)
         if isinstance(domain, int):
             self.domain = domains.domainById(domain)
         else: self.domain = domain
@@ -88,13 +88,18 @@ class Source:
     
     def contains(self, path):
         path = os.path.normpath(path)
-        return path.startswith(os.path.normpath(self.path))
+        return path.startswith(self.path)
 
     def dirState(self, path):
         return 'unsynced'
 
     def fileState(self, path):
         return 'unsynced'
+    
+    def relPath(self, path):
+        """Return the relative path to this source's directory. *path* must be within this source
+        (see self.contains)."""
+        return os.path.normpath(path)[len(self.path):]
 
 
 def sourceByName(name):

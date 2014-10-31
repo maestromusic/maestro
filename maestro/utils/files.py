@@ -87,6 +87,24 @@ def collectAsList(urls):
     return itertools.chain.from_iterable(checkUrl(url) for url in urls)
 
 
+def splitPath(path, includeRoot=True):
+    """Split a path: '/home/maestro/Music' becomes ['/', 'home', 'maestro', 'Music']."""
+    components = []
+    while True:
+        basePath, c = os.path.split(path)
+        if basePath == '':
+            components.insert(0, c)
+            break
+        elif c == '':
+            if includeRoot:
+                components.insert(0, path)
+            break
+        else:
+            components.insert(0, c)
+            path = basePath
+    return components
+
+
 # 120 is a sensible max length, the real length is of course platform-dependent and not important.
 def makeFilePath(folder, fileName, forceAscii=False, maxLength=120):
     """Return a file path that is similar to os.path.join(folder,fileName), but

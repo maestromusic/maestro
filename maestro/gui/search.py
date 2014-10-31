@@ -136,6 +136,11 @@ class CriterionLineEdit(IconLineEdit):
         super().focusOutEvent(event)
         self._handleChange()
         
+    def setText(self, text):
+        if text != self.text():
+            super().setText(text)
+            self._handleChange()
+        
     def _handleChange(self):
         text = self.text().strip()
         try:
