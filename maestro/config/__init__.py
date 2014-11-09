@@ -121,7 +121,7 @@ def shutdown():
 configOptions = collections.OrderedDict((
 ("main", {
     "plugins": (list, [], "List of plugin names (i.e. the name of the corresponding directory in /maestro/plugins/."),
-    "music_extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "music file extensions")
+    "music_extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx", "wma"], "music file extensions")
 }),
     
 ("i18n", {
