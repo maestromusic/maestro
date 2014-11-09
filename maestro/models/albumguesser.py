@@ -155,7 +155,7 @@ class StandardGuesser(profiles.Profile):
                     children[i] = element.id
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
-                container = self.level.createContainer(domain = domain, tags=albumTags, 
+                container = self.level.createContainer(domain=domain, tags=albumTags,
                                                        flags=list(flags), type=TYPE_ALBUM,
                                                        contents=ContentList.fromPairs(children.items()))
                 self.orders[container] = self.orders[elements[0]]
@@ -189,7 +189,8 @@ class StandardGuesser(profiles.Profile):
             metaTags = tags.findCommonTags(contents.values())
             metaTags[tags.TITLE] = [key[1]]
             self.level.setTypes({album: TYPE_CONTAINER for album in contents.values()})
-            container = self.level.createContainer(tags=metaTags,
+            domain = next(iter(contents.values())).domain
+            container = self.level.createContainer(domain=domain, tags=metaTags,
                                                    contents=ContentList.fromPairs(contents.items()),
                                                    type=TYPE_ALBUM)
             self.orders[container] = self.orders[contents[min(contents)]]
