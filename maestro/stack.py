@@ -435,7 +435,7 @@ class Macro:
         if self.postMethod is not None:
             self.postMethod()
         if self.transaction:
-            self._transaction.commit()
+            self._transaction.close()
             self._transaction = None
         self.finished = True # after first redo, the macro is finished
     
