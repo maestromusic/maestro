@@ -124,7 +124,7 @@ class GrammarRenamer(profiles.Profile):
             state = {}
         if 'formatString' in state:
             self.formatString = state['formatString']
-        else: self.formatString = "<1.artist>/<1.title>/<#> - <title>"
+        else: self.formatString = "/tmp/<1.artist>/<1.title>/<#> - <title>"
         if 'replaceChars' in state:
             self.replaceChars = state['replaceChars']
         else: self.replaceChars = '\\:/'

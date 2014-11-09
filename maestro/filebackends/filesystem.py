@@ -154,7 +154,12 @@ class FileURL(BackendURL):
     
     def __init__(self, urlString):
         if not urlString.startswith('file://'):
-            assert os.path.isabs(urlString)
+            if not os.path.isabs(urlString):
+                absUrlString = os.path.abspath(urlString)
+                logging.warning(__name__,
+                                'converting non-absolute path "{}" to absolute form "{}"'
+                                .format(urlString, absUrlString))
+                urlString = absUrlString
             urlString = 'file://'+urlString
         super().__init__(urlString)
     
