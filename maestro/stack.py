@@ -464,7 +464,7 @@ class Macro:
             command.undo()
         if self.transaction:
             #This assumes that this macro has not been finished
-            self._transaction.rollback()
+            self._transaction.__exit__(RuntimeError, RuntimeError('transaction rolled back'), None)
             self._transaction = None
             
     def isEmpty(self):

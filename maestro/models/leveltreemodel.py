@@ -184,7 +184,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 filesByFolder[folder] = []
                 for file in filesInOneFolder:
                     if progress.wasCanceled():
-                        macro.abort()
+                        self.level.stack.abortMacro()
                         return []
                     progress.setValue(progress.value() + 1)
                     element = self.loadFile(file)
