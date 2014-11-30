@@ -25,6 +25,7 @@ translate = QtCore.QCoreApplication.translate
 from .. import application, filebackends, filesystem, utils, constants
 from . import mainwindow, selection, dockwidget, widgets
 from ..core import levels
+from ..filesystem import FilesystemState
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -41,24 +42,27 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     """
     
     folderIcons = {
-        'unsynced' : utils.getIcon("folder_unsynced.svg"),
-        'ok'       : utils.getIcon("folder_ok.svg"),
-        'nomusic'  : utils.getIcon("folder.svg"),
-        'unknown'  : utils.getIcon("folder_unknown.svg"),
-        'problem'  : utils.getIcon("folder_problem.svg") }
+        FilesystemState.unsynced : utils.getIcon("folder_unsynced.svg"),
+        FilesystemState.synced   : utils.getIcon("folder_ok.svg"),
+        FilesystemState.empty    : utils.getIcon("folder.svg"),
+        FilesystemState.unknown  : utils.getIcon("folder_unknown.svg"),
+        FilesystemState.problem  : utils.getIcon("folder_problem.svg") }
     
     fileIcons = {
-        'unsynced' : utils.getIcon("file_unsynced.svg"),
-        'ok'       : utils.getIcon("file_ok.svg"),
-        'unknown'  : utils.getIcon("file_unknown.svg"),
-        'problem'  : utils.getIcon("file_problem.svg") }
+        FilesystemState.unsynced : utils.getIcon("file_unsynced.svg"),
+        FilesystemState.synced   : utils.getIcon("file_ok.svg"),
+        FilesystemState.unknown  : utils.getIcon("file_unknown.svg"),
+        FilesystemState.problem  : utils.getIcon("file_problem.svg") }
     
     descriptions = {
-        'unsynced' : translate("FileSystemBrowserModel", "contains music which is not in Maestro's database"),
-        'ok'       : translate("FileSystemBrowserModel", "in sync with Maestro's database"),
-        'nomusic'  : translate("FileSystemBrowserModel", "does not contain music"),
-        'unknown'  : translate("FileSystemBrowserModel", "unknown status"),
-        'problem'  : translate("FileSystemBrowserModel", "in conflict with database") }
+        FilesystemState.unsynced : translate("FileSystemBrowserModel",
+                                             "contains files that are not in Maestro's database"),
+        FilesystemState.synced   : translate("FileSystemBrowserModel",
+                                             "in sync with Maestro's database"),
+        FilesystemState.empty    : translate("FileSystemBrowserModel",
+                                             "empty directory"),
+        FilesystemState.unknown  : translate("FileSystemBrowserModel", "unknown status"),
+        FilesystemState.problem  : translate("FileSystemBrowserModel", "in conflict with database") }
     
     def __init__(self, parent=None):
         QtGui.QFileSystemModel.__init__(self, parent)
@@ -90,7 +94,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 dirpath = info.absoluteFilePath()
                 if dirpath == '..':
                     return super().data(index, role)
-                status = self.source.dirState(dirpath)
+                status = self.source.folderState(dirpath)
                 if role == Qt.DecorationRole:
                     return self.folderIcons[status]
                 else:

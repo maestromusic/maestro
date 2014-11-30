@@ -170,7 +170,11 @@ class FileURL(BackendURL):
     def renamed(self, newPath):
         """Return a new FileURL with the given *newPath* as path."""
         return FileURL(newPath)
-    
+
+    @property
+    def directory(self):
+        return os.path.dirname(self.path)
+
     def toQUrl(self):
         """Return a QUrl from this URL. Return None if that is not possible (e.g. weird scheme)."""
         return QtCore.QUrl(str(self.parsedUrl))

@@ -36,6 +36,7 @@ or, if the connection was already established in another module:
 """
 
 import os, threading
+import datetime
 import sqlalchemy
 
 from .. import config, utils
@@ -186,6 +187,8 @@ def isNull(value):
     return value is None
 
 def getDate(value):
+    if isinstance(value, str):
+        value = datetime.datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
     return value.replace(tzinfo=datetime.timezone.utc)
 
 

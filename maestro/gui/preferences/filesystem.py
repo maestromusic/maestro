@@ -181,7 +181,7 @@ class FilesystemSettings(QtGui.QWidget):
         self.redoButton.setToolTip(self.tr("Redo: {}").format(stack.redoText()))
            
     def _handleRecheckButton(self):
-        if filesystem.enabled:
+        if filesystem.moduleEnabled:
             QtCore.QMetaObject.invokeMethod(filesystem.synchronizer,
                                             "recheck", Qt.QueuedConnection,
                                             QtCore.Q_ARG("QString", ""))
@@ -193,7 +193,7 @@ class FilesystemSettings(QtGui.QWidget):
             self.scanIntervalLabel.setText(self.scanIntervalText.format(val))
         config.options.filesystem.scan_interval = val
         return #TODO
-        if filesystem.enabled:
+        if filesystem.moduleEnabled:
             timer = filesystem.synchronizer.timer
             timer.stop()
             if val != 0:

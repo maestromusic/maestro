@@ -16,7 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, subprocess, hashlib, threading
+import os
+import threading
+import enum
 from os.path import basename, dirname, join, split
 from datetime import datetime, timezone, MINYEAR
 
@@ -34,12 +36,16 @@ logger = logging.getLogger(__name__)
 synchronizer = None
 sources = None
 
-enabled = False #TODO
+moduleEnabled = True #TODO
 
-NO_MUSIC = 0
-HAS_FILES = 1
-HAS_NEW_FILES = 2
-PROBLEM = 4
+
+class FilesystemState(enum.Enum):
+    empty = 0
+    synced = 1
+    unsynced = 2
+    unknown = 3
+    problem = 4
+
 
 def init():
     """Initialize file system watching.
@@ -47,19 +53,14 @@ def init():
     This will start a separate thread that repeatedly scans the music folder for changes.
     """
     global synchronizer, sources
-    import _strptime
     from . import identification
     # Create folders even if filesystem watching is disabled (for filesystembrowser etc.)
     sources = [Source(**data) for data in config.storage.filesystem.sources]
     sources.sort(key=lambda s: s.name)
-    #synchronizer = FileSystemSynchronizer()
-    #application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "enabled"))
-
-    
 
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
-    global synchronizer
+    global synchronizer, sources
     config.storage.filesystem.sources = [s.save() for s in sources]
     if synchronizer is not None:
         levels.real.filesystemDispatcher.disconnect(synchronizer.handleRealFileEvent)
@@ -68,6 +69,7 @@ def shutdown():
         synchronizer.wait()
         synchronizer = None
         application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "disabled"))
+    sources = None
     logger.debug("Filesystem module: shutdown complete")
 
 
@@ -77,9 +79,118 @@ class Source:
         self.path = path
         if isinstance(domain, int):
             self.domain = domains.domainById(domain)
-        else: self.domain = domain
+        else:
+            self.domain = domain
         self.enabled = enabled
-    
+        self.files = {}
+        self.folders = {}
+        self.loadFolders()
+        self.loadDBFiles()
+        self.loadNewFiles()
+
+    def loadFolders(self):
+        """Load the folders table from the database.
+
+        Creates the tree of Directory objects and initializes self.directories and
+        self.tableFolders.
+        """
+        for path, state in db.query("SELECT path, state FROM {p}folders WHERE path LIKE "
+                                    + "'{}%' ORDER BY LENGTH(path)".format(self.path)):
+            if path == self.path: # root folder first
+                folder = Folder(path=self.path, parent=None)
+            else:
+                parentName = os.path.split(path)[0]
+                parent = self.folders[parentName]
+                folder = Folder(path, parent)
+            folder.state = FilesystemState(state)
+            self.folders[folder.path] = folder
+
+    def loadDBFiles(self):
+        """Load files table.
+
+        Adds them to self.files and self.dbFiles, and to the Directory objects in memory.
+        It might happen that the folders table does not contain the directory of some DB file (e.g.
+        if Maestro was exited unexpectedly). In such a case the folders table is augmented by that
+        directory.
+
+        This method returns a list of Tracks (if any) which are in the files table but have no hash
+        set.
+        """
+        logger.debug('loading DB files for source {}'.format(self.path))
+        newDirectories = []
+        missingHashes = set()
+        ans = db.query("SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE "
+                       + "'{}%'".format('file://' + self.path)) #TODO: escape!!!!
+        for elid, urlstring, elhash, verified in ans:
+            url = BackendURL.fromString(urlstring)
+            if url.scheme != "file":
+                continue
+            file = File(url)
+            file.id = elid
+            if db.isNull(elhash) or elhash == "0":
+                missingHashes.add(file)
+            else:
+                file.hash = elhash
+            file.verified = db.getDate(verified)
+            file.state = FilesystemState.synced
+            self.files[url.path] = file
+            dir, newDirs = self.getFolder(url.directory)
+            dir.add(file)
+            newDirectories += newDirs
+        if len(newDirectories) > 0:
+            logger.debug("{} dirs with DBfiles but not in folders".format(len(newDirectories)))
+            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES (?,?)",
+                          [(dir.path, dir.state) for dir in newDirectories])
+        return missingHashes
+
+    def loadNewFiles(self):
+        """Load the newfiles table and add the tracks to self.tracks.
+
+        URLs from newfiles already contained in files are deleted.
+        """
+        toDelete = []
+        newDirectories = []
+        for urlstring, elhash, verified in db.query("SELECT url, hash, verified FROM {p}newfiles "
+            + "WHERE url LIKE '{}%'".format('file://' + self.path)):
+            file = File(BackendURL.fromString(urlstring))
+            if file.url.path in self.files:
+                logger.warning("url {} is BOTH n files and newfiles!".format(urlstring))
+                toDelete.append((urlstring,))
+                continue
+            file.hash = elhash
+            file.verified = db.getDate(verified)
+            file.state = FilesystemState.unsynced
+            self.files[file.url.path] = file
+            dir, newDirs = self.getFolder(file.url.directory)
+            dir = self.folders[file.url.directory]
+            dir.add(file)
+            newDirectories += newDirs
+        if len(toDelete) > 0:
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", toDelete)
+        if len(newDirectories):
+            logger.debug("{} dirs with files but not in folders".format(len(newDirectories)))
+            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES (?,?)",
+                          [(dir.path, dir.state) for dir in newDirectories])
+
+    def getFolder(self, path):
+        """Get a :class:`Folder` object for *path*.
+
+        If necessary, the path and potential parents are created and inserted into self.directories
+        (but not into the database). The result is a pair consisting of the requested Directory and
+        a list of newly created Directory objects.
+        When *storeNew* is True and new directories were created, they will be inserted into the
+        database. Otherwise the caller is responsible for that.
+        """
+        if path is None:
+            return None, []
+        if path in self.folders:
+            return self.folders[path], []
+        parentPath = None if path == '/' else split(path)[0]
+        parent, new = self.getFolder(parentPath)
+        dir = Folder(path, parent)
+        self.folders[path] = dir
+        return dir, new + [dir]
+
     def save(self):
         return {'name': self.name,
                 'path': self.path,
@@ -90,11 +201,15 @@ class Source:
         path = os.path.normpath(path)
         return path.startswith(os.path.normpath(self.path))
 
-    def dirState(self, path):
-        return 'unsynced'
+    def folderState(self, path):
+        if path in self.folders:
+            return self.folders[path].state
+        return FilesystemState.unknown
 
     def fileState(self, path):
-        return 'unsynced'
+        if path in self.files:
+            return self.files[path].state
+        return FilesystemState.unknown
 
 
 def sourceByName(name):
@@ -103,21 +218,25 @@ def sourceByName(name):
             return source
     else: return None
     
+
 def sourceByPath(path):
     for source in sources:
         if source.contains(path):
             return source
     else: return None
     
+
 def isValidSourceName(name):
     return name == name.strip() and 0 < len(name) <= 64
+
 
 def addSource(**data):
     source = Source(**data)
     stack.push(translate("Filesystem", "Add source"), 
                stack.Call(_addSource, source),
                stack.Call(_deleteSource, source))
-    
+
+
 def _addSource(source):
     sources.append(source)
     sources.sort(key=lambda s: s.name)
@@ -127,6 +246,7 @@ def deleteSource(source):
     stack.push(translate("Filesystem", "Delete source"),
                stack.Call(_deleteSource, source), 
                stack.Call(_addSource, source))
+
 
 def _deleteSource(source):
     sources.remove(source)
@@ -138,7 +258,8 @@ def changeSource(source, **data):
     stack.push(translate("Filesystem", "Change source"),
                stack.Call(_changeSource, source, data),
                stack.Call(_changeSource, source, oldData))
-    
+
+
 def _changeSource(source, data):
     for attr in ['name', 'path', 'domain', 'enabled']:
         if attr in data:
@@ -159,40 +280,55 @@ def getNewfileHash(url):
     
     If the hash is not known, returns None.
     """
-    if enabled:
+    if moduleEnabled:
         try:
             return synchronizer.tracks[url].hash
         except KeyError: pass
     return None
 
 
-class Track:
-    """A track represents a real audio file inside the music collection folder.
-    
-    It stores URL, directory, possibly the ID (or None if the track is not in the database),
-    and a *problem* flag if there is a synchronization problem with this track.
-    """
-    
+class File:
+
     def __init__(self, url):
         self.url = url
-        self.directory = None
-        self.id = self.lastChecked = self.hash = None
-        self.problem = False
-    
-    def simpleState(self):
-        """Return the state of this file as one of the strings "problem", "ok", "unsynced".
-        """
-        if self.problem:
-            return 'problem'
-        if self.id is not None:
-            return 'ok'
-        return 'unsynced'
-    
+        self.folder = None
+        self.id = None
+        self.lastChecked = None
+        self.hash = None
+        self.state = None
+
     def __str__(self):
         if self.id is not None:
-            return "DB Track[{}](url={})".format(self.id, self.url)
-        return ("New Track(url={})".format(self.url))
+            return "DB File[{}](url={})".format(self.id, self.url)
+        return "New File(url={})".format(self.url)
 
+
+class Folder:
+    """A folder inside a source.
+
+    This is used for efficient storing and updating of the folder state. A :class:`Folder` has lists
+    for subfolders and files, a pointer to the parent directory (*None* for the root), and a state
+    flag.
+    """
+
+    def __init__(self, path, parent):
+        """Create the Folder in *path*. *parent* is the parent Folder object (possibly None).
+
+        *path* is always a relative path. If a parent is given, the new directory is automatically
+        added to its subdirs.
+        """
+        self.parent = parent
+        self.path = path
+        self.files = []
+        self.subdirs = []
+        self.state = FilesystemState.unknown
+        if parent is not None:
+            parent.subdirs.append(self)
+
+    def add(self, file):
+        """Adds *track* to the list self.tracks and updates track.directory."""
+        file.folder = self
+        self.files.append(file)
 
 class Directory:
     """A directory inside the music collection directory.
