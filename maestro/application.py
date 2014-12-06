@@ -165,7 +165,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
         logger.error("Uncaught exception: {}\n{}"
                      .format(str(value), "\n".join(traceback.format_tb(tb))))
         sys.__excepthook__(type, value, tb)
-    sys.excepthook = exceptionHandler
+    # sys.excepthook = exceptionHandler
     
     logger.debug("START")
 

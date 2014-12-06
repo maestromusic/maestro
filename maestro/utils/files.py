@@ -29,9 +29,13 @@ def isMusicFile(path):
     return ext in config.options.main.music_extensions
 
 
-def mTimeStamp(url):
-    """Get the modification timestamp of a file given by *url* as UTC datetime."""
-    return datetime.datetime.fromtimestamp(os.path.getmtime(url.path),
+def mTimeStamp(file):
+    """Get the modification timestamp of *file* as UTC datetime. *file* might be either a BackendURL
+    or a path."""
+    from ..filebackends import BackendURL
+    if isinstance(file, BackendURL):
+        file = file.path
+    return datetime.datetime.fromtimestamp(os.path.getmtime(file),
                                            tz=datetime.timezone.utc).replace(microsecond=0)
 
 

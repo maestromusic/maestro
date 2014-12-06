@@ -16,14 +16,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import threading
+import multiprocessing, os, queue
 import enum
 from os.path import basename, dirname, join, split
 from datetime import datetime, timezone, MINYEAR
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
+from maestro.filesystem.identification import AcoustIDIdentifier
+
 translate = QtCore.QCoreApplication.translate
 
 from .. import application, logging, config, utils, database as db, stack, constants
@@ -46,6 +47,11 @@ class FilesystemState(enum.Enum):
     unknown = 3
     problem = 4
 
+class ScanState(enum.Enum):
+    notScanning = 0
+    initialScan = 1
+    computingHashes = 2
+
 
 def init():
     """Initialize file system watching.
@@ -57,6 +63,7 @@ def init():
     # Create folders even if filesystem watching is disabled (for filesystembrowser etc.)
     sources = [Source(**data) for data in config.storage.filesystem.sources]
     sources.sort(key=lambda s: s.name)
+
 
 def shutdown():
     """Terminates this module; waits for all threads to complete."""
@@ -84,9 +91,20 @@ class Source:
         self.enabled = enabled
         self.files = {}
         self.folders = {}
+        logger.debug('loading filesystem source {}'.format(self.name))
         self.loadFolders()
         self.loadDBFiles()
         self.loadNewFiles()
+        for folder in self.folders.values():
+            if folder.empty():
+                logger.debug('empty folder {} '.format(folder))
+        self.scanState = ScanState.notScanning
+        self.pool = multiprocessing.Pool(processes=1)
+        self.manager = multiprocessing.Manager()
+        self.scanTimer = QtCore.QTimer()
+        self.scanTimer.setInterval(200)
+        self.scanTimer.timeout.connect(self.checkScan)
+        QtCore.QTimer.singleShot(100, self.scan)
 
     def loadFolders(self):
         """Load the folders table from the database.
@@ -116,7 +134,6 @@ class Source:
         This method returns a list of Tracks (if any) which are in the files table but have no hash
         set.
         """
-        logger.debug('loading DB files for source {}'.format(self.path))
         newDirectories = []
         missingHashes = set()
         ans = db.query("SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE "
@@ -134,13 +151,8 @@ class Source:
             file.verified = db.getDate(verified)
             file.state = FilesystemState.synced
             self.files[url.path] = file
-            dir, newDirs = self.getFolder(url.directory)
+            dir, newDirs = self.getFolder(url.directory, storeNew=True)
             dir.add(file)
-            newDirectories += newDirs
-        if len(newDirectories) > 0:
-            logger.debug("{} dirs with DBfiles but not in folders".format(len(newDirectories)))
-            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES (?,?)",
-                          [(dir.path, dir.state) for dir in newDirectories])
         return missingHashes
 
     def loadNewFiles(self):
@@ -148,31 +160,24 @@ class Source:
 
         URLs from newfiles already contained in files are deleted.
         """
-        toDelete = []
         newDirectories = []
         for urlstring, elhash, verified in db.query("SELECT url, hash, verified FROM {p}newfiles "
-            + "WHERE url LIKE '{}%'".format('file://' + self.path)):
+            + "WHERE url LIKE '{}%'".format('file://' + self.path)): # TODO: escape path!!
             file = File(BackendURL.fromString(urlstring))
             if file.url.path in self.files:
                 logger.warning("url {} is BOTH n files and newfiles!".format(urlstring))
-                toDelete.append((urlstring,))
+                db.query('DELETE FROM {p}newfiles WHERE url=?', urlstring)
                 continue
             file.hash = elhash
             file.verified = db.getDate(verified)
             file.state = FilesystemState.unsynced
             self.files[file.url.path] = file
-            dir, newDirs = self.getFolder(file.url.directory)
+            dir, newDirs = self.getFolder(file.url.directory, storeNew=True)
             dir = self.folders[file.url.directory]
             dir.add(file)
             newDirectories += newDirs
-        if len(toDelete) > 0:
-            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", toDelete)
-        if len(newDirectories):
-            logger.debug("{} dirs with files but not in folders".format(len(newDirectories)))
-            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES (?,?)",
-                          [(dir.path, dir.state) for dir in newDirectories])
 
-    def getFolder(self, path):
+    def getFolder(self, path, storeNew=False):
         """Get a :class:`Folder` object for *path*.
 
         If necessary, the path and potential parents are created and inserted into self.directories
@@ -189,7 +194,112 @@ class Source:
         parent, new = self.getFolder(parentPath)
         dir = Folder(path, parent)
         self.folders[path] = dir
+        if storeNew:
+            self.storeFolders(new + [dir])
         return dir, new + [dir]
+
+    def storeFolders(self, folders):
+        """Insert the given list of :class:`Folder` objects into the folders table."""
+        if len(folders) > 0:
+            db.multiQuery("INSERT INTO {p}folders (path, state) VALUES(?,?)",
+                          [(dir.path, dir.state.value) for dir in folders])
+
+    def removeFiles(self, files):
+        removedFolders = []
+        urlstrings = []
+        for file in files:
+            folder = file.folder
+            folder.files.remove(file)
+            while folder.empty():
+                removedFolders.append((folder.path,))
+                del self.folders[folder.path]
+                if folder.parent:
+                    folder.parent.subdirs.remove(folder)
+                    folder = folder.parent
+                else:
+                    break
+            urlstrings.append((str(file.url),))
+            del self.files[file.url.path]
+        db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", urlstrings)
+        db.multiQuery('DELETE FROM {p}folders WHERE path=?', removedFolders)
+
+    def scan(self):
+        """Initiates a filesystem scan in order to synchronize OMG's database with the real
+        filesystem layout."""
+        self.scanResult = self.pool.apply_async(readFilesystem, args=(self.path,))
+        self.scanState = ScanState.initialScan
+        self.scanTimer.start(200)
+
+    def checkScan(self):
+        if self.scanState == ScanState.initialScan:
+            if self.scanResult.ready():
+                self.handleInitialScan()
+        elif self.scanState == ScanState.computingHashes:
+            self.checkScanMissingHash()
+
+    def handleInitialScan(self):
+        files = self.scanResult.get()
+        # add newly found files to newfiles table (also creating folders entries)
+        newfolders = []
+        newfiles = []
+        for path in files:
+            if path not in self.files:
+                dir, new = self.getFolder(dirname(path))
+                file = File(FileURL(path))
+                dir.add(file)
+                newfolders.extend(new)
+                newfiles.append((str(file.url),))
+        if len(newfiles):
+            logger.debug('inserting {} new files into newfiles table'.format(len(newfiles)))
+            db.multiQuery('INSERT INTO {p}newfiles (url) VALUES (?)', newfiles)
+        self.storeFolders(newfolders)
+        # remove missing new files
+        missingNew = [file for path, file in self.files.items()
+                      if path not in files and file.id is None]
+        if len(missingNew):
+            logger.debug('removing {} missing new files'.format(len(missingNew)))
+            self.removeFiles(missingNew)
+        # store missing DB files
+        self.missingDB = [file for path, file in self.files.items()
+                          if path not in files and file.id is not None]
+        # compute missing hashes, if necessary
+        missingHash = [path for path, file in self.files.items() if file.hash is None]
+        if len(missingHash):
+            print('missing hashes of {} files'.format(len(missingHash)))
+            self.scanState = ScanState.computingHashes
+            self.hashQueue = self.manager.Queue()
+            self.scanResult = self.pool.apply_async(computeHashes,
+                                                    args=(missingHash, self.hashQueue))
+            self.scanTimer.start(5000)
+        else:
+            self.scanTimer.stop()
+            self.analyzeScanResult()
+
+    def checkScanMissingHash(self):
+        if self.scanResult.ready():
+            self.scanTimer.stop()
+        hashIds = []
+        hashUrls = []
+        try:
+            while True:
+                path, hash = self.hashQueue.get(False)
+                file = self.files[path]
+                file.hash = hash
+                if file.id:
+                    hashIds.append( (hash, file.id) )
+                else:
+                    hashUrls.append( (hash, str(file.url)))
+        except queue.Empty:
+            if len(hashIds):
+                db.multiQuery('UPDATE {p}files SET hash=? WHERE element_id=?', hashIds)
+            if len(hashUrls):
+                db.multiQuery('UPDATE {p}newfiles SET hash=? WHERE url=?', hashUrls)
+        if self.scanResult.ready():
+            self.scanState = ScanState.notScanning
+            self.analyzeScanResult()
+
+    def analyzeScanResult(self):
+        pass
 
     def save(self):
         return {'name': self.name,
@@ -211,6 +321,24 @@ class Source:
             return self.files[path].state
         return FilesystemState.unknown
 
+
+def readFilesystem(path):
+    files = {}
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            absFilename = join(dirpath, filename)
+            stamp = utils.files.mTimeStamp(absFilename)
+            files[absFilename] = stamp
+    return files
+
+
+def computeHashes(paths, queue):
+    print('yeha')
+    provider = AcoustIDIdentifier(config.options.filesystem.acoustid_apikey)
+    for path in paths:
+        hash = provider(path)
+        logger.debug('worker computed hash {} of {}'.format(hash, path))
+        queue.put( (path, hash))
 
 def sourceByName(name):
     for source in sources:
@@ -295,7 +423,7 @@ class File:
         self.id = None
         self.lastChecked = None
         self.hash = None
-        self.state = None
+        self.state = FilesystemState.unsynced
 
     def __str__(self):
         if self.id is not None:
@@ -329,6 +457,13 @@ class Folder:
         """Adds *track* to the list self.tracks and updates track.directory."""
         file.folder = self
         self.files.append(file)
+
+    def empty(self):
+        return len(self.files) == 0 and len(self.subdirs) == 0
+
+    def __str__(self):
+        return self.path
+
 
 class Directory:
     """A directory inside the music collection directory.
@@ -609,8 +744,7 @@ class FileSystemSynchronizer(QtCore.QThread):
             dir = self.directories[dirname(track.url.path)]
             dir.addTrack(track)
         if len(toDelete) > 0:
-            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", toDelete)  
-
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", toDelete)
     
     def getDirectory(self, path, storeNew=False):
         """Get a Directory object for *path*.

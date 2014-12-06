@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 _logOSError = True
 
+
 class AcoustIDIdentifier:
     """An identifier using the AcoustID fingerprinter and web service.
     
@@ -46,23 +47,23 @@ class AcoustIDIdentifier:
         self.apikey = apikey
         self.null = open(os.devnull)
         
-    def __call__(self, url):
+    def __call__(self, path):
         try:
-            data = subprocess.check_output(['fpcalc', url.absPath])
+            data = subprocess.check_output(['fpcalc', path])
         except OSError: # fpcalc not found, not executable etc.
             global _logOSError
             if _logOSError:
                 _logOSError = False # This error will always occur  - don't print it again.
             logger.exception("Exception when computing audio fingerprint.")
-            return self.fallbackHash(url)
+            return self.fallbackHash(path)
         except subprocess.CalledProcessError:
             # fpcalc returned non-zero exit status
-            logger.exception("Exception when computing audio fingerprint.")
-            return self.fallbackHash(url)
+            logger.warning("Exception when computing audio fingerprint.")
+            return self.fallbackHash(path)
         data = data.decode(sys.getfilesystemencoding())
         if len(data) == 0:
             logger.warning("fpcalc did not return any data")
-            return self.fallbackHash(url)
+            return self.fallbackHash(path)
         duration, fingerprint = (line.split("=", 1)[1] for line in data.splitlines()[1:] )
         import urllib.request, urllib.error, json
         try:
@@ -70,27 +71,27 @@ class AcoustIDIdentifier:
         except urllib.error.HTTPError as e:
             logger.warning(e)
             logger.warning(self.requestURL.format(self.apikey, duration, fingerprint))
-            return self.fallbackHash(url)
+            return self.fallbackHash(path)
         ans = req.readall().decode("utf-8")
         req.close()
         ans = json.loads(ans)
         if ans['status'] != 'ok':
-            logger.warning("Error retrieving AcoustID fingerprint for {}".format(url))
-            return self.fallbackHash(url)
+            logger.warning("Error retrieving AcoustID fingerprint for {}".format(path))
+            return self.fallbackHash(path)
         results = ans['results']
         if len(results) == 0:
-            logger.warning("No AcoustID fingerprint found for {}".format(url))
-            return self.fallbackHash(url)
+            logger.warning("No AcoustID fingerprint found for {}".format(path))
+            return self.fallbackHash(path)
         bestResult = max(results, key=lambda x: x['score'])
         if "recordings" in bestResult and len(bestResult["recordings"]) > 0:
             ans = "mbid:{}".format(bestResult["recordings"][0]["id"])
-            logger.debug("found mbid={} for {}".format(ans, url))
+            logger.debug("found mbid={} for {}".format(ans, path))
         else:
             ans = "acoustid:{}".format(bestResult["id"])
-            logger.debug("found acoustid={} for {}".format(ans, url))
+            logger.debug("found acoustid={} for {}".format(ans, path))
         return ans
 
-    def fallbackHash(self, url):
+    def fallbackHash(self, path):
         """Compute the audio hash of a single file using ffmpeg to dump the audio.
         
         This method uses the "ffmpeg" binary ot extract the first 15 seconds in raw PCM format and
@@ -98,7 +99,7 @@ class AcoustIDIdentifier:
         """
         logger.warning("Using fallback FFMPEG method")
         try:
-            proc = subprocess.Popen(['ffmpeg', '-i', url.absPath, '-v', 'quiet',
+            proc = subprocess.Popen(['ffmpeg', '-i', path, '-v', 'quiet',
                                      '-f', 's16le', '-t', '15', '-'],
                                     stdout=subprocess.PIPE,
                                     stderr=self.null)
