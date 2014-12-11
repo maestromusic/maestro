@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import multiprocessing, os, queue
+import multiprocessing, os, queue, threading
 import enum
 from os.path import basename, dirname, join, split
 from datetime import datetime, timezone, MINYEAR
@@ -46,6 +46,10 @@ class FilesystemState(enum.Enum):
     unsynced = 2
     unknown = 3
     problem = 4
+
+    def combine(self, other):
+        return FilesystemState(max(self.value, other.value))
+
 
 class ScanState(enum.Enum):
     notScanning = 0
@@ -80,8 +84,13 @@ def shutdown():
     logger.debug("Filesystem module: shutdown complete")
 
 
-class Source:
+class Source(QtCore.QObject):
+
+    folderStateChanged = QtCore.pyqtSignal(object)
+    fileStateChanged = QtCore.pyqtSignal(object)
+
     def __init__(self, name, path, domain, enabled):
+        super().__init__()
         self.name = name
         self.path = path
         if isinstance(domain, int):
@@ -89,6 +98,15 @@ class Source:
         else:
             self.domain = domain
         self.enabled = enabled
+        self.scanState = ScanState.notScanning
+        self.fsThread = None
+        self.scanTimer = QtCore.QTimer()
+        self.scanTimer.setInterval(200)
+        self.scanTimer.timeout.connect(self.checkScan)
+        if self.enabled:
+            self.init()
+
+    def init(self):
         self.files = {}
         self.folders = {}
         logger.debug('loading filesystem source {}'.format(self.name))
@@ -98,13 +116,10 @@ class Source:
         for folder in self.folders.values():
             if folder.empty():
                 logger.debug('empty folder {} '.format(folder))
-        self.scanState = ScanState.notScanning
-        self.pool = multiprocessing.Pool(processes=1)
-        self.manager = multiprocessing.Manager()
-        self.scanTimer = QtCore.QTimer()
-        self.scanTimer.setInterval(200)
-        self.scanTimer.timeout.connect(self.checkScan)
         QtCore.QTimer.singleShot(100, self.scan)
+        levels.real.filesystemDispatcher.connect(self.handleRealFileEvent)
+        self.hashQueue = queue.Queue()
+
 
     def loadFolders(self):
         """Load the folders table from the database.
@@ -134,26 +149,17 @@ class Source:
         This method returns a list of Tracks (if any) which are in the files table but have no hash
         set.
         """
-        newDirectories = []
-        missingHashes = set()
         ans = db.query("SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE "
                        + "'{}%'".format('file://' + self.path)) #TODO: escape!!!!
         for elid, urlstring, elhash, verified in ans:
             url = BackendURL.fromString(urlstring)
             if url.scheme != "file":
                 continue
-            file = File(url)
-            file.id = elid
-            if db.isNull(elhash) or elhash == "0":
-                missingHashes.add(file)
-            else:
-                file.hash = elhash
-            file.verified = db.getDate(verified)
-            file.state = FilesystemState.synced
+            file = File(url, id=elid, verified=db.getDate(verified), state=FilesystemState.synced,
+                        hash=elhash)
             self.files[url.path] = file
-            dir, newDirs = self.getFolder(url.directory, storeNew=True)
+            dir = self.getFolder(url.directory, storeNew=True)[0]
             dir.add(file)
-        return missingHashes
 
     def loadNewFiles(self):
         """Load the newfiles table and add the tracks to self.tracks.
@@ -204,6 +210,24 @@ class Source:
             db.multiQuery("INSERT INTO {p}folders (path, state) VALUES(?,?)",
                           [(dir.path, dir.state.value) for dir in folders])
 
+    def storeNewFiles(self, newfiles):
+        if len(newfiles):
+            logger.debug('inserting {} new files into newfiles table'.format(len(newfiles)))
+            db.multiQuery('INSERT INTO {p}newfiles (url, hash, verified) VALUES (?,?,?)',
+                          [(str(file.url), file.hash,
+                           file.verified.strftime("%Y-%m-%d %H:%M:%S")) for file in newfiles])
+
+    def updateFolders(self, folders=None):
+        if folders is None:
+            folders = sorted(self.folders.values(), key=lambda f: f.path, reverse=True)
+        changes = []
+        for folder in folders:
+            for changed in folder.updateState(False):
+                changes.append((changed.state.value, changed.path))
+                self.folderStateChanged.emit(changed.path)
+        if len(changes):
+            db.multiQuery('UPDATE {p}folders SET state=? WHERE path=?', changes)
+
     def removeFiles(self, files):
         removedFolders = []
         urlstrings = []
@@ -226,57 +250,59 @@ class Source:
     def scan(self):
         """Initiates a filesystem scan in order to synchronize OMG's database with the real
         filesystem layout."""
-        self.scanResult = self.pool.apply_async(readFilesystem, args=(self.path,))
+        self.fsThread = FilesystemThread('readFilesystem', self.path)
+        self.fsThread.start()
         self.scanState = ScanState.initialScan
         self.scanTimer.start(200)
 
     def checkScan(self):
         if self.scanState == ScanState.initialScan:
-            if self.scanResult.ready():
+            if not self.fsThread.is_alive():
                 self.handleInitialScan()
         elif self.scanState == ScanState.computingHashes:
             self.checkScanMissingHash()
 
     def handleInitialScan(self):
-        files = self.scanResult.get()
+        scannedFiles = self.fsThread.files
         # add newly found files to newfiles table (also creating folders entries)
         newfolders = []
         newfiles = []
-        for path in files:
+        for path in scannedFiles:
             if path not in self.files:
                 dir, new = self.getFolder(dirname(path))
                 file = File(FileURL(path))
                 dir.add(file)
                 newfolders.extend(new)
-                newfiles.append((str(file.url),))
-        if len(newfiles):
-            logger.debug('inserting {} new files into newfiles table'.format(len(newfiles)))
-            db.multiQuery('INSERT INTO {p}newfiles (url) VALUES (?)', newfiles)
+                newfiles.append(file)
+        self.storeNewFiles(newfiles)
         self.storeFolders(newfolders)
         # remove missing new files
         missingNew = [file for path, file in self.files.items()
-                      if path not in files and file.id is None]
+                      if path not in scannedFiles and file.id is None]
         if len(missingNew):
             logger.debug('removing {} missing new files'.format(len(missingNew)))
             self.removeFiles(missingNew)
         # store missing DB files
         self.missingDB = [file for path, file in self.files.items()
-                          if path not in files and file.id is not None]
+                          if path not in scannedFiles and file.id is not None]
+        print('missing DB:')
+        print(self.missingDB)
+        # update folder states
+        self.updateFolders()
         # compute missing hashes, if necessary
         missingHash = [path for path, file in self.files.items() if file.hash is None]
         if len(missingHash):
             print('missing hashes of {} files'.format(len(missingHash)))
             self.scanState = ScanState.computingHashes
-            self.hashQueue = self.manager.Queue()
-            self.scanResult = self.pool.apply_async(computeHashes,
-                                                    args=(missingHash, self.hashQueue))
+            self.fsThread = FilesystemThread('computeHashes', missingHash, self.hashQueue)
+            self.fsThread.start()
             self.scanTimer.start(5000)
         else:
             self.scanTimer.stop()
             self.analyzeScanResult()
 
     def checkScanMissingHash(self):
-        if self.scanResult.ready():
+        if not self.fsThread.is_alive():
             self.scanTimer.stop()
         hashIds = []
         hashUrls = []
@@ -294,7 +320,7 @@ class Source:
                 db.multiQuery('UPDATE {p}files SET hash=? WHERE element_id=?', hashIds)
             if len(hashUrls):
                 db.multiQuery('UPDATE {p}newfiles SET hash=? WHERE url=?', hashUrls)
-        if self.scanResult.ready():
+        if not self.fsThread.is_alive():
             self.scanState = ScanState.notScanning
             self.analyzeScanResult()
 
@@ -321,24 +347,132 @@ class Source:
             return self.files[path].state
         return FilesystemState.unknown
 
+    def moveFile(self, file, newUrl):
+        """Internally move *file* to *newUrl* by updating the folders and their states.
 
-def readFilesystem(path):
-    files = {}
-    for dirpath, dirnames, filenames in os.walk(path):
-        for filename in filenames:
-            absFilename = join(dirpath, filename)
-            stamp = utils.files.mTimeStamp(absFilename)
-            files[absFilename] = stamp
-    return files
+        This does not alter the filesystem and normally also not the database. The exception is
+        the target URL already exist in self.files; in that case it is removed from newfiles.
+        Also if newUrl is in a directory not yet contained in self.directories it (and potential
+        parents which are also new) is added to the folders table.
+        """
+        newDir = self.getFolder(newUrl.directory, storeNew=True)[0]
+        oldDir = file.folder
+        oldDir.files.remove(file)
+        if newUrl.path in self.files:
+            existingFile = self.files[newUrl.path]
+            newDir.files.remove(existingFile)
+            db.query('DELETE FROM {p}newfiles WHERE url=?', str(newUrl))
+        newDir.add(file)
+        del self.files[file.url.path]
+        file.url = newUrl
+        self.files[newUrl.path] = file
+        stateChanges = newDir.updateState(True)
+        if oldDir != newDir:
+            stateChanges += oldDir.updateState(True)
+        self.updateFolders(stateChanges)
+        self.fileStateChanged.emit(newUrl.path)
+
+    def handleRealFileEvent(self, event):
+        """Handle an event issued by levels.real if something has affected the filesystem."""
+        if self.scanState != ScanState.notScanning:
+            self.scanTimer.stop()
+            self
+        for oldURL, newURL in event.renamed:
+            if oldURL.path in self.files:
+                if self.files[oldURL.path].id is None:
+                    db.query("DELETE FROM {p}newfiles WHERE url=?", str(oldURL))
+                self.moveFile(self.files[oldURL.path], newURL)
+
+        updateHash = []
+        for url in event.modified:
+            if url.path not in self.files:
+                continue
+            updateHash.append(url.path)  # recompute hash if file was modified
+
+        modifiedDirs = []
+        if len(event.added) > 0:
+            db.multiQuery('DELETE FROM {p}newfiles WHERE url=?',
+                          [(str(elem.url),) for elem in event.added])
+            for elem in event.added:
+                url = elem.url
+                if url.path not in self.files:
+                    dir = self.getFolder(url.directory, storeNew=True)[0]
+                    file = File(url, state=FilesystemState.synced)
+                    dir.addFile(file)
+                    self.files[url.path] = file
+                    updateHash.append(url.path)
+                else:
+                    dir = self.folders[url.directory]
+                    file = self.files[url.path]
+                if file.hash is None:
+                    updateHash.append(url.path)
+                file.id = elem.id
+                modifiedDirs += dir.updateState(True)
+                self.fileStateChanged.emit(url.path)
+        if len(updateHash) > 0:
+            #TODO
+            pass
+
+        if len(event.removed) > 0:
+            newFiles = []
+            for url in event.removed:
+                if url.path not in self.files:
+                    continue # happens after removals in a LostFilesDialog
+                file = self.files[url.path]
+                newFiles.append(file)
+                file.id = None
+                modifiedDirs += file.folder.updateState(True)
+            self.storeNewFiles(newFiles)
+        self.updateFolders(modifiedDirs)
+
+        if len(event.deleted) > 0:
+            changedFolders = []
+            urls = []
+            for url in event.deleted:
+                if url.path not in self.files:
+                    continue
+                urls.append((str(url),))
+                file = self.files[url.path]
+                file.folder.files.remove(file)
+                changedFolders.extend(file.folder.updateState(True))
+                del self.files[url.path]
+            self.updateFolders(changedFolders)
+            if len(urls) > 0:
+                db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", urls)
 
 
-def computeHashes(paths, queue):
-    print('yeha')
-    provider = AcoustIDIdentifier(config.options.filesystem.acoustid_apikey)
-    for path in paths:
-        hash = provider(path)
-        logger.debug('worker computed hash {} of {}'.format(hash, path))
-        queue.put( (path, hash))
+class FilesystemThread(threading.Thread):
+
+    def __init__(self, action, *args):
+        super().__init__()
+        self.action = action
+        self.args = args
+        self.daemon = True
+
+    def run(self):
+        if self.action == 'readFilesystem':
+            self.readFilesystem()
+        else:
+            self.computeHashes()
+
+    def readFilesystem(self):
+        path = self.args[0]
+        self.files = {}
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                absFilename = join(dirpath, filename)
+                stamp = utils.files.mTimeStamp(absFilename)
+                self.files[absFilename] = stamp
+        print(len(self.files))
+
+    def computeHashes(self):
+        paths, queue = self.args
+        print(queue.qsize())
+        provider = AcoustIDIdentifier(config.options.filesystem.acoustid_apikey)
+        for path in paths:
+            hash = provider(path)
+            logger.debug('worker computed hash {} of {}'.format(hash, path))
+            queue.put((path, hash))
 
 def sourceByName(name):
     for source in sources:
@@ -417,18 +551,23 @@ def getNewfileHash(url):
 
 class File:
 
-    def __init__(self, url):
+    def __init__(self, url, id=None,
+                 verified=datetime.min.replace(tzinfo=timezone.utc),
+                 hash=None, state=FilesystemState.unknown):
         self.url = url
+        self.id = id
+        self.verified = verified
+        self.hash = hash
+        self.state = state
         self.folder = None
-        self.id = None
-        self.lastChecked = None
-        self.hash = None
-        self.state = FilesystemState.unsynced
 
     def __str__(self):
         if self.id is not None:
             return "DB File[{}](url={})".format(self.id, self.url)
         return "New File(url={})".format(self.url)
+
+    def __repr__(self):
+        return 'File({})'.format(self.url)
 
 
 class Folder:
@@ -460,6 +599,28 @@ class Folder:
 
     def empty(self):
         return len(self.files) == 0 and len(self.subdirs) == 0
+
+    def updateState(self, recurse=False):
+        """Update the *state* attribute of this directory.
+
+        The state is determined by the tracks inside the directory and the state of possible
+        subdirectories.
+        This method returns a list of folders whose states have changed.
+        """
+        ownState = FilesystemState.empty
+        for file in self.files:
+            ownState = ownState.combine(FilesystemState.synced)
+            if file.id is None:
+                ownState = ownState.combine(FilesystemState.unsynced)
+        for dir in self.subdirs:
+            ownState = ownState.combine(dir.state)
+        if ownState != self.state:
+            ret = [self]
+            if recurse and self.parent:
+                ret += self.parent.updateState(True)
+            self.state = ownState
+            return ret
+        return []
 
     def __str__(self):
         return self.path

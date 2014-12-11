@@ -68,8 +68,8 @@ class AcoustIDIdentifier:
         import urllib.request, urllib.error, json
         try:
             req = urllib.request.urlopen(self.requestURL.format(self.apikey, duration, fingerprint))
-        except urllib.error.HTTPError as e:
-            logger.warning(e)
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+            logger.warning(str(e))
             logger.warning(self.requestURL.format(self.apikey, duration, fingerprint))
             return self.fallbackHash(path)
         ans = req.readall().decode("utf-8")

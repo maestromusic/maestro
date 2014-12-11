@@ -68,22 +68,23 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
         self.source = None
-        #filesystem.synchronizer.folderStateChanged.connect(self.handleStateChange)
-        #filesystem.synchronizer.fileStateChanged.connect(self.handleStateChange)
-        #self.rescanRequested.connect(filesystem.synchronizer.recheck)
         self.setRootPath(None)
         
     def setSource(self, source):
         if source != self.source:
+            if self.source is not None:
+                self.source.fileStateChanged.disconnect(self.handleStateChange)
+                self.source.folderStateChanged.disconnect(self.handleStateChange)
             self.source = source
             self.setRootPath(source.path)
+            source.folderStateChanged.connect(self.handleStateChange)
+            source.fileStateChanged.connect(self.handleStateChange)
             
     def columnCount(self, index):
         return 1
-    
-    @QtCore.pyqtSlot(object)
-    def handleStateChange(self, url):
-        index = self.index(url.path)
+
+    def handleStateChange(self, path):
+        index = self.index(path)
         self.dataChanged.emit(index, index)   
     
     def data(self, index, role=Qt.DisplayRole):

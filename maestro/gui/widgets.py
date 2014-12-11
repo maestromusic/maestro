@@ -101,7 +101,7 @@ class SourceBox(QtGui.QComboBox):
     sourceChanged = QtCore.pyqtSignal(filesystem.Source)
     
     def __init__(self, currentSource=None):
-        """Create the DomainBox with *currentDomain* selected."""
+        """Create the SourceBox with *currentSource* selected."""
         super().__init__()
         self._fillBox(currentSource)
         self.highlighted.connect(self._activated)
