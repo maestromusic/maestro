@@ -51,7 +51,7 @@ def disable():
 
 def defaultStorage():
     return {"dbanalyzer": {
-            "size": (800,600),
+            "size": [800,600],
             "pos": None # Position of the window as tuple or None to center the window
         }}
     

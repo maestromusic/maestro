@@ -19,10 +19,10 @@
 """This module contains the file identifier providers - ffmpeg/md5 and acoustid."""
 
 import hashlib
-import os, subprocess
+import subprocess
 import sys
 
-from .. import logging
+from .. import logging, config
 logger = logging.getLogger(__name__)
 
 _logOSError = True
@@ -43,10 +43,9 @@ class AcoustIDIdentifier:
     requestURL = ("http://api.acoustid.org/v2/lookup?"
                   "client={}&meta=recordingids&duration={}&fingerprint={}")
     
-    def __init__(self, apikey):
-        self.apikey = apikey
-        self.null = open(os.devnull)
-        
+    def __init__(self):
+        self.apikey = config.options.filesystem.acoustid_apikey
+
     def __call__(self, path):
         try:
             data = subprocess.check_output(['fpcalc', path])
@@ -99,14 +98,10 @@ class AcoustIDIdentifier:
         """
         logger.warning("Using fallback FFMPEG method")
         try:
-            proc = subprocess.Popen(['ffmpeg', '-i', path, '-v', 'quiet',
-                                     '-f', 's16le', '-t', '15', '-'],
-                                    stdout=subprocess.PIPE,
-                                    stderr=self.null)
+            ans = subprocess.check_output(['ffmpeg', '-i', path, '-v', 'quiet',
+                                           '-f', 's16le', '-t', '15', '-'])
+            return 'hash:{}'.format(hashlib.md5(ans).hexdigest())
         except OSError:
-            logger.warning('ffmpeg not installed - could not compute fallback audio hash.')
-            return None
-        data = proc.stdout.read()
-        proc.wait()
-        hash = hashlib.md5(data).hexdigest()
-        return "hash:{}".format(hash)
+            logger.warning('ffmpeg not installed - could not compute fallback audio hash')
+        except subprocess.CalledProcessError:
+            logger.warning('ffmpeg failed')
