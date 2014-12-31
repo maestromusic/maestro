@@ -23,6 +23,7 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from .. import application, filebackends, filesystem, utils, constants
+from ..filebackends.filesystem import FileURL
 from . import mainwindow, selection, dockwidget, widgets
 from ..core import levels
 from ..filesystem import FilesystemState
@@ -126,6 +127,9 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         self.rescanDirectoryAction = QtGui.QAction(self.tr("rescan"), self)
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
+        self.deleteFileAction = QtGui.QAction(self.tr('delete'), self)
+        self.addAction(self.deleteFileAction)
+        self.deleteFileAction.triggered.connect(self._handleDelete)
         application.dispatcher.connect(self._handleDispatcher)
         self.setRootIndex(QtCore.QModelIndex())
     
@@ -153,18 +157,24 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
     
     def contextMenuEvent(self, event):
         index = self.indexAt(event.pos())
+        menu = QtGui.QMenu(self)
         if self.model().isDir(index):
-            menu = QtGui.QMenu(self)
             menu.addAction(self.rescanDirectoryAction)
-            menu.popup(event.globalPos())
-            event.accept()
         else:
-            event.ignore()
+            menu.addAction(self.deleteFileAction)
+        menu.popup(event.globalPos())
+        event.accept()
             
     def _handleRescan(self):
         path = self.model().filePath(self.currentIndex())
         self.rescanRequested.emit(path)
-        
+
+    def _handleDelete(self):
+        path = self.model().filePath(self.currentIndex())
+        url = FileURL(path)
+        elem = levels.real.collect(url)
+        levels.real.deleteElements([elem], fromDisk=True)
+
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
         paths = [self.model().filePath(index)

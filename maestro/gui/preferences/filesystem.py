@@ -122,7 +122,7 @@ class FilesystemSettings(QtGui.QWidget):
             item = QtGui.QTableWidgetItem(source.domain.name if source.domain is not None else '')
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
-            
+
             column = self._getColumnIndex("enable")
             item = QtGui.QTableWidgetItem(source.enabled)
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)

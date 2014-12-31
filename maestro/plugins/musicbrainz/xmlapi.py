@@ -53,9 +53,9 @@ def query(resource, mbid, includes=[]):
         url += "?inc={}".format("+".join(includes))
     logger.debug('querying {}'.format(url))
     ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
-    if len(ans):
+    try:
         data = ans.getSingle()
-    else:
+    except db.EmptyResultException:
         try:
             with urllib.request.urlopen(url) as response:
                 data = response.readall()

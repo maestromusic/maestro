@@ -47,7 +47,7 @@ class LostFilesDelegate(delegates.StandardDelegate):
         
     def addPath(self, element):
         if element.isFile():
-            if os.path.exists(element.url.absPath):
+            if os.path.exists(element.url.path):
                 style = self.goodPathStyle
             else:
                 style = self.badPathStyle
@@ -79,7 +79,7 @@ class SetPathAction(treeactions.TreeAction):
         elem = next(self.parent().selection.fileWrappers()).element
         path = QtGui.QFileDialog.getOpenFileName(application.mainWindow,
                                                  self.tr("Select new file location"),
-                                                 os.path.dirname(elem.url.absPath))
+                                                 os.path.dirname(elem.url.path))
         if path != "":
             newUrl = FileURL(path)
             from . import getNewfileHash

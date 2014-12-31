@@ -23,8 +23,9 @@ import subprocess
 import sys
 
 from .. import logging, config
-logger = logging.getLogger(__name__)
+from ..utils.files import isMusicFile
 
+logger = logging.getLogger(__name__)
 _logOSError = True
 
 
@@ -47,6 +48,8 @@ class AcoustIDIdentifier:
         self.apikey = config.options.filesystem.acoustid_apikey
 
     def __call__(self, path):
+        if not isMusicFile(path):
+            return 'nomusic'
         try:
             data = subprocess.check_output(['fpcalc', path])
         except OSError: # fpcalc not found, not executable etc.
@@ -84,10 +87,9 @@ class AcoustIDIdentifier:
         bestResult = max(results, key=lambda x: x['score'])
         if "recordings" in bestResult and len(bestResult["recordings"]) > 0:
             ans = "mbid:{}".format(bestResult["recordings"][0]["id"])
-            logger.debug("found mbid={} for {}".format(ans, path))
         else:
             ans = "acoustid:{}".format(bestResult["id"])
-            logger.debug("found acoustid={} for {}".format(ans, path))
+        logger.debug("found  hash {} for {}".format(ans, path))
         return ans
 
     def fallbackHash(self, path):

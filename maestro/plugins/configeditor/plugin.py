@@ -64,7 +64,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
         if option.type is bool:
             self.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             self.setCheckState(Qt.Checked if option.getValue() else Qt.Unchecked)
-        self.setText(option.export())
+        self.setText(str(option.getValue()))
         if option.getValue() != option.default:
             f = self.font()
             f.setBold(True)
@@ -104,7 +104,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
         super().setData(Qt.EditRole,self.option.export())
         
     def save(self):
-        self.option.fromString(self.text())
+        self.option.setValue(self.option.parseString(self.text()))
         self.dirty = False
         
         
