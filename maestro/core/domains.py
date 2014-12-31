@@ -30,6 +30,11 @@ domains = []
 # Maximum length of encoded domain names.
 MAX_NAME_LENGTH = 63
 
+
+def default():
+    return domains[0]
+
+
 def isValidName(name):
     return name == name.strip() and 0 < len(name.encode()) <= MAX_NAME_LENGTH 
 

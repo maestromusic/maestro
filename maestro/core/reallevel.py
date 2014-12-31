@@ -228,8 +228,8 @@ class RealLevel(levels.Level):
                 raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
             id = levels.idFromUrl(url, create=True)
             from .. import filesystem
-            folder = filesystem.sourceByPath(url.path)
-            domain = folder.domain if folder is not None else None
+            source = filesystem.sourceByPath(url.path)
+            domain = source.domain if source else domains.default()
             elem = elements.File(domain, level, id, url=url, length=fLength, tags=fTags)
             elem.specialTags = backendFile.specialTags           
             level.elements[id] = elem
@@ -351,7 +351,7 @@ class RealLevel(levels.Level):
             else: assert element.isFile() 
         
         with db.transaction():
-            data = [(element.domain.id if element.domain is not None else None,
+            data = [(element.domain.id,
                      element.id,
                      element.isFile(),
                      element.type if element.isContainer() else 0,

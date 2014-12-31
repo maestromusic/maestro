@@ -352,6 +352,8 @@ class CommitTreeAction(TreeAction):
                 model.commit()
             except filebackends.TagWriteError as e:
                 e.displayMessage()
+            except levels.RenameFilesError as e:
+                e.displayMessage()
         else:
             dialogs.warning(self.tr("No commit possible"),
                             self.tr("While the editor contains external tags, no commit is possible. "

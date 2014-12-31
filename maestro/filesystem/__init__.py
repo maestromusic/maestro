@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 synchronizer = None
 sources = None
+min_verified = datetime(1000,1,1, tzinfo=timezone.utc)
 
 
 class FilesystemState(enum.Enum):
@@ -150,10 +151,7 @@ class Source(QtCore.QObject):
             url = BackendURL.fromString(urlstring)
             if url.scheme != "file":
                 continue
-            file = File(url, id=elid, verified=db.getDate(verified), hash=elhash)
-            self.files[url.path] = file
-            dir = self.getFolder(url.directory, storeNew=True)[0]
-            dir.add(file)
+            self.addFile(url, id=elid, verified=db.getDate(verified), hash=elhash)
 
     def loadNewFiles(self):
         """Load the newfiles table and add the files to self.files.
@@ -161,12 +159,13 @@ class Source(QtCore.QObject):
         URLs from newfiles already contained in files are deleted.
         """
         newDirectories = []
+        toDelete = []
         for urlstring, elhash, verified in db.query("SELECT url, hash, verified FROM {p}newfiles "
             + "WHERE url LIKE '{}%'".format('file://' + self.path)): # TODO: escape path!!
             file = File(BackendURL.fromString(urlstring))
             if file.url.path in self.files:
-                logger.warning("url {} is BOTH n files and newfiles!".format(urlstring))
-                db.query('DELETE FROM {p}newfiles WHERE url=?', urlstring)
+                logger.warning("url {} is BOTH in files and newfiles!".format(urlstring))
+                toDelete.append((urlstring,))
                 continue
             file.hash = elhash
             file.verified = db.getDate(verified)
@@ -175,6 +174,8 @@ class Source(QtCore.QObject):
             dir = self.folders[file.url.directory]
             dir.add(file)
             newDirectories += newDirs
+        if len(toDelete):
+            db.multiQuery('DELETE FROM {p}newfiles WHERE url=?', toDelete)
 
     def getFolder(self, path, storeNew=False):
         """Get a :class:`Folder` object for *path*.
@@ -219,6 +220,7 @@ class Source(QtCore.QObject):
                 self.folderStateChanged.emit(folder.path)
 
     def removeFiles(self, files):
+        """Removes given files from structure and database."""
         if len(files) == 0:
             return
         removedFolders = []
@@ -236,8 +238,10 @@ class Source(QtCore.QObject):
                     break
             urlstrings.append((str(file.url),))
             del self.files[file.url.path]
-        db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", urlstrings)
-        db.multiQuery('DELETE FROM {p}folders WHERE path=?', removedFolders)
+        if len(urlstrings):
+            db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", urlstrings)
+        if len(removedFolders):
+            db.multiQuery('DELETE FROM {p}folders WHERE path=?', removedFolders)
 
     def scan(self):
         """Initiates a filesystem scan in order to synchronize OMG's database with the real
@@ -295,12 +299,9 @@ class Source(QtCore.QObject):
             if path in self.files:
                 file = self.files[path]
             else:
-                dir, new = self.getFolder(dirname(path))
-                file = File(FileURL(path))
-                dir.add(file)
-                newfolders.extend(new)
+                file, newdirs = self.addFile(FileURL(path), storeFolders=False, storeFile=False)
+                newfolders.extend(newdirs)
                 newfiles.append(file)
-                self.files[path] = file
             if file.hash is None or (file.id is None and file.verified < stamp):
                 requestHash.append((int(file.id is None), path))
 
@@ -364,7 +365,8 @@ class Source(QtCore.QObject):
                     hashUrls.append((hash, str(file.url)))
         except queue.Empty:
             if len(hashIds):
-                db.multiQuery('UPDATE {p}files SET hash=? WHERE element_id=?', hashIds)
+                db.multiQuery('UPDATE {p}files SET hash=?, verified=CURRENT_TIMESTAMP '
+                              'WHERE element_id=?', hashIds)
             if len(hashUrls):
                 db.multiQuery('UPDATE {p}newfiles SET hash=?, verified=CURRENT_TIMESTAMP '
                               'WHERE url=?', hashUrls)
@@ -500,6 +502,14 @@ class Source(QtCore.QObject):
         self.updateFolders(stateChanges)
         self.fileStateChanged.emit(newUrl.path)
 
+    def addFile(self, url, id=None, hash=None, verified=min_verified,
+                storeFolders=True, storeFile=True):
+        dir, newdirs = self.getFolder(url.directory, storeNew=storeFolders)
+        file = File(url, id=id, hash=hash, verified=verified)
+        dir.add(file)
+        self.files[url.path] = file
+        return file, newdirs
+
     def handleRealFileEvent(self, event):
         """Handle an event issued by levels.real if something has affected the filesystem.
 
@@ -507,36 +517,42 @@ class Source(QtCore.QObject):
         """
         if self.scanState != ScanState.notScanning:
             self.scanInterrupted = True
+        updateHash = []  # list of paths for which new hashes need to be computed
+        updatedDirs = []
         for oldURL, newURL in event.renamed:
             if oldURL.path in self.files:
                 if self.files[oldURL.path].id is None:
                     db.query('DELETE FROM {p}newfiles WHERE url=?', str(oldURL))
-                self.moveFile(self.files[oldURL.path], newURL)
-
-        updateHash = []  # list of paths for which new hashes need to be computed
+                if self.contains(newURL.path):
+                    self.moveFile(self.files[oldURL.path], newURL)
+                else:
+                    self.removeFiles([self.files[oldURL.path]])
+            elif self.contains(newURL.path):
+                elem = levels.real.fetch(newURL)
+                self.addFile(url=newURL, id=elem.id)
+                updateHash.append(newURL.path)
+            if self.contains(newURL.path):
+                dir, _ = self.getFolder(newURL.directory, storeNew=True)
+                updatedDirs.extend(dir.updateState(True))
         for url in event.modified:
-            updateHash.append(url.path)  # recompute hash if file was modified
-
-        updatedDirs = []
+            if self.contains(url.path):
+                updateHash.append(url.path)  # recompute hash if file was modified
         if len(event.added) > 0:
             db.multiQuery('DELETE FROM {p}newfiles WHERE url=?',
                           [(str(elem.url),) for elem in event.added])
             for elem in event.added:
-                url = elem.url
-                if url.path not in self.files:
-                    dir = self.getFolder(url.directory, storeNew=True)[0]
-                    file = File(url, state=FilesystemState.synced)
-                    dir.addFile(file)
-                    self.files[url.path] = file
-                    updateHash.append(url.path)
-                else:
+                if self.contains(elem.url.path):
+                    url = elem.url
+                    if url.path not in self.files:
+                        file = self.addFile(url, id=elem.id)[0]
+                    else:
+                        file = self.files[url.path]
+                    if file.hash is None:
+                        updateHash.append(url.path)
+                    file.id = elem.id
                     dir = self.folders[url.directory]
-                    file = self.files[url.path]
-                if file.hash is None:
-                    updateHash.append(url.path)
-                file.id = elem.id
-                updatedDirs += dir.updateState(True)
-                self.fileStateChanged.emit(url.path)
+                    updatedDirs += dir.updateState(True)
+                    self.fileStateChanged.emit(url.path)
         if len(updateHash) > 0:
             self.hashThread.lastJobDone.clear()
             for path in updateHash:
@@ -546,7 +562,6 @@ class Source(QtCore.QObject):
                 self.scanTimer.start(5000)
 
         if len(event.removed) > 0:  # removed means deleted from DB, but not filesystem
-            logger.debug('removed {}'.format(event.removed))
             newFiles = []
             for url in event.removed:
                 if url.path not in self.files:
@@ -559,7 +574,6 @@ class Source(QtCore.QObject):
             self.storeNewFiles(newFiles)
 
         if len(event.deleted) > 0:
-            logger.debug('deleted {}'.format(event.deleted))
             urls = []
             for url in event.deleted:
                 if url.path not in self.files:
@@ -692,11 +706,8 @@ def getNewfileHash(url):
     If the hash is not known, returns None.
     """
     source = sourceByPath(url.path)
-    if source.enabled and url.path in source.files:
+    if source and source.enabled and url.path in source.files:
         return source.files[url.path].hash
-
-
-min_verified = datetime(1000,1,1, tzinfo=timezone.utc)
 
 
 class File:

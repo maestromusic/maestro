@@ -45,13 +45,15 @@ def enable():
     from .ripper import fileChangerHook
     real.commitHooks.append(fileChangerHook)
 
+
 def mainWindowInit():
     global _action
     _action = QtGui.QAction(application.mainWindow)
     _action.setText(translate("AudioCD Plugin", "rip missing tracks..."))
     _action.triggered.connect(showRipMissingDialog)
     application.mainWindow.menus['extras'].addAction(_action)
-    
+
+
 def disable():
     del filebackends.urlTypes["audiocd"]
     editor.EditorTreeView.actionConfig.removeActionDefinition( (("plugins", "audiocd"),) )
@@ -59,6 +61,7 @@ def disable():
     from .ripper import fileChangerHook
     real.commitHooks.remove(fileChangerHook)
     application.mainWindow.menus['extras'].removeAction(_action)
+
 
 def simpleDiscContainer(discid, trackCount, level):
     from ...core.elements import TYPE_ALBUM
@@ -68,7 +71,7 @@ def simpleDiscContainer(discid, trackCount, level):
         url = filebackends.BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
                         discid, i, config.options.audiocd.rippath))
         elems.append(level.collect(url))
-    return level.createContainer(contents=elems, type=TYPE_ALBUM)
+    return level.createContainer(contents=elems, type=TYPE_ALBUM, domain=domains.default())
     
 
 def showRipMissingDialog():

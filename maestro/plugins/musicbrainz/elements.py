@@ -107,9 +107,7 @@ class MBTreeElement:
         if includeSelf:
             yield self
         for child in self.children.values():
-            for subchild in child.walk():
-                yield subchild
-            #yield from child.walk() py3.3 version
+            yield from child.walk()
     
     def makeElements(self, level, conf):
         """Creates a tree of Maestro elements resembling the calling :class:`MBTreeElement`.
@@ -207,6 +205,7 @@ class MBTreeElement:
         return self.idTagName, self.mbid
     
     def passTags(self, excludes):
+        print('passing tags {}'.format(self))
         for tag, vals in self.tags.items():
             if tag in excludes:
                 continue
@@ -365,6 +364,8 @@ class Recording(MBTreeElement):
                     else:
                         if voice == "choir vocals":
                             tag = "performer:choir"
+                        elif voice == 'lead vocals':
+                            tag = 'vocals'
                         else:
                             logger.warning("unknown voice: {} in {}".format(voice, self))
                             continue
@@ -422,6 +423,7 @@ class Work(MBTreeElement):
                               'lyricist' : 'lyricist',
                               'orchestrator' : 'orchestrator',
                               'librettist' : 'librettist',
+                              'writer' : 'writer',
                             }
             reltype = relation.get("type")
             artist = AliasEntity.get(relation.find('artist'))

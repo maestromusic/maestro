@@ -84,9 +84,12 @@ class ImportAudioCDAction(treeactions.TreeAction):
         if config.options.audiocd.earlyrip:
             self.ripper.start()
         try:
+            print('wt')
             release = self._getRelease(theDiscid)
+            print('z')
             if release is None:
                 return
+            print('f')
             progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
             progress.open()
             stack = self.level().stack.createSubstack(modalDialog=True)
@@ -116,7 +119,7 @@ class ImportAudioCDAction(treeactions.TreeAction):
                 return False
             from .plugin import simpleDiscContainer
 
-            if not config.options.audiocd.earlyrip and False:  #TODO: only for debugging
+            if not config.options.audiocd.earlyrip:
                 self.ripper.start()
 
             self.level().stack.beginMacro(self.tr("Load Audio CD"))

@@ -65,19 +65,6 @@ class EditorTreeView(treeview.DraggingTreeView):
                                                           self.model().index(end, 0, parent)),
                                      QtGui.QItemSelectionModel.ClearAndSelect)   
         self.setFocus(Qt.MouseFocusReason)
-        
-    def commitData(self, lineEdit):
-        newTitle = lineEdit.text()
-        oldTitle = lineEdit.element.tags[tags.TITLE][0] if tags.TITLE in lineEdit.element.tags else ''
-        if newTitle == oldTitle:
-            return
-        if len(newTitle) > 0 and len(oldTitle) > 0:
-            difference = tags.SingleTagDifference(tags.TITLE, replacements=[(oldTitle, newTitle)])
-        elif len(newTitle) > 0:
-            difference = tags.SingleTagDifference(tags.TITLE, additions=[newTitle])
-        else: difference = tags.SingleTagDifference(tags.TITLE, removals=[oldTitle])
-        levels.editor.changeTags({lineEdit.element: difference})
-        
 
     
 class EditorWidget(mainwindow.Widget):

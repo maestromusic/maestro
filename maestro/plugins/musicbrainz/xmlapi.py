@@ -60,7 +60,10 @@ def query(resource, mbid, includes=[]):
             with urllib.request.urlopen(url) as response:
                 data = response.readall()
         except urllib.error.HTTPError as e:
-            raise ConnectionError(e.msg)
+            if e.code == 404:
+                raise e
+            else:
+                raise ConnectionError(e.msg)
         db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)"
                  .format(db.prefix), url, data)
     root = etree.fromstring(data)
@@ -223,7 +226,6 @@ def findReleasesForDiscid(discid):
             raise UnknownDiscException()
         else:
             raise e
-        
     releases = []
     from .elements import Release, Medium
     for release in root.iter("release"):
@@ -284,15 +286,13 @@ def fillReleaseForDisc(MBrelease, discid):
                                                  .format(discid, tracknr, config.options.audiocd.rippath))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
-    if MBmedium.containerType == TYPE_ALBUM:
-        MBmedium.passTags(excludes=['title'])
     MBmedium.insertWorks()
-    
     if len(MBrelease.children) == 1:
         logger.debug("single child release -> removing release container")
         del MBrelease.children[pos]
         for p, child in MBmedium.children.items():
             MBrelease.insertChild(p, child)
+        MBrelease.passTags(excludes=['title'])
     for p in list(MBrelease.children.keys()):
         if isinstance(MBrelease.children[p], Medium) and MBrelease.children[p] != MBmedium:
             logger.debug("ignoring other child {}".format(MBrelease.children[p]))

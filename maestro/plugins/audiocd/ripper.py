@@ -173,7 +173,7 @@ class InsertRippedFileCommand:
         self.element = element
         self.tmpPath = tmpPath
         self.oldUrl = self.element.url
-        self.newUrl = FileURL('file:///' + self.element.url.targetPath)
+        self.newUrl = FileURL('file://' + self.element.url.targetPath)
         self.text = translate("AudioCD Plugin", "Ripped Track {}".format(element.url.tracknr))
 
     def redo(self):

@@ -21,7 +21,7 @@ import os.path, bisect
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import tags as tagsModule
+from . import tags as tagsModule, domains
 from .. import config, filebackends, utils
 
 CONTAINER_TYPES = range(4)
@@ -225,6 +225,8 @@ class Container(Element):
         if stickers is None:
             stickers = {}
         self.stickers = stickers
+        if domain is None:
+            raise ValueError('container needs a domain')
     
     def copy(self, level=None):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
@@ -280,6 +282,9 @@ class File(Element):
         self.tags = kwargs.get('tags', tagsModule.Storage())
         self.flags = kwargs.get('flags', [])
         self.stickers = kwargs.get('stickers', {})
+        if domain is None:
+            raise ValueError('file needs a domain')
+
         
     def copy(self, level=None):
         """Create a copy of this file. Create copies of all attributes. If *level* is not None, the copy
