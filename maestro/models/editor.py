@@ -87,8 +87,9 @@ class EditorModel(leveltreemodel.LevelTreeModel):
             return element
         
     def removeElements(self, parent, rows):
-        """This reimplements LevelTreeModel.removeElements so that elements that have been removed from
-        the tree are also removed from editor level (unless they still appear in some EditorModel)."""
+        """Reimplements LevelTreeModel.removeElements so that elements that have been removed from
+        the tree are also removed from editor level (unless they still appear in some EditorModel).
+        """
         stack.beginMacro(self.tr("Remove elements"))
         
         # All elements from toCheck that are nowhere present in the editor will be removed.

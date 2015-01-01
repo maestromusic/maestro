@@ -171,8 +171,7 @@ configOptions = collections.OrderedDict((
 ("filesystem", {
     "scan_interval": (int, 1800, "Interval (in seconds) in which the filesystem will be rescanned for changes"),
     "disable": (bool, False, "completely disable filesystem synchronization"),
-    "acoustid_apikey": (str, "8XaBELgH", "API key for AcoustID web service"),
-    #TODO: get a real API key for Maestro
+    "acoustid_apikey": (str, "VGPeEVtB", "API key for AcoustID web service"),
 }),
 ("misc", {
     "show_ids": (bool, False, "Whether Maestro should display element IDs"),

@@ -408,15 +408,6 @@ class Source(QtCore.QObject):
                 dialog = dialogs.ModifiedTagsDialog(file, dbTags, fsTags)
                 dialog.exec_()
                 if dialog.result() == dialog.Accepted:
-                    if dialog.choice == 'DB':
-                        backendFile = file.url.getBackendFile()
-                        backendFile.readTags()
-                        backendFile.tags = dbTags.withoutPrivateTags()
-                        backendFile.saveTags()
-                    else:
-                        stack.clear()
-                        diff = tags.TagStorageDifference(dbTags.withoutPrivateTags(), fsTags)
-                        levels.real._changeTags({levels.real.get(file.id) : diff }, dbOnly=True)
                     file.verified = datetime.now(timezone.utc)
                     self.changedHash[file] = hash
         if len(self.changedHash):
@@ -446,8 +437,6 @@ class Source(QtCore.QObject):
                 dialog = dialogs.MissingFilesDialog([file.id for file in self.missingDB])
                 dialog.exec_()
                 stack.clear()
-                self._dialogResult = {"removed" : dialog.deleteAction.removedURLs,
-                                      "renamed" : dialog.setPathAction.setPaths }
                 for oldURL, newURL in dialog.setPathAction.setPaths:
                     self.moveFile(self.files[oldURL.path], newURL.path)
                 self.removeFiles([self.files[url.path] for url in dialog.deleteAction.removedURLs])
@@ -602,7 +591,7 @@ def checkFiles(files, tagDiffs, newHash):
     for file in files:
         hash = identifier(file.url.path)
         if file.id in levels.real:
-            dbTags = levels.real.get(file.id).tags
+            dbTags = levels.real.collect(file.id).tags
         else:
             dbTags = db.tags(file.id)
         backendFile = file.url.getBackendFile()

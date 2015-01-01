@@ -423,19 +423,7 @@ class ContentList:
     
     def __getitem__(self, i):
         return self.ids[i]
-    
-    def __setitem__(self, i, pair):
-        raise NotImplementedError()
-# This is a possible implementation, but maybe it's best that this method is nowhere used.
-#        pos, id = pair
-#        if (i > 0 and self.positions[i-1] >= pos) or \
-#            (i < len(self.positions)-1 and self.positions[i+1] <= pos):
-#            raise ValueError("id/position ({}, {}) cannot be inserted at index {} because positions "
-#                             " must be strictly monotonically increasing."""
-#                             .format(id, pos, i))
-#        self.positions[i] = pos
-#        self.ids[i] = id
-    
+
     def __delitem__(self, i):
         del self.ids[i]
         del self.positions[i]

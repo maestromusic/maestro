@@ -93,7 +93,6 @@ class RealLevel(levels.Level):
     fetch = collect
     _fetch = collect
     fetchMany = collectMany
-    get = collect #TODO deprecated
     
     def _ensureLoaded(self, params):
         # note that __contains__ (p not in self) ensures that p is either int or url 

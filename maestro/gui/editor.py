@@ -38,6 +38,7 @@ class EditorTreeView(treeview.DraggingTreeView):
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
     actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
+    actionConfig.addActionDefinition(((sect, 'flatten'),), treeactions.FlattenAction)
     treeactions.SetElementTypeAction.addSubmenu(actionConfig, sect)
     treeactions.ChangePositionAction.addSubmenu(actionConfig, sect)
     sect = translate("EditorTreeView", "editor")
@@ -80,11 +81,11 @@ class EditorWidget(mainwindow.Widget):
         if state is None:
             state = {}
         expand = 'expand' not in state or state['expand'] # by default expand
-        guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled'] # by default guess 
+        guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled']
         guessProfile = albumguesser.profileCategory.getFromStorage(state.get('guessProfile'))
         delegateProfile = delegates.profiles.category.getFromStorage(
-                                                    state.get('delegate'),
-                                                    editordelegate.EditorDelegate.profileType)
+            state.get('delegate'),
+            editordelegate.EditorDelegate.profileType)
         
         buttonLayout = QtGui.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
@@ -109,7 +110,7 @@ class EditorWidget(mainwindow.Widget):
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
         
-        self.toolbar.addAction(self.editor.treeActions["commit"])
+        self.toolbar.addAction(self.editor.treeActions['commit'])
         buttonLayout.addWidget(self.toolbar)
         buttonLayout.addStretch()
     

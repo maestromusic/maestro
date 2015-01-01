@@ -345,7 +345,7 @@ class CoverItem(QtGui.QGraphicsItem):
             self.setCursor(Qt.OpenHandCursor)
             
     def mouseDoubleClickEvent(self, event):
-        wrapper = nodes.Wrapper(levels.real.get(self.elid))
+        wrapper = nodes.Wrapper(levels.real.collect(self.elid))
         wrapper.loadContents(recursive=True)
         from . import playlist
         playlist.appendToDefaultPlaylist([wrapper], replace=event.modifiers() & Qt.ControlModifier)

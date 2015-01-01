@@ -420,25 +420,3 @@ class MergeDialog(QtGui.QDialog):
         else: config.storage.gui.merge_dialog_container_type = None
             
         self.accept()
-        
-
-class FlattenDialog(QtGui.QDialog):
-    """A dialog for the "flatten" operation."""
-    
-    def __init__(self, hintRecursive = False, parent = None):
-        super().__init__(parent)
-        
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget(QtGui.QLabel(self.tr("Flatten out containers"), self))
-        self.recursiveBox = QtGui.QCheckBox(self.tr("recursively"))
-        self.recursiveBox.setChecked(hintRecursive)
-        layout.addWidget(self.recursiveBox)
-        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-        self.setLayout(layout)
-        
-    def recursive(self):
-        return self.recursiveBox.isChecked()
-        

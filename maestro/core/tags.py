@@ -276,7 +276,7 @@ class Tag:
         self.name = name
         self.type = type
         self.rawTitle = title
-        self.iconPath = iconPath # invoke iconPath.setter
+        self.iconPath = iconPath
         self.private = private
     
     def _getData(self):
@@ -578,11 +578,12 @@ def changeTagType(tagType, **data):
             stack.abortMacro()
             raise error
         
-    stack.push('', stack.Call(tagType, data), stack.Call(tagType, tagType._getData()))
+    stack.push('', stack.Call(_changeTagType, tagType, data),
+               stack.Call(_changeTagType, tagType, tagType._getData()))
     stack.endMacro()
     
     
-def _changeTagType(tagType, ata):
+def _changeTagType(tagType, data):
     """Like changeTagType, but not undoable."""
     assert tagType.isInDb()
     

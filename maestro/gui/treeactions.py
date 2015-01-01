@@ -132,7 +132,7 @@ class ChangeFileUrlsAction(TreeAction):
             QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("The given path does not exists."))
             return False
-        source = core.domains.getSource(oldPath)
+        source = domains.getSource(oldPath)
         if not path.startswith(source.path):
             QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("Path must be inside collection directory"))
@@ -338,7 +338,7 @@ class CommitTreeAction(TreeAction):
     """Commit the contents of a LevelTreeModel."""
     
     def __init__(self, parent):
-        super().__init__(parent, shortcut="Shift+Enter")
+        super().__init__(parent, shortcut='Shift+Enter')
         self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
         self.setText(self.tr('Commit'))
         
@@ -355,9 +355,8 @@ class CommitTreeAction(TreeAction):
             except levels.RenameFilesError as e:
                 e.displayMessage()
         else:
-            dialogs.warning(self.tr("No commit possible"),
-                            self.tr("While the editor contains external tags, no commit is possible. "
-                                    "Delete those tags or add their tagtype to the database."))
+            dialogs.warning(self.tr('No commit possible'),
+                            self.tr("Can't commit while editor contains external tags."))
 
         
 class FlattenAction(TreeAction):
@@ -365,16 +364,29 @@ class FlattenAction(TreeAction):
     children."""
     def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr("Flatten..."))
+        self.setText(self.tr("Flatten"))
         
     def initialize(self, selection):
-        self.setEnabled(selection.hasContainers())
+        self.setEnabled(not selection.hasFiles() and selection.singleParent(True))
         
     def doAction(self):
-        from ..gui.dialogs import FlattenDialog
-        dialog = FlattenDialog(parent = self.parent())
-        if dialog.exec_() == QtGui.QDialog.Accepted:
-            flatten(self.parent().level, self.parent().selection.wrappers(), dialog.recursive())
+        stack = self.level().stack
+        stack.beginMacro(self.tr('flatten container(s)'))
+        wrappers = self.parent().selection.wrappers()
+        elements = [wrapper.element for wrapper in wrappers]
+        positions = [wrapper.position for wrapper in wrappers]
+        parent = wrappers[0].parent.element
+        indices = sorted([parent.contents.positions.index(pos) for pos in positions], reverse=True)
+        for i, index in enumerate(indices, start=1):
+            element = self.level().collect(parent.contents.ids[index])
+            pos = parent.contents.positions[index]
+            children = list(element.getContents())
+            self.level().removeContents(parent, [pos])
+            self.level().removeContents(element, element.contents.positions)
+            if element not in elements[:-i]:
+                self.level().removeElements([element])
+            self.level().insertContentsAuto(parent, index, children)
+        stack.endMacro()
             
 
 class ChangePositionAction(TreeAction):

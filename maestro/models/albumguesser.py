@@ -148,6 +148,7 @@ class StandardGuesser(profiles.Profile):
                         from ..gui.dialogs import warning
                         warning(self.tr("Error guessing albums"),
                                 self.tr("position {} appears twice in {}").format(position(element), key))
+                        self.level.removeElements([element])
                     else:
                         children[position(element)] = element.id
                 firstFreePosition = position(elementsWithPos[-1])+1 if len(elementsWithPos) > 0 else 1
