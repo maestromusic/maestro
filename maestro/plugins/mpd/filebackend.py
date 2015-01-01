@@ -47,10 +47,6 @@ class MPDFile(filebackends.BackendFile):
     
     @staticmethod
     def tryLoad(url):
-        #TODO support multiple urls
-        #rf = filesystem.RealFile.tryLoad(url.asLocalFile())
-        #if rf is not None:
-        #    return rf
         return MPDFile(url)
         
     def __init__(self, url):

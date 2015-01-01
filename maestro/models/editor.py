@@ -81,7 +81,6 @@ class EditorModel(leveltreemodel.LevelTreeModel):
         if url in self.level:
             return self.level[url]
         else:
-            #TODO leveltreemodel.loadFile loads each element separately and is thus inefficient
             element = self.level.collect(url)
             _processor.perform(element)
             return element

@@ -146,7 +146,7 @@ class Source(QtCore.QObject):
         set.
         """
         ans = db.query("SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE "
-                       + "'{}%'".format('file://' + self.path)) #TODO: escape!!!!
+                       + "'{}%'".format('file://' + self.path.replace("'", "\\'")))
         for elid, urlstring, elhash, verified in ans:
             url = BackendURL.fromString(urlstring)
             if url.scheme != "file":
@@ -161,7 +161,7 @@ class Source(QtCore.QObject):
         newDirectories = []
         toDelete = []
         for urlstring, elhash, verified in db.query("SELECT url, hash, verified FROM {p}newfiles "
-            + "WHERE url LIKE '{}%'".format('file://' + self.path)): # TODO: escape path!!
+            + "WHERE url LIKE '{}%'".format('file://' + self.path.replace("'", "\\'"))):
             file = File(BackendURL.fromString(urlstring))
             if file.url.path in self.files:
                 logger.warning("url {} is BOTH in files and newfiles!".format(urlstring))
@@ -319,7 +319,6 @@ class Source(QtCore.QObject):
         if len(self.missingDB):
             logger.warning('{} files in DB missing on filesystem'.format(len(self.missingDB)))
         # update folder states
-        #TODO: can't we omit this?
         folders = sorted(self.folders.values(), key=lambda f: f.path, reverse=True)
         changedFolders = []
         for folder in folders:

@@ -149,7 +149,6 @@ class MissingFilesDialog(QtGui.QDialog):
                 if file in files:
                     files.remove(file)
         self.model = LevelTreeModel(levels.real, containers + files)
-        # TODO: containerless files don't disappear in view after deleting
         
         self.view = treeview.TreeView(levels.real, affectGlobalSelection=False)        
         self.view.setModel(self.model)
