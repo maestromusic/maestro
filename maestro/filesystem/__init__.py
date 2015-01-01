@@ -98,25 +98,43 @@ class Source(QtCore.QObject):
             self.domain = domains.domainById(domain)
         else:
             self.domain = domain
-        self.enabled = enabled
-        self.scanState = ScanState.notScanning
         self.scanTimer = QtCore.QTimer()
         self.scanTimer.setInterval(200)
         self.scanTimer.timeout.connect(self.checkScan)
-        if self.enabled:
-            self.init()
+        if enabled:
+            self.enable()
 
-    def init(self):
+    def setEnabled(self, enabled):
+        if enabled and not self.enabled:
+            self.enable()
+        if not enabled and self.enabled:
+            self.disable()
+
+    def enable(self):
+        self.enabled = True
         self.files = {}
         self.folders = {}
         self.hashThread = HashThread()
         self.scanInterrupted = False
+        self.scanState = ScanState.notScanning
         logger.debug('loading filesystem source {}'.format(self.name))
         self.loadFolders()
         self.loadDBFiles()
         self.loadNewFiles()
-        QtCore.QTimer.singleShot(100, self.scan)
+        QtCore.QTimer.singleShot(5000, self.scan)
         levels.real.filesystemDispatcher.connect(self.handleRealFileEvent)
+
+    def disable(self):
+        self.enabled = False
+        if self.scanState != ScanState.notScanning:
+            self.scanTimer.stop()
+        levels.real.filesystemDispatcher.connect(self.handleRealFileEvent)
+
+    def setPath(self, path):
+        self.path = path
+        if path != self.path and self.enabled:
+            self.disable()
+            self.enable()
 
     def loadFolders(self):
         """Load the folders table from the database.
@@ -674,9 +692,14 @@ def changeSource(source, **data):
 
 
 def _changeSource(source, data):
-    for attr in ['name', 'path', 'domain', 'enabled']:
-        if attr in data:
-            setattr(source, attr, data[attr])
+    if 'name' in data:
+        source.name = data['name']
+    if 'path' in data:
+        source.setPath(data['path'])
+    if 'domain' in data:
+        source.domain = data['domain']
+    if 'enabled' in data:
+        source.setEnabled(data['enabled'])
     application.dispatcher.emit(SourceChangeEvent(constants.CHANGED, source))
 
 
