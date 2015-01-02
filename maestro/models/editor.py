@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 from . import leveltreemodel
 from ..core import elements, levels, tags
 from ..core.elements import Element
-from .. import application, config, constants, logging, stack
+from .. import application, config, logging, stack
 
 
 _processor = None # the single instance of AutoTagProcessor used by all EditorModels
@@ -199,7 +199,8 @@ class EditorModel(leveltreemodel.LevelTreeModel):
                 self.extTagInfosChanged.emit()
                 
     def _handleDispatcher(self,event):
-        if isinstance(event,tags.TagTypeChangeEvent) and event.action != constants.CHANGED:
+        if isinstance(event, tags.TagTypeChangeEvent) \
+                and event.action != application.ChangeType.changed:
             self._updateExtTagInfos()
           
     def undoExtTagInfo(self,info):

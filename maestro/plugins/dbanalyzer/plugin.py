@@ -23,7 +23,7 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import database as db, application, constants, config, utils
+from ... import database as db, application, config, utils, VERSION
 from ...gui import mainwindow
 from . import resources, checks
 
@@ -319,7 +319,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
     """A dialog containing a DBAnalyzer."""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Maestro version {} – Database Analyzer".format(constants.VERSION))
+        self.setWindowTitle("Maestro version {} – Database Analyzer".format(VERSION))
         self.setWindowIcon(QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
         layout = QtGui.QVBoxLayout(self)
         analyzer = DBAnalyzer(widgetClass=_getWidgetClass())

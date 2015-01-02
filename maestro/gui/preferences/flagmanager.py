@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from ... import application, database as db, utils, stack, constants
+from ... import application, database as db, utils, stack
 from ...core import flags
 from .. import dialogs, flexform
 
@@ -39,10 +39,10 @@ class FlagModel(flexform.FlexTableModel):
         
     def _handleDispatcher(self, event):
         if isinstance(event, flags.FlagTypeChangeEvent):
-            if event.action == constants.ADDED:
+            if event.action == application.ChangeType.added:
                 row = flags.allFlags().index(event.flagType)
                 self.insertItem(row, event.flagType)
-            elif event.action == constants.DELETED:
+            elif event.action == application.ChangeType.deleted:
                 self.removeItem(event.flagType)
             else: self.itemChanged(event.flagType)
                 

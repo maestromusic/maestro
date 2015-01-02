@@ -27,7 +27,7 @@ from maestro.filesystem.identification import AcoustIDIdentifier
 
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, logging, config, utils, database as db, stack, constants
+from .. import application, logging, config, utils, database as db, stack
 from ..filebackends import BackendURL
 from ..filebackends.filesystem import FileURL
 from ..core import levels, tags, domains
@@ -665,7 +665,7 @@ def addSource(**data):
 def _addSource(source):
     sources.append(source)
     sources.sort(key=lambda s: s.name)
-    application.dispatcher.emit(SourceChangeEvent(constants.ADDED, source))
+    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.added, source))
     
 def deleteSource(source):
     stack.push(translate("Filesystem", "Delete source"),
@@ -675,7 +675,7 @@ def deleteSource(source):
 
 def _deleteSource(source):
     sources.remove(source)
-    application.dispatcher.emit(SourceChangeEvent(constants.DELETED, source))
+    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.deleted, source))
     
 
 def changeSource(source, **data):
@@ -694,13 +694,13 @@ def _changeSource(source, data):
         source.domain = data['domain']
     if 'enabled' in data:
         source.setEnabled(data['enabled'])
-    application.dispatcher.emit(SourceChangeEvent(constants.CHANGED, source))
+    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.changed, source))
 
 
 class SourceChangeEvent(application.ChangeEvent):
     """SourceChangeEvent are used when a source is added, changed or deleted."""
     def __init__(self, action, source):
-        assert action in constants.CHANGE_TYPES
+        assert isinstance(action, application.ChangeType)
         self.action = action
         self.source = source
         

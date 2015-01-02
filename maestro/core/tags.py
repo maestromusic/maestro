@@ -50,9 +50,8 @@ from functools import reduce
 
 from PyQt4 import QtGui
 
-from .. import application, config, constants, logging, utils, stack
-from ..constants import ADDED, REMOVED, CHANGED
-from ..application import ChangeEvent
+from .. import application, config, logging, utils, stack
+from ..application import ChangeEvent, ChangeType
 
 translate = QtGui.QApplication.translate
 
@@ -513,7 +512,7 @@ def _addTagType(tagType, data):
     logging.info(__name__, "Added new tag '{}' of type '{}'.".format(tagType.name, tagType.type.name))
 
     _tagsById[tagType.id] = tagType
-    application.dispatcher.emit(TagTypeChangeEvent(ADDED, tagType))
+    application.dispatcher.emit(TagTypeChangeEvent(ChangeType.added, tagType))
     
 
 def removeTagType(tagType):
@@ -549,7 +548,7 @@ def _removeTagType(tagType):
     del _tagsById[tagType.id]
     tagList.remove(tagType)
     tagType._clearData()
-    application.dispatcher.emit(TagTypeChangeEvent(REMOVED, tagType))
+    application.dispatcher.emit(TagTypeChangeEvent(ChangeType.removed, tagType))
     
 
 def changeTagType(tagType, **data):
@@ -623,7 +622,7 @@ def _changeTagType(tagType, data):
     if len(assignments) > 0:
         params.append(tagType.id) # for the WHERE clause
         db.query("UPDATE {p}tagids SET "+','.join(assignments)+" WHERE id = ?", *params)
-        application.dispatcher.emit(TagTypeChangeEvent(CHANGED, tagType))
+        application.dispatcher.emit(TagTypeChangeEvent(ChangeType.changed, tagType))
 
 
 def _convertTagTypeOnLevels(tagType, valueType):
@@ -658,7 +657,6 @@ class TagTypeChangeEvent(ChangeEvent):
     """TagTypeChangeEvents are used when a tag type (like artist, composer...) is added, changed or removed.
     """
     def __init__(self, action, tagType):
-        assert action in constants.CHANGE_TYPES
         self.action = action
         self.tagType = tagType
   

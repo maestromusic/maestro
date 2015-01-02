@@ -40,7 +40,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 QWIDGETSIZE_MAX = 16777215
 
-from .. import config, constants, logging, utils, stack
+from .. import config, logging, utils, stack, VERSION
 from . import selection, dialogs
 
 # This will contain the single instance of MainWindow once it is initialized
@@ -285,7 +285,7 @@ class MainWindow(QtGui.QMainWindow):
         self._isClosing = False
 
         self.setDockNestingEnabled(True)
-        self.setWindowTitle(self.tr('Maestro version {}').format(constants.VERSION))
+        self.setWindowTitle(self.tr('Maestro version {}').format(VERSION))
         self.setWindowIcon(QtGui.QIcon(":maestro/omg_square.svg"))
 
         selection.changed = self._globalSelectionChanged
@@ -764,7 +764,7 @@ class MainWindow(QtGui.QMainWindow):
         box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon, self.tr("About Maestro"),
                 '<div align="center"><img src=":maestro/omg.png" /><br />'
                 + self.tr("This is Maestro version {} by Martin Altmayer and Michael Helmling.")
-                             .format(constants.VERSION)
+                             .format(VERSION)
                 + '</div>',
                 QtGui.QMessageBox.Ok)
         box.exec_()

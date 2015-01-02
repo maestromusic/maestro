@@ -23,7 +23,7 @@ from PyQt4.QtCore import Qt
 
 from . import profiles as profilesgui
 from .. import dialogs, delegates
-from ... import application, constants, utils
+from ... import application, utils
 from ...core import tags
 
         

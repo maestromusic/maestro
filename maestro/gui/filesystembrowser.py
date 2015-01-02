@@ -22,7 +22,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, filebackends, filesystem, utils, constants
+from .. import application, filebackends, filesystem, utils
 from ..filebackends.filesystem import FileURL
 from . import mainwindow, selection, dockwidget, widgets
 from ..core import levels
@@ -151,7 +151,7 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
             
     def _handleDispatcher(self, event):
         if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.getSource():
-            if event.action == constants.DELETED:
+            if event.action == application.ChangeType.deleted:
                 self.setSource(None)
             else: self.setRootIndex(self.model().index(event.source.path))
     

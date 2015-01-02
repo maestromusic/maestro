@@ -21,7 +21,7 @@ import collections, itertools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import constants, utils
+from .. import utils
 from ..core import levels, tags
 
 translate = QtCore.QCoreApplication.translate
@@ -604,7 +604,7 @@ class TagEditorModel(QtCore.QObject):
         # Collect all separators appearing in the first record
         if len(records) == 0 or any(record.tag.type == tags.TYPE_DATE for record in records):
             return []
-        result = [s for s in constants.SEPARATORS if s in records[0].value]
+        result = [s for s in utils.strings.SEPARATORS if s in records[0].value]
         for record in records[1:]:
             if len(result) == 0:
                 break

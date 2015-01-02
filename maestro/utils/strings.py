@@ -18,12 +18,15 @@
 
 """This module just contains several useful string functions."""
 
-import re, string, unicodedata
+import re, unicodedata
 
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from .. import constants
+
+# Separators which may separate different values in tags
+# (usually you'll want to split the tag into one tag for each value)
+SEPARATORS = ('/', " / ", ' - ', ", ", ' & ')
 
 
 def replace(text, dict):
@@ -166,7 +169,7 @@ def rstripSeparator(string):
     string contains one of the separators from ``constants.SEPARATORS`` at its end, remove it together with
     additional whitespace."""
     string = string.rstrip()
-    for sep in constants.SEPARATORS:
+    for sep in SEPARATORS:
         if string.endswith(sep):
             string = string[:-len(sep)]
             break

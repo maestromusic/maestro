@@ -58,7 +58,7 @@ options. Use 'loadPlugins' and 'removePlugins' to add or remove plugin configura
 import functools
 
 from .config import *
-from .. import constants, logging
+from .. import logging, VERSION
 
 # Directory of the configuration files.
 CONFDIR = None
@@ -87,7 +87,7 @@ def init(cmdConfig=[], testMode=False):
 
     for name, type, fileName, defaults in fileData:
         file = addFile(type, os.path.join(CONFDIR, fileName), globals()[defaults],
-                       allowUndefinedSections=True, version=constants.VERSION,
+                       allowUndefinedSections=True, version=VERSION,
                        errorMethod=functools.partial(logging.error, __name__))
         globals()[name] = file.getAccess()
         del globals()[defaults] # not necessary anymore

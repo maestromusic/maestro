@@ -23,7 +23,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from ...core import tags, domains
-from ... import search, config, application, database as db, constants, utils
+from ... import search, config, application, database as db, utils
 from ...search import criteria
 from ...gui import mainwindow, dialogs, search as searchgui, widgets
 from . import resources
