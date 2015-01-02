@@ -16,44 +16,54 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, bisect
+import os.path
+import bisect
+import enum
 
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import tags as tagsModule, domains
+from . import tags as tagsModule
 from .. import config, filebackends, utils
 
-CONTAINER_TYPES = range(4)
-TYPE_CONTAINER, TYPE_ALBUM, TYPE_WORK, TYPE_COLLECTION = CONTAINER_TYPES
-MAJOR_TYPES = (TYPE_ALBUM, TYPE_WORK)
 
-def getTypeTitle(type):
-    """Return the human-readable and translated title for the given type."""
-    return {
-            TYPE_CONTAINER: translate("Elements", "Container"),
-            TYPE_ALBUM: translate("Elements", "Album"),
-            TYPE_WORK: translate("Elements", "Work"),
-            TYPE_COLLECTION: translate("Elements", "Collection")
-    }[type]
+class ContainerType(enum.Enum):
+    Container = 0
+    Album = 1
+    Work = 2
+    Collection = 3
 
-_typeIcons = {
-    TYPE_ALBUM: 'cd.png',
-    TYPE_WORK: 'work.png',
-    TYPE_COLLECTION: 'cdbox.png'              
-}
+    @classmethod
+    def majorTypes(cls):
+        return cls.Album, cls.Work
 
-def getTypeIcon(type):
-    """Return an icon as QIcon for the given container type. Return None for TYPE_CONTAINER."""
-    if type in _typeIcons:
-        return utils.getIcon(_typeIcons[type])
-    else: return None
+    def title(self):
+        if self == ContainerType.Container:
+            return translate('Elements', 'Container')
+        elif self == ContainerType.Album:
+            return translate('Elements', 'Album')
+        elif self == ContainerType.Work:
+            return translate('Elements', 'Work')
+        elif self == ContainerType.Collection:
+            return translate('Elements', 'Collection')
 
-def getTypePixmap(type):
-    """Return an icon as QPixmap for the given container type. Return None for TYPE_CONTAINER."""
-    if type in _typeIcons:
-        return utils.getPixmap(_typeIcons[type])
-    else: return None
+    def iconPath(self):
+        if self == ContainerType.Album:
+            return 'cd.png'
+        elif self == ContainerType.Work:
+            return 'work.png'
+        elif self == ContainerType.Collection:
+            return 'cdbox.png'
+
+    def icon(self):
+        path = self.iconPath()
+        if path:
+            return utils.getIcon(path)
+
+    def pixmap(self):
+        path = self.iconPath()
+        if path:
+            return utils.getPixmap(path)
 
 
 class Element:
@@ -76,7 +86,7 @@ class Element:
     
     def isMajor(self):
         """Return whether the type of this element implies the 'major'-property."""
-        return self.isContainer() and self.type in MAJOR_TYPES
+        return self.isContainer() and self.type in ContainerType.majorTypes()
         
     def getTitle(self, usePath=True, neverShowIds=False):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
@@ -206,7 +216,7 @@ class Container(Element):
         self.id = id
         
         if type is None:
-            type = TYPE_CONTAINER
+            type = ContainerType.Container
         self.type = type
         if contents is None:
             contents = ContentList()

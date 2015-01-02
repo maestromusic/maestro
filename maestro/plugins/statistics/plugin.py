@@ -178,7 +178,7 @@ class StatisticsWidget(mainwindow.Widget):
             GROUP BY type
             ORDER BY count DESC
             """)
-        return [(row[0], elements.getTypeTitle(row[1])) for row in result]
+        return [(row[0], elements.ContainerType(row[1]).title()) for row in result]
     
     def getDates(self):
         """Return heights and labels of the bars in the date chart."""

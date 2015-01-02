@@ -23,7 +23,7 @@ from lxml import etree
 
 from ... import config, database as db, logging
 from ...core import elements, tags
-from ...core.elements import TYPE_ALBUM
+from ...core.elements import ContainerType
 from ...utils import FlexiDate
 from ...filebackends import BackendURL
 
@@ -252,9 +252,9 @@ def findReleasesForDiscid(discid):
             mbit.tags.add("barcode", release.findtext('barcode'))
         relGroup = release.find('release-group')
         if relGroup is not None and relGroup.get("type") == "Compilation":
-            mbit.containerType = elements.TYPE_COLLECTION
+            mbit.containerType = ContainerType.Collection
             for medium in mbit.children.values():
-                medium.containerType = elements.TYPE_ALBUM
+                medium.containerType = ContainerType.Album
                 medium.tags.add('album', medium.tags['title'][0])
         else:
             mbit.tags.add('album', title)

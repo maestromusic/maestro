@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 
 from .. import config, profiles, utils
 from ..core import flags, tags
-from ..core.elements import ContentList, TYPE_ALBUM, TYPE_CONTAINER
+from ..core.elements import ContentList, ContainerType
 
 translate = QtCore.QCoreApplication.translate
 
@@ -157,7 +157,7 @@ class StandardGuesser(profiles.Profile):
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
                 container = self.level.createContainer(domain=domain, tags=albumTags,
-                                                       flags=list(flags), type=TYPE_ALBUM,
+                                                       flags=list(flags), type=ContainerType.Album,
                                                        contents=ContentList.fromPairs(children.items()))
                 self.orders[container] = self.orders[elements[0]]
                 self.albums.append(container)
@@ -189,11 +189,11 @@ class StandardGuesser(profiles.Profile):
         for key, contents in byKey.items():
             metaTags = tags.findCommonTags(contents.values())
             metaTags[tags.TITLE] = [key[1]]
-            self.level.setTypes({album: TYPE_CONTAINER for album in contents.values()})
+            self.level.setTypes({album: ContainerType.Container for album in contents.values()})
             domain = next(iter(contents.values())).domain
             container = self.level.createContainer(domain=domain, tags=metaTags,
                                                    contents=ContentList.fromPairs(contents.items()),
-                                                   type=TYPE_ALBUM)
+                                                   type=ContainerType.Album)
             self.orders[container] = self.orders[contents[min(contents)]]
             self.albums.append(container)
             self.toplevels.add(container)

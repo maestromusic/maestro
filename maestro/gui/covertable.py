@@ -205,7 +205,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
         if el.isFile() and el.url is not None:
             lines.append(str(el.url))
         elif el.isContainer():
-            lines.append(elements.getTypeTitle(el.type))
+            lines.append(el.type.title())
         if showTags and el.tags is not None:
             lines.extend("{}: {}".format(tag.title, ', '.join(map(str, values)))
                          for tag, values in el.tags.items() if tag != tags.TITLE)

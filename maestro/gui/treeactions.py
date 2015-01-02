@@ -456,10 +456,10 @@ class SetElementTypeAction(TreeAction):
     """Action to set the element type of one or more elements."""
     
     def __init__(self, parent, type):
-        """Constructor. *type* is one of elements.CONTAINER_TYPES."""
+        """Constructor. *type* is one of elements.ContainerType."""
         super().__init__(parent)
         self.type = type
-        self.setText(elements.getTypeTitle(type))
+        self.setText(type.title())
         
     
     def initialize(self, selection):
@@ -476,10 +476,10 @@ class SetElementTypeAction(TreeAction):
     def addSubmenu(actionConfig, section):
         """Create a submenu in the given action configuration with entries for each type.""" 
         typeSection = translate("TreeActions", "set element type ...")
-        for type in elements.CONTAINER_TYPES:
+        for type in elements.ContainerType:
             actionConfig.addActionDefinition(((section, typeSection), 
-                                              (typeSection, "setType{}".format(type))),
-                                             SetElementTypeAction, type)
+                                              (typeSection, "setType{}".format(type.name))),
+                                               SetElementTypeAction, type)
 
 
 

@@ -21,6 +21,7 @@ from PyQt4 import QtCore, QtGui
 from ..core import domains, elements
 from .. import application, filesystem
 
+
 class ContainerTypeBox(QtGui.QComboBox):
     """ComboBox to select a container type."""
     
@@ -33,12 +34,12 @@ class ContainerTypeBox(QtGui.QComboBox):
         super().__init__()
         if currentType is None:
             self.addItem('')
-        for type in elements.CONTAINER_TYPES:
-            if type == elements.TYPE_CONTAINER:
+        for type in elements.ContainerType:
+            if type == elements.ContainerType.Container:
                 title = self.tr('(General) container')
             else:
-                title = elements.getTypeTitle(type)
-            icon = elements.getTypeIcon(type)
+                title = type.title()
+            icon = type.icon()
             if icon is not None:
                 self.addItem(icon, title, type)
             else:

@@ -379,10 +379,11 @@ class TagLayer(Layer):
         new = toplevel
         while len(new):
             new = set(db.query("""
-                    SELECT c.element_id
-                    FROM {p}contents AS c JOIN {p}elements AS el ON c.container_id = el.id
-                    WHERE el.type IN ({collection},{container}) AND el.id IN ({parents})
-                    """, collection=elements.TYPE_COLLECTION, container=elements.TYPE_CONTAINER,
+                SELECT c.element_id
+                FROM {p}contents AS c JOIN {p}elements AS el ON c.container_id = el.id
+                WHERE el.type IN ({collection},{container}) AND el.id IN ({parents})""",
+                    collection=elements.ContainerType.Collection.value,
+                    container=elements.ContainerType.Container.value,
                     parents=db.csList(new)).getSingleColumn())
             # Restrict to search result. If the node's value only appears in contents of a permeable
             # node in the search result and these contents are not in the result themselves,
@@ -595,7 +596,7 @@ def _buildContainerTree(domain, elids):
         """Intelligent sort: sort albums by their date, everything else by name."""
         element = wrapper.element
         date = 0
-        if element.isContainer() and element.type == elements.TYPE_ALBUM:
+        if element.isContainer() and element.type == elements.ContainerType.Album:
             dateTag = tags.get("date")
             if dateTag.type == tags.TYPE_DATE and dateTag in element.tags: 
                 date = -element.tags[dateTag][0].toSql() # minus leads to descending sort

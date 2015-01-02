@@ -22,6 +22,7 @@ from PyQt4.QtGui import QDialogButtonBox
 
 from ... import config, logging, filebackends
 from ...core import levels, tags, domains
+from ...core.elements import ContainerType
 from ...gui import dialogs, delegates, mainwindow, treeactions, treeview
 from ...gui.delegates.abstractdelegate import *
 from ...models import leveltreemodel
@@ -465,7 +466,6 @@ class SimpleRipDialog(QtGui.QDialog):
         self.edits = edits
 
     def finish(self):
-        from ...core.elements import TYPE_ALBUM
         elems = []
         for i, edit in enumerate(self.edits, start=1):
             url = filebackends.BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
@@ -481,8 +481,8 @@ class SimpleRipDialog(QtGui.QDialog):
         contTags = tags.Storage()
         contTags[tags.TITLE] = [edit.text()]
         contTags[tags.ALBUM] = [self.titleEdit.text()]
-        cont = self.level.createContainer(contents=elems, type=TYPE_ALBUM, domain=domains.default(),
-                                          tags=contTags)
+        cont = self.level.createContainer(contents=elems, type=ContainerType.Album,
+                                          domain=domains.default(), tags=contTags)
         self.container = cont
         self.accept()
 

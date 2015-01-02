@@ -145,7 +145,7 @@ class DetailsView(mainwindow.Widget):
         # Type
         text.append('<tr><td>'+self.tr("Type: ")+'</td><td>')
         if el.isContainer():
-            text.append(elements.getTypeTitle(el.type))
+            text.append(el.type.title())
         else: text.append(Qt.escape(el.url.extension))
         text.append('</td></tr>')
         

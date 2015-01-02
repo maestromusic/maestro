@@ -106,9 +106,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             lines.append(str(el.url))
         elif el.isContainer():
             if showFileNumber:
-                lines.append(self.tr("{} with {} pieces").format(elements.getTypeTitle(el.type),
-                                                                 wrapper.fileCount()))
-            else: lines.append(elements.getTypeTitle(el.type))
+                lines.append(self.tr("{} with {} pieces").format(el.type.title(), wrapper.fileCount()))
+            else:
+                lines.append(el.type.title())
         if showTags and el.tags is not None:
             lines.extend("{}: {}".format(tag.title, ', '.join(map(str, values)))
                          for tag, values in el.tags.items() if tag != tags.TITLE)

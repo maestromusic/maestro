@@ -17,9 +17,9 @@
 #
 
 from functools import reduce
-from collections import namedtuple
 
 from ...core import elements, nodes, tags, domains
+from ...core.elements import ContainerType
 from .. import logging, config
 from ...core.nodes import Wrapper
 
@@ -222,7 +222,7 @@ class Release(MBTreeElement):
     """A release is the top-level container structure in MusicBrainz that we care about.
     """
     
-    containerType = elements.TYPE_ALBUM
+    containerType = ContainerType.Album
     idTagName = 'musicbrainz_albumid'
     
     def mediumForDiscid(self, discid):
@@ -237,7 +237,7 @@ class Release(MBTreeElement):
 class Medium(MBTreeElement):
     """A medium inside a release. Usually has one or more discids associated to it."""
     
-    containerType = elements.TYPE_CONTAINER
+    containerType = ContainerType.Container
     idTagName = 'musicbrainz_discid'
     
     def __init__(self, pos, release, discids, title=None):
@@ -404,7 +404,7 @@ class Recording(MBTreeElement):
 
 class Work(MBTreeElement):
     
-    containerType = elements.TYPE_WORK
+    containerType = ContainerType.Work
     
     idTagName = 'musicbrainz_workid'
     

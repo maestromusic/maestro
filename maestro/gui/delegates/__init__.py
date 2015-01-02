@@ -89,7 +89,7 @@ class StandardDelegate(AbstractDelegate):
         if urlWarningItem is not None:
             self.addCenter(urlWarningItem)
         if self.profile.options['showType'] and element.isContainer():
-            pixmap = elements.getTypePixmap(element.type)
+            pixmap = element.type.pixmap()
             if pixmap is not None:
                 self.addCenter(ImageItem(pixmap))
         self.addCenter(titleItem)

@@ -136,12 +136,12 @@ class RealLevel(levels.Level):
             _dbIds.add(id)
             if file:
                 level.elements[id] = elements.File(domains.domainById(domainId), level, id,
-                                                   url = filebackends.BackendURL.fromString(url),
-                                                   length = length,
-                                                   type = elementType)
+                                                   url=filebackends.BackendURL.fromString(url),
+                                                   length=length,
+                                                   type=elements.ContainerType(elementType))
             else:
                 level.elements[id] = elements.Container(domains.domainById(domainId), level, id,
-                                                        type=elementType)
+                                                        type=elements.ContainerType(elementType))
                 
         # contents
         result = db.query("""
@@ -353,7 +353,7 @@ class RealLevel(levels.Level):
             data = [(element.domain.id,
                      element.id,
                      element.isFile(),
-                     element.type if element.isContainer() else 0,
+                     element.type.value if element.isContainer() else 0,
                      len(element.contents) if element.isContainer() else 0)
                             for element in elements]
             db.multiQuery("INSERT INTO {p}elements (domain, id, file, type, elements) VALUES (?,?,?,?,?)",
@@ -521,7 +521,7 @@ class RealLevel(levels.Level):
     def _setTypes(self, containerTypes):
         if len(containerTypes) > 0:
             db.multiQuery("UPDATE {p}elements SET type = ? WHERE id = ?",
-                          ((type, c.id) for c, type in containerTypes.items()))
+                          ((type.value, c.id) for c, type in containerTypes.items()))
             super()._setTypes(containerTypes)
     
     def _setContents(self, parent, contents):
