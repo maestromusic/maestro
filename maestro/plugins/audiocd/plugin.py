@@ -23,8 +23,6 @@ except ImportError:
 from PyQt4 import QtCore, QtGui
 from ... import application, database as db, filebackends
 from ...gui import editor
-from ... import config
-from ...core import domains
 
 translate = QtCore.QCoreApplication.translate
 
@@ -62,17 +60,6 @@ def disable():
     real.commitHooks.remove(fileChangerHook)
     application.mainWindow.menus['extras'].removeAction(_action)
 
-
-def simpleDiscContainer(discid, trackCount, level):
-    from ...core.elements import TYPE_ALBUM
-    
-    elems = []
-    for i in range(1, trackCount+1):
-        url = filebackends.BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
-                        discid, i, config.options.audiocd.rippath))
-        elems.append(level.collect(url))
-    return level.createContainer(contents=elems, type=TYPE_ALBUM, domain=domains.default())
-    
 
 def showRipMissingDialog():
     ans = list(db.query("SELECT url, element_id FROM {p}files WHERE url LIKE 'audiocd://%'"))

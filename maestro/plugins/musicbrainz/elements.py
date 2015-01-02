@@ -177,6 +177,8 @@ class MBTreeElement:
         """Add tags that are common in all children to the own tags."""
         children = self.children.values()
         commonTags = set(reduce(lambda x,y: x & y, [set(child.tags.keys()) for child in children]))
+        if 'title' in commonTags:
+            commonTags.remove('title')
         commonTagValues = {}
         differentTags=set()
         for child in children:
@@ -272,7 +274,6 @@ class Medium(MBTreeElement):
             if child.parentWork:
                 if len(newChildren) and newChildren[-1][1] == child.parentWork:
                     newChildren[-1][1].insertChild(None, child)
-                    
                     posOffset -= 1
                 else:
                     newChildren.append((child.position + posOffset, child.parentWork))
@@ -376,6 +377,8 @@ class Recording(MBTreeElement):
             self.tags.add(tag, artist)
             artist.asTag.add(tag)
         for i, relation in enumerate(recording.iterfind('relation-list[@target-type="work"]/relation')):
+            from lxml import etree
+            print(etree.tostring(relation, pretty_print=True))
             if i > 0:
                 logger.warning("more than one work relation in recording {}".format(self.mbid))
                 break

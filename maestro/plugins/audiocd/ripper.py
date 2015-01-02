@@ -153,10 +153,9 @@ class Ripper(QtCore.QObject):
     def handleRipFinish(self, exitCode, exitStatus):
         if exitCode == 0 and config.options.audiocd.eject:
             try:
-                subprocess.check_call(['eject', self.device])
-            except:
+                subprocess.Popen(['eject', self.device])
+            except FileNotFoundError:
                 # 'eject' might not be installed or not working ... well,
-                # then we don't
                 pass
 
     def cancel(self):

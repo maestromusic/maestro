@@ -20,11 +20,11 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
-from ... import config, logging
-from ...core import levels, tags
+from ... import config, logging, filebackends
+from ...core import levels, tags, domains
 from ...gui import dialogs, delegates, mainwindow, treeactions, treeview
 from ...gui.delegates.abstractdelegate import *
-from ...models import leveltreemodel, rootedtreemodel
+from ...models import leveltreemodel
 from ...plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
 
 translate = QtCore.QCoreApplication.translate
@@ -84,12 +84,9 @@ class ImportAudioCDAction(treeactions.TreeAction):
         if config.options.audiocd.earlyrip:
             self.ripper.start()
         try:
-            print('wt')
             release = self._getRelease(theDiscid)
-            print('z')
             if release is None:
                 return
-            print('f')
             progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
             progress.open()
             stack = self.level().stack.createSubstack(modalDialog=True)
@@ -112,21 +109,14 @@ class ImportAudioCDAction(treeactions.TreeAction):
                     self.ripper.start()
             stack.close()
         except xmlapi.UnknownDiscException:
-            ans = dialogs.question(self.tr("Disc not found"),
-                                   self.tr("The disc was not found in the MusicBrainz database. "
-                                           "You need to tag the album yourself. Proceed?"))
-            if not ans:
-                return False
-            from .plugin import simpleDiscContainer
-
-            if not config.options.audiocd.earlyrip:
-                self.ripper.start()
-
-            self.level().stack.beginMacro(self.tr("Load Audio CD"))
-            container = simpleDiscContainer(theDiscid, trackCount, self.level())
-            model = self.parent().model()
-            model.insertElements(model.root, len(model.root.contents), [container])
-            self.level().stack.endMacro()
+            dialog = SimpleRipDialog(theDiscid, trackCount, self.level())
+            if dialog.exec_():
+                if not config.options.audiocd.earlyrip:
+                    self.ripper.start()
+                self.level().stack.beginMacro(self.tr("Load Audio CD"))
+                model = self.parent().model()
+                model.insertElements(model.root, len(model.root.contents), [dialog.container])
+                self.level().stack.endMacro()
         except ConnectionError as e:
             dialogs.warning(self.tr('Error communicating with MusicBrainz'), str(e))
 
@@ -433,4 +423,64 @@ class ImportAudioCDDialog(QtGui.QDialog):
             config.storage.musicbrainz.tagmap[mbname] = maestroTag.name if maestroTag else None
         self.level.commit()
         self.accept()
-                
+
+
+class SimpleRipDialog(QtGui.QDialog):
+    """Dialog for ripping CDs that are not found in the MusicBrainz database. Allows to enter album
+    title, artist, date, and a title for each track,
+    """
+    def __init__(self, discId, trackCount, level):
+        super().__init__(mainwindow.mainWindow)
+        self.setModal(True)
+        self.level = level
+        self.discid = discId
+        topLayout = QtGui.QHBoxLayout()
+        topLayout.addWidget(QtGui.QLabel(self.tr('Album title:')))
+        self.titleEdit = QtGui.QLineEdit('unknown album')
+        topLayout.addWidget(self.titleEdit)
+        topLayout.addWidget(QtGui.QLabel(self.tr('Artist:')))
+        self.artistEdit = QtGui.QLineEdit('unknown artist')
+        topLayout.addWidget(self.artistEdit)
+        layout = QtGui.QVBoxLayout()
+        description = QtGui.QLabel(self.tr('The MusicBrainz database does not contain a release '
+            'for this disc. Please fill the tags manually.'))
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        layout.addLayout(topLayout)
+
+        tableLayout = QtGui.QGridLayout()
+        edits = []
+        for i in range(1, trackCount+1):
+            tableLayout.addWidget(QtGui.QLabel(self.tr('Track {:2d}:').format(i)), i-1, 0)
+            edits.append(QtGui.QLineEdit('unknown title'))
+            tableLayout.addWidget(edits[-1], i-1, 1)
+        layout.addLayout(tableLayout)
+        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        box.accepted.connect(self.finish)
+        box.rejected.connect(self.reject)
+        layout.addWidget(box)
+        self.setLayout(layout)
+        self.edits = edits
+
+    def finish(self):
+        from ...core.elements import TYPE_ALBUM
+        elems = []
+        for i, edit in enumerate(self.edits, start=1):
+            url = filebackends.BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
+                            self.discid, i, config.options.audiocd.rippath))
+            elem = self.level.collect(url)
+            elTags = tags.Storage()
+            elTags[tags.TITLE] = [edit.text()]
+            elTags[tags.ALBUM] = [self.titleEdit.text()]
+            elTags[tags.get('artist')] = [self.artistEdit.text()]
+            diff = tags.TagStorageDifference(None, elTags)
+            self.level.changeTags({elem: diff})
+            elems.append(elem)
+        contTags = tags.Storage()
+        contTags[tags.TITLE] = [edit.text()]
+        contTags[tags.ALBUM] = [self.titleEdit.text()]
+        cont = self.level.createContainer(contents=elems, type=TYPE_ALBUM, domain=domains.default(),
+                                          tags=contTags)
+        self.container = cont
+        self.accept()
+
