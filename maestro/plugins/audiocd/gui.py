@@ -490,7 +490,7 @@ class SimpleRipDialog(QtGui.QDialog):
             self.level.changeTags({elem: diff})
             elems.append(elem)
         contTags = tags.Storage()
-        contTags[tags.TITLE] = [edit.getValue()]
+        contTags[tags.TITLE] = [self.titleEdit.getValue()]
         contTags[tags.ALBUM] = [self.titleEdit.getValue()]
         contTags[tags.get('date')] = [self.dateEdit.getValue()]
         contTags[tags.get('artist')] = [self.artistEdit.getValue()]
