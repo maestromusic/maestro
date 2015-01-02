@@ -18,7 +18,7 @@
 
 """This module just contains several useful string functions."""
 
-import re, unicodedata
+import re, unicodedata, string
 
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate

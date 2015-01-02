@@ -517,7 +517,7 @@ class Source(QtCore.QObject):
         """
         if self.scanState != ScanState.notScanning:
             self.scanInterrupted = True
-        updateHash = []  # list of paths for which new hashes need to be computed
+        updateHash = set()  # paths for which new hashes need to be computed
         updatedDirs = []
         for oldURL, newURL in event.renamed:
             if oldURL.path in self.files:
@@ -530,13 +530,13 @@ class Source(QtCore.QObject):
             elif self.contains(newURL.path):
                 elem = levels.real.fetch(newURL)
                 self.addFile(url=newURL, id=elem.id)
-                updateHash.append(newURL.path)
+                updateHash.add(newURL.path)
             if self.contains(newURL.path):
                 dir, _ = self.getFolder(newURL.directory, storeNew=True)
                 updatedDirs.extend(dir.updateState(True))
         for url in event.modified:
             if self.contains(url.path):
-                updateHash.append(url.path)  # recompute hash if file was modified
+                updateHash.add(url.path)  # recompute hash if file was modified
         if len(event.added) > 0:
             db.multiQuery('DELETE FROM {p}newfiles WHERE url=?',
                           [(str(elem.url),) for elem in event.added])
@@ -548,7 +548,7 @@ class Source(QtCore.QObject):
                     else:
                         file = self.files[url.path]
                     if file.hash is None:
-                        updateHash.append(url.path)
+                        updateHash.add(url.path)
                     file.id = elem.id
                     dir = self.folders[url.directory]
                     updatedDirs += dir.updateState(True)

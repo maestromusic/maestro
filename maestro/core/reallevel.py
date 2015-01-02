@@ -569,7 +569,8 @@ class RealLevel(levels.Level):
                         for (oldPos, newPos) in sorted(changes, key=lambda chng: chng[1])
                         if newPos < oldPos ]
         for data in changesOne, changesTwo:
-            db.multiQuery("UPDATE {p}contents SET position=? WHERE container_id=? AND position=?", data)
+            if len(data):
+                db.multiQuery("UPDATE {p}contents SET position=? WHERE container_id=? AND position=?", data)
     
     def _renameFiles(self, renamings):
         """On the real level, files are renamed both on disk and in DB."""

@@ -57,7 +57,9 @@ def query(resource, mbid, includes=[]):
         data = ans.getSingle()
     except db.EmptyResultException:
         try:
-            with urllib.request.urlopen(url) as response:
+            request = urllib.request.Request(url)
+            request.add_header('User-Agent', 'Maestro/0.4.0 (https://github.com/maestromusic/maestro)')
+            with urllib.request.urlopen(request) as response:
                 data = response.readall()
         except urllib.error.HTTPError as e:
             if e.code == 404:
@@ -255,7 +257,8 @@ def findReleasesForDiscid(discid):
             mbit.containerType = ContainerType.Collection
             for medium in mbit.children.values():
                 medium.containerType = ContainerType.Album
-                medium.tags.add('album', medium.tags['title'][0])
+                if 'title' in medium.tags:
+                    medium.tags.add('album', medium.tags['title'][0])
         else:
             mbit.tags.add('album', title)
         releases.append(mbit)

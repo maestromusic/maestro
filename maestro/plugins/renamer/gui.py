@@ -51,8 +51,7 @@ class RenameFilesAction(treeactions.TreeAction):
             return True
         elements = [elem for elem in self.parent().selection.elements() if check(elem)]
         dialog = RenameDialog(self.parent(), self.level(), elements)
-        dialog.exec_()
-        if dialog.result() == dialog.Accepted:
+        if dialog.exec_():
             try:
                 dialog.sublevel.commit()
             except levels.RenameFilesError as e:
@@ -74,7 +73,7 @@ class PathDelegate(delegates.StandardDelegate):
     def addPath(self, element):
         if element.isFile():
             if not element.inParentLevel():
-                logger.warning('?')
+                print('?')
                 return
             oldPath = element.inParentLevel().url.path
             newPath = element.url.path

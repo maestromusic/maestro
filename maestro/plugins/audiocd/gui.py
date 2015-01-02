@@ -90,8 +90,6 @@ class ImportAudioCDAction(treeactions.TreeAction):
                 return
             progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
             progress.open()
-            stack = self.level().stack.createSubstack(modalDialog=True)
-            level = levels.Level("audiocd", self.level(), stack=stack)
 
             def callback(url):
                 progress.setText(self.tr("Fetching data from:\n{}").format(url))
@@ -102,6 +100,8 @@ class ImportAudioCDAction(treeactions.TreeAction):
             progress.close()
             xmlapi.queryCallback = None
             QtGui.qApp.processEvents()
+            stack = self.level().stack.createSubstack(modalDialog=True)
+            level = levels.Level("audiocd", self.level(), stack=stack)
             dialog = ImportAudioCDDialog(level, release)
             if dialog.exec_():
                 model = self.parent().model()
@@ -120,6 +120,8 @@ class ImportAudioCDAction(treeactions.TreeAction):
                 self.level().stack.endMacro()
         except ConnectionError as e:
             dialogs.warning(self.tr('Error communicating with MusicBrainz'), str(e))
+            if 'progress' in locals():
+                progress.close()
 
 
 class ReleaseSelectionDialog(QtGui.QDialog):
