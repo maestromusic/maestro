@@ -207,7 +207,6 @@ class MBTreeElement:
         return self.idTagName, self.mbid
     
     def passTags(self, excludes):
-        print('passing tags {}'.format(self))
         for tag, vals in self.tags.items():
             if tag in excludes:
                 continue
@@ -377,8 +376,6 @@ class Recording(MBTreeElement):
             self.tags.add(tag, artist)
             artist.asTag.add(tag)
         for i, relation in enumerate(recording.iterfind('relation-list[@target-type="work"]/relation')):
-            from lxml import etree
-            print(etree.tostring(relation, pretty_print=True))
             if i > 0:
                 logger.warning("more than one work relation in recording {}".format(self.mbid))
                 break
@@ -446,7 +443,7 @@ class Work(MBTreeElement):
                     self.parentWork.tags["title"] = [relation.findtext('work/title')]
                 else:
                     logger.warning('ignoring forward parts relation in {}'.format(self))
-            elif relation.get('type') in ('based on', 'other version'):
+            elif relation.get('type') in ('based on', 'other version', 'arrangement'):
                 pass # ignore these
             else:
                 logger.warning('unknown work-work relation "{}" in {}'.format(relation.get("type"), self.mbid))

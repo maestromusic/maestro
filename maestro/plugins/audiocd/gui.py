@@ -303,14 +303,16 @@ class TagMapWidget(QtGui.QTableWidget):
         from ...gui.tagwidgets import TagTypeBox
 
         for row, tagname in enumerate(newtags):
-
-            tag = tags.get(tagname)
+            if tagname in self.tagMapping:
+                tag = self.tagMapping[tagname]
+            else:
+                tag = tags.get(tagname)
             checkbox = QtGui.QTableWidgetItem()
             ttBox = TagTypeBox(tag, editable=True)
             ttBox.tagChanged.connect(self._handleTagTypeChanged)
             mbname = QtGui.QTableWidgetItem(tagname)
             self.setCellWidget(row, 2, ttBox)
-            if tagname in self.tagMapping and self.tagMapping[tagname] is None:
+            if tag is None:
                 checkbox.setCheckState(Qt.Unchecked)
                 ttBox.setEnabled(False)
                 mbname.setFlags(mbname.flags() ^ Qt.ItemIsEnabled)
