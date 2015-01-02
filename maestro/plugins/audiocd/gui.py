@@ -23,7 +23,7 @@ from PyQt4.QtGui import QDialogButtonBox
 from ... import config, logging, filebackends
 from ...core import levels, tags, domains
 from ...core.elements import ContainerType
-from ...gui import dialogs, delegates, mainwindow, treeactions, treeview
+from ...gui import dialogs, delegates, mainwindow, treeactions, tagwidgets, treeview
 from ...gui.delegates.abstractdelegate import *
 from ...models import leveltreemodel
 from ...plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
@@ -439,23 +439,33 @@ class SimpleRipDialog(QtGui.QDialog):
         self.discid = discId
         topLayout = QtGui.QHBoxLayout()
         topLayout.addWidget(QtGui.QLabel(self.tr('Album title:')))
-        self.titleEdit = QtGui.QLineEdit('unknown album')
+        self.titleEdit = tagwidgets.TagValueEditor(tags.TITLE)
+        self.titleEdit.setValue('unknown album')
         topLayout.addWidget(self.titleEdit)
-        topLayout.addWidget(QtGui.QLabel(self.tr('Artist:')))
-        self.artistEdit = QtGui.QLineEdit('unknown artist')
-        topLayout.addWidget(self.artistEdit)
+        midLayout = QtGui.QHBoxLayout()
+        midLayout.addWidget(QtGui.QLabel(self.tr('Artist:')))
+        self.artistEdit = tagwidgets.TagValueEditor(tags.get('artist'))
+        self.artistEdit.setValue('unknown artist')
+        midLayout.addWidget(self.artistEdit)
+        midLayout.addStretch()
+        midLayout.addWidget(QtGui.QLabel(self.tr('Date:')))
+        self.dateEdit = tagwidgets.TagValueEditor(tags.get('date'))
+        self.dateEdit.setValue(utils.FlexiDate(1900))
+        midLayout.addWidget(self.dateEdit)
         layout = QtGui.QVBoxLayout()
         description = QtGui.QLabel(self.tr('The MusicBrainz database does not contain a release '
             'for this disc. Please fill the tags manually.'))
         description.setWordWrap(True)
         layout.addWidget(description)
         layout.addLayout(topLayout)
+        layout.addLayout(midLayout)
 
         tableLayout = QtGui.QGridLayout()
         edits = []
         for i in range(1, trackCount+1):
             tableLayout.addWidget(QtGui.QLabel(self.tr('Track {:2d}:').format(i)), i-1, 0)
-            edits.append(QtGui.QLineEdit('unknown title'))
+            edits.append(tagwidgets.TagValueEditor(tags.TITLE))
+            edits[-1].setValue('unknown title')
             tableLayout.addWidget(edits[-1], i-1, 1)
         layout.addLayout(tableLayout)
         box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -472,15 +482,18 @@ class SimpleRipDialog(QtGui.QDialog):
                             self.discid, i, config.options.audiocd.rippath))
             elem = self.level.collect(url)
             elTags = tags.Storage()
-            elTags[tags.TITLE] = [edit.text()]
-            elTags[tags.ALBUM] = [self.titleEdit.text()]
-            elTags[tags.get('artist')] = [self.artistEdit.text()]
+            elTags[tags.TITLE] = [edit.getValue()]
+            elTags[tags.ALBUM] = [self.titleEdit.getValue()]
+            elTags[tags.get('artist')] = [self.artistEdit.getValue()]
+            elTags[tags.get('date')] = [self.dateEdit.getValue()]
             diff = tags.TagStorageDifference(None, elTags)
             self.level.changeTags({elem: diff})
             elems.append(elem)
         contTags = tags.Storage()
-        contTags[tags.TITLE] = [edit.text()]
-        contTags[tags.ALBUM] = [self.titleEdit.text()]
+        contTags[tags.TITLE] = [edit.getValue()]
+        contTags[tags.ALBUM] = [self.titleEdit.getValue()]
+        contTags[tags.get('date')] = [self.dateEdit.getValue()]
+        contTags[tags.get('artist')] = [self.artistEdit.getValue()]
         cont = self.level.createContainer(contents=elems, type=ContainerType.Album,
                                           domain=domains.default(), tags=contTags)
         self.container = cont
