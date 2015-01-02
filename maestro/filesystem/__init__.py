@@ -288,7 +288,7 @@ class Source(QtCore.QObject):
         self.scanInterrupted = False
         self.scanState = ScanState.initialScan
         self.scanTimer.start(200)
-        logger.debug('starting filesystem scan')
+        logger.debug('source {} scanning path {}'.format(self.name, self.path))
 
     def checkScan(self):
         """Called periodically by a timer while threaded filesystem operations are running. Checks
@@ -329,7 +329,6 @@ class Source(QtCore.QObject):
         missingNew = [file for path, file in self.files.items()
                       if path not in self.fsFiles and file.id is None]
         if len(missingNew):
-            logger.debug('removing {} missing new files'.format(len(missingNew)))
             self.removeFiles(missingNew)
         # store missing DB files
         self.missingDB = [file for path, file in self.files.items()
@@ -345,14 +344,12 @@ class Source(QtCore.QObject):
         # remove empty folders
         emptyFolders = [folder for folder in self.folders.values() if folder.empty()]
         if len(emptyFolders):
-            logger.debug('removing {} empty folders from database'.format(len(emptyFolders)))
             for folder in emptyFolders:
                 del self.folders[folder.path]
                 if folder.parent:
                     folder.parent.subdirs.remove(folder)
             db.multiQuery('DELETE FROM {p}folders WHERE path=?', [(f.path,) for f in emptyFolders])
         # compute missing hashes, if necessary
-        logger.debug('check initial scan')
         if len(requestHash):
             self.scanState = ScanState.computingHashes
             self.hashThread.lastJobDone.clear()
@@ -398,7 +395,6 @@ class Source(QtCore.QObject):
                     self.scanState = ScanState.notScanning
 
     def scanCheckModified(self):
-        logger.debug('scan check modified')
         self.scanState = ScanState.checkModified
         toCheck = []
         for path, stamp in self.fsFiles.items():
@@ -412,12 +408,10 @@ class Source(QtCore.QObject):
                                              daemon=True)
             self.fsThread.start()
             self.scanTimer.start(1000)
-            logger.debug('checking {} files'.format(len(toCheck)))
         else:
             self.analyzeScanResult()
 
     def analyzeScanResult(self):
-        logger.debug('analyze scan results')
         if len(self.modifiedTags) > 0:
             logger.debug("detected {} files with modified tags".format(len(self.modifiedTags)))
             from . import dialogs

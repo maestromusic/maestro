@@ -33,11 +33,8 @@ class IconChooser(QtGui.QDialog):
         icons = []
         for path in folders:
             for file in QtCore.QDir(path).entryInfoList(filters=QtCore.QDir.Files):
-                try:
-                    icon = QtGui.QIcon(file.canonicalFilePath())
-                    icons.append( (icon, file) )
-                except Exception as e:
-                    print(e) # TODO remove print
+                icon = QtGui.QIcon(file.canonicalFilePath())
+                icons.append( (icon, file) )
         self.view = QtGui.QListWidget(self)
         self.view.setViewMode(QtGui.QListView.IconMode)
         self.view.doubleClicked.connect(self.accept)

@@ -232,8 +232,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node.setContents([])
             self.endRemoveRows()
             self.beginInsertRows(self.getIndex(node), 0, len(contents)-1)
-            if node is self.root:
-                print("SETTING ROOT CONTENTS", len(node.contents), len(contents))
             node.setContents(contents)
             self.endInsertRows()
         else:

@@ -471,7 +471,7 @@ class Macro:
         """Return whether this macro is empty, i.e. no command has been added to it."""
         return all(isinstance(command, Macro) and command.isEmpty() for command in self.commands)
     
-    def printStructure(self, indent = ''):
+    def printStructure(self, indent=''):
         """Debug method: print the tree below this node using indentation."""
         print(indent + str(self))
         indent, aIndent = indent+'  ', indent+'A '

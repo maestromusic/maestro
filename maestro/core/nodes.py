@@ -316,7 +316,7 @@ class Node:
                 return selfString
             else: return ''
         
-    def printStructure(self, indent = ''):
+    def printStructure(self, indent=''):
         """Debug method: print the tree below this node using indentation."""
         print(indent + str(self))
         for child in self.getContents():

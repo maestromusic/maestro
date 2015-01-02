@@ -59,7 +59,6 @@ def enable():
         if maestroName:
             maestroTag = tags.get(maestroName)
             if maestroTag.isInDb():
-                print(mbtag, maestroTag)
                 tagMap[mbtag] = maestroTag
         else:
             tagMap[mbtag] = None

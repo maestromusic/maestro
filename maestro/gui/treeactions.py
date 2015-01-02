@@ -257,7 +257,6 @@ class DeleteAction(TreeAction):
                                  'Do you want to append its children to its parent?'))
                 if ans:
                     insertPos = container.position
-                    print(insertPos)
                     insertParent = container.parent.element
                     insertIndex = insertParent.contents.positions.index(insertPos)
                     insertChildren = [wrapper.element for wrapper in container.contents]

@@ -55,7 +55,7 @@ Call 'init' at application start to read options and call 'shutdown' at the end 
 options. Use 'loadPlugins' and 'removePlugins' to add or remove plugin configuration.
 """
 
-import os, sys, collections, functools
+import functools
 
 from .config import *
 from .. import constants, logging
@@ -84,17 +84,13 @@ def init(cmdConfig=[], testMode=False):
                 ('storage', 'json',   'storage' if not testMode else None, 'storageOptions'),
                 ('binary',  'pickle', 'binary' if not testMode else None, 'binaryOptions')
                 ]
-    
-    try:
-        for name, type, fileName, defaults in fileData:
-            file = addFile(type, os.path.join(CONFDIR, fileName), globals()[defaults],
-                           allowUndefinedSections=True, version=constants.VERSION,
-                           errorMethod=functools.partial(logging.error, __name__))
-            globals()[name] = file.getAccess()
-            del globals()[defaults] # not necessary anymore
-    except ConfigError as e:
-        print(str(e))
-        sys.exit(1)
+
+    for name, type, fileName, defaults in fileData:
+        file = addFile(type, os.path.join(CONFDIR, fileName), globals()[defaults],
+                       allowUndefinedSections=True, version=constants.VERSION,
+                       errorMethod=functools.partial(logging.error, __name__))
+        globals()[name] = file.getAccess()
+        del globals()[defaults] # not necessary anymore
     
     # Set values from command line
     for line in cmdConfig:

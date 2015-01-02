@@ -102,7 +102,6 @@ class PhononPlayerBackend(player.PlayerBackend):
     # Insert etc. are handled by the PlaylistModel.
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
-        print(urls)
         for i, url in enumerate(urls):
             if not isinstance(url, FileURL):
                 raise player.InsertError("URL type {} not supported".format(type(url)))

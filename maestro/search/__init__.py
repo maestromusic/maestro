@@ -85,5 +85,4 @@ class SearchTask(utils.worker.Task):
                     criterion.result = allElements - criterion.result
                 yield
         end = time.perf_counter()
-        print(end-start)
                 

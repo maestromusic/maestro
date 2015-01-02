@@ -79,19 +79,22 @@ def collect(urls):
 
 
 def collectAsList(urls):
-    """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
-    are received. Return a list of FileURLs. Sort files within each directory, but not the list as whole.
+    """Find all music files below the given QUrls. This is used in various dropMimeData methods when
+    urls are received. Return a list of FileURLs. Sort files within each directory, but not the list
+    as whole.
     """
     from ..filebackends.filesystem import FileURL
+
     def checkUrl(url):
-        path = url.path
+        path = url.path()
         if os.path.isfile(path):
             return [FileURL(path)]
-        else: return itertools.chain.from_iterable(collect([url]).values())
+        else:
+            return itertools.chain.from_iterable(collect([url]).values())
+
     return itertools.chain.from_iterable(checkUrl(url) for url in urls)
 
 
-# 120 is a sensible max length, the real length is of course platform-dependent and not important.
 def makeFilePath(folder, fileName, forceAscii=False, maxLength=120):
     """Return a file path that is similar to os.path.join(folder,fileName), but
         - weird special characters will be removed,
@@ -99,6 +102,8 @@ def makeFilePath(folder, fileName, forceAscii=False, maxLength=120):
         - if *forceAscii* is true, the path will only contain ASCII characters,
         - including the numbers from above and the extension the file name (not the whole path)
           has at most *maxLength* characters.
+
+        120 is a sensible max length; the real max length is platform-dependent, but not important.
     """
     fileName, extension = os.path.splitext(fileName)
     
