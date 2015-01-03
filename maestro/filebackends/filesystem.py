@@ -39,8 +39,8 @@ class RealFile(BackendFile):
     
     @staticmethod
     def tryLoad(url):
-        """Returns a RealFile instance if the url scheme fits and the file exists."""
-        if url.scheme == 'file' and os.path.exists(url.path):
+        """Returns a RealFile instance if the url scheme fits."""
+        if url.scheme == 'file':
             return RealFile(url)
         return None
     

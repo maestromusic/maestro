@@ -34,7 +34,7 @@ from ..core import levels, domains
 logger = logging.getLogger(__name__)
 
 sources = None
-min_verified = datetime(1000,1,1, tzinfo=timezone.utc)
+min_verified = datetime(1000, 1, 1, tzinfo=timezone.utc)
 
 
 class FilesystemState(enum.Enum):
@@ -43,7 +43,6 @@ class FilesystemState(enum.Enum):
     synced = 1
     unsynced = 2
     unknown = 3
-    missing = 4
 
     def combine(self, other):
         """Compute the cumulative state. For example, if a directory contains synced as well as
@@ -142,6 +141,24 @@ class SourceChangeEvent(application.ChangeEvent):
         assert isinstance(action, application.ChangeType)
         self.action = action
         self.source = source
+
+
+class File:
+    """Representation of a file in the internal structure."""
+    def __init__(self, url, id=None, verified=min_verified, hash=None):
+        self.url = url
+        self.id = id
+        self.verified = verified
+        self.hash = hash
+        self.folder = None
+
+    def __str__(self):
+        if self.id is not None:
+            return "DB File[{}](url={})".format(self.id, self.url)
+        return "New File(url={})".format(self.url)
+
+    def __repr__(self):
+        return 'File({})'.format(self.url)
 
 
 class Source(QtCore.QObject):
@@ -715,24 +732,6 @@ def getNewfileHash(url):
     source = sourceByPath(url.path)
     if source and source.enabled and url.path in source.files:
         return source.files[url.path].hash
-
-
-class File:
-    """Representation of a file in the internal structure."""
-    def __init__(self, url, id=None, verified=min_verified, hash=None):
-        self.url = url
-        self.id = id
-        self.verified = verified
-        self.hash = hash
-        self.folder = None
-
-    def __str__(self):
-        if self.id is not None:
-            return "DB File[{}](url={})".format(self.id, self.url)
-        return "New File(url={})".format(self.url)
-
-    def __repr__(self):
-        return 'File({})'.format(self.url)
 
 
 class Folder:

@@ -46,14 +46,12 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         FilesystemState.unsynced : utils.getIcon("folder_unsynced.svg"),
         FilesystemState.synced   : utils.getIcon("folder_ok.svg"),
         FilesystemState.empty    : utils.getIcon("folder.svg"),
-        FilesystemState.unknown  : utils.getIcon("folder_unknown.svg"),
-        FilesystemState.missing  : utils.getIcon("folder_problem.svg") }
+        FilesystemState.unknown  : utils.getIcon("folder_unknown.svg")}
     
     fileIcons = {
         FilesystemState.unsynced : utils.getIcon("file_unsynced.svg"),
         FilesystemState.synced   : utils.getIcon("file_ok.svg"),
-        FilesystemState.unknown  : utils.getIcon("file_unknown.svg"),
-        FilesystemState.missing  : utils.getIcon("file_problem.svg") }
+        FilesystemState.unknown  : utils.getIcon("file_unknown.svg")}
     
     descriptions = {
         FilesystemState.unsynced : translate("FileSystemBrowserModel",
@@ -62,8 +60,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                                              "in sync with Maestro's database"),
         FilesystemState.empty    : translate("FileSystemBrowserModel",
                                              "empty directory"),
-        FilesystemState.unknown  : translate("FileSystemBrowserModel", "unknown status"),
-        FilesystemState.missing  : translate("FileSystemBrowserModel", "in conflict with database") }
+        FilesystemState.unknown  : translate("FileSystemBrowserModel", "unknown status")}
     
     def __init__(self, parent=None):
         QtGui.QFileSystemModel.__init__(self, parent)

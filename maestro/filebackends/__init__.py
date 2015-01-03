@@ -28,6 +28,7 @@ from .. import logging, utils
 urlTypes = {}
 """Maps scheme to implementing BackendURL subclass, e.g. "file"->RealFile."""
 
+
 class ParsedUrl:
     def __init__(self, urlString):
         self.scheme, rest = urlString.split("://", 1)
@@ -41,6 +42,7 @@ class ParsedUrl:
 
     def __str__(self):
         return self.geturl()
+
 
 def getFile(urlString):
     """Convenience method: first creates an URL and then the according backend file object."""
@@ -90,7 +92,7 @@ class BackendURL:
             backendFile = cls.tryLoad(self)
             if backendFile is not None:
                 return backendFile
-        raise ValueError("No backend succeeded to load {}".format(self))
+        raise ValueError('No backend succeeded to load {}'.format(self))
     
     def renamed(self, newPath):
         """Return a new URL object with path *newPath*, while all other attributes are unchanged."""
