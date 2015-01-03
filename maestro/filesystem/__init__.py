@@ -16,30 +16,29 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import multiprocessing, os, queue, threading
+import os, queue, threading
 import enum
-from os.path import basename, dirname, join, split
-from datetime import datetime, timezone, MINYEAR
+from os.path import basename, join, split
+from datetime import datetime, timezone
 
 from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt
-from maestro.filesystem.identification import AcoustIDIdentifier
+from .identification import AcoustIDIdentifier
 
 translate = QtCore.QCoreApplication.translate
 
 from .. import application, logging, config, utils, database as db, stack
 from ..filebackends import BackendURL
 from ..filebackends.filesystem import FileURL
-from ..core import levels, tags, domains
+from ..core import levels, domains
 
 logger = logging.getLogger(__name__)
 
-synchronizer = None
 sources = None
 min_verified = datetime(1000,1,1, tzinfo=timezone.utc)
 
 
 class FilesystemState(enum.Enum):
+    """State of a folder or file in a source directory."""
     empty = 0
     synced = 1
     unsynced = 2
@@ -47,10 +46,14 @@ class FilesystemState(enum.Enum):
     missing = 4
 
     def combine(self, other):
+        """Compute the cumulative state. For example, if a directory contains synced as well as
+        unsynced files / subdirectories, its combined state is unsynced.
+        """
         return FilesystemState(max(self.value, other.value))
 
 
 class ScanState(enum.Enum):
+    """State of the filesystem scan. Used internally in :class:`Source`."""
     notScanning = 0
     initialScan = 1
     computingHashes = 2
@@ -59,33 +62,98 @@ class ScanState(enum.Enum):
 
 
 def init():
-    """Initialize file system watching.
-    
-    This will start a separate thread that repeatedly scans the music folder for changes.
+    """Initialize filesystem module. Creates :class:`Source` instances for all configured sources.
     """
-    global synchronizer, sources
-    from . import identification
-    # Create folders even if filesystem watching is disabled (for filesystembrowser etc.)
+    global sources
     sources = [Source(**data) for data in config.storage.filesystem.sources]
     sources.sort(key=lambda s: s.name)
 
 
 def shutdown():
-    """Terminates this module; waits for all threads to complete."""
-    global synchronizer, sources
+    """Terminates this module, storing the state of all sources."""
+    global sources
     config.storage.filesystem.sources = [s.save() for s in sources]
-    if synchronizer is not None:
-        levels.real.filesystemDispatcher.disconnect(synchronizer.handleRealFileEvent)
-        synchronizer.shouldStop.set()
-        synchronizer.exit()
-        synchronizer.wait()
-        synchronizer = None
-        application.dispatcher.emit(application.ModuleStateChangeEvent("filesystem", "disabled"))
     sources = None
-    logger.debug("Filesystem module: shutdown complete")
+
+
+def sourceByName(name):
+    for source in sources:
+        if source.name == name:
+            return source
+    else: return None
+
+
+def sourceByPath(path):
+    for source in sources:
+        if source.contains(path):
+            return source
+    else: return None
+
+
+def isValidSourceName(name):
+    return name == name.strip() and 0 < len(name) <= 64
+
+
+def addSource(**data):
+    source = Source(**data)
+    stack.push(translate("Filesystem", "Add source"),
+               stack.Call(_addSource, source),
+               stack.Call(_deleteSource, source))
+
+
+def _addSource(source):
+    sources.append(source)
+    sources.sort(key=lambda s: s.name)
+    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.added, source))
+
+def deleteSource(source):
+    stack.push(translate("Filesystem", "Delete source"),
+               stack.Call(_deleteSource, source),
+               stack.Call(_addSource, source))
+
+
+def _deleteSource(source):
+    sources.remove(source)
+    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.deleted, source))
+
+
+def changeSource(source, **data):
+    oldData = {attr: getattr(source, attr) for attr in ['name', 'path', 'domain', 'enabled']}
+    stack.push(translate("Filesystem", "Change source"),
+               stack.Call(_changeSource, source, data),
+               stack.Call(_changeSource, source, oldData))
+
+
+def _changeSource(source, data):
+    if 'name' in data:
+        source.name = data['name']
+    if 'path' in data:
+        source.setPath(data['path'])
+    if 'domain' in data:
+        source.domain = data['domain']
+    if 'enabled' in data:
+        source.setEnabled(data['enabled'])
+    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.changed, source))
+
+
+class SourceChangeEvent(application.ChangeEvent):
+    """SourceChangeEvent are used when a source is added, changed or deleted."""
+    def __init__(self, action, source):
+        assert isinstance(action, application.ChangeType)
+        self.action = action
+        self.source = source
 
 
 class Source(QtCore.QObject):
+    """A source is a path in the filesystem that is watched by maestro. If enabled, maestro
+    periodically scans the filesystem in order to detect differences between the layouts of the
+    database and the filesystem.
+
+    :param str name: Name of the source (free-form string)
+    :param str path: Root path of the source.
+    :param object domain: Domain associated to this source (either Domain object or its ID).
+    :param bool enabled: Determines if filesystem scanning is enabled.
+    """
 
     folderStateChanged = QtCore.pyqtSignal(object)
     fileStateChanged = QtCore.pyqtSignal(object)
@@ -94,10 +162,7 @@ class Source(QtCore.QObject):
         super().__init__()
         self.name = name
         self.path = path
-        if isinstance(domain, int):
-            self.domain = domains.domainById(domain)
-        else:
-            self.domain = domain
+        self.domain = domains.domainById(domain) if isinstance(domain, int) else domain
         self.scanTimer = QtCore.QTimer()
         self.scanTimer.setInterval(200)
         self.scanTimer.timeout.connect(self.checkScan)
@@ -118,7 +183,7 @@ class Source(QtCore.QObject):
         self.scanInterrupted = False
         self.scanState = ScanState.notScanning
         logger.debug('loading filesystem source {}'.format(self.name))
-        self.loadFolders()
+        self.loadFolders() # TODO: could be done in worker thread to decrease startup time
         self.loadDBFiles()
         self.loadNewFiles()
         QtCore.QTimer.singleShot(5000, self.scan)
@@ -131,19 +196,19 @@ class Source(QtCore.QObject):
         levels.real.filesystemDispatcher.connect(self.handleRealFileEvent)
 
     def setPath(self, path):
+        """Change the path of this source to *path*. Will recreate internal structures if changed.
+        """
         self.path = path
         if path != self.path and self.enabled:
             self.disable()
             self.enable()
 
     def loadFolders(self):
-        """Load the folders table from the database.
-
-        Creates the tree of Folder objects and initializes self.folders.
+        """Load the folders table from the database. Initializes *self.folders*.
         """
         for path, state in db.query("SELECT path, state FROM {p}folders WHERE path LIKE "
-                                    + "'{}%' ORDER BY LENGTH(path)".format(self.path)):
-            if path == self.path: # root folder first
+                       + "'{}%' ORDER BY LENGTH(path)".format(self.path.replace("'", "\\'"))):
+            if path == self.path:
                 folder = Folder(path=self.path, parent=None)
             else:
                 parentName = os.path.split(path)[0]
@@ -153,28 +218,15 @@ class Source(QtCore.QObject):
             self.folders[folder.path] = folder
 
     def loadDBFiles(self):
-        """Load files table.
-
-        Adds them to self.files and self.dbFiles, and to the Directory objects in memory.
-        It might happen that the folders table does not contain the directory of some DB file (e.g.
-        if Maestro was exited unexpectedly). In such a case the folders table is augmented by that
-        directory.
-
-        This method returns a list of Tracks (if any) which are in the files table but have no hash
-        set.
-        """
+        """Load files table. Adds all files in there to self.files."""
         ans = db.query("SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE "
                        + "'{}%'".format('file://' + self.path.replace("'", "\\'")))
         for elid, urlstring, elhash, verified in ans:
             url = BackendURL.fromString(urlstring)
-            if url.scheme != "file":
-                continue
             self.addFile(url, id=elid, verified=db.getDate(verified), hash=elhash)
 
     def loadNewFiles(self):
         """Load the newfiles table and add the files to self.files.
-
-        URLs from newfiles already contained in files are deleted.
         """
         newDirectories = []
         toDelete = []
@@ -182,7 +234,6 @@ class Source(QtCore.QObject):
             + "WHERE url LIKE '{}%'".format('file://' + self.path.replace("'", "\\'"))):
             file = File(BackendURL.fromString(urlstring))
             if file.url.path in self.files:
-                logger.warning("url {} is BOTH in files and newfiles!".format(urlstring))
                 toDelete.append((urlstring,))
                 continue
             file.hash = elhash
@@ -218,18 +269,21 @@ class Source(QtCore.QObject):
 
     def storeFolders(self, folders):
         """Insert the given list of :class:`Folder` objects into the folders table."""
-        if len(folders) > 0:
+        if len(folders):
             db.multiQuery("INSERT INTO {p}folders (path, state) VALUES(?,?)",
                           [(dir.path, dir.state.value) for dir in folders])
 
     def storeNewFiles(self, newfiles):
+        """Inserts the given list of :class:`File` objects into the newfiles table."""
         if len(newfiles):
-            logger.debug('inserting {} new files into newfiles table'.format(len(newfiles)))
             db.multiQuery('INSERT INTO {p}newfiles (url, hash, verified) VALUES (?,?,?)',
                           [(str(file.url), file.hash,
                            file.verified.strftime("%Y-%m-%d %H:%M:%S")) for file in newfiles])
 
     def updateFolders(self, folders, emit=True):
+        """Updates entries for given list of :class:`Folder` objects in the folders table. Emits
+        :attr:folderStateChanged: unless *emit* is set to `False`.
+        """
         if len(folders):
             db.multiQuery('UPDATE {p}folders SET state=? WHERE path=?',
                           [(folder.state.value, folder.path) for folder in folders])
@@ -449,7 +503,7 @@ class Source(QtCore.QObject):
                 dialog.exec_()
                 stack.clear()
                 for oldURL, newURL in dialog.setPathAction.setPaths:
-                    self.moveFile(self.files[oldURL.path], newURL.path)
+                    self.moveFile(self.files[oldURL.path], newURL)
                 self.removeFiles([self.files[url.path] for url in dialog.deleteAction.removedURLs])
         self.scanState = ScanState.notScanning
         self.scanTimer.stop()
@@ -461,16 +515,19 @@ class Source(QtCore.QObject):
                 'domain': self.domain.id,
                 'enabled': self.enabled}
     
-    def contains(self, path):
+    def contains(self, path) -> bool:
+        """Tells whether the given *path* is contained in this source."""
         path = os.path.normpath(path)
         return path.startswith(os.path.normpath(self.path))
 
-    def folderState(self, path):
+    def folderState(self, path) -> FilesystemState:
+        """Returns the state of the folder given by *path*."""
         if path in self.folders:
             return self.folders[path].state
         return FilesystemState.unknown
 
-    def fileState(self, path):
+    def fileState(self, path) -> FilesystemState:
+        """Returns the state of the file given by *path*."""
         if path in self.files:
             if self.files[path].id:
                 return FilesystemState.synced
@@ -478,7 +535,7 @@ class Source(QtCore.QObject):
                 return FilesystemState.unsynced
         return FilesystemState.unknown
 
-    def moveFile(self, file, newUrl):
+    def moveFile(self, file: File, newUrl):
         """Internally move *file* to *newUrl* by updating the folders and their states.
 
         This does not alter the filesystem and normally also not the database. The exception is
@@ -503,11 +560,17 @@ class Source(QtCore.QObject):
         self.fileStateChanged.emit(newUrl.path)
 
     def addFile(self, url, id=None, hash=None, verified=min_verified,
-                storeFolders=True, storeFile=True):
+                storeFolders=True, storeFile=True) -> (File, list):
+        """Adds a new file with the given parameters to the internal structure. New folders will be
+        created if necessary, and stored in the database unless *storeFolders=False*. If
+        *storeFile=True* and *id is None*, the file will be stored in the newfiles table.
+        """
         dir, newdirs = self.getFolder(url.directory, storeNew=storeFolders)
         file = File(url, id=id, hash=hash, verified=verified)
         dir.add(file)
         self.files[url.path] = file
+        if storeFile and id is None:
+            self.storeNewFiles([file])
         return file, newdirs
 
     def handleRealFileEvent(self, event):
@@ -588,7 +651,10 @@ class Source(QtCore.QObject):
         self.updateFolders(updatedDirs)
 
 
-def readFilesystem(path, files):
+def readFilesystem(path, files: dict):
+    """Helper function that walks *path* and stores, for each found music file, an entry in *files*
+    mapping its path to its modification timestamp.
+    """
     for dirpath, dirnames, filenames in os.walk(path):
         for filename in filenames:
             if utils.files.isMusicFile(filename):
@@ -597,7 +663,10 @@ def readFilesystem(path, files):
                 files[absFilename] = stamp
 
 
-def checkFiles(files, tagDiffs, newHash):
+def checkFiles(files: list, tagDiffs: dict, newHash: dict):
+    """Compares database and filesystem state of *files*. If tags differ, adds an entry in
+    *tagDiffs*. If the hash is different, adds an entry in *newHash*.
+    """
     identifier = AcoustIDIdentifier()
     for file in files:
         hash = identifier(file.url.path)
@@ -617,7 +686,8 @@ def checkFiles(files, tagDiffs, newHash):
 
 
 class HashThread(threading.Thread):
-
+    """Helper thread for :class:`Source` that computes file hashes for files in :attr:`jobQueue`.
+    """
     def __init__(self):
         super().__init__()
         self.jobQueue = queue.PriorityQueue()
@@ -637,74 +707,6 @@ class HashThread(threading.Thread):
                 self.lastJobDone.set()
 
 
-def sourceByName(name):
-    for source in sources:
-        if source.name == name:
-            return source
-    else: return None
-    
-
-def sourceByPath(path):
-    for source in sources:
-        if source.contains(path):
-            return source
-    else: return None
-    
-
-def isValidSourceName(name):
-    return name == name.strip() and 0 < len(name) <= 64
-
-
-def addSource(**data):
-    source = Source(**data)
-    stack.push(translate("Filesystem", "Add source"), 
-               stack.Call(_addSource, source),
-               stack.Call(_deleteSource, source))
-
-
-def _addSource(source):
-    sources.append(source)
-    sources.sort(key=lambda s: s.name)
-    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.added, source))
-    
-def deleteSource(source):
-    stack.push(translate("Filesystem", "Delete source"),
-               stack.Call(_deleteSource, source), 
-               stack.Call(_addSource, source))
-
-
-def _deleteSource(source):
-    sources.remove(source)
-    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.deleted, source))
-    
-
-def changeSource(source, **data):
-    oldData = {attr: getattr(source, attr) for attr in ['name', 'path', 'domain', 'enabled']}
-    stack.push(translate("Filesystem", "Change source"),
-               stack.Call(_changeSource, source, data),
-               stack.Call(_changeSource, source, oldData))
-
-
-def _changeSource(source, data):
-    if 'name' in data:
-        source.name = data['name']
-    if 'path' in data:
-        source.setPath(data['path'])
-    if 'domain' in data:
-        source.domain = data['domain']
-    if 'enabled' in data:
-        source.setEnabled(data['enabled'])
-    application.dispatcher.emit(SourceChangeEvent(application.ChangeType.changed, source))
-
-
-class SourceChangeEvent(application.ChangeEvent):
-    """SourceChangeEvent are used when a source is added, changed or deleted."""
-    def __init__(self, action, source):
-        assert isinstance(action, application.ChangeType)
-        self.action = action
-        self.source = source
-        
-
 def getNewfileHash(url):
     """Return the hash of a file specified by *url* which is not yet in the database.
     
@@ -716,7 +718,7 @@ def getNewfileHash(url):
 
 
 class File:
-
+    """Representation of a file in the internal structure."""
     def __init__(self, url, id=None, verified=min_verified, hash=None):
         self.url = url
         self.id = id

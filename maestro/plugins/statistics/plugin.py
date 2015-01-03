@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import collections, datetime, math
+import collections, datetime
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt

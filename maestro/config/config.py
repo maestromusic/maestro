@@ -86,7 +86,7 @@ def getOption(access, option):
     Option-instance (which is not the option value!) for this option.
     """ 
     if not isinstance(access, Access):
-        raise TypeError("access must be a config.Access-instance.") 
+        raise TypeError("{} is not a config.Access-instance.".format(access))
     return getFile(access).getOption(option)
 
 
