@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ class FilesystemState(enum.Enum):
     synced = 1
     unsynced = 2
     unknown = 3
-    problem = 4
+    missing = 4
 
     def combine(self, other):
         return FilesystemState(max(self.value, other.value))

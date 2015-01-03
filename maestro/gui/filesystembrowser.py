@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,13 +47,13 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         FilesystemState.synced   : utils.getIcon("folder_ok.svg"),
         FilesystemState.empty    : utils.getIcon("folder.svg"),
         FilesystemState.unknown  : utils.getIcon("folder_unknown.svg"),
-        FilesystemState.problem  : utils.getIcon("folder_problem.svg") }
+        FilesystemState.missing  : utils.getIcon("folder_problem.svg") }
     
     fileIcons = {
         FilesystemState.unsynced : utils.getIcon("file_unsynced.svg"),
         FilesystemState.synced   : utils.getIcon("file_ok.svg"),
         FilesystemState.unknown  : utils.getIcon("file_unknown.svg"),
-        FilesystemState.problem  : utils.getIcon("file_problem.svg") }
+        FilesystemState.missing  : utils.getIcon("file_problem.svg") }
     
     descriptions = {
         FilesystemState.unsynced : translate("FileSystemBrowserModel",
@@ -63,7 +63,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         FilesystemState.empty    : translate("FileSystemBrowserModel",
                                              "empty directory"),
         FilesystemState.unknown  : translate("FileSystemBrowserModel", "unknown status"),
-        FilesystemState.problem  : translate("FileSystemBrowserModel", "in conflict with database") }
+        FilesystemState.missing  : translate("FileSystemBrowserModel", "in conflict with database") }
     
     def __init__(self, parent=None):
         QtGui.QFileSystemModel.__init__(self, parent)
