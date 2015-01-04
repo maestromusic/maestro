@@ -169,7 +169,7 @@ class TagEditorWidget(mainwindow.Widget):
             self.setElements(None, [])
         else:
             self.useElementsFromSelection(selection)
-        
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
             event.acceptProposedAction()

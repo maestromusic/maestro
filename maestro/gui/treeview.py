@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 from . import selection, treeactions
 
 
-class Selection(selection.Selection):
+class TreeviewSelection(selection.Selection):
     """Objects of this class store a selection of nodes in a TreeView. Different than a QItemSelectionModel,
     a Selection knows about Nodes, Elements etc and provides special methods to determine properties
     of the selection. Actions can use this information to decide whether they are enabled or not.
@@ -195,15 +195,11 @@ class TreeView(QtGui.QTreeView):
     def setModel(self, model):
         super().setModel(model)
         self.updateSelection()
-    
-    def focusInEvent(self, event):
-        self.updateSelection()
-        super().focusInEvent(event)
 
     def updateSelection(self):
         selectionModel = self.selectionModel()
         if selectionModel is not None: # happens if the view is empty
-            self.selection = Selection(self.level, selectionModel)
+            self.selection = TreeviewSelection(self.level, selectionModel)
             for action in self.treeActions.values():
                 if isinstance(action, treeactions.TreeAction) or \
                    isinstance(action, TreeActionConfiguration):
@@ -228,12 +224,12 @@ class TreeView(QtGui.QTreeView):
         if self.affectGlobalSelection:
             selection.setGlobalSelection(self.selection)  
     
-    def focusInEvent(self, event):
-        super().focusInEvent(event)
-        self.updateSelection()
-        if self.affectGlobalSelection:
-            selection.setGlobalSelection(self.selection)  
-        
+    # def focusInEvent(self, event):
+    #     super().focusInEvent(event)
+    #     #self.updateSelection() #TODO: raises a strange segfault bug without any exceptions
+    #     if self.affectGlobalSelection:
+    #         selection.setGlobalSelection(self.selection)
+    #
     def currentNode(self):
         current = self.currentIndex()
         if current.isValid():

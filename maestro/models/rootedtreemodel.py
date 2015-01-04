@@ -183,13 +183,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             # http://doc.trolltech.com/4.4/model-view-dnd.html#enabling-drag-and-drop-for-items
             return Qt.ItemIsEnabled;
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable
-    
-    def createIndex(self,row,column,internalPointer):
-        if not isinstance(internalPointer,Node):
-            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node, but got {}"
-                               .format(type(internalPointer)))
-        return super().createIndex(row,column,internalPointer)
-        
+
     def getIndex(self, node):
         """Return the (Qt)-index of the given node. If *node* is the root of this model, return an invalid
         QModelIndex."""
@@ -201,8 +195,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         except ValueError:
             raise RuntimeError("Cannot create an index for node {} because ".format(node)
                                + "it is not contained in its alleged parent {}.".format(parent))
-            
-        return self.createIndex(pos,0,node)     
+        return self.createIndex(pos, 0, node)
 
     def getAllNodes(self):
         """Generator which will return all nodes contained in the tree (excluding the rootnode) 

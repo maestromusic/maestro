@@ -23,10 +23,9 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import rootedtreemodel
-from .. import config, search, database as db, logging, utils, search
+from .. import config, database as db, logging, utils, search
 from ..core import tags, levels, elements
-from ..core.elements import Element
-from ..core.nodes import Node, RootNode, Wrapper, TextNode
+from ..core.nodes import Node, Wrapper, TextNode
 from ..gui import selection, dialogs
 
 
