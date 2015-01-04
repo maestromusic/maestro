@@ -423,6 +423,7 @@ class RealLevel(levels.Level):
                                                             and element.url.scheme == "file"]
         if len(removedFiles) > 0:
             self.emitFilesystemEvent(removed=removedFiles)
+        self.checkGlobalSelection(elements)
         self.emit(levels.LevelChangeEvent(dbRemovedIds=[el.id for el in elements]))
         
     def deleteElements(self, elements, fromDisk=False):
@@ -438,7 +439,7 @@ class RealLevel(levels.Level):
                     self.removeContents(parent, parent.contents.positionsOf(id=element.id))
         self.removeFromDb([element for element in elements if element.isInDb()])
         stack.endMacro()
-        if fromDisk and any(element.isFile() for element in elements):
+        if fromDisk:
             for element in elements:
                 if element.isFile():
                     element.url.getBackendFile().delete()

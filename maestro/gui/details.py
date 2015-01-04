@@ -22,9 +22,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import mainwindow, dockwidget, selection, browser
+from . import mainwindow, selection
 from .. import logging, utils
-from ..core import levels, tags, elements
+from ..core import levels, tags
 
 
 class DetailsView(mainwindow.Widget):
@@ -246,7 +246,7 @@ class DetailsView(mainwindow.Widget):
                 text.append('<br />'.join(stickerLines))
             else: text.append(str(sum(len(stickerList) for stickerList in el.stickers.values())))
             text.append('</td></tr>')
-            
+        text.append('<tr><td>Level</td><td>{}</td></tr>'.format(el.level))
         text.append('</table>')
         self.label.setText(''.join(text))
 

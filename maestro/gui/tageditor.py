@@ -25,7 +25,7 @@ translate = QtCore.QCoreApplication.translate
 from .. import utils, config, logging, filebackends, stack
 from ..core import tags, levels
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
+from . import singletageditor, tagwidgets, mainwindow, flageditor, dialogs
 from .misc import widgetlist
         
         
@@ -165,10 +165,10 @@ class TagEditorWidget(mainwindow.Widget):
     def _handleSelectionChanged(self, selection):
         """React to changes to the global selection: Load the elements of the selected wrappers
         into the TagEditorWidget."""
-        if selection is not None and selection.hasElements():
-            self.setElements(selection.level,
-                            list(selection.elements(recursive=False)),
-                            list(selection.elements(recursive=True)))
+        if selection is None or not selection.hasElements():
+            self.setElements(None, [])
+        else:
+            self.useElementsFromSelection(selection)
         
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
@@ -204,8 +204,8 @@ class TagEditorWidget(mainwindow.Widget):
         elements. *elements* and *elementsWithContents* are the lists of elements that will be edited when
         the "Include contents" button is not pressed / pressed, respectively.
         """
-        self.levelLabel.setPixmap(utils.getPixmap('real.png' if level == levels.real or level is None
-                                                   else 'editor.png'))
+        self.levelLabel.setPixmap(utils.getPixmap('real.png' if level in (levels.real, None)
+                                                  else 'editor.png'))
         self.level = level
         self.elements = elements
         if elementsWithContents is not None and elementsWithContents != elements:

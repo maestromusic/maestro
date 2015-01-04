@@ -239,9 +239,8 @@ class Widget(QtGui.QWidget):
         """
         if self._dialog is None:
             self._dialog = self.createOptionDialog(button)
-            # The window title is not visible within the application, but might be visible in the taskbar.
-            self._dialog.setWindowTitle(self.tr("{} Options").format(self.widgetClass.name))
             if self._dialog is not None:
+                self._dialog.setWindowTitle(self.tr("{} Options").format(self.widgetClass.name))
                 self._dialog.installEventFilter(self)
                 if isinstance(self._dialog, dialogs.FancyTabbedPopup):
                     self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
@@ -278,7 +277,7 @@ class MainWindow(QtGui.QMainWindow):
     """The main window of Maestro. It contains a CentralTabWidget as actual central widget (in Qt sense)
     so that several widgets (in tabs) can be displayed as central widgets (in Maestro's sense)."""
     # Do not use this! Use gui.selection.changed instead. We just need a QObject to put the signal in.
-    _globalSelectionChanged = QtCore.pyqtSignal(selection.Selection)
+    _globalSelectionChanged = QtCore.pyqtSignal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)

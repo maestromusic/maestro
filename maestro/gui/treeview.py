@@ -225,12 +225,13 @@ class TreeView(QtGui.QTreeView):
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
         self.updateSelection()
-        if self.affectGlobalSelection and not self.selection.empty():
+        if self.affectGlobalSelection:
             selection.setGlobalSelection(self.selection)  
     
     def focusInEvent(self, event):
         super().focusInEvent(event)
-        if self.affectGlobalSelection and not self.selection.empty():
+        self.updateSelection()
+        if self.affectGlobalSelection:
             selection.setGlobalSelection(self.selection)  
         
     def currentNode(self):

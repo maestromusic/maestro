@@ -190,12 +190,11 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
                                .format(type(internalPointer)))
         return super().createIndex(row,column,internalPointer)
         
-    def getIndex(self,node):
+    def getIndex(self, node):
         """Return the (Qt)-index of the given node. If *node* is the root of this model, return an invalid
         QModelIndex."""
         if node == self.root:
             return QtCore.QModelIndex()
-
         parent = node.parent
         try:
             pos = parent.index(node)

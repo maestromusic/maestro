@@ -569,9 +569,10 @@ class Level(application.ChangeEventDispatcher):
         for element in elements:
             if element.id in self.elements: # *elements* might contain some elements more than once
                 del self.elements[element.id]
+        self.checkGlobalSelection(elements)
         if len(elements) > 0:
             self.emit(LevelChangeEvent(removedIds=[element.id for element in elements]))
-            
+
     def _applyDiffs(self, changes):
         """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply
         these differences to the elements.
@@ -742,7 +743,15 @@ class Level(application.ChangeEventDispatcher):
                     logging.exception(__name__, "Error reading a WrapperString")
                     continue
         return roots
-    
+
+    def checkGlobalSelection(self, elements):
+        """Erases global selection when elements of it have been removed."""
+        from ..gui import selection
+        globalSelection = selection.getGlobalSelection()
+        if globalSelection and globalSelection.level is self \
+                and any(elem in globalSelection.elements() for elem in elements):
+            selection.setGlobalSelection(None)
+
     def __str__(self):
         return 'Level({})'.format(self.name)
     

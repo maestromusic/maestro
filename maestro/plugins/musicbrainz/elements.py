@@ -345,7 +345,7 @@ class Recording(MBTreeElement):
             
             if reltype == "instrument":
                 instrument = relation.findtext("attribute-list/attribute")
-                tag = "performer:"+instrument
+                tag = 'performer:' + instrument if instrument else 'instruments'
             elif reltype in simpleTags:
                 tag = simpleTags[reltype]
             elif reltype == "vocal":
@@ -437,7 +437,8 @@ class Work(MBTreeElement):
         for relation in work.iterfind('relation-list[@target-type="work"]/relation'):
             if relation.get("type") == "parts":
                 if relation.findtext("direction") == "backward":
-                    assert self.parentWork is None
+                    if self.parentWork:
+                        continue
                     parentWorkId = relation.find('work').get('id')
                     self.parentWork = Work(parentWorkId)
                     self.parentWork.tags["title"] = [relation.findtext('work/title')]

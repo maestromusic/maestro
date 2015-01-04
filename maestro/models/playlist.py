@@ -486,7 +486,10 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             if token.startswith('EXT:'):
                 url = urllib.parse.unquote(token[4:]) # remove "EXT:"
                 url = filebackends.BackendURL.fromString(url)
-                element = self.level.collect(url)
+                try:
+                    element = self.level.collect(url)
+                except OSError as e:
+                    raise ValueError(str(e))
             else:
                 element = self.level.collect(int(token))
             return Wrapper(element, parent=parent)

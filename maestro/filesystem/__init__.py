@@ -183,6 +183,7 @@ class Source(QtCore.QObject):
         self.scanTimer = QtCore.QTimer()
         self.scanTimer.setInterval(200)
         self.scanTimer.timeout.connect(self.checkScan)
+        self.enabled = False
         if enabled:
             self.enable()
 
@@ -210,6 +211,7 @@ class Source(QtCore.QObject):
         self.enabled = False
         if self.scanState != ScanState.notScanning:
             self.scanTimer.stop()
+        self.hashThread.stop()
         levels.real.filesystemDispatcher.connect(self.handleRealFileEvent)
 
     def setPath(self, path):
@@ -539,7 +541,7 @@ class Source(QtCore.QObject):
 
     def folderState(self, path) -> FilesystemState:
         """Returns the state of the folder given by *path*."""
-        if path in self.folders:
+        if self.enabled and path in self.folders:
             return self.folders[path].state
         return FilesystemState.unknown
 
@@ -712,6 +714,13 @@ class HashThread(threading.Thread):
         self.daemon = True
         self.lastJobDone = threading.Event()
         self.start()
+
+    def stop(self):
+        try:
+            while True:
+                self.jobQueue.get_nowait()
+        except queue.Empty:
+            pass
 
     def run(self):
         identifier = AcoustIDIdentifier()
