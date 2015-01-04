@@ -427,7 +427,7 @@ class RealLevel(levels.Level):
         self.emit(levels.LevelChangeEvent(dbRemovedIds=[el.id for el in elements]))
         
     def deleteElements(self, elements, fromDisk=False):
-        elements = list(elements)
+        elements = tuple(elements)
         stack.beginMacro("delete elements")
         # 1st step: isolate the elements (remove contents & parents)
         for element in elements:

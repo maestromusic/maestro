@@ -248,6 +248,7 @@ class DeleteAction(TreeAction):
         selection = self.parent().selection
         insertPending = False
         self.level().stack.beginMacro(self.tr('delete elements'))
+        files = tuple(elem for elem in selection.files() if elem.url.CAN_DELETE)
         if selection.singleWrapper() and selection.hasContainers():
             container = selection.wrappers()[0]
             container.loadContents(recursive=True)
@@ -261,9 +262,6 @@ class DeleteAction(TreeAction):
                     insertIndex = insertParent.contents.positions.index(insertPos)
                     insertChildren = [wrapper.element for wrapper in container.contents]
                     insertPending = True
-
-        files = [wrap.element for wrap in selection.fileWrappers()
-                              if wrap.element.url.CAN_DELETE]
         self.level().deleteElements(selection.elements())
         if insertPending:
             self.level().insertContentsAuto(insertParent, insertIndex, insertChildren)

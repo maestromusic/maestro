@@ -168,6 +168,7 @@ class Ripper(QtCore.QObject):
 class InsertRippedFileCommand:
     """Command to replace a file of backend type `AudioCDURL` by the ripped real file.
     """
+    #TODO: when this happens while rename dialog is open, the file is not renamed properly
     def __init__(self, element, tmpPath):
         self.element = element
         self.tmpPath = tmpPath
