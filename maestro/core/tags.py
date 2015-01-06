@@ -548,7 +548,7 @@ def _removeTagType(tagType):
     del _tagsById[tagType.id]
     tagList.remove(tagType)
     tagType._clearData()
-    application.dispatcher.emit(TagTypeChangeEvent(ChangeType.removed, tagType))
+    application.dispatcher.emit(TagTypeChangeEvent(ChangeType.deleted, tagType))
     
 
 def changeTagType(tagType, **data):
