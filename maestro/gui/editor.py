@@ -21,7 +21,6 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, delegates
-from . import dockwidget
 from .. import utils
 from ..core import levels, tags
 from ..models import albumguesser

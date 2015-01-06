@@ -468,7 +468,7 @@ def addTagType(tagType, type, **data):
     if tagType.isInDb():
         raise ValueError("Cannot add tag '{}' because it is already in the DB.".format(tagType))
     if 'title' in data:
-        if titleAllowed(data['title']):
+        if not titleAllowed(data['title']):
             raise ValueError("Cannot add tag '{}' with title '{}' because that title exists already."
                              .format(tagType, data['title']))
             

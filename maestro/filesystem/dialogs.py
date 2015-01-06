@@ -244,6 +244,24 @@ class ModifiedTagsDialog(QtGui.QDialog):
         self.accept()
     
     def useFSTags(self):
+        """Use the tags from filesystem. Here, we need to first check if there are any not-in-DB
+        tags in the file. In that case, we display a dialog to add those to the database.
+        """
+        while True:
+            newTags = [tag for tag in self.fsTags if not tag.isInDb()]
+            if len(newTags) == 0:
+                break
+            from ..gui.tagwidgets import AddTagTypeDialog
+            for tag in newTags:
+                ans = AddTagTypeDialog.addTagType(tag, text=self.tr('Please configure the new tag '
+                    '"{}" found in this file'.format(tag)))
+                if not ans:
+                    return
+                elif ans != tag:
+                    # user has renamed tag -> restart the check from the beginning of the while loop
+                    self.fsTags[ans] = self.fsTags[tag]
+                    del self.fsTags[tag]
+                    break
         stack.clear()
         diff = tags.TagStorageDifference(self.dbTags.withoutPrivateTags(), self.fsTags)
         levels.real._changeTags({levels.real.collect(self.file.id): diff}, dbOnly=True)
