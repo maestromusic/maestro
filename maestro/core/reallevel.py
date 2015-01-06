@@ -446,6 +446,10 @@ class RealLevel(levels.Level):
             stack.clear()
 
     def _changeTags(self, changes, dbOnly=False):
+        """Change tags without undo/redo support.
+
+        :param bool dbOnly: If *True*, only change tags in database, not in the actual file.
+        """
         if not dbOnly:
             filebackends.changeTags(changes) # might raise TagWriteError
         
@@ -456,18 +460,18 @@ class RealLevel(levels.Level):
                               for el, diff in dbChanges.items()
                               for tag, value in diff.getRemovals() if tag.isInDb()]
                 if len(dbRemovals):
-                    db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?",
+                    db.multiQuery('DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?',
                                   dbRemovals)
                     
                 dbAdditions = [(el.id, tag.id, db.idFromValue(tag, value, insert=True))
                                for el, diff in dbChanges.items()
                                for tag, value in diff.getAdditions() if tag.isInDb()]
                 if len(dbAdditions):
-                    db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)",
+                    db.multiQuery('INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)',
                                   dbAdditions)
                 files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
                 if len(files) > 0:
-                    db.multiQuery("UPDATE {p}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?",
+                    db.multiQuery('UPDATE {p}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?',
                                   files)
 
         super()._changeTags(changes)

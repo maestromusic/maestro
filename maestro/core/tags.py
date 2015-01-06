@@ -428,9 +428,18 @@ def get(identifier, addDialogIfNew=False):
                             .format(identifier, type(identifier)))
 
 
-def isTitle(title):
-    """Return whether *title* is the raw title of a tag (comparison is case-insensitive!)."""
-    return title.lower() in (str.lower(tag.rawTitle) for tag in tagList if tag.rawTitle is not None)
+def titleAllowed(title: str, forTag: Tag=None) -> bool:
+    """Return whether *title* is an allowed tag title. Checks if any other tag has the same title
+    already (case-insensitive). If *forTag* is given, that tag is excluded from the check (allows
+    to change casing of a tag title).
+    """
+    if title is None:
+        return True
+    for tag in tagList:
+        if tag.rawTitle is not None and tag is not forTag:
+            if title.lower() == tag.rawTitle.lower():
+                return False
+    return True
 
 
 def fromTitle(title):
@@ -459,7 +468,7 @@ def addTagType(tagType, type, **data):
     if tagType.isInDb():
         raise ValueError("Cannot add tag '{}' because it is already in the DB.".format(tagType))
     if 'title' in data:
-        if data['title'] is not None and isTitle(data['title']):
+        if titleAllowed(data['title']):
             raise ValueError("Cannot add tag '{}' with title '{}' because that title exists already."
                              .format(tagType, data['title']))
             
@@ -605,7 +614,6 @@ def _changeTagType(tagType, data):
         title = data['title']
         if title is not None and len(title) == 0:
             title = None
-        assert title is None or not isTitle(title) # titles must be unique
         assignments.append('title = ?')
         params.append(title)
         tagType.rawTitle = title

@@ -21,12 +21,12 @@ import os.path
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import utils, filebackends, config, stack
+from .. import utils, filebackends, stack
 from ..core import levels, tags, elements, domains
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
-from . import dialogs, widgets
+from . import dialogs
 
 translate = QtGui.QApplication.translate
 
@@ -427,26 +427,6 @@ class ChangePositionAction(TreeAction):
             actionConfig.addActionDefinition(((section, typeSection), 
                                               (typeSection, "changePos{}".format(mode))),
                                              ChangePositionAction, mode=mode)
-
-
-class MatchTagsFromFilenamesAction(TreeAction):
-    """An action to trigger a dialog that matches tags from file names. Will be enabled only if at least
-    one file is selected."""
-    
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setText(self.tr('match tags from filename'))
-    
-    def initialize(self, selection):
-        self.setEnabled(selection.hasFiles())
-        
-    def doAction(self):
-        """Open a TagMatchDialog for the selected elements."""
-        from ..gui import tagmatchdialog
-        dialog = tagmatchdialog.TagMatchDialog(self.parent().level,
-                                               self.parent().selection.wrappers(),
-                                               self.parent())
-        dialog.exec_()
 
 
 class SetElementTypeAction(TreeAction):

@@ -24,7 +24,6 @@ from PyQt4.QtCore import Qt
 from ... import application, database as db, utils, stack
 from ...core import tags
 from .. import tagwidgets, dialogs, misc
-from ..misc import iconbuttonbar
 
 CUSTOM_MIME = 'application/x-maestrotagtype'
 
@@ -278,7 +277,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             tag = self.getTag(item.row())
             itemText = item.text() if item.text() != '' else None
             if itemText != tag.rawTitle:
-                if itemText is not None and tags.isTitle(itemText):
+                if not tags.titleAllowed(itemText, tag):
                     dialogs.warning(self.tr("Cannot change title"),
                                     self.tr("A tag with this title exists already."),
                                     self)

@@ -629,7 +629,7 @@ class AddTagTypeDialog(QtGui.QDialog):
                                       self.tr("'{}' is not a valid tagname.").format(tagName))
             return
         title = self.titleLineEdit.text()
-        if tags.isTitle(title):
+        if not tags.titleAllowed(title):
             QtGui.QMessageBox.warning(self, self.tr("Title exists already"),
                                       self.tr("There is already a tag with title '{}'.").format(title))
             return
