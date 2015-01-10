@@ -20,7 +20,7 @@ from functools import reduce
 
 from ...core import elements, nodes, tags, domains
 from ...core.elements import ContainerType
-from .. import logging, config
+from ... import logging, config, utils
 from ...core.nodes import Wrapper
 
 from .xmlapi import AliasEntity, MBTagStorage, query
@@ -263,7 +263,7 @@ class Medium(MBTreeElement):
             return self.idTagName, next(iter(self.discids))
     
     def insertWorks(self):
-        """Inserts superworks as intermediate level between the medium and its recording.
+        """Inserts parent works as intermediate level between the medium and its recording.
         
         This method assumes that all children of *self* are :class:`Recording` instances.
         """
@@ -288,6 +288,16 @@ class Medium(MBTreeElement):
                 child.tags['album'] = child.tags['title'][:]
                 child.passTags(['title'])
                 child.assignCommonTags()
+                # remove common prefix on children tags
+                children = child.children.values()
+                titles = [str(elem.tags['title'][0]) for elem in children]
+                print(titles)
+                shortTitles = utils.strings.removeCommonPrefixAndNumbers(titles)
+                for c, t in zip(children, shortTitles):
+                    if isinstance(c.tags['title'][0], AliasEntity):
+                        c.tags['title'][0].name = t
+                    else:
+                        c.tags['title'][0] = t
     
     def __eq__(self, other):
         return self is other
@@ -344,8 +354,12 @@ class Recording(MBTreeElement):
                           "mastering" : "mastering"}
             
             if reltype == "instrument":
-                instrument = relation.findtext("attribute-list/attribute")
-                tag = 'performer:' + instrument if instrument else 'instruments'
+                for attr in relation.iterfind('attribute-list/attribute'):
+                    if attr.text != 'solo':
+                        tag = 'performer:' + attr.text
+                        break
+                else:
+                    tag = 'instruments'
             elif reltype in simpleTags:
                 tag = simpleTags[reltype]
             elif reltype == "vocal":
@@ -389,7 +403,6 @@ class Recording(MBTreeElement):
                                .format(relation.get("type"), self.mbid))
         
     def mergeWork(self, work):
-        logger.debug("merging work {} into recording {}".format(work.mbid, self.mbid))
         self.workid = work.mbid
         for tag, values in work.tags.items():
             if tag in self.tags:
@@ -419,17 +432,12 @@ class Work(MBTreeElement):
         ent.asTag.add("title")
         self.tags['title'] = ent
         for relation in work.iterfind('relation-list[@target-type="artist"]/relation'):
-            easyRelations = { 'composer' : 'composer',
-                              'lyricist' : 'lyricist',
-                              'orchestrator' : 'orchestrator',
-                              'librettist' : 'librettist',
-                              'writer' : 'writer',
-                            }
-            reltype = relation.get("type")
+            easyRelations = ('composer', 'lyricist', 'orchestrator', 'librettist', 'writer')
+            reltype = relation.get('type')
             artist = AliasEntity.get(relation.find('artist'))
             if reltype in easyRelations:
-                artist.asTag.add(easyRelations[reltype])
-                self.tags.add(easyRelations[reltype], artist)
+                artist.asTag.add(reltype)
+                self.tags.add(reltype, artist)
             else:
                 logger.warning("unknown work-artist relation {} in work {}"
                                .format(reltype, self.mbid))
@@ -441,7 +449,6 @@ class Work(MBTreeElement):
                         continue
                     parentWorkId = relation.find('work').get('id')
                     self.parentWork = Work(parentWorkId)
-                    self.parentWork.tags["title"] = [relation.findtext('work/title')]
                 else:
                     logger.warning('ignoring forward parts relation in {}'.format(self))
             elif relation.get('type') in ('based on', 'other version', 'arrangement'):

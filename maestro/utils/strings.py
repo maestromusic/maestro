@@ -99,12 +99,12 @@ def commonPrefix(strings, separated=False):
         return ''
     i = 0
     try:
-        while i < len(strings[0]) and all(strings[0][i] == string[i] for string in strings[1:]):
+        while i < len(strings[0]) and all(strings[0][i] == s[i] for s in strings[1:]):
             i += 1
     except IndexError:
         pass
     prefix = strings[0][:i]
-    if not separated or all(len(prefix) == len(string) for string in strings):
+    if not separated or all(len(prefix) == len(s) for s in strings):
         return prefix
     else:
         while i > 0 and prefix[i-1] not in string.whitespace + string.punctuation:
@@ -160,10 +160,20 @@ def numberFromPrefix(string):
         i += 1
     # Only detect a number if at least one whitespace or a period was found
     if indexWhereNumberEnds < i:
-        return (number, string[:i])
-    else: return (None, '')
+        return number, string[:i]
+    else:
+        return None, ''
 
-    
+
+def removeCommonPrefixAndNumbers(strings: list) -> list:
+    """For the given list of strings, remove common prefix plus potential following numbers from all
+    strings. Returns the result as list of strings in same order.
+    """
+    prefix = commonPrefix(strings, True)
+    ans = [s[len(prefix):] for s in strings]
+    return [s[len(numberFromPrefix(s)[1]):] for s in ans]
+
+
 def rstripSeparator(string):
     """Return a copy of *string* where whitespace at the end is removed. If after removing whitespace the
     string contains one of the separators from ``constants.SEPARATORS`` at its end, remove it together with

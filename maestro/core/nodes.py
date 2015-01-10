@@ -405,11 +405,12 @@ class Wrapper(Node):
         """
         if self.element.isContainer():
             if self.contents is None or len(self.contents) == 0:
-                self.setContents([Wrapper(self.element.level.collect(id), position=pos)
+                self.element.level.collectMany(self.element.contents.ids)
+                self.setContents([Wrapper(self.element.level[id], position=pos)
                                   for pos, id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:
-                    child.loadContents(recursive)
+                    child.loadContents(True)
     
     def getTitle(self, prependPosition=False, usePath=True):
         """Return the title of the wrapped element. If *prependPosition* is True and this wrapper has a

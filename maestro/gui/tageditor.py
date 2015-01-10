@@ -404,18 +404,13 @@ class TagEditorWidget(mainwindow.Widget):
                 if len(commonPrefix) > 0:
                     action = fancyMenu.addAction(self.tr("Edit common start..."))
                     action.triggered.connect(self._editCommonStart)
-                    
-                    commonPrefix = utils.strings.commonPrefix([record.value for record in selectedRecords],
-                                                              separated=True)
                     if len(commonPrefix) > 0:
                         rests = [record.value[len(commonPrefix):] for record in selectedRecords]
                         if any(utils.strings.numberFromPrefix(rest)[0] is not None for rest in rests):
                             newValues = []
                             for record, rest in zip(selectedRecords, rests):
-                                number, prefix = utils.strings.numberFromPrefix(rest)
-                                if number is not None:
-                                    newValues.append(record.value[len(commonPrefix)+len(prefix):])
-                                else: newValues.append(record.value[len(commonPrefix):])
+                                prefix = utils.strings.numberFromPrefix(rest)[1]
+                                newValues.append(record.value[len(commonPrefix)+len(prefix):])
                             if all(record.tag.isValid(value)
                                    for record, value in zip(selectedRecords, newValues)):
                                 action = fancyMenu.addAction(

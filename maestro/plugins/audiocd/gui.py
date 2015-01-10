@@ -29,7 +29,6 @@ from ...models import leveltreemodel
 from ...plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
 
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class ImportAudioCDAction(treeactions.TreeAction):
@@ -368,7 +367,6 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.maestroView = treeview.TreeView(level, affectGlobalSelection=False)
         self.maestroView.setModel(self.maestroModel)
         self.maestroView.setItemDelegate(CDROMDelegate(self.maestroView))
-
         # collect alias entities in this release
         entities = set()
         for item in release.walk():
@@ -376,23 +374,21 @@ class ImportAudioCDDialog(QtGui.QDialog):
                 entities.update(val for val in itertools.chain.from_iterable(item.tags.values())
                                 if isinstance(val, xmlapi.AliasEntity))
         self.aliasWidget = AliasWidget(entities)
+        self.aliasWidget.aliasChanged.connect(self.makeElements)
         self.newTagWidget = TagMapWidget(release.collectExternalTags())
         self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
-
+        self.newTagWidget.tagConfigChanged.connect(self.makeElements)
         configLayout = QtGui.QVBoxLayout()
-        makeElementsButton = QtGui.QPushButton(
-            QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_ArrowRight),
-            self.tr('Re-generate elements'))
-        makeElementsButton.clicked.connect(self.makeElements)
-        configLayout.addWidget(makeElementsButton)
         self.searchReleaseBox = QtGui.QCheckBox(self.tr('search for existing release'))
         self.searchReleaseBox.setChecked(True)
+        self.searchReleaseBox.stateChanged.connect(self.makeElements)
         configLayout.addWidget(self.searchReleaseBox)
         self.mediumContainerBox = QtGui.QCheckBox(self.tr('add containers for discs'))
+        self.mediumContainerBox.stateChanged.connect(self.makeElements)
         self.forceBox = QtGui.QCheckBox(self.tr('...even without title'))
+        self.forceBox.stateChanged.connect(self.makeElements)
         configLayout.addWidget(self.mediumContainerBox)
         configLayout.addWidget(self.forceBox)
-
         btbx = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btbx.accepted.connect(self.finalize)
         btbx.rejected.connect(self.reject)
@@ -411,7 +407,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.makeElements()
         self.resize(mainwindow.mainWindow.size() * 0.9)
 
-    def makeElements(self):
+    def makeElements(self, *args, **kwargs):
         self.maestroModel.clear()
         self.level.removeElements(list(self.level.elements.values()))
         elemConfig = elements.ElementConfiguration(self.newTagWidget.tagMapping)
@@ -420,7 +416,6 @@ class ImportAudioCDDialog(QtGui.QDialog):
         elemConfig.forceMediumContainer = self.forceBox.isChecked()
         self.container = self.release.makeElements(self.level, elemConfig)
         self.maestroModel.insertElements(self.maestroModel.root, 0, [self.container])
-        self.maestroView.expandAll()
 
     def finalize(self):
         mbplugin.updateDBAliases(self.aliasWidget.activeEntities())
