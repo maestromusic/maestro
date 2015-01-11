@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 from ... import database as db
@@ -25,16 +25,14 @@ from ...core import tags, domains
 
 
 def defaultStorage():
-    return {"musicbrainz": {'tagmap': ({},),
-                                }
-            }
+    return {"musicbrainz": {'tagmap': ({}, ), }}
 
 
 def defaultConfig():
     return {"musicbrainz": {
-            "queryCacheDays": (int, 7, "Number of days after which cached web service calls expire."),
-            'domain':         (str, domains.domains[0].name, 'domain for new containers')
-        }}
+            'queryCacheDays': (int, 7, 'web service call caching time (in days)'),
+            'domain':         (str, domains.default().name, 'domain for new containers')
+           }}
 
 tagMap = {}
 
