@@ -217,8 +217,8 @@ class TagEditorWidget(mainwindow.Widget):
     def useElementsFromSelection(self, selection):
         """Use the elements in the given Selection in the tageditor."""
         self.setElements(selection.level,
-                         selection.elements(recursive=False),
-                         selection.elements(recursive=True))
+                         list(selection.elements(recursive=False)),
+                         list(selection.elements(recursive=True)))
         
     def _updateElements(self):
         """Update the element display."""
