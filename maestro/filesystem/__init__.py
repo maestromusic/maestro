@@ -238,8 +238,8 @@ class Source(QtCore.QObject):
 
     def loadDBFiles(self):
         """Load files table. Adds all files in there to self.files."""
-        ans = db.query("SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE "
-                       + "'{}%'".format('file://' + self.path.replace("'", "\\'")))
+        ans = list(db.query("SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE "
+                       + "'{}%'".format('file://' + self.path.replace("'", "\\'"))))
         for elid, urlstring, elhash, verified in ans:
             url = BackendURL.fromString(urlstring)
             self.addFile(url, id=elid, verified=db.getDate(verified), hash=elhash)
