@@ -51,7 +51,7 @@ class AcoustIDIdentifier:
         if not isMusicFile(path):
             return 'nomusic'
         try:
-            data = subprocess.check_output(['fpcalc', path])
+            data = subprocess.check_output(['fpcalc', path], stderr=subprocess.DEVNULL)
         except OSError: # fpcalc not found, not executable etc.
             global _logOSError
             if _logOSError:

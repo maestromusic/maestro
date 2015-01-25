@@ -156,8 +156,9 @@ class StandardGuesser(profiles.Profile):
                     children[i] = element.id
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
+                cType = ContainerType.Work if tags.get('composer') in albumTags else ContainerType.Work
                 container = self.level.createContainer(domain=domain, tags=albumTags,
-                                                       flags=list(flags), type=ContainerType.Album,
+                                                       flags=list(flags), type=cType,
                                                        contents=ContentList.fromPairs(children.items()))
                 self.orders[container] = self.orders[elements[0]]
                 self.albums.append(container)

@@ -224,6 +224,7 @@ def tagsFromQuery(xml):
                     'conductor', 'composer', 'lyricist', 'orchestrator', 'librettist', 'writer'):
         typeMap[relType] = relType
     voices = 'soprano', 'mezzo-soprano', 'tenor', 'baritone', 'bass'
+    artistFlags = ('solo', 'guest')
 
     def logWarning(msg, xml):
         logging.warning(__name__, msg + '\n' + etree.tostring(xml, pretty_print=True, encoding=str))
@@ -243,7 +244,7 @@ def tagsFromQuery(xml):
         reltype = relation.get('type')
         if reltype == 'instrument':
             for attr in relation.iterfind('attribute-list/attribute'):
-                if attr.text != 'solo':
+                if attr.text not in artistFlags:
                     tag = 'performer:' + attr.text
                     break
             else:
@@ -253,7 +254,7 @@ def tagsFromQuery(xml):
         elif reltype == 'vocal':
             voice = None
             for attr in relation.iterfind('attribute-list/attribute'):
-                if attr.text != 'solo':
+                if attr.text not in artistFlags:
                     voice = attr.text
             if not voice:
                 tag = 'vocals'

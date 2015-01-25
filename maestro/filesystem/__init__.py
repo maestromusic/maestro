@@ -597,7 +597,7 @@ class Source(QtCore.QObject):
 
         Updates the internal directory tree structure, and recomputes hashes if necessary.
         """
-        if self.scanState != ScanState.notScanning:
+        if self.scanState not in  (ScanState.notScanning, ScanState.realHashOnly):
             self.scanInterrupted = True
         updateHash = set()  # paths for which new hashes need to be computed
         updatedDirs = []
