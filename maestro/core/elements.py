@@ -174,12 +174,9 @@ class Element:
     def inParentLevel(self):
         """If this element is also loaded in the parent level of this element's level, return its version
         there."""
-        if self.level.parent is None:
-            return None
-        elif self.id not in self.level.parent:
-            return None
-        else: return self.level.parent[self.id]
-    
+        if self.level.parent and self.id in self.level.parent:
+            return self.level.parent[self.id]
+
     def equalsButLevel(self, other):
         """Return True if this element equals *other* in all aspects but possibly the level."""
         if self.domain != other.domain:

@@ -194,8 +194,8 @@ class Level(application.ChangeEventDispatcher):
         self.name = name
         self.parent = parent
         if elements is None:
-            self.elements = {}
-        else: self.elements = {element.id: element.copy(level=self) for element in elements}
+            elements = {}
+        self.elements = {element.id: element.copy(level=self) for element in elements}
         self.stack = stack if stack is not None else globals()['stack'].stack
         
         # These are necessary to solve ticket #138

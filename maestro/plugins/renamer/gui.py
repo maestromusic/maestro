@@ -128,8 +128,7 @@ class RenameDialog(QtGui.QDialog):
         self.model = leveltreemodel.LevelTreeModel(self.sublevel, self.elementsSub)
         self.tree = treeview.TreeView(self.sublevel, affectGlobalSelection=False)
         self.tree.setModel(self.model)
-        self.delegate = PathDelegate(self.tree)
-        self.tree.setItemDelegate(self.delegate)
+        self.tree.setItemDelegate(PathDelegate(self.tree))
         self.tree.expandAll()
         
         self.bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
@@ -143,7 +142,7 @@ class RenameDialog(QtGui.QDialog):
         self.setLayout(mainLayout)
         self.resize(800,700)
         self._handleTemporaryChanged()
-        
+
     def _handleTemporaryChanged(self):
         """Handle changes to the temporary profile of self.configDisplay."""
         profile = self.configDisplay.tempProfile
@@ -178,8 +177,8 @@ class RenameDialog(QtGui.QDialog):
                         self.tr("Save modified profile {}?").format(self.configDisplay.profile.name)):
                 self.configDisplay._handleSave()
         self.accept()
-    
-    
+
+
 class GrammarConfigurationWidget(QtGui.QWidget):
     """This widget is used in two places to configure grammar profiles:
     
