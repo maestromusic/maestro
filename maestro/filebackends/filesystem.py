@@ -81,13 +81,16 @@ class RealFile(BackendFile):
             return 
         self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True) 
         self.specialTags = OrderedDict()
+        autoProcessingDone = False
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
             if key in self.specialTagNames:
                 self.specialTags[key] = values
             elif key in config.options.tags.auto_delete:
+                autoProcessingDone = True
                 continue
             elif key in autoReplaceTags:
+                autoProcessingDone = True
                 key = autoReplaceTags[key]
             elif tags.isValidTagName(key):
                 tag = tags.get(key)
@@ -102,6 +105,8 @@ class RealFile(BackendFile):
                     self.tags.add(tag, *validValues)
             else:
                 logging.error(__name__, "Invalid tag name '{}' found : {}".format(key, self.url))
+        if autoProcessingDone:
+            self.saveTags()
         
     @property
     def length(self):
