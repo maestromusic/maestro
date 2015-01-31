@@ -273,7 +273,7 @@ class ElementTypeCriterion(Criterion):
             query = "SELECT id FROM {p}elements AS el"
         else: query = "SELECT id FROM {table} JOIN {p}elements AS el USING(id)"
         # Add where clause
-        query += " WHERE el.file={}".format(value)
+        query += " WHERE el.file={}".format(int(value))
         if domain is not None:
             query += " AND el.domain={}".format(domain.id)
         self.result = set(db.query(query, table=fromTable).getSingleColumn())
