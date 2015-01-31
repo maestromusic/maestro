@@ -133,7 +133,7 @@ class RealFile(BackendFile):
         for tag, values in self.specialTags.items():
             self._taglibFile.tags[tag.upper()] = values
         for tag, values in self.tags.items():
-            values = [tag.fileFormat(value) for value in values]
+            values = sorted(tag.fileFormat(value) for value in values)
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         ret = {key.upper(): values for key,values in unsuccessful.items()}
