@@ -211,7 +211,7 @@ class FlexTableModel(QtCore.QAbstractTableModel):
     
     def setItemData(self, item, field, value):
         setattr(item, field.name, value)
-        row = self.items.index(row)
+        row = self.items.index(item)
         column = self.fields.index(field)
         index = self.index(row, column)
         self.dataChanged.emit(index, index)
@@ -638,9 +638,6 @@ class ImageField(Field):
         removeAction.triggered.connect(lambda: view.model.setItemData(item, self, None))
         menu.addAction(removeAction)
         return menu
-        
-    def _changeAction(self, item):
-        image = ImageChooser.getImage(self.folders, default, view)
 
 
 class ImageLabel(QtGui.QLabel):
