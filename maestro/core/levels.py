@@ -293,7 +293,7 @@ class Level(application.ChangeEventDispatcher):
         """Collect several elements by their id/url and return them."""
         self._ensureLoaded(params) # without this line all missing elements would be loaded separately.
         newElements = [self._correctParents(self.parent.fetch(param), changeLevel=True)
-                       for param in params if param not in self]
+                          for param in params if param not in self]
         if len(newElements):
             self.addElements(newElements)
         return [self[param] for param in params]
@@ -560,8 +560,9 @@ class Level(application.ChangeEventDispatcher):
     # ====================================================================================   
     def _addElements(self, elements):
         for element in elements:
-            assert element.id not in self and element.level is self
-            self.elements[element.id] = element
+            if element.id not in self:
+                assert element.level is self
+                self.elements[element.id] = element
         if len(elements) > 0:
             self.emit(LevelChangeEvent(addedIds=[element.id for element in elements]))
             
