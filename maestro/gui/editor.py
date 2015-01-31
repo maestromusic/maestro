@@ -246,8 +246,6 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         elif action == 'delete':
             levels.editor.changeTags({el: tags.SingleTagDifference(info.tag,removals=el.tags[info.tag])
                                       for el in info.elements})
-        elif action == 'undo':
-            self.editor.model().undoExtTagInfo(info)
         elif action == 'select':
             # Construct a QItemSelection storing the whole selection and add it to the model at once.
             # Otherwise a selectionChanged signal would be emitted after each selected wrapper. 
