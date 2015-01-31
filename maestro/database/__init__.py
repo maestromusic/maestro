@@ -54,6 +54,7 @@ _nextIdLock = threading.Lock()
 
 DBException = sqlalchemy.exc.DBAPIError
 
+
 class EmptyResultException(Exception):
     """This exception is executed if getSingle, getSingleRow or getSingleColumn are
     performed on a result which does not contain any row.
@@ -70,7 +71,7 @@ class FlexiDateType(sqlalchemy.types.TypeDecorator):
         return utils.FlexiDate.fromSql(value)
 
     def copy(self):
-        return FlexiDateDecorator()
+        return FlexiDateType()
 
 
 def createEngine(**kwargs):

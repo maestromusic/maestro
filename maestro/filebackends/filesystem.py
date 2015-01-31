@@ -24,9 +24,9 @@ import taglib
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import BackendFile, BackendURL, urlTypes
-from .. import logging, utils
-from ..core import tags, domains
+from maestro.filebackends import BackendFile, BackendURL, urlTypes
+from maestro import logging, utils
+from maestro.core import tags
 
 
 def init():
