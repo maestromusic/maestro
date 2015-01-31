@@ -465,9 +465,7 @@ class Level(application.ChangeEventDispatcher):
                 else:
                     break
         self.stack.beginMacro(self.tr("Remove contents"))
-        self.removeContents(parent, positions) 
-        #TODO: when the positions are not connected, using several different shifts might be more
-        # appropriate
+        self.removeContents(parent, positions)
         if shiftPositions is not None:
             self.shiftPositions(parent, shiftPositions, shift)
         self.stack.endMacro()
