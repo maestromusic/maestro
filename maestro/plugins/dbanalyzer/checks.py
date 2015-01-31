@@ -99,7 +99,7 @@ class ElementCounterCheck(Check):
 
 class FileFlagCheck(Check):
     """Check for broken file flags in the element table. The file flag should be true if and only if the
-    element is contained in the file table."""
+    element is contained in the file table. Fixing this bug will delete fake files."""
     _columnHeaders = (translate("DBAnalyzerChecks", "ID"), translate("DBAnalyzerChecks", "Name"),
                      translate("DBAnalyzerChecks", "In DB"), translate("DBAnalyzerChecks", "Real"))
                      
@@ -119,10 +119,19 @@ class FileFlagCheck(Check):
             return [(row[0], getTitle(row[0]), row[1], (row[1] + 1) % 2) for row in result]
 
     def _fix(self):
-        db.query("""
-            UPDATE {p}elements LEFT JOIN {p}files ON id = element_id
-            SET file = (element_id IS NOT NULL)
-            """)
+        fakeFiles = list(db.query("""
+                SELECT id FROM {p}elements LEFT JOIN {p}files ON id = element_id
+                WHERE file != 0 AND element_id IS NULL
+                """).getSingleColumn())
+        fakeContainers = list(db.query("""
+                SELECT id FROM {p}elements LEFT JOIN {p}files ON id = element_id
+                WHERE file == 0 AND element_id IS NOT NULL
+                """).getSingleColumn())
+        
+        if len(fakeFiles) > 0:
+            db.query("DELETE FROM elements WHERE id IN ({})".format(db.csList(fakeFiles)))
+        if len(fakeContainers) > 0:
+            db.query("UPDATE elements SET file=1 WHERE id IN ({})".format(db.csList(fakeContainers)))
 
 
 class EmptyContainerCheck(Check):
