@@ -166,7 +166,6 @@ configOptions = collections.OrderedDict((
 }),
 ("filesystem", {
     "scan_interval": (int, 1800, "Interval (in seconds) in which the filesystem will be rescanned for changes"),
-    "disable": (bool, False, "completely disable filesystem synchronization"),
     "acoustid_apikey": (str, "VGPeEVtB", "API key for AcoustID web service"),
 }),
 ("misc", {
