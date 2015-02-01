@@ -301,6 +301,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     plugins.shutdown()
     covers.shutdown()
     profiles.manager.save()
+    database.deleteSuperfluousTagValues()
     database.shutdown()
     config.shutdown()
     logging.shutdown()
