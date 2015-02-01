@@ -506,14 +506,15 @@ class TagEditorWidget(mainwindow.Widget):
         self.includeContentsButton.setChecked(value)
 
 
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
+widgetClass = mainwindow.WidgetClass(
         id = "tageditor",
         name = translate("Tageditor", "Tageditor"),
         icon = utils.getIcon('widgets/tageditor.png'),
         theClass = TagEditorWidget,
         unique = True,
         areas = 'dock',
-        preferredDockArea = 'right'))
+        preferredDockArea = 'right')
+mainwindow.addWidgetClass(widgetClass)
 
 
 class RecordDialog(QtGui.QDialog):
@@ -630,7 +631,8 @@ class TagEditorDialog(QtGui.QDialog):
         self.tagedit = TagEditorWidget(state={'includeContents': includeContents},
                                        stack=self.stack,
                                        flagEditorInTitleLine=False,
-                                       useGlobalSelection=False)
+                                       useGlobalSelection=False,
+                                       widgetClass=widgetClass)
         self.layout().addWidget(self.tagedit)
         
         style = QtGui.QApplication.style()
