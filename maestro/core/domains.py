@@ -62,9 +62,6 @@ def init():
     result = db.query("SELECT id, name FROM {p}domains ORDER BY name")
     for row in result:
         domains.append(Domain(*row))
-    if len(domains) == 0:
-        logging.error(__name__, "No domain defined.")
-        raise RuntimeError()
     
     
 class Domain:
