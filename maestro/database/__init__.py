@@ -335,6 +335,24 @@ def updateElementsCounter(elids=None):
         """.format(prefix, whereClause))
 
 
+def deleteSuperfluousTagValues():
+    """Remove unused entries from the values_* tables."""
+    for valueType in tagsModule.TYPES:
+        tableName = "{}values_{}".format(prefix, valueType)
+        # This is complicated because we need different queries for MySQL and SQLite.
+        # Neither query works in both.
+        mainPart = """ FROM {1} LEFT JOIN {0}tags ON {1}.tag_id = {0}tags.tag_id
+                                                 AND {1}.id = {0}tags.value_id
+                    WHERE element_id IS NULL
+                    """.format(prefix, tableName)
+        if type == 'mysql':
+            # Cannot use DELETE together with JOIN in SQLite
+            query("DELETE {} {}".format(tableName, mainPart))
+        else:
+            # Cannot delete from a table used in a subquery in MySQL
+            query("DELETE FROM {0} WHERE id IN (SELECT {0}.id {1})".format(tableName, mainPart))
+    
+
 # Files-Table
 #================================================
 def url(elid):
