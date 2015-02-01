@@ -37,13 +37,7 @@ class RenameFilesAction(treeactions.TreeAction):
         self.setEnabled(True)
     
     def doAction(self):
-        def check(element):
-            """Check if all files under this parent can be renamed."""
-            for file in element.getAllFiles():
-                if not file.url.CAN_RENAME:
-                    return False
-            return True
-        elements = [elem for elem in self.parent().selection.elements() if check(elem)]
+        elements = self.parent().selection.elements()
         dialog = RenameDialog(self.parent(), self.level(), elements)
         if dialog.exec_():
             try:

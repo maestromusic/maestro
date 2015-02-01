@@ -41,7 +41,7 @@ def mTimeStamp(file):
 
 def collect(urls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
-    are received. Return a dict mapping directory to list of FileURLs within. Sort directories and files.
+    are received. Return a dict mapping directory to list of URLs within. Sort directories and files.
     """
     filePaths = collections.OrderedDict()
     
@@ -79,7 +79,7 @@ def collect(urls):
 
 def collectAsList(urls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when
-    urls are received. Return a list of FileURLs. Sort files within each directory, but not the list
+    urls are received. Return a list of URLs. Sort files within each directory, but not the list
     as whole.
     """
     def checkUrl(url):

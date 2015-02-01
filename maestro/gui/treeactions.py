@@ -86,7 +86,7 @@ class ChangeFileUrlsAction(TreeAction):
         if selection.singleWrapper():
             self.setText(self.tr("Change file URL"))
             element = selection.wrappers()[0].element
-            if element.isFile() and element.url is not None and element.url.CAN_RENAME:
+            if element.isFile():
                 self.setEnabled(True)
         elif selection.hasFiles():
             elements = list(selection.files())
@@ -246,7 +246,7 @@ class DeleteAction(TreeAction):
         selection = self.parent().selection
         insertPending = False
         self.level().stack.beginMacro(self.tr('delete elements'))
-        files = tuple(elem for elem in selection.files() if elem.url.CAN_DELETE)
+        files = list(selection.files())
         if selection.singleWrapper() and selection.hasContainers():
             container = selection.wrappers()[0]
             container.loadContents(recursive=True)

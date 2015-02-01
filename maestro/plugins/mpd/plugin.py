@@ -462,10 +462,9 @@ class MPDPlayerBackend(player.PlayerBackend):
     def makeUrls(self, paths):
         """Create Maestro URLs for the given paths reported by MPD.
         
-        If an MPD path has the form of a non-default URL (i.e. proto://path), it is tried to load
-        an appropriate URL using BackendURL.fromString().
-        Otherwise, if *path* refers to a normal file in MPDs database, an MPDURL is created.
-        If the file is also found on the local filesystem, then a normal FileURL is returned.
+        MPD paths of non-default form (i.e. proto://path) are mapped to URLs with scheme 'proto'.
+        If *path* refers to a normal file in MPDs database, a URL with scheme 'MPD' is created.  If the file
+        is also found on the local filesystem, then a normal 'file' URL is returned.
         """
         returned = []
         for path in paths:
