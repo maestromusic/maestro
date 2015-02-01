@@ -20,8 +20,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import tagwidgets, dialogs
+from maestro.core import urls
 from .misc import listview, widgetlist
-from .. import utils, filebackends
 from ..core import tags
 from ..models import simplelistmodel
 
@@ -298,7 +298,7 @@ class RecordEditor(QtGui.QWidget):
             newRecord.value = value
             try:
                 self.model.changeRecord(self.record, newRecord)
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 self.valueEditor.setValue(self.record.value)
                 self._handleError(e)
 

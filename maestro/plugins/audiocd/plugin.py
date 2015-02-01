@@ -21,10 +21,12 @@ try:
 except ImportError:
     raise ImportError('discid module not installed')
 from PyQt4 import QtCore, QtGui
-from ... import application, database as db, filebackends
-from ...gui import editor
+from maestro import application, database as db
+from maestro.gui import editor
+from maestro.core import urls, tags
 
 translate = QtCore.QCoreApplication.translate
+
 
 def defaultConfig():
     return {"audiocd": {
@@ -35,8 +37,7 @@ def defaultConfig():
 
 
 def enable():
-    from . import filebackend as cdfilebackend
-    filebackends.urlTypes["audiocd"] = cdfilebackend.AudioCDURL
+    urls.fileBackends.append(AudioCDTrack)
     from .gui import ImportAudioCDAction
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'audiocd'),), ImportAudioCDAction)
     from ...core.levels import real
@@ -53,12 +54,28 @@ def mainWindowInit():
 
 
 def disable():
-    del filebackends.urlTypes["audiocd"]
+    urls.fileBackends.remove(AudioCDTrack)
     editor.EditorTreeView.actionConfig.removeActionDefinition( (("plugins", "audiocd"),) )
     from ...core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.remove(fileChangerHook)
     application.mainWindow.menus['extras'].removeAction(_action)
+
+
+def parseNetloc(url):
+    a, b = url.netloc.split('.')
+    return a, int(b)
+
+
+class AudioCDTrack(urls.BackendFile):
+
+    scheme = 'audiocd'
+
+    def readTags(self):
+        self.tags, self.length = tags.Storage(), 0
+
+    def saveTags(self):
+        pass
 
 
 def showRipMissingDialog():
@@ -70,11 +87,12 @@ def showRipMissingDialog():
         return
     discids = {}
     for url, id in ans:
-        url = filebackends.BackendURL.fromString(url)
-        if url.discid not in discids:
-            discids[url.discid] = (id, set())
-        assert url.tracknr not in discids[url.discid][1]
-        discids[url.discid][1].add(url.tracknr)
+        url = urls.URL(url)
+        discid, tracknr = parseNetloc(url)
+        if discid not in discids:
+            discids[discid] = (id, set())
+        assert tracknr not in discids[discid][1]
+        discids[discid][1].add(tracknr)
     from . import gui
     dev, discid, ntracks = gui.ImportAudioCDAction.askForDiscId()
     if discid in discids:

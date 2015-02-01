@@ -20,13 +20,14 @@ import os
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
+from maestro.core import urls
+
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, filebackends, filesystem, utils
-from ..filebackends.filesystem import FileURL
-from . import mainwindow, selection, dockwidget, widgets
+from .. import application, filesystem, utils
+from . import mainwindow, selection, widgets
 from ..core import levels
-from ..filesystem import FilesystemState
+from maestro.filesystem.sources import FilesystemState
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -168,7 +169,7 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
 
     def _handleDelete(self):
         path = self.model().filePath(self.currentIndex())
-        url = FileURL(path)
+        url = urls.URL.fileURL(path)
         elem = levels.real.collect(url)
         levels.real.deleteElements([elem], fromDisk=True)
 
@@ -177,7 +178,7 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         paths = [self.model().filePath(index)
                  for index in self.selectedIndexes()
                  if not self.model().isDir(index)] # TODO: remove this restriction
-        s = FileSystemSelection([filebackends.filesystem.FileURL(path) for path in paths])
+        s = FileSystemSelection([urls.URL.fileURL(path) for path in paths])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
     

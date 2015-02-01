@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import urllib.parse
 import os.path
 
 from PyQt4 import QtCore
@@ -26,9 +25,7 @@ except ImportError as e:
     raise ImportError("PyQt4-phonon is not installed.")
 
 from ... import player, profiles
-from ...filebackends.filesystem import FileURL
 from ...models import playlist
-from ...core import elements
         
 translate = QtCore.QCoreApplication.translate
 
@@ -103,7 +100,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
         for i, url in enumerate(urls):
-            if not isinstance(url, FileURL):
+            if url.scheme != 'file':
                 raise player.InsertError("URL type {} not supported".format(type(url)))
             elif not os.path.exists(url.path):
                 raise player.InsertError(self.tr("Cannot play '{}': File does not exist.")
@@ -230,7 +227,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     def _getPath(self, offset):
         """Return the absolute path of the file at the given offset."""
         url = self.playlist.root.fileAtOffset(offset).element.url
-        if isinstance(url, FileURL):
+        if url.scheme == 'file':
             return url.path
         raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))
     

@@ -24,10 +24,9 @@ from os.path import dirname, exists,join
 import subprocess
 from PyQt4 import QtCore, QtGui
 
-from ... import utils, database as db, logging, config
-from ...core import levels
-from ...gui import mainwindow
-from ...filebackends.filesystem import RealFile, FileURL
+from maestro import database as db, logging, config, filesystem
+from maestro.core import urls, levels
+from maestro.gui import mainwindow
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -173,7 +172,7 @@ class InsertRippedFileCommand:
         self.element = element
         self.tmpPath = tmpPath
         self.oldUrl = self.element.url
-        self.newUrl = FileURL('file://' + self.element.url.targetPath)
+        self.newUrl = urls.URL('file://' + self.element.url.targetPath)
         self.text = translate("AudioCD Plugin", "Ripped Track {}".format(element.url.tracknr))
 
     def redo(self):
@@ -181,7 +180,7 @@ class InsertRippedFileCommand:
         if not exists(dirname(target)):
             os.makedirs(dirname(target))
         shutil.move(self.tmpPath, target)
-        tmpFile = RealFile(self.newUrl)
+        tmpFile = filesystem.RealFile(self.newUrl)
         tmpFile.readTags()
         length = tmpFile.length
         tmpFile.tags = self.element.tags.withoutPrivateTags(copy=True)

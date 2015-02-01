@@ -20,9 +20,11 @@ import os.path, functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+from maestro.core import urls
+
 translate = QtCore.QCoreApplication.translate
 
-from .. import utils, config, logging, filebackends, stack
+from .. import utils, config, logging, stack
 from ..core import tags, levels
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
 from . import singletageditor, tagwidgets, mainwindow, flageditor, dialogs
@@ -285,7 +287,7 @@ class TagEditorWidget(mainwindow.Widget):
         if dialog.exec_() == QtGui.QDialog.Accepted:
             try:
                 self.model.addRecord(dialog.getRecord())
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 self._handleError(e)
 
     def _handleRemoveSelected(self):
@@ -294,7 +296,7 @@ class TagEditorWidget(mainwindow.Widget):
         if len(records) > 0:
             try:
                 self.model.removeRecords(records)
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 self._handleError(e)
         
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors
@@ -355,7 +357,7 @@ class TagEditorWidget(mainwindow.Widget):
         
         try:
             result = self.model.changeTag(oldTag, newTag)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
             
         if result:
@@ -451,21 +453,21 @@ class TagEditorWidget(mainwindow.Widget):
         """Handle 'extend records' action from context menu."""
         try:
             self.model.extendRecords(records)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
             
     def _editMany(self, records, newValues):
         """Handle 'edit many' action from context menu."""
         try:
             self.model.editMany(records, newValues)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
             
     def _splitMany(self, records, separator):
         """Handle 'split' action from context menu."""
         try:
             self.model.splitMany(records, separator)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
 
     def _editCommonStart(self):
@@ -488,7 +490,7 @@ class TagEditorWidget(mainwindow.Widget):
         if dialog.exec_() == QtGui.QDialog.Accepted:
             try:
                 self.model.changeRecord(record, dialog.getRecord())
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 self._handleError(e)
         
     def _getSelectedRecords(self):
@@ -695,7 +697,7 @@ class TagEditorDialog(QtGui.QDialog):
             self.level.commit()
             super().accept()
             config.storage.gui.tag_editor_include_contents = self.tagedit.includeContentsButton.isChecked()
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             e.displayMessage()
             self.level.stack = self.stack
     

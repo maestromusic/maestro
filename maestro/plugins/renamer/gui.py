@@ -34,13 +34,7 @@ class RenameFilesAction(treeactions.TreeAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.setText(self.tr("Rename files"))
-    
-    def initialize(self, selection):
-        for fileW in selection.fileWrappers(True):
-            if fileW.element.url.CAN_RENAME:
-                self.setEnabled(True)
-                return
-        self.setEnabled(False)
+        self.setEnabled(True)
     
     def doAction(self):
         def check(element):

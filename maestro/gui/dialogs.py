@@ -22,6 +22,7 @@ from .. import utils, config
 from ..core import elements, levels, nodes, tags
 from ..core.elements import ContainerType
 from . import widgets
+from maestro.core import urls
 
 
 def question(title, text, parent=None):
@@ -369,10 +370,9 @@ class MergeDialog(QtGui.QDialog):
                                                      replacements=replacements)
 
         if len(tagChanges) > 0:
-            from ..filebackends import TagWriteError
             try:
                 self.level.changeTags(tagChanges)
-            except TagWriteError as e:
+            except urls.TagWriteError as e:
                 e.displayMessage()
                 self.level.stack.abortMacro()
                 self.reject()

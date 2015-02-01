@@ -19,8 +19,9 @@
 import itertools
 import collections.abc
 
-from . import elements, levels, tags, flags, domains
-from .. import application, database as db, filebackends, stack
+from maestro.core import elements, levels, tags, flags, domains
+from maestro.core.urls import URL, TagWriteError, changeTags
+from maestro import application, database as db, stack
 
 
 # The ids of all elements that are in the database and have been loaded to some level 
@@ -100,7 +101,7 @@ class RealLevel(levels.Level):
         ids = [p for p in params if isinstance(p, int) and p not in self]
         urls = []
         for p in params:
-            if isinstance(p, filebackends.BackendURL) and p not in self:
+            if isinstance(p, URL) and p not in self:
                 id = db.idFromUrl(p)
                 if id is not None:
                     ids.append(id)
@@ -137,8 +138,7 @@ class RealLevel(levels.Level):
             _dbIds.add(id)
             if file:
                 level.elements[id] = elements.File(domains.domainById(domainId), level, id,
-                                                   url=filebackends.BackendURL.fromString(url),
-                                                   length=length,
+                                                   url=URL(url), length=length,
                                                    type=elements.ContainerType(elementType))
             else:
                 level.elements[id] = elements.Container(domains.domainById(domainId), level, id,
@@ -220,7 +220,7 @@ class RealLevel(levels.Level):
             level = self
         result = []
         for url in urls:
-            backendFile = url.getBackendFile()
+            backendFile = url.backendFile()
             backendFile.readTags()
             fTags = backendFile.tags
             fLength = backendFile.length
@@ -283,7 +283,7 @@ class RealLevel(levels.Level):
         # 2.-4.
         try:
             self.changeTags(fileTagChanges)
-        except (filebackends.TagWriteError, OSError) as e:
+        except (TagWriteError, OSError) as e:
             stack.abortMacro()
             raise e
         self.addToDb(addToDbElements)
@@ -443,7 +443,7 @@ class RealLevel(levels.Level):
         if fromDisk:
             for element in elements:
                 if element.isFile():
-                    element.url.getBackendFile().delete()
+                    element.url.backendFile().delete()
             stack.clear()
 
     def _changeTags(self, changes, dbOnly=False):
@@ -452,7 +452,7 @@ class RealLevel(levels.Level):
         :param bool dbOnly: If *True*, only change tags in database, not in the actual file.
         """
         if not dbOnly:
-            filebackends.changeTags(changes) # might raise TagWriteError
+            changeTags(changes) # might raise TagWriteError
         
         dbChanges = {el: diffs for el, diffs in changes.items() if el.isInDb()}
         if len(dbChanges) > 0:
@@ -583,13 +583,13 @@ class RealLevel(levels.Level):
         doneFiles = []
         try:
             for elem, (oldUrl, newUrl) in renamings.items():
-                oldUrl.getBackendFile().rename(newUrl)
+                oldUrl.backendFile().rename(newUrl)
                 doneFiles.append(elem)
         except OSError as e:
             # rollback changes and throw error
             for elem in doneFiles:
                 oldUrl, newUrl = renamings[elem]
-                newUrl.getBackendFile().rename(oldUrl)
+                newUrl.backendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
         db.multiQuery("UPDATE {p}files SET url=? WHERE element_id=?",
                       [ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])

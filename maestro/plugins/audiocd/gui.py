@@ -20,8 +20,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
-from ... import config, logging, filebackends
-from ...core import levels, tags, domains
+from ... import config
+from ...core import levels, tags, domains, urls
 from ...core.elements import ContainerType
 from ...gui import dialogs, delegates, mainwindow, treeactions, tagwidgets, treeview
 from ...gui.delegates.abstractdelegate import *
@@ -475,7 +475,7 @@ class SimpleRipDialog(QtGui.QDialog):
     def finish(self):
         elems = []
         for i, edit in enumerate(self.edits, start=1):
-            url = filebackends.BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
+            url = urls.URL("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
                             self.discid, i, config.options.audiocd.rippath))
             elem = self.level.collect(url)
             elTags = tags.Storage()

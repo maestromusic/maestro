@@ -22,10 +22,9 @@ import urllib.error
 from lxml import etree
 
 from ... import config, database as db, logging
-from ...core import tags
+from ...core import tags, urls
 from ...core.elements import ContainerType
 from ...utils import FlexiDate
-from ...filebackends import BackendURL
 
 from . import plugin as mbplugin
 
@@ -348,8 +347,8 @@ def fillReleaseForDisc(MBrelease, discid):
         tracknr = int(track.findtext('number'))
         MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, tracknr)
         MBrec.tags.add("title", recording.findtext("title"))
-        MBrec.backendUrl = BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac"
-                                                 .format(discid, tracknr, config.options.audiocd.rippath))
+        MBrec.backendUrl = urls.URL("audiocd://{0}.{1}/{2}/{0}/{1}.flac"
+                                    .format(discid, tracknr, config.options.audiocd.rippath))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
     MBmedium.insertWorks()
