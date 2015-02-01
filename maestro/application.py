@@ -205,9 +205,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
             runInstaller()
             
     if type == 'test':
-        from .database import tables
-        for table in tables.tables:
-            table.create()
+        database.createTables()
             
     if exitPoint == 'database':
         return app
