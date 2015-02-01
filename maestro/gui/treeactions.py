@@ -34,7 +34,7 @@ translate = QtGui.QApplication.translate
 class TreeAction(QtGui.QAction):
     """Super class for TreeActions, i.e. Actions for TreeViews.
     """
-    def __init__(self, parent, text=None, shortcut=None, icon=None, tooltip=None):
+    def __init__(self, parent, shortcut=None, icon=None, tooltip=None):
         super().__init__(parent)
         if shortcut:
             self.setShortcut(shortcut)

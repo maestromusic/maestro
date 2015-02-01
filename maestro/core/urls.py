@@ -67,6 +67,15 @@ class URL:
     def directory(self):
         return os.path.dirname(self.path)
 
+    def copy(self, **kwargs):
+        """Create a copy of this URL. Optional kwargs allow to change specific parts, i.e.:
+            >>> copiedUrl = url.copy(scheme="foo", netloc="bar")
+        """
+        scheme = kwargs.get('scheme', self.scheme)
+        netloc = kwargs.get('netloc', self.netloc)
+        path = kwargs.get('path', self.path)
+        return URL('{}://{}{}'.format(scheme, netloc, path))
+
     def toQUrl(self):
         return QtCore.QUrl(str(self))
 

@@ -20,8 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, treeactions, delegates
-from . import dockwidget
-from ..core import levels, nodes
+from ..core import nodes
 from .delegates import playlist as playlistdelegate
 from .preferences import profiles as profilesgui
 from .treeactions import *
