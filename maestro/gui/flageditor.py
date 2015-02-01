@@ -28,7 +28,7 @@ from ..models import flageditor as flageditormodel, simplelistmodel
 class FlagEditor(QtGui.QWidget):
     """A FlagEditor contains a label, a button to add new flags and a FlagListWidget that displays the
     model's records using FlagWidgets. It is used as part of the tageditor."""
-    def __init__(self, model, vertical=False, parent=None):
+    def __init__(self, model, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
         
@@ -36,9 +36,8 @@ class FlagEditor(QtGui.QWidget):
         self.layout().setSpacing(0)
         self.layout().setContentsMargins(0, 0, 0, 0)
         
-        label = QtGui.QLabel() # Text will be set in setVertical
+        label = QtGui.QLabel('<img src=":maestro/icons/flag_blue.png"> '+self.tr("Flags: "))
         label.setToolTip(self.tr("Flags"))
-        label.setText('<img src=":maestro/icons/flag_blue.png"> '+self.tr("Flags: "))
         self.layout().addWidget(label)
         
         self.addButton = QtGui.QPushButton()
@@ -52,7 +51,7 @@ class FlagEditor(QtGui.QWidget):
         self.flagScrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.flagScrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.flagScrollArea.setViewportMargins(0, 0, 0, 0)
-        self.flagList = FlagListWidget(model, vertical)
+        self.flagList = FlagListWidget(model)
         self.flagScrollArea.setWidget(self.flagList)
         self.flagList.installEventFilter(self)
         self.layout().addWidget(self.flagScrollArea, 1)
@@ -62,10 +61,6 @@ class FlagEditor(QtGui.QWidget):
             # This makes the scrollarea scroll horizontally when the mouse approaches the border
             self.flagScrollArea.ensureVisible(event.pos().x(), event.pos().y(), 25, 0)
         return False
-            
-    def setVertical(self, vertical):
-        """Set whether the list of FlagWidgets should be vertical or horizontical."""
-        self.flagList.setVertical(vertical)
                  
     def _handleAddButton(self):
         """Ask the user to add a flag."""
@@ -74,16 +69,13 @@ class FlagEditor(QtGui.QWidget):
 
 
 class FlagListWidget(QtGui.QWidget):
-    """Displays a list of FlagWidgets representing the records in the FlagEditorModel *model*. *vertical*
-    specifies the direction of the list. When a record is removed, the other records slide to fill the gap.
-    """
+    """Displays a list of FlagWidgets representing the records in the FlagEditorModel *model*."""
     # The animation currently running (if any). This is used to stop the animation if the model changes.
     _animation = None
     
-    def __init__(self, model, vertical):
+    def __init__(self, model):
         super().__init__()
         self.setMouseTracking(True)
-        self.vertical = vertical
         
         self._flagWidgets = []
         self.model = model
@@ -92,8 +84,7 @@ class FlagListWidget(QtGui.QWidget):
         self.model.recordRemoved.connect(self._handleRecordRemoved)
         self.model.recordChanged.connect(self._handleRecordChanged)
         
-        self.setLayout(QtGui.QBoxLayout(QtGui.QBoxLayout.TopToBottom if vertical
-                                        else QtGui.QBoxLayout.LeftToRight))
+        self.setLayout(QtGui.QBoxLayout(QtGui.QBoxLayout.LeftToRight))
         self.layout().setAlignment(Qt.AlignLeft)
         style = QtGui.QApplication.style()
         # Use horizontal spacing instead of left margin so that the distance to the add button equals
@@ -102,14 +93,6 @@ class FlagListWidget(QtGui.QWidget):
                                          style.pixelMetric(style.PM_LayoutRightMargin), 0)
         
         self._handleReset()
-        
-    def setVertical(self, vertical):
-        """Set whether this editor display the flags vertically."""
-        if vertical != self.vertical:
-            self._stopAnimation()
-            self.vertical = vertical
-            self.layout().setDirection(
-                            QtGui.QBoxLayout.TopToBottom if vertical else QtGui.QBoxLayout.LeftToRight)
 
     def _handleReset(self):
         """Reset the FlagEditor."""
@@ -146,12 +129,8 @@ class FlagListWidget(QtGui.QWidget):
                     and self.isVisible():
                     size = flagWidget.sizeHint()
                     empty = QtGui.QWidget()
-                    if self.vertical:
-                        empty.setMinimumHeight(size.height())
-                        property = "minimumHeight"
-                    else:
-                        empty.setMinimumWidth(size.width())
-                        property = "minimumWidth"
+                    empty.setMinimumWidth(size.width())
+                    property = "minimumWidth"
                     self.layout().insertWidget(self._mapToLayout(pos), empty)
                     self._animation = QtCore.QPropertyAnimation(empty, property, self)
                     self._animation.setDuration(250)
