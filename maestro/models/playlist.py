@@ -364,7 +364,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
     def removeByOffset(self, offset, count, updateBackend='always'):
         """Remove *count* files beginning at *offset* from the playlist."""
-        # TODO: This is very inefficient
         ranges = []
         for offset in range(offset, offset+count):
             file = self.root.fileAtOffset(offset)

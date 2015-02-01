@@ -33,9 +33,9 @@ class ContainerType(enum.Enum):
     Work = 2
     Collection = 3
 
-    @classmethod
-    def majorTypes(cls):
-        return cls.Album, cls.Work
+    @property
+    def major(self):
+        return self is not ContainerType.Collection
 
     def title(self):
         if self == ContainerType.Container:
@@ -71,7 +71,7 @@ class Element:
     def __init__(self):
         raise RuntimeError("Cannot instantiate abstract base class Element.")
     
-    def isFile(self):
+    def isFile(self) -> bool:
         """Return whether this element is a file."""
         raise NotImplementedError()
     
@@ -83,10 +83,6 @@ class Element:
         """Return whether this element (or rather its version on real level) is stored in the database."""
         from . import reallevel
         return self.id in reallevel._dbIds
-    
-    def isMajor(self):
-        """Return whether the type of this element implies the 'major'-property."""
-        return self.isContainer() and self.type in ContainerType.majorTypes()
         
     def getTitle(self, usePath=True, neverShowIds=False):
         """Return the title of this element or some dummy title, if the element does not have a title tag.

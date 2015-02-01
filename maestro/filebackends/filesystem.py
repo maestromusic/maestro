@@ -24,14 +24,34 @@ import taglib
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import BackendFile, BackendURL, urlTypes
-from .. import logging, utils
-from ..core import tags, domains
+from maestro.filebackends import BackendFile, BackendURL, urlTypes
+from maestro import logging, utils, config
+from maestro.core import tags
 
 
 def init():
     # register the file:// URL scheme
-    urlTypes["file"] = FileURL
+    urlTypes['file'] = FileURL
+    parseAutoReplace()
+
+autoReplaceTags = None
+
+
+def parseAutoReplace():
+    """Parse the config option tags.auto_replace and return a list of tuples (oldname,newname) specifying
+    the tags that should be replaced. This does not check whether the tag names are valid."""
+    global autoReplaceTags
+    string = config.options.tags.auto_replace.replace(' ', '')
+    autoReplaceTags = {}
+    if len(string) == 0:
+        return
+    if string[0] != '(' or string[-1] != ')':
+        raise ValueError()
+    string = string[1:-1]
+    autoReplaceTags = {}
+    for pair in string.split('),('):
+        oldName, newName = pair.split(',') # may raise ValueError
+        autoReplaceTags[oldName] = newName
     
 
 class RealFile(BackendFile):
@@ -47,6 +67,7 @@ class RealFile(BackendFile):
     def __init__(self, url):
         assert url.scheme == "file"
         super().__init__(url)
+        self._taglibFile = None
         
     specialTagNames = "tracknumber", "compilation", "discnumber"
            
@@ -60,10 +81,17 @@ class RealFile(BackendFile):
             return 
         self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True) 
         self.specialTags = OrderedDict()
+        autoProcessingDone = False
         for key, values in self._taglibFile.tags.items():
             key = key.lower()
             if key in self.specialTagNames:
                 self.specialTags[key] = values
+            elif key in config.options.tags.auto_delete:
+                autoProcessingDone = True
+                continue
+            elif key in autoReplaceTags:
+                autoProcessingDone = True
+                key = autoReplaceTags[key]
             elif tags.isValidTagName(key):
                 tag = tags.get(key)
                 validValues = []
@@ -77,23 +105,26 @@ class RealFile(BackendFile):
                     self.tags.add(tag, *validValues)
             else:
                 logging.error(__name__, "Invalid tag name '{}' found : {}".format(key, self.url))
+        if autoProcessingDone:
+            self.saveTags()
         
     @property
     def length(self):
-        if hasattr(self, '_taglibFile'):
+        if self._taglibFile:
             return self._taglibFile.length
         else: return 0
 
     @property
     def readOnly(self):
-        if hasattr(self, '_taglibFile'):
+        if self._taglibFile:
             return self._taglibFile.readOnly
         fileAtt = os.stat(self.url.path)
         import stat
         return not (fileAtt[stat.ST_MODE] & stat.S_IWUSR)
     
     def rename(self, newUrl):
-        # TODO: handle open taglib file references
+        if self._taglibFile:
+            self._taglibFile = None
         if os.path.exists(newUrl.path):
             raise OSError("Target exists.")
         dir = os.path.dirname(newUrl.path)
@@ -127,13 +158,12 @@ class RealFile(BackendFile):
         If some tags cannot be saved due to restrictions of the underlying metadata format, those
         tags/values that remain unsaved will be returned.
         """
-        if not hasattr(self, '_taglibFile'):
-            return
+        assert self._taglibFile is not None
         self._taglibFile.tags = dict()
         for tag, values in self.specialTags.items():
             self._taglibFile.tags[tag.upper()] = values
         for tag, values in self.tags.items():
-            values = [tag.fileFormat(value) for value in values]
+            values = sorted(tag.fileFormat(value) for value in values)
             self._taglibFile.tags[tag.name.upper()] = values
         unsuccessful = self._taglibFile.save()
         ret = {key.upper(): values for key,values in unsuccessful.items()}

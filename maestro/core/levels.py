@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import collections.abc
 import weakref
 
 from PyQt4 import QtCore, QtGui
@@ -261,7 +262,6 @@ class Level(application.ChangeEventDispatcher):
             element = element.copy(level=self if changeLevel else None)
             for parentId in parentsToRemove:
                 element.parents.remove(parentId)
-            
         return element
     
     def fetch(self, param):
@@ -291,6 +291,8 @@ class Level(application.ChangeEventDispatcher):
     
     def collectMany(self, params):
         """Collect several elements by their id/url and return them."""
+        if not isinstance(params, collections.abc.Sized):  # exclude one-time generators
+            params = list(params)
         self._ensureLoaded(params) # without this line all missing elements would be loaded separately.
         newElements = [self._correctParents(self.parent.fetch(param), changeLevel=True)
                           for param in params if param not in self]
@@ -463,9 +465,7 @@ class Level(application.ChangeEventDispatcher):
                 else:
                     break
         self.stack.beginMacro(self.tr("Remove contents"))
-        self.removeContents(parent, positions) 
-        #TODO: when the positions are not connected, using several different shifts might be more
-        # appropriate
+        self.removeContents(parent, positions)
         if shiftPositions is not None:
             self.shiftPositions(parent, shiftPositions, shift)
         self.stack.endMacro()

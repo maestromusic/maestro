@@ -260,7 +260,7 @@ class TypedProfileCategory(ProfileCategory):
         if isinstance(type, str):
             type = self.getType(type)
             if type is None:
-                raise ValueError("There is no profile type of name '{}'.".format(name))
+                raise ValueError("There is no profile type of name '{}'.".format(type))
         for profile in self._profiles:
             if profile.type == type:
                 profile.builtIn = False # delete built-in profiles, too

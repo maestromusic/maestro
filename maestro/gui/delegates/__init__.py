@@ -207,7 +207,7 @@ class StandardDelegate(AbstractDelegate):
                 ancestor = element.level.fetch(id)
             except levels.ElementGetError: # this may happen if the parent has just been deleted
                 continue
-            if not onlyMajor or ancestor.isMajor():
+            if not onlyMajor or ancestor.type.major:
                 ancestorIds.append(id)
                 ancestors.append(ancestor)
             # Search for ancestors recursively even if the current ancestor is not major. It might have

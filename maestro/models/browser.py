@@ -564,7 +564,7 @@ def _buildContainerTree(domain, elids):
                 result = True
                 cDict[pid].append(id)
                 toplevel.discard(id)
-            elif levels.real[pid].isMajor(): # This is a major parent. Add it to toplevel
+            elif levels.real[pid].type.major: # This is a major parent. Add it to toplevel
                 result = True
                 cDict[pid].append(id)
                 toplevel.discard(id)

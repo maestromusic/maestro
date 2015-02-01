@@ -17,6 +17,7 @@
 #
 
 import itertools
+import collections.abc
 
 from . import elements, levels, tags, flags, domains
 from .. import application, database as db, filebackends, stack
@@ -84,7 +85,7 @@ class RealLevel(levels.Level):
     
     def collectMany(self, params):
         # We need to iterate params twice
-        if not isinstance(params, (list, tuple)):
+        if not isinstance(params, collections.abc.Sized):  # exclude one-time generators
             params = list(params)
         self._ensureLoaded(params)
         return [self[param] for param in params]

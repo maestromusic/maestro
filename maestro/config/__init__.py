@@ -137,14 +137,7 @@ configOptions = collections.OrderedDict((
     "prefix":  (str, "", "Prefix which will be prepended to the table names."),
 }),
 
-#TODO move these into the plugin
-("mpd", {
-    "timer_interval": (int, 300, "Interval of mpd synchronization"),
-    "host": (str, "localhost", "MPD's host name"),
-    "port": (int, 6600, "MPD's port"),
-}),
-
-("tags", {    
+("tags", {
     "title_tag": (str, "title", "Key of the title-tag."),
     "album_tag": (str, "album", "Key of the album-tag."),
     "search_tags": (list, ["album", "performer", "conductor", "title", "lyricist", "composer", "date", "artist"],

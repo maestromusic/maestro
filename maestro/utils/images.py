@@ -96,7 +96,7 @@ def html(pixmap, attributes=''):
 
 def renderSvg(fileOrRenderer, name, width, height, background=Qt.transparent):
     """Load the object with the given name from *file* and render it into a pixmap of the given
-    dimensions. Return that pixmap."""#TODO
+    dimensions. Return that pixmap."""
     if isinstance(fileOrRenderer, str):
         renderer = QtSvg.QSvgRenderer(fileOrRenderer)
     else: renderer = fileOrRenderer

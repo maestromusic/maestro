@@ -271,7 +271,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     if type != 'gui':
         return app
-        
+
     from . import filesystem
     filesystem.init()
 
