@@ -689,7 +689,8 @@ class Level(application.ChangeEventDispatcher):
         If *createFunc* is None, all names in *wrapperString* must be ids and wrappers are created using
         these ids.
         
-        Identifiers for which no element can be created due to an ElementGetError will simply be skipped.
+        Identifiers for which no element can be created due to an ElementGetError will simply be skipped
+        with a logged warning.
         """  
         roots = []
         currentWrapper = None
@@ -735,13 +736,13 @@ class Level(application.ChangeEventDispatcher):
                             wrapper.parent = currentWrapper
                     else:
                         wrapper = createFunc(currentWrapper, token) # may raise ValueError
-                
+
                     if currentWrapper is not None and wrapper.element.id not in currentWrapper.element.contents:
                         raise ValueError("Invalid wrapper string: {} is not contained in {}."
                                          .format(wrapper.element.id, currentWrapper.element.id))
                     currentList.append(wrapper)
-                except ElementGetError:
-                    logging.exception(__name__, "Error reading a WrapperString")
+                except ElementGetError as e:
+                    logging.error(__name__, "Error reading a WrapperString: "+str(e))
                     continue
         return roots
 
