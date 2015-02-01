@@ -176,6 +176,7 @@ class DBAnalyzer(mainwindow.Widget):
 
         # Problems
         self.checks = [checkClass() for checkClass in checks.Check.__subclasses__()]
+        self.checks.sort(key=lambda check: check.getName())
         checkData = [(check.getName(),check.getInfo(),check.getNumber()) for check in self.checks]
         self.problemDetails = {}
         self.problemsTable.setRowCount(len(checkData))
