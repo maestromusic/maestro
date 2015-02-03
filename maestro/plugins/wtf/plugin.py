@@ -129,9 +129,6 @@ class Dialog(profilesgui.ProfileActionDialog):
     def execute():
         dialog = Dialog()
         dialog.exec_()
-    
-
-
 
     
 class ConfigWidget(QtGui.QWidget):
