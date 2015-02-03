@@ -236,7 +236,7 @@ class FileSystemSelection(selection.Selection):
     
     def __init__(self, urls):
         super().__init__(levels.real,[])
-        self._files = levels.real.collectMany(urls)
+        self._files = levels.real.collect(urls)
         
     def elements(self,recursive=False):
         return self._files

@@ -291,14 +291,14 @@ def export(profile):
     exported = set()
     if profile.structure == STRUCTURE_FLAT or profile.delete:
         exportedPaths = set()
-    toExport = levels.real.collectMany(request.result)
+    toExport = levels.real.collect(request.result)
     while len(toExport) > 0:
         element = toExport.pop()
         if element.id in exported:
             continue
         exported.add(element.id)
         if element.isContainer():
-            toExport.extend(levels.real.collectMany(element.contents))
+            toExport.extend(levels.real.collect(element.contents))
             continue
         if element.url.scheme != 'file':
             print("I can only export regular files. Skipping", str(element.url))

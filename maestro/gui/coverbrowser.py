@@ -261,7 +261,7 @@ class CoverBrowser(mainwindow.Widget):
             """, filter=filterClause)
         coverPaths = {id: path for id, path in result}
         ids = list(coverPaths.keys())
-        levels.real.collectMany(ids)
+        levels.real.collect(ids)
         if tags.isInDb("artist") and tags.isInDb("date"):
             sortValues = {}
             artistTag = tags.get("artist")

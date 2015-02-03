@@ -186,7 +186,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
     def selection(self):
         """Return a selection.Selection object based on the selected covers."""
         return selection.Selection.fromElements(levels.real,
-                                    levels.real.collectMany([item.elid for item in self.selectedItems()]))
+                                    levels.real.collect([item.elid for item in self.selectedItems()]))
         
     def helpEvent(self, helpEvent):
         # Note: Setting all tooltips when the scene is generated takes much too long. Reimplementing
@@ -215,7 +215,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
             
         if showParents and el.parents is not None:
             parentIds = list(el.parents)
-            parents = levels.real.collectMany(parentIds)
+            parents = levels.real.collect(parentIds)
             parents.sort(key=elements.Element.getTitle)
             lines.extend(translate("RootedTreeModel", "#{} in {}").format(p.contents.positionOf(el.id),
                                                                           p.getTitle())

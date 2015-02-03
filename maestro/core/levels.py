@@ -270,28 +270,22 @@ class Level(application.ChangeEventDispatcher):
         Do not load the element onto this level. Correct the 'parents' attribute if the element is fetched
         from a parent level.
         """
-        if param in self:
+        if isinstance(param, collections.abc.Iterable):
+            self._ensureLoaded(param)
+            return [self.fetch(prm) for prm in param]
+        elif param in self:
             return self[param]
-        else: return self._correctParents(self.parent._fetch(param), changeLevel=False)
+        else:
+            return self._correctParents(self.parent._fetch(param), changeLevel=False)
     
     def _fetch(self, param):
         """Like fetch, but do not correct the 'parents' attribute."""
-        if param in self:
-            return self[param]
-        else: return self.parent._fetch(param)
-    
-    def fetchMany(self, params):
-        """Fetch several elements by their id/url and return them."""
-        self._ensureLoaded(params) # without this line all missing elements would be loaded separately.
-        return [self.fetch(param) for param in params]
-        
-    def collect(self, param):
-        """Return the element specified by the id or url *param* from this level. Load the element if it is
-        not loaded yet."""
-        return self.collectMany([param])[0]
-    
-    def collectMany(self, params):
+        return self[param] if param in self else self.parent._fetch(param)
+
+    def collect(self, params):
         """Collect several elements by their id/url and return them."""
+        if not isinstance(params, collections.abc.Iterable):
+            return self.collect([params])[0]
         if not isinstance(params, collections.abc.Sized):  # exclude one-time generators
             params = list(params)
         self._ensureLoaded(params) # without this line all missing elements would be loaded separately.

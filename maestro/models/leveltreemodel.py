@@ -84,7 +84,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         # Get elements to insert
         if mimeData.hasFormat(config.options.gui.mime):
             ids = [ node.element.id for node in mimeData.wrappers() ]
-            elements = self.level.collectMany(ids)
+            elements = self.level.collect(ids)
         else:  # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
 

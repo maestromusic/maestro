@@ -79,13 +79,12 @@ class RealLevel(levels.Level):
     def emitFilesystemEvent(self, **kwArgs):
         """Simple shortcut to emit a FileSystemEvent."""
         stack.addEvent(self.filesystemDispatcher, RealFileEvent(**kwArgs))
-        
-    def collect(self, param):
-        self._ensureLoaded([param])
-        return self[param]
-    
-    def collectMany(self, params):
+
+    def collect(self, params):
         # We need to iterate params twice
+        if not isinstance(params, collections.abc.Iterable):
+            self._ensureLoaded([params])
+            return self[params]
         if not isinstance(params, collections.abc.Sized):  # exclude one-time generators
             params = list(params)
         self._ensureLoaded(params)
@@ -94,7 +93,6 @@ class RealLevel(levels.Level):
     # The difference between fetch, _fetch and collect is only important on levels below real.
     fetch = collect
     _fetch = collect
-    fetchMany = collectMany
     
     def _ensureLoaded(self, params):
         # note that __contains__ (p not in self) ensures that p is either int or url 

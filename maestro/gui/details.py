@@ -178,7 +178,7 @@ class DetailsView(mainwindow.Widget):
         # Parents
         if len(el.parents) > 0:
             text.append('<tr><td>'+self.tr("Parents: ")+'</td><td>')
-            parents = el.level.fetchMany(el.parents)
+            parents = el.level.fetch(el.parents)
             text.append('<br />'.join(link(p.id, Qt.escape(p.getTitle())) for p in parents))
             text.append('</td></tr>')
             
@@ -228,7 +228,7 @@ class DetailsView(mainwindow.Widget):
             ln = link("contents", utils.images.html(collapser if self.contentsVisible else expander))
             text.append('<tr><td>' + ln + self.tr("Contents: ") + '</td><td>')
             if self.contentsVisible:
-                contents = el.level.fetchMany(el.contents)
+                contents = el.level.fetch(el.contents)
                 contents = ["{} - {}".format(pos, link(id, Qt.escape(c.getTitle())))
                             for (pos, id), c in zip(el.contents.items(), contents)]
                 text.append('<br />'.join(contents))

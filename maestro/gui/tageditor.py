@@ -145,7 +145,7 @@ class TagEditorWidget(mainwindow.Widget):
             allElements = (w.element for w in mimeData.wrappers())
             level = mimeData.level
         elif mimeData.hasUrls():
-            allElements = levels.real.collectMany(url for url in event.mimeData().urls()
+            allElements = levels.real.collect(url for url in event.mimeData().urls()
                            if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile()))
             level = levels.real
         else:
@@ -667,7 +667,7 @@ class TagEditorDialog(QtGui.QDialog):
         """Handle clicks on the reset button: Reload all elements and clear the stack."""
         ids = list(self.level.elements.keys())
         self.level.elements = {}
-        elements = self.level.collectMany(ids)
+        elements = self.level.collect(ids)
         self.stack.resetSubstack(self.stack)
         self.tagedit.setElements(self.level, elements)
 

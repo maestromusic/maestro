@@ -122,7 +122,7 @@ class StandardGuesser(profiles.Profile):
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
-        existing = self.level.collectMany(existingParents)
+        existing = self.level.collect(existingParents)
         for elem in existing:
             self.orders[elem] = self.currentOrder
             self.currentOrder += 1
