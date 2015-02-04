@@ -34,22 +34,10 @@ class RenameFilesAction(treeactions.TreeAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.setText(self.tr("Rename files"))
-    
-    def initialize(self, selection):
-        for fileW in selection.fileWrappers(True):
-            if fileW.element.url.CAN_RENAME:
-                self.setEnabled(True)
-                return
-        self.setEnabled(False)
+        self.setEnabled(True)
     
     def doAction(self):
-        def check(element):
-            """Check if all files under this parent can be renamed."""
-            for file in element.getAllFiles():
-                if not file.url.CAN_RENAME:
-                    return False
-            return True
-        elements = [elem for elem in self.parent().selection.elements() if check(elem)]
+        elements = self.parent().selection.elements()
         dialog = RenameDialog(self.parent(), self.level(), elements)
         if dialog.exec_():
             try:
@@ -154,7 +142,7 @@ class RenameDialog(QtGui.QDialog):
             for elem, newPath in totalResult.items():
                 if elem.id in self.sublevel:
                     subelem = self.sublevel[elem.id]
-                    subelem.url = subelem.url.renamed(newPath)
+                    subelem.url = subelem.url.copy(path=newPath)
             if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
                 self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
                 self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))

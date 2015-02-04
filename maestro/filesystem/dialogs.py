@@ -24,6 +24,7 @@ from PyQt4.QtCore import Qt
 
 from .. import application, database as db, stack
 from ..core import levels, tags
+from maestro.core import urls
 from ..models.leveltreemodel import LevelTreeModel
 from ..gui import delegates, treeactions, treeview
 from ..gui.delegates import abstractdelegate, editor as editordelegate
@@ -74,13 +75,12 @@ class SetPathAction(treeactions.TreeAction):
                         not os.path.exists(next(selection.fileWrappers()).element.url.absPath))
     
     def doAction(self):
-        from ..filebackends.filesystem import FileURL
         elem = next(self.parent().selection.fileWrappers()).element
         path = QtGui.QFileDialog.getOpenFileName(application.mainWindow,
                                                  self.tr("Select new file location"),
                                                  os.path.dirname(elem.url.path))
         if path != "":
-            newUrl = FileURL(path)
+            newUrl = urls.URL.fileURL(path)
             from . import getNewfileHash
             db.query("UPDATE {p}files SET url=?,hash=? WHERE element_id=?",
                      str(newUrl), getNewfileHash(newUrl), elem.id)
@@ -237,7 +237,7 @@ class ModifiedTagsDialog(QtGui.QDialog):
         self.setLayout(layout)
         
     def useDBTags(self):
-        backendFile = self.file.url.getBackendFile()
+        backendFile = self.file.url.backendFile()
         backendFile.readTags()
         backendFile.tags = self.dbTags.withoutPrivateTags()
         backendFile.saveTags()

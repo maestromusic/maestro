@@ -44,19 +44,6 @@ class TestFile(BackendFile):
     
     length = 180
 
-class TestUrl(BackendURL):
-    CAN_RENAME = False
-    CAN_DELETE = False
-    IMPLEMENTATIONS = [ TestFile ]
-    
-    def __init__(self, urlString):
-        if "://" not in urlString:
-            urlString = "test:///" + utils.relPath(urlString)
-        super().__init__(urlString)
-
-urlTypes["test"] = TestUrl
- 
-
 class LevelTestCase(testcase.UndoableTestCase):
     """Base test case for level related test cases."""
     def __init__(self,level):

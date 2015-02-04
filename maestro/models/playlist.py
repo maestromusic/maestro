@@ -22,8 +22,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import wrappertreemodel, treebuilder
-from .. import config, logging, player, utils, filebackends
-from ..core import levels
+from .. import config, logging, player, utils
+from ..core import levels, urls
 from ..core.nodes import RootNode, Wrapper
 
  
@@ -484,7 +484,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             """This is used as createFunc-argument for Level.createWrappers."""
             if token.startswith('EXT:'):
                 url = urllib.parse.unquote(token[4:]) # remove "EXT:"
-                url = filebackends.BackendURL.fromString(url)
+                url = urls.URL(url)
                 try:
                     element = self.level.collect(url)
                 except OSError as e:

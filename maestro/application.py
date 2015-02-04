@@ -249,16 +249,13 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
         return app
     
     # Load and initialize remaining modules
-    from .core import levels
+    from maestro.core import levels
     levels.init()
     from . import search, profiles
-    from .core import covers
+    from maestro.core import covers
     search.init()
     covers.init()
-    
-    from .filebackends import filesystem
-    filesystem.init()
-    
+
     global network
     network = QtNetwork.QNetworkAccessManager()
     

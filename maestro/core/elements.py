@@ -23,8 +23,8 @@ import enum
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import tags as tagsModule
-from .. import config, filebackends, utils
+from . import tags as tagsModule, urls
+from .. import config, utils
 
 
 class ContainerType(enum.Enum):
@@ -271,7 +271,7 @@ class File(Element):
     will be used. Valid keyword-arguments are parents, tags, flags, stickers.
     """
     def __init__(self, domain, level, id, url, length, **kwargs):
-        if not isinstance(id, int) or not isinstance(url, filebackends.BackendURL) \
+        if not isinstance(id, int) or not isinstance(url, urls.URL) \
                 or not isinstance(length, int):
             raise TypeError("Invalid type (id, url, length): ({}, {}, {}) of types ({}, {}, {})"
                             .format(id, url, length, type(id), type(url), type(length)))

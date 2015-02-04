@@ -16,7 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import re, time, select, contextlib, os.path
+import re
+import time
+import select
+import contextlib
+import os.path
 
 try:
     import mpd
@@ -32,14 +36,11 @@ if mpd_version < [0,5,1]:
                       "python-mpd2-0.5.1 to function properly.")
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
 
-from ... import application, database as db, filebackends, player, logging, profiles, stack
-from ...filebackends import filesystem as filesystembackend
-from ...gui.misc import lineedits
-from ...core import domains, tags
-from ...models import playlist
-from . import filebackend as mpdfilebackend
+from maestro import application, player, logging, profiles, stack
+from maestro.gui.misc import lineedits
+from maestro.core import tags, urls
+from maestro.models import playlist
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -47,13 +48,23 @@ logger = logging.getLogger(__name__)
 
 def enable():
     player.profileCategory.addType(profiles.ProfileType(
-                'mpd', translate('MPDPlayerBackend','MPD'), MPDPlayerBackend))
-    filebackends.urlTypes["mpd"] = mpdfilebackend.MPDURL
+                                   'mpd', translate('MPDPlayerBackend', 'MPD'), MPDPlayerBackend))
+    urls.fileBackends.append(MPDFile)
 
 
 def disable():
     player.profileCategory.removeType('mpd')
-    del filebackends.urlTypes["mpd"]
+    urls.fileBackends.remove(MPDFile)
+
+
+class MPDFile(urls.BackendFile):
+
+    scheme = 'mpd'
+
+    def readTags(self):
+        mpdProfile = player.profileCategory.get(self.url.profile)
+        self.tags, self.length = mpdProfile.getInfo(self.url.path)
+
 
 MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
 
@@ -451,24 +462,20 @@ class MPDPlayerBackend(player.PlayerBackend):
     def makeUrls(self, paths):
         """Create Maestro URLs for the given paths reported by MPD.
         
-        If an MPD path has the form of a non-default URL (i.e. proto://path), it is tried to load
-        an appropriate URL using BackendURL.fromString().
-        Otherwise, if *path* refers to a normal file in MPDs database, an MPDURL is created.
-        If the file is also found on the local filesystem, then a normal FileURL is returned.
+        MPD paths of non-default form (i.e. proto://path) are mapped to URLs with scheme 'proto'.
+        If *path* refers to a normal file in MPDs database, a URL with scheme 'MPD' is created.  If the file
+        is also found on the local filesystem, then a normal 'file' URL is returned.
         """
-        urls = []
+        returned = []
         for path in paths:
             if re.match("[a-zA-Z]{2,5}://", path) is not None:
-                try:
-                    urls.append(filebackends.BackendURL.fromString(path))
-                except KeyError:
-                    logger.warning("Unsupported MPD URL type: {}".format(path))
+                returned.append(urls.URL(path))
             else:
                 if os.path.exists(os.path.join(self.path, path)):
-                    urls.append(filesystembackend.FileURL(os.path.join(self.path, path)))
+                    returned.append(urls.URL.fileURL(os.path.join(self.path, path)))
                 else:
-                    urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
-        return urls
+                    returned.append(urls.URL('mpd://{}/{}'.format(self.name, path)))
+        return returned
         
     def treeActions(self):
         yield self.separator

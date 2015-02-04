@@ -21,8 +21,8 @@ import os.path
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import utils, filebackends, stack
-from ..core import levels, tags, elements, domains
+from .. import utils, stack
+from maestro.core import levels, tags, elements, domains, urls
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
@@ -34,7 +34,7 @@ translate = QtGui.QApplication.translate
 class TreeAction(QtGui.QAction):
     """Super class for TreeActions, i.e. Actions for TreeViews.
     """
-    def __init__(self, parent, text=None, shortcut=None, icon=None, tooltip=None):
+    def __init__(self, parent, shortcut=None, icon=None, tooltip=None):
         super().__init__(parent)
         if shortcut:
             self.setShortcut(shortcut)
@@ -86,11 +86,11 @@ class ChangeFileUrlsAction(TreeAction):
         if selection.singleWrapper():
             self.setText(self.tr("Change file URL"))
             element = selection.wrappers()[0].element
-            if element.isFile() and element.url is not None and element.url.CAN_RENAME:
+            if element.isFile():
                 self.setEnabled(True)
         elif selection.hasFiles():
             elements = list(selection.files())
-            if all(isinstance(el.url, filebackends.filesystem.FileURL) for el in elements):
+            if all(el.url.scheme == 'file' for el in elements):
                 dir = self._getDirectory(elements)
                 if dir is not None:
                     self.setEnabled(True)
@@ -108,13 +108,13 @@ class ChangeFileUrlsAction(TreeAction):
         return dir if len(dir) > 0 else None
     
     def doAction(self):
-        from ..filebackends.filesystem import FileURL
         selection = self.parent().selection
         if selection.singleWrapper():
             element = next(selection.fileWrappers()).element
-            if isinstance(element.url, FileURL):
+            if element.url.scheme == 'file':
                 self.changeFileUrl(element)
-            else: self.changeOtherUrl(element)
+            else:
+                self.changeOtherUrl(element)
         else:
             elements = list(selection.files())
             self.changeElementsDirectory(elements)
@@ -141,13 +141,12 @@ class ChangeFileUrlsAction(TreeAction):
         
     def changeFileUrl(self, element):
         """Ask the user for a new URL for *element* and change the URL. Element must be a filesystem-file."""
-        from ..filebackends.filesystem import FileURL
         path = QtGui.QFileDialog.getSaveFileName(None,
                                                  self.tr("Select new file location"),
                                                  element.url.path,
                                                  options=QtGui.QFileDialog.DontConfirmOverwrite)
         if self._checkFilePath(path, shouldExist=False, oldPath=element.url.path):
-            self.level().renameFiles( {element: (element.url, FileURL(path)) })
+            self.level().renameFiles( {element: (element.url, urls.URL.fileURL(path)) })
             
     def changeOtherUrl(self, element):
         """Ask the user for a new URL for *element* and change the URL. For filesystem-files use
@@ -158,12 +157,12 @@ class ChangeFileUrlsAction(TreeAction):
         if not ok or path is None or path == '':
             return
         try:
-            newUrl = filebackends.BackendURL.fromString(path)
+            newUrl = urls.URL(path)
         except ValueError:
             QtGui.QMessageBox.warning(None, self.tr("Invalid URL"), self.tr("Please enter a valid URL."))
             return
         
-        self.level().renameFiles( {element: (element.url, newUrl) })
+        self.level().renameFiles({element: (element.url, newUrl)})
         
     def changeElementsDirectory(self, elements):
         """Given a list of elements from the same directory, ask the user for a new directory and move
@@ -173,8 +172,7 @@ class ChangeFileUrlsAction(TreeAction):
             return
         path = QtGui.QFileDialog.getExistingDirectory(None, self.tr("Select new files directory"), dir)
         if self._checkFilePath(path, shouldExist=True, oldPath=dir):
-            from ..filebackends.filesystem import FileURL
-            changes = {element: (element.url, FileURL(os.path.join(path, os.path.basename(element.url.path))))
+            changes = {element: (element.url, urls.URL.fileURL(os.path.join(path, os.path.basename(element.url.path))))
                        for element in elements}
             for oldUrl, newUrl in changes.values():
                 if os.path.exists(newUrl.path):
@@ -248,7 +246,7 @@ class DeleteAction(TreeAction):
         selection = self.parent().selection
         insertPending = False
         self.level().stack.beginMacro(self.tr('delete elements'))
-        files = tuple(elem for elem in selection.files() if elem.url.CAN_DELETE)
+        files = list(selection.files())
         if selection.singleWrapper() and selection.hasContainers():
             container = selection.wrappers()[0]
             container.loadContents(recursive=True)
@@ -347,7 +345,7 @@ class CommitTreeAction(TreeAction):
         if not model.containsExternalTags():
             try:
                 model.commit()
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 e.displayMessage()
             except levels.RenameFilesError as e:
                 e.displayMessage()

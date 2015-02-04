@@ -32,8 +32,8 @@ def isMusicFile(path):
 def mTimeStamp(file):
     """Get the modification timestamp of *file* as UTC datetime. *file* might be either a BackendURL
     or a path."""
-    from ..filebackends import BackendURL
-    if isinstance(file, BackendURL):
+    from maestro.core.urls import URL
+    if isinstance(file, URL):
         file = file.path
     return datetime.datetime.fromtimestamp(os.path.getmtime(file),
                                            tz=datetime.timezone.utc).replace(microsecond=0)
@@ -41,16 +41,15 @@ def mTimeStamp(file):
 
 def collect(urls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
-    are received. Return a dict mapping directory to list of FileURLs within. Sort directories and files.
+    are received. Return a dict mapping directory to list of URLs within. Sort directories and files.
     """
-    from ..filebackends.filesystem import FileURL
     filePaths = collections.OrderedDict()
     
     def add(file, parent=None):
         dir = parent or os.path.dirname(file)
         if dir not in filePaths:
             filePaths[dir] = []
-        filePaths[dir].append(FileURL(file))
+        filePaths[dir].append(urls.URL.fileURL(file))
         
     for url in urls:
         path = url.path()
@@ -80,15 +79,13 @@ def collect(urls):
 
 def collectAsList(urls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when
-    urls are received. Return a list of FileURLs. Sort files within each directory, but not the list
+    urls are received. Return a list of URLs. Sort files within each directory, but not the list
     as whole.
     """
-    from ..filebackends.filesystem import FileURL
-
     def checkUrl(url):
         path = url.path()
         if os.path.isfile(path):
-            return [FileURL(path)]
+            return [urls.URL.fileURL(path)]
         else:
             return itertools.chain.from_iterable(collect([url]).values())
 

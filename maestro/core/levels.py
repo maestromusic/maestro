@@ -19,12 +19,13 @@
 import collections.abc
 import weakref
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
+from maestro.core.urls import URL
 from . import elements, tags, flags, stickers
 from .nodes import Wrapper
-from .. import application, filebackends, database as db, logging, stack
+from .. import application, database as db, logging, stack
 
 
 allLevels = weakref.WeakSet()
@@ -224,7 +225,7 @@ class Level(application.ChangeEventDispatcher):
         """
         if isinstance(param, int):
             return param in self.elements
-        elif isinstance(param, filebackends.BackendURL):
+        elif isinstance(param, URL):
             try:
                 id = idFromUrl(param)
             except KeyError:
@@ -237,7 +238,7 @@ class Level(application.ChangeEventDispatcher):
     def __getitem__(self, key):
         if isinstance(key, int):
             return self.elements[key]
-        elif isinstance(key, filebackends.BackendURL):
+        elif isinstance(key, URL):
             return self.elements[idFromUrl(key)] # __getitem__ and idFromUrl may raise KeyErrors
         else:
             raise ValueError("param must be either ID or URL, not {} of type {}"
