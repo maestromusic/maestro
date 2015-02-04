@@ -25,20 +25,22 @@ def load_tests(loader, standard_tests, pattern):
     # Remember that Maestro uses its own test loader (see testloader.py)
     suite = unittest.TestSuite()
 
-    from . import sql
-    suite.addTests(loader.loadTestsFromModule(sql))
-    
-    from . import tagflagtypes
-    suite.addTests(loader.loadTestsFromModule(tagflagtypes))
-    
-    from . import levels
-    suite.addTests(loader.loadTestsFromModule(levels))
-    
-    from . import realfiles
-    suite.addTests(loader.loadTestsFromModule(realfiles))
-    
-    from . import playlistmodel
-    suite.addTests(loader.loadTestsFromModule(playlistmodel))
+#    from . import sql
+#    suite.addTests(loader.loadTestsFromModule(sql))
+#    
+#    from . import tagflagtypes
+#    suite.addTests(loader.loadTestsFromModule(tagflagtypes))
+#    
+#    from . import levels
+#    suite.addTests(loader.loadTestsFromModule(levels))
+#    
+#    from . import realfiles
+#    suite.addTests(loader.loadTestsFromModule(realfiles))
+#    
+#    from . import playlistmodel
+#    suite.addTests(loader.loadTestsFromModule(playlistmodel))
+    from . import criteria
+    suite.addTests(loader.loadTestsFromModule(criteria))
     
     return suite
 

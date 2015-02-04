@@ -40,12 +40,13 @@ class TestLoader(unittest.TestLoader):
     """
     def __init__(self):
         from maestro import application
-        from maestro.core import tags
+        from maestro.core import tags, domains
         # Save the app from the garbage collector
-        self.app = application.init(cmdConfig=['main.collection=/'],type="test",exitPoint='noplugins')
+        self.app = application.init(type="test", exitPoint='noplugins')
         for name,type in  [("artist","varchar"),("title","varchar"),("album","varchar"),("date","date"),
                            ("genre","varchar"),("comment","text")]:
             tags.addTagType(name,tags.ValueType.byName(type))
+        domains.addDomain('Music')
             
     def loadTestsFromModule(self,module):
         if hasattr(module,'load_tests'):

@@ -27,10 +27,6 @@ TT_HELP = 'tmp_help'
 
 def init():
     """Initialize the search module."""
-    criteria.SEARCH_TAGS = set()
-    for tagname in config.options.tags.search_tags:
-        if tags.isInDb(tagname):
-            criteria.SEARCH_TAGS.add(tags.get(tagname))
     # Using temporary tables is important when several (worker) threads use the search function
     # at the same time: With temporary tables each thread has its own help table.
     if db.type == 'mysql':
