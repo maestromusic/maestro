@@ -106,13 +106,17 @@ def splitPath(path, includeRoot=True):
 
 
 # 120 is a sensible max length, the real length is of course platform-dependent and not important.
-def makeFilePath(folder, fileName, forceAscii=False, maxLength=120):
+def makeFilePath(folder, fileName, forceAscii=False, maxLength=120, exists=os.path.exists):
     """Return a file path that is similar to os.path.join(folder,fileName), but
         - weird special characters will be removed,
         - the path does not exist yet (or numbers will be appended before the extension to guarantee this),
         - if *forceAscii* is true, the path will only contain ASCII characters,
         - including the numbers from above and the extension the file name (not the whole path)
           has at most *maxLength* characters.
+        
+    The argument *exists* is used to test whether a path exists. It must be a function taking an absolute
+    path as argument and returning a bool. The default 'os.path.exists' should work in most cases, but
+    for virtual filesystems other functions are necessary.
     """
     fileName, extension = os.path.splitext(fileName)
     
@@ -149,5 +153,5 @@ def makeFilePath(folder, fileName, forceAscii=False, maxLength=120):
             continue
         
         path = os.path.join(folder, fileName+currentExt)
-        if not os.path.exists(path):
+        if not exists(path):
             return path

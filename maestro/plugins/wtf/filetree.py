@@ -115,6 +115,8 @@ class RootDirectory(Directory, nodes.RootNode):
 class FileTreeModel(rootedtreemodel.RootedTreeModel):
     def __init__(self):
         super().__init__(RootDirectory(self))
+        self.fileCount = 0
+        self.totalLength = 0
         
     def addFile(self, path, element):
         components = utils.files.splitPath(path, includeRoot=False)
@@ -129,6 +131,8 @@ class FileTreeModel(rootedtreemodel.RootedTreeModel):
         file = File(components[-1], element)
         file.parent = parent
         parent.contents.append(file)
+        self.fileCount += 1
+        self.totalLength += element.length
         
     def sort(self):
         self.root.sort()
