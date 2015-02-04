@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,11 +33,8 @@ class IconChooser(QtGui.QDialog):
         icons = []
         for path in folders:
             for file in QtCore.QDir(path).entryInfoList(filters=QtCore.QDir.Files):
-                try:
-                    icon = QtGui.QIcon(file.canonicalFilePath())
-                    icons.append( (icon, file) )
-                except Exception as e:
-                    print(e) # TODO remove print
+                icon = QtGui.QIcon(file.canonicalFilePath())
+                icons.append( (icon, file) )
         self.view = QtGui.QListWidget(self)
         self.view.setViewMode(QtGui.QListView.IconMode)
         self.view.doubleClicked.connect(self.accept)

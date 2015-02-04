@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -122,7 +122,7 @@ class FilesystemSettings(QtGui.QWidget):
             item = QtGui.QTableWidgetItem(source.domain.name if source.domain is not None else '')
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
-            
+
             column = self._getColumnIndex("enable")
             item = QtGui.QTableWidgetItem(source.enabled)
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
@@ -181,7 +181,7 @@ class FilesystemSettings(QtGui.QWidget):
         self.redoButton.setToolTip(self.tr("Redo: {}").format(stack.redoText()))
            
     def _handleRecheckButton(self):
-        if filesystem.enabled:
+        if filesystem.moduleEnabled:
             QtCore.QMetaObject.invokeMethod(filesystem.synchronizer,
                                             "recheck", Qt.QueuedConnection,
                                             QtCore.Q_ARG("QString", ""))
@@ -193,7 +193,7 @@ class FilesystemSettings(QtGui.QWidget):
             self.scanIntervalLabel.setText(self.scanIntervalText.format(val))
         config.options.filesystem.scan_interval = val
         return #TODO
-        if filesystem.enabled:
+        if filesystem.moduleEnabled:
             timer = filesystem.synchronizer.timer
             timer.stop()
             if val != 0:

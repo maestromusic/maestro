@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -435,7 +435,7 @@ class Macro:
         if self.postMethod is not None:
             self.postMethod()
         if self.transaction:
-            self._transaction.commit()
+            self._transaction.__exit__(None, None, None)
             self._transaction = None
         self.finished = True # after first redo, the macro is finished
     
@@ -464,14 +464,14 @@ class Macro:
             command.undo()
         if self.transaction:
             #This assumes that this macro has not been finished
-            self._transaction.rollback()
+            self._transaction.__exit__(RuntimeError, RuntimeError('transaction rolled back'), None)
             self._transaction = None
             
     def isEmpty(self):
         """Return whether this macro is empty, i.e. no command has been added to it."""
         return all(isinstance(command, Macro) and command.isEmpty() for command in self.commands)
     
-    def printStructure(self, indent = ''):
+    def printStructure(self, indent=''):
         """Debug method: print the tree below this node using indentation."""
         print(indent + str(self))
         indent, aIndent = indent+'  ', indent+'A '

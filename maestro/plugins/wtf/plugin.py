@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -198,7 +198,6 @@ class Dialog(QtGui.QDialog):
     def execute():
         dialog = Dialog(application.mainWindow)
         dialog.exec_()
-    
 
 
 def buildFileTree(profile):
@@ -218,14 +217,14 @@ def buildFileTree(profile):
     exported = set()
     if profile.structure == STRUCTURE_FLAT or OPTION_DELETE in profile.options:
         exportedPaths = set()
-    toExport = levels.real.collectMany(result)
+    toExport = levels.real.collect(result)
     while len(toExport) > 0:
         element = toExport.pop()
         if element.id in exported:
             continue
         exported.add(element.id)
         if element.isContainer():
-            toExport.extend(levels.real.collectMany(element.contents))
+            toExport.extend(levels.real.collect(element.contents))
             continue
         if element.url.scheme != 'file':
             print("I can only export regular files. Skipping", str(element.url))
@@ -256,7 +255,7 @@ def buildFileTree(profile):
             titlesToAdd = []
             parentIds = element.parents
             while len(parentIds) > 0:
-                parents = levels.real.collectMany(parentIds)
+                parents = levels.real.collect(parentIds)
                 parentIds = set() 
                 for p in parents:
                     if p.type == elements.TYPE_WORK and tags.TITLE in p.tags:
@@ -270,9 +269,8 @@ def buildFileTree(profile):
         fileTree.addFile(exportPath, element)
     fileTree.sort()
     return fileTree
-    
 
-    
+
 class ConfigWidget(QtGui.QWidget):
     def __init__(self, profile, parent):
         super().__init__(parent)
@@ -430,14 +428,14 @@ def export(profile):
     exported = set()
     if profile.structure == STRUCTURE_FLAT or profile.delete:
         exportedPaths = set()
-    toExport = levels.real.collectMany(request.result)
+    toExport = levels.real.collect(request.result)
     while len(toExport) > 0:
         element = toExport.pop()
         if element.id in exported:
             continue
         exported.add(element.id)
         if element.isContainer():
-            toExport.extend(levels.real.collectMany(element.contents))
+            toExport.extend(levels.real.collect(element.contents))
             continue
         if element.url.scheme != 'file':
             print("I can only export regular files. Skipping", str(element.url))

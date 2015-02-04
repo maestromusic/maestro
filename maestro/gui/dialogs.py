@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,9 +18,11 @@
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import database as db, utils, config
+from .. import utils, config
 from ..core import elements, levels, nodes, tags
-from . import tagwidgets, widgets
+from ..core.elements import ContainerType
+from . import widgets
+from maestro.core import urls
 
 
 def question(title, text, parent=None):
@@ -210,7 +212,7 @@ class MergeDialog(QtGui.QDialog):
       - the container can be assigned the common tags of all children
       - positions of subsequent elements can be lowered accordingly.
     """ 
-    STANDARD_TYPE = elements.TYPE_COLLECTION
+    DefaultType = elements.ContainerType.Collection
     
     def __init__(self, model, wrappers, parent=None):
         """Set up the dialog for *wrappers* (all with the same parent) in *model*.
@@ -227,7 +229,7 @@ class MergeDialog(QtGui.QDialog):
         self.parentNode = wrappers[0].parent
         
         domain = self.wrappers[0].element.domain
-        containerType = config.storage.gui.merge_dialog_container_type or self.STANDARD_TYPE
+        containerType = config.storage.gui.merge_dialog_container_type or self.DefaultType
         
         titleHint = ''
         prefix = ''
@@ -289,7 +291,7 @@ class MergeDialog(QtGui.QDialog):
             self.changeTypeBox = QtGui.QCheckBox(self.tr("Change content container types to:"))
             self.changeTypeBox.setChecked(False)
             layout.addWidget(self.changeTypeBox, row, 0)
-            self.childrenTypeBox = widgets.ContainerTypeBox(elements.TYPE_CONTAINER)
+            self.childrenTypeBox = widgets.ContainerTypeBox(ContainerType.Container)
             layout.addWidget(self.childrenTypeBox, row, 1)
             self.childrenTypeBox.setEnabled(False)
             self.changeTypeBox.toggled.connect(self.childrenTypeBox.setEnabled)
@@ -336,7 +338,7 @@ class MergeDialog(QtGui.QDialog):
             
         if len(containerTitle) > 0:
             containerTags[tags.TITLE] = [containerTitle]
-            if containerType == elements.TYPE_ALBUM and tags.ALBUM not in containerTags:
+            if containerType == ContainerType.Album and tags.ALBUM not in containerTags:
                 containerTags[tags.ALBUM] = [containerTitle]
                 
         # Before creating anything, change tags of children (might raise filesystem errors)
@@ -361,17 +363,16 @@ class MergeDialog(QtGui.QDialog):
                         removals.append((tags.TITLE, value))
                     elif value != newValue:
                         replacements.append((tags.TITLE, value, newValue))
-            if containerType == elements.TYPE_ALBUM and tags.ALBUM not in element.tags:
+            if containerType == ContainerType.Album and tags.ALBUM not in element.tags:
                 additions = [(tags.ALBUM, containerTitle)]
             tagChanges[element] = tags.TagDifference(additions=additions,
                                                      removals=removals,
                                                      replacements=replacements)
 
         if len(tagChanges) > 0:
-            from ..filebackends import TagWriteError
             try:
                 self.level.changeTags(tagChanges)
-            except TagWriteError as e:
+            except urls.TagWriteError as e:
                 e.displayMessage()
                 self.level.stack.abortMacro()
                 self.reject()
@@ -415,30 +416,8 @@ class MergeDialog(QtGui.QDialog):
                 
         self.level.stack.endMacro()
         
-        if containerType != self.STANDARD_TYPE:
+        if containerType != self.DefaultType:
             config.storage.gui.merge_dialog_container_type = containerType
         else: config.storage.gui.merge_dialog_container_type = None
             
         self.accept()
-        
-
-class FlattenDialog(QtGui.QDialog):
-    """A dialog for the "flatten" operation."""
-    
-    def __init__(self, hintRecursive = False, parent = None):
-        super().__init__(parent)
-        
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget(QtGui.QLabel(self.tr("Flatten out containers"), self))
-        self.recursiveBox = QtGui.QCheckBox(self.tr("recursively"))
-        self.recursiveBox.setChecked(hintRecursive)
-        layout.addWidget(self.recursiveBox)
-        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-        self.setLayout(layout)
-        
-    def recursive(self):
-        return self.recursiveBox.isChecked()
-        

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -43,19 +43,6 @@ class TestFile(BackendFile):
         return []
     
     length = 180
-
-class TestUrl(BackendURL):
-    CAN_RENAME = False
-    CAN_DELETE = False
-    IMPLEMENTATIONS = [ TestFile ]
-    
-    def __init__(self, urlString):
-        if "://" not in urlString:
-            urlString = "test:///" + utils.relPath(urlString)
-        super().__init__(urlString)
-
-urlTypes["test"] = TestUrl
- 
 
 class LevelTestCase(testcase.UndoableTestCase):
     """Base test case for level related test cases."""

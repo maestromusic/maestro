@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,14 +16,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import collections.abc
 import weakref
 
-from PyQt4 import QtCore, QtGui
+from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
+from maestro.core.urls import URL
 from . import elements, tags, flags, stickers
 from .nodes import Wrapper
-from .. import application, filebackends, database as db, logging, stack
+from .. import application, database as db, logging, stack
 
 
 allLevels = weakref.WeakSet()
@@ -194,8 +196,8 @@ class Level(application.ChangeEventDispatcher):
         self.name = name
         self.parent = parent
         if elements is None:
-            self.elements = {}
-        else: self.elements = {element.id: element.copy(level=self) for element in elements}
+            elements = {}
+        self.elements = {element.id: element.copy(level=self) for element in elements}
         self.stack = stack if stack is not None else globals()['stack'].stack
         
         # These are necessary to solve ticket #138
@@ -223,7 +225,7 @@ class Level(application.ChangeEventDispatcher):
         """
         if isinstance(param, int):
             return param in self.elements
-        elif isinstance(param, filebackends.BackendURL):
+        elif isinstance(param, URL):
             try:
                 id = idFromUrl(param)
             except KeyError:
@@ -236,7 +238,7 @@ class Level(application.ChangeEventDispatcher):
     def __getitem__(self, key):
         if isinstance(key, int):
             return self.elements[key]
-        elif isinstance(key, filebackends.BackendURL):
+        elif isinstance(key, URL):
             return self.elements[idFromUrl(key)] # __getitem__ and idFromUrl may raise KeyErrors
         else:
             raise ValueError("param must be either ID or URL, not {} of type {}"
@@ -261,7 +263,6 @@ class Level(application.ChangeEventDispatcher):
             element = element.copy(level=self if changeLevel else None)
             for parentId in parentsToRemove:
                 element.parents.remove(parentId)
-            
         return element
     
     def fetch(self, param):
@@ -269,31 +270,27 @@ class Level(application.ChangeEventDispatcher):
         Do not load the element onto this level. Correct the 'parents' attribute if the element is fetched
         from a parent level.
         """
-        if param in self:
+        if isinstance(param, collections.abc.Iterable):
+            self._ensureLoaded(param)
+            return [self.fetch(prm) for prm in param]
+        elif param in self:
             return self[param]
-        else: return self._correctParents(self.parent._fetch(param), changeLevel=False)
+        else:
+            return self._correctParents(self.parent._fetch(param), changeLevel=False)
     
     def _fetch(self, param):
         """Like fetch, but do not correct the 'parents' attribute."""
-        if param in self:
-            return self[param]
-        else: return self.parent._fetch(param)
-    
-    def fetchMany(self, params):
-        """Fetch several elements by their id/url and return them."""
-        self._ensureLoaded(params) # without this line all missing elements would be loaded separately.
-        return [self.fetch(param) for param in params]
-        
-    def collect(self, param):
-        """Return the element specified by the id or url *param* from this level. Load the element if it is
-        not loaded yet."""
-        return self.collectMany([param])[0]
-    
-    def collectMany(self, params):
+        return self[param] if param in self else self.parent._fetch(param)
+
+    def collect(self, params):
         """Collect several elements by their id/url and return them."""
+        if not isinstance(params, collections.abc.Iterable):
+            return self.collect([params])[0]
+        if not isinstance(params, collections.abc.Sized):  # exclude one-time generators
+            params = list(params)
         self._ensureLoaded(params) # without this line all missing elements would be loaded separately.
         newElements = [self._correctParents(self.parent.fetch(param), changeLevel=True)
-                       for param in params if param not in self]
+                          for param in params if param not in self]
         if len(newElements):
             self.addElements(newElements)
         return [self[param] for param in params]
@@ -463,9 +460,7 @@ class Level(application.ChangeEventDispatcher):
                 else:
                     break
         self.stack.beginMacro(self.tr("Remove contents"))
-        self.removeContents(parent, positions) 
-        #TODO: when the positions are not connected, using several different shifts might be more
-        # appropriate
+        self.removeContents(parent, positions)
         if shiftPositions is not None:
             self.shiftPositions(parent, shiftPositions, shift)
         self.stack.endMacro()
@@ -560,8 +555,9 @@ class Level(application.ChangeEventDispatcher):
     # ====================================================================================   
     def _addElements(self, elements):
         for element in elements:
-            assert element.id not in self and element.level is self
-            self.elements[element.id] = element
+            if element.id not in self:
+                assert element.level is self
+                self.elements[element.id] = element
         if len(elements) > 0:
             self.emit(LevelChangeEvent(addedIds=[element.id for element in elements]))
             
@@ -569,9 +565,10 @@ class Level(application.ChangeEventDispatcher):
         for element in elements:
             if element.id in self.elements: # *elements* might contain some elements more than once
                 del self.elements[element.id]
+        self.checkGlobalSelection(elements)
         if len(elements) > 0:
             self.emit(LevelChangeEvent(removedIds=[element.id for element in elements]))
-            
+
     def _applyDiffs(self, changes):
         """Given the dict *changes* mapping elements to Difference objects (e.g. tags.TagDifference, apply
         these differences to the elements.
@@ -687,7 +684,8 @@ class Level(application.ChangeEventDispatcher):
         If *createFunc* is None, all names in *wrapperString* must be ids and wrappers are created using
         these ids.
         
-        Identifiers for which no element can be created due to an ElementGetError will simply be skipped.
+        Identifiers for which no element can be created due to an ElementGetError will simply be skipped
+        with a logged warning.
         """  
         roots = []
         currentWrapper = None
@@ -733,16 +731,24 @@ class Level(application.ChangeEventDispatcher):
                             wrapper.parent = currentWrapper
                     else:
                         wrapper = createFunc(currentWrapper, token) # may raise ValueError
-                
+
                     if currentWrapper is not None and wrapper.element.id not in currentWrapper.element.contents:
                         raise ValueError("Invalid wrapper string: {} is not contained in {}."
                                          .format(wrapper.element.id, currentWrapper.element.id))
                     currentList.append(wrapper)
-                except ElementGetError:
-                    logging.exception(__name__, "Error reading a WrapperString")
+                except ElementGetError as e:
+                    logging.error(__name__, "Error reading a WrapperString: "+str(e))
                     continue
         return roots
-    
+
+    def checkGlobalSelection(self, elements):
+        """Erases global selection when elements of it have been removed."""
+        from ..gui import selection
+        globalSelection = selection.getGlobalSelection()
+        if globalSelection and globalSelection.level is self \
+                and any(elem in globalSelection.elements() for elem in elements):
+            selection.setGlobalSelection(None)
+
     def __str__(self):
         return 'Level({})'.format(self.name)
     

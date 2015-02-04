@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2014-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,14 +21,18 @@ import os.path
 from PyQt4 import QtCore, QtGui
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, database as db, logging, constants, stack
-from ..constants import ADDED, DELETED, CHANGED
-from ..application import ChangeEvent
+from .. import application, database as db, logging, stack
+from ..application import ChangeEvent, ChangeType
 
 domains = []
     
 # Maximum length of encoded domain names.
 MAX_NAME_LENGTH = 63
+
+
+def default():
+    return domains[0]
+
 
 def isValidName(name):
     return name == name.strip() and 0 < len(name.encode()) <= MAX_NAME_LENGTH 
@@ -97,7 +101,7 @@ def _addDomain(domain):
     logging.info(__name__, "Added new domain '{}'".format(domain.name))
     
     domains.append(domain)
-    application.dispatcher.emit(DomainChangeEvent(ADDED, domain))
+    application.dispatcher.emit(DomainChangeEvent(ChangeType.added, domain))
 
 
 def deleteDomain(domain):
@@ -115,7 +119,7 @@ def _deleteDomain(domain):
     logging.info(__name__, "Deleting domain '{}'.".format(domain))
     db.query("DELETE FROM {p}domains WHERE id = ?", domain.id)
     domains.remove(domain)
-    application.dispatcher.emit(DomainChangeEvent(DELETED, domain))
+    application.dispatcher.emit(DomainChangeEvent(ChangeType.deleted, domain))
 
 
 def changeDomain(domain, **data):
@@ -148,13 +152,13 @@ def _changeDomain(domain, **data):
     if len(assignments) > 0:
         params.append(domain.id) # for the where clause
         db.query("UPDATE {p}domains SET "+','.join(assignments)+" WHERE id = ?", *params)
-        application.dispatcher.emit(DomainChangeEvent(CHANGED, domain))
+        application.dispatcher.emit(DomainChangeEvent(ChangeType.changed, domain))
 
 
 class DomainChangeEvent(ChangeEvent):
     """DomainChangeEvents are used when a domain is added, changed or deleted."""
     def __init__(self, action, domain):
-        assert action in constants.CHANGE_TYPES
+        assert isinstance(action, ChangeType)
         self.action = action
         self.domain = domain
     

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2014-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from ... import application, database as db, utils, stack, constants
+from ... import application, database as db, utils, stack
 from ...core import domains
 from .. import dialogs, flexform
 
@@ -50,10 +50,10 @@ class DomainModel(flexform.FlexTableModel):
     
     def _handleDispatcher(self, event):
         if isinstance(event, domains.DomainChangeEvent):
-            if event.action == constants.ADDED:
+            if event.action == application.ChangeType.added:
                 row = domains.domains.index(event.domain)
                 self.insertItem(row, event.domain)
-            elif event.action == constants.DELETED:
+            elif event.action == application.ChangeType.deleted:
                 self.removeItem(event.domain)
             else: self.itemChanged(event.domain)
     

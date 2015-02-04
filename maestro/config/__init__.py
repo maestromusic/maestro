@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -55,10 +55,10 @@ Call 'init' at application start to read options and call 'shutdown' at the end 
 options. Use 'loadPlugins' and 'removePlugins' to add or remove plugin configuration.
 """
 
-import os, sys, collections, functools
+import functools
 
 from .config import *
-from .. import constants, logging
+from .. import logging, VERSION
 
 # Directory of the configuration files.
 CONFDIR = None
@@ -84,17 +84,13 @@ def init(cmdConfig=[], testMode=False):
                 ('storage', 'json',   'storage' if not testMode else None, 'storageOptions'),
                 ('binary',  'pickle', 'binary' if not testMode else None, 'binaryOptions')
                 ]
-    
-    try:
-        for name, type, fileName, defaults in fileData:
-            file = addFile(type, os.path.join(CONFDIR, fileName), globals()[defaults],
-                           allowUndefinedSections=True, version=constants.VERSION,
-                           errorMethod=functools.partial(logging.error, __name__))
-            globals()[name] = file.getAccess()
-            del globals()[defaults] # not necessary anymore
-    except ConfigError as e:
-        print(str(e))
-        sys.exit(1)
+
+    for name, type, fileName, defaults in fileData:
+        file = addFile(type, os.path.join(CONFDIR, fileName), globals()[defaults],
+                       allowUndefinedSections=True, version=VERSION,
+                       errorMethod=functools.partial(logging.error, __name__))
+        globals()[name] = file.getAccess()
+        del globals()[defaults] # not necessary anymore
     
     # Set values from command line
     for line in cmdConfig:
@@ -121,7 +117,7 @@ def shutdown():
 configOptions = collections.OrderedDict((
 ("main", {
     "plugins": (list, [], "List of plugin names (i.e. the name of the corresponding directory in /maestro/plugins/."),
-    "music_extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx"], "music file extensions")
+    "music_extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx", "wma"], "music file extensions")
 }),
     
 ("i18n", {
@@ -141,14 +137,7 @@ configOptions = collections.OrderedDict((
     "prefix":  (str, "", "Prefix which will be prepended to the table names."),
 }),
 
-#TODO move these into the plugin
-("mpd", {
-    "timer_interval": (int, 300, "Interval of mpd synchronization"),
-    "host": (str, "localhost", "MPD's host name"),
-    "port": (int, 6600, "MPD's port"),
-}),
-
-("tags", {    
+("tags", {
     "title_tag": (str, "title", "Key of the title-tag."),
     "album_tag": (str, "album", "Key of the album-tag."),
     "search_tags": (list, ["album", "performer", "conductor", "title", "lyricist", "composer", "date", "artist"],
@@ -170,9 +159,7 @@ configOptions = collections.OrderedDict((
 }),
 ("filesystem", {
     "scan_interval": (int, 1800, "Interval (in seconds) in which the filesystem will be rescanned for changes"),
-    "disable": (bool, False, "completely disable filesystem synchronization"),
-    "acoustid_apikey": (str, "8XaBELgH", "API key for AcoustID web service"),
-    #TODO: get a real API key for Maestro
+    "acoustid_apikey": (str, "VGPeEVtB", "API key for AcoustID web service"),
 }),
 ("misc", {
     "show_ids": (bool, False, "Whether Maestro should display element IDs"),

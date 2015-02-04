@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,8 +22,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import wrappertreemodel, treebuilder
-from .. import config, logging, player, utils, filebackends
-from ..core import levels
+from .. import config, logging, player, utils
+from ..core import levels, urls
 from ..core.nodes import RootNode, Wrapper
 
  
@@ -104,7 +104,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Build wrappers for the given urls and if possible add containers.
         In other words: convert a flat playlist to a tree playlist.
         """
-        files = [Wrapper(element) for element in self.level.collectMany(urls)]
+        files = [Wrapper(element) for element in self.level.collect(urls)]
         wrappers = treebuilder.buildTree(self.level, files)
         for i in range(len(wrappers)):
             while wrappers[i].getContentsCount() == 1:
@@ -205,7 +205,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                             for wrapper in mimeData.fileWrappers()]   
         else:
             urls = utils.files.collectAsList(mimeData.urls())
-            wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
+            wrappers = [Wrapper(element) for element in self.level.collect(urls)]
         
         if len(wrappers) == 0:
             return True
@@ -306,7 +306,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     
     def insertUrlsAtOffset(self, offset, urls, updateBackend='always'):
         """Insert the given paths at the given offset."""
-        wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
+        wrappers = [Wrapper(element) for element in self.level.collect(urls)]
         file = self.root.fileAtOffset(offset, allowFileCount=True)
         if file is None:
             parent = self.root
@@ -364,7 +364,6 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         
     def removeByOffset(self, offset, count, updateBackend='always'):
         """Remove *count* files beginning at *offset* from the playlist."""
-        # TODO: This is very inefficient
         ranges = []
         for offset in range(offset, offset+count):
             file = self.root.fileAtOffset(offset)
@@ -485,8 +484,11 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
             """This is used as createFunc-argument for Level.createWrappers."""
             if token.startswith('EXT:'):
                 url = urllib.parse.unquote(token[4:]) # remove "EXT:"
-                url = filebackends.BackendURL.fromString(url)
-                element = self.level.collect(url)
+                url = urls.URL(url)
+                try:
+                    element = self.level.collect(url)
+                except OSError as e:
+                    raise ValueError(str(e))
             else:
                 element = self.level.collect(int(token))
             return Wrapper(element, parent=parent)

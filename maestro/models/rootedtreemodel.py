@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -106,9 +106,9 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             lines.append(str(el.url))
         elif el.isContainer():
             if showFileNumber:
-                lines.append(self.tr("{} with {} pieces").format(elements.getTypeTitle(el.type),
-                                                                 wrapper.fileCount()))
-            else: lines.append(elements.getTypeTitle(el.type))
+                lines.append(self.tr("{} with {} pieces").format(el.type.title(), wrapper.fileCount()))
+            else:
+                lines.append(el.type.title())
         if showTags and el.tags is not None:
             lines.extend("{}: {}".format(tag.title, ', '.join(map(str, values)))
                          for tag, values in el.tags.items() if tag != tags.TITLE)
@@ -120,7 +120,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             parentIds = list(el.parents)
             if isinstance(wrapper.parent, Wrapper) and wrapper.parent.element.id in parentIds:
                 parentIds.remove(wrapper.parent.element.id)
-            parents = levels.real.collectMany(parentIds)
+            parents = levels.real.collect(parentIds)
             parents.sort(key=elements.Element.getTitle)
             lines.extend(self.tr("#{} in {}").format(p.contents.positionOf(el.id), p.getTitle())
                          for p in parents)
@@ -183,27 +183,19 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             # http://doc.trolltech.com/4.4/model-view-dnd.html#enabling-drag-and-drop-for-items
             return Qt.ItemIsEnabled;
         else: return Qt.ItemIsEnabled | Qt.ItemIsSelectable
-    
-    def createIndex(self,row,column,internalPointer):
-        if not isinstance(internalPointer,Node):
-            raise TypeError("Internal pointers in a RootedTreeModel must be subclasses of Node, but got {}"
-                               .format(type(internalPointer)))
-        return super().createIndex(row,column,internalPointer)
-        
-    def getIndex(self,node):
+
+    def getIndex(self, node):
         """Return the (Qt)-index of the given node. If *node* is the root of this model, return an invalid
         QModelIndex."""
         if node == self.root:
             return QtCore.QModelIndex()
-
         parent = node.parent
         try:
             pos = parent.index(node)
         except ValueError:
             raise RuntimeError("Cannot create an index for node {} because ".format(node)
                                + "it is not contained in its alleged parent {}.".format(parent))
-            
-        return self.createIndex(pos,0,node)     
+        return self.createIndex(pos, 0, node)
 
     def getAllNodes(self):
         """Generator which will return all nodes contained in the tree (excluding the rootnode) 

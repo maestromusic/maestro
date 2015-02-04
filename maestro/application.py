@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@ This module controls the startup and finishing process of Maestro. The init meth
 Maestro's framework without starting a GUI.
 """
 
-import sys, os, fcntl, getopt
+import sys, os, fcntl, getopt, enum
 
 from PyQt4 import QtCore, QtGui, QtNetwork
 from PyQt4.QtCore import Qt
 
-from . import config, logging, constants
+from . import config, logging, VERSION
 
 logger = None # Will be set when logging is initialized
         
@@ -42,11 +42,18 @@ _translators = []
 
 class ChangeEvent:
     """Abstract super class for all changeevents."""
-    def merge(self,other):
+    def merge(self, other):
         """If possible merge the ChangeEvent *other* and this event, so that this event stores the
         information of both events. Return whether merging was succesful. This event will always have been
         emitted earlier than *other*."""
         return False
+
+
+class ChangeType(enum.Enum):
+    """Used in :class:`ChangeEvent` objects to signal the type of change."""
+    added = 1
+    changed = 2
+    deleted = 3
 
 
 class ModuleStateChangeEvent(ChangeEvent):
@@ -143,7 +150,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     # Some Qt-classes need a running QApplication before they can be created
     app = QtGui.QApplication(sys.argv)
     app.setApplicationName("Maestro")
-    app.setApplicationVersion(constants.VERSION)
+    app.setApplicationVersion(VERSION)
 
     from . import resources
     if type == "gui":
@@ -165,7 +172,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
         logger.error("Uncaught exception: {}\n{}"
                      .format(str(value), "\n".join(traceback.format_tb(tb))))
         sys.__excepthook__(type, value, tb)
-    sys.excepthook = exceptionHandler
+    # sys.excepthook = exceptionHandler
     
     logger.debug("START")
 
@@ -239,16 +246,13 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
         return app
     
     # Load and initialize remaining modules
-    from .core import levels
+    from maestro.core import levels
     levels.init()
     from . import search, profiles
-    from .core import covers
+    from maestro.core import covers
     search.init()
     covers.init()
-    
-    from .filebackends import filesystem
-    filesystem.init()
-    
+
     global network
     network = QtNetwork.QNetworkAccessManager()
     
@@ -264,7 +268,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     if type != 'gui':
         return app
-        
+
     from . import filesystem
     filesystem.init()
 
@@ -294,6 +298,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     plugins.shutdown()
     covers.shutdown()
     profiles.manager.save()
+    database.deleteSuperfluousTagValues()
     database.shutdown()
     config.shutdown()
     logging.shutdown()
@@ -309,7 +314,7 @@ def handleCommandLineOptions(cmdConfig):
 
     for opt,arg in opts:
         if opt in ('-v','-V', '--version'):
-            print('This is Maestro version {}. Nice to meet you.'.format(constants.VERSION))
+            print('This is Maestro version {}. Nice to meet you.'.format(VERSION))
             sys.exit(0)
         elif opt in ('-c','--config'):
             cmdConfig.append(arg)
@@ -397,7 +402,7 @@ def executeEntryPoint(name, category='gui_scripts'):
     os.execl(sys.executable, os.path.basename(sys.executable), "-c",
         "import sys, pkg_resources;"
         "sys.exit(pkg_resources.load_entry_point('maestro=={}', '{}', '{}')())"
-            .format(constants.VERSION, category, name)
+            .format(VERSION, category, name)
         )
 
 

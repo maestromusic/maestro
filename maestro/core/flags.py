@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,9 +19,8 @@
 from PyQt4 import QtCore, QtGui
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, constants, database as db, logging, utils, stack
-from ..constants import ADDED, DELETED, CHANGED
-from ..application import ChangeEvent
+from .. import application, database as db, logging, utils, stack
+from ..application import ChangeEvent, ChangeType
 
 
 _flagsById = None
@@ -146,7 +145,7 @@ def _addFlagType(flagType):
     
     _flagsById[flagType.id] = flagType
     _flagsByName[flagType.name] = flagType
-    application.dispatcher.emit(FlagTypeChangeEvent(ADDED, flagType))
+    application.dispatcher.emit(FlagTypeChangeEvent(ChangeType.added, flagType))
 
 
 def deleteFlagType(flagType):
@@ -158,7 +157,7 @@ def deleteFlagType(flagType):
         if level == levels.real:
             elementIds = db.query("SELECT element_id FROM {p}flags WHERE flag_id=?", flagType.id)\
                                   .getSingleColumn()
-            elements = level.collectMany(elementIds)
+            elements = level.collect(elementIds)
         else: elements = [el for el in level.elements.values() if flagType in el.flags]
         if len(elements) > 0:
             level.changeFlags({element: difference for element in elements})
@@ -175,7 +174,7 @@ def _deleteFlagType(flagType):
     db.query("DELETE FROM {p}flag_names WHERE id = ?", flagType.id)
     del _flagsById[flagType.id]
     del _flagsByName[flagType.name]
-    application.dispatcher.emit(FlagTypeChangeEvent(DELETED, flagType))
+    application.dispatcher.emit(FlagTypeChangeEvent(ChangeType.deleted, flagType))
 
 
 def changeFlagType(flagType, **data):
@@ -216,13 +215,12 @@ def _changeFlagType(flagType, **data):
     if len(assignments) > 0:
         params.append(flagType.id) # for the where clause
         db.query("UPDATE {p}flag_names SET "+','.join(assignments)+" WHERE id = ?", *params)
-        application.dispatcher.emit(FlagTypeChangeEvent(CHANGED, flagType))
+        application.dispatcher.emit(FlagTypeChangeEvent(ChangeType.changed, flagType))
 
 
 class FlagTypeChangeEvent(ChangeEvent):
     """FlagTypeChangeEvent are used when a flagtype is added, changed or deleted."""
     def __init__(self, action, flagType):
-        assert action in constants.CHANGE_TYPES
         self.action = action
         self.flagType = flagType
 

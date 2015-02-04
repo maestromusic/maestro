@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,10 +24,9 @@ from os.path import dirname, exists,join
 import subprocess
 from PyQt4 import QtCore, QtGui
 
-from ... import utils, database as db, logging, config
-from ...core import levels
-from ...gui import mainwindow
-from ...filebackends.filesystem import RealFile, FileURL
+from maestro import database as db, logging, config, filesystem
+from maestro.core import urls, levels
+from maestro.gui import mainwindow
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -153,10 +152,9 @@ class Ripper(QtCore.QObject):
     def handleRipFinish(self, exitCode, exitStatus):
         if exitCode == 0 and config.options.audiocd.eject:
             try:
-                subprocess.check_call(['eject', self.device])
-            except:
+                subprocess.Popen(['eject', self.device])
+            except FileNotFoundError:
                 # 'eject' might not be installed or not working ... well,
-                # then we don't
                 pass
 
     def cancel(self):
@@ -169,11 +167,12 @@ class Ripper(QtCore.QObject):
 class InsertRippedFileCommand:
     """Command to replace a file of backend type `AudioCDURL` by the ripped real file.
     """
+    #TODO: when this happens while rename dialog is open, the file is not renamed properly
     def __init__(self, element, tmpPath):
         self.element = element
         self.tmpPath = tmpPath
         self.oldUrl = self.element.url
-        self.newUrl = FileURL('file:///' + self.element.url.targetPath)
+        self.newUrl = urls.URL('file://' + self.element.url.targetPath)
         self.text = translate("AudioCD Plugin", "Ripped Track {}".format(element.url.tracknr))
 
     def redo(self):
@@ -181,7 +180,7 @@ class InsertRippedFileCommand:
         if not exists(dirname(target)):
             os.makedirs(dirname(target))
         shutil.move(self.tmpPath, target)
-        tmpFile = RealFile(self.newUrl)
+        tmpFile = filesystem.RealFile(self.newUrl)
         tmpFile.readTags()
         length = tmpFile.length
         tmpFile.tags = self.element.tags.withoutPrivateTags(copy=True)

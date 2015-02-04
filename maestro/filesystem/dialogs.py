@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,17 +17,17 @@
 #
 
 import itertools
+import os.path
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, database as db
-from ..core import levels
+from .. import application, database as db, stack
+from ..core import levels, tags
+from maestro.core import urls
 from ..models.leveltreemodel import LevelTreeModel
 from ..gui import delegates, treeactions, treeview
 from ..gui.delegates import abstractdelegate, editor as editordelegate
-
-import os.path
 
 translate = QtCore.QCoreApplication.translate
 
@@ -47,7 +47,7 @@ class LostFilesDelegate(delegates.StandardDelegate):
         
     def addPath(self, element):
         if element.isFile():
-            if os.path.exists(element.url.absPath):
+            if os.path.exists(element.url.path):
                 style = self.goodPathStyle
             else:
                 style = self.badPathStyle
@@ -75,13 +75,12 @@ class SetPathAction(treeactions.TreeAction):
                         not os.path.exists(next(selection.fileWrappers()).element.url.absPath))
     
     def doAction(self):
-        from ..filebackends.filesystem import FileURL
         elem = next(self.parent().selection.fileWrappers()).element
         path = QtGui.QFileDialog.getOpenFileName(application.mainWindow,
                                                  self.tr("Select new file location"),
-                                                 os.path.dirname(elem.url.absPath))
+                                                 os.path.dirname(elem.url.path))
         if path != "":
-            newUrl = FileURL(path)
+            newUrl = urls.URL.fileURL(path)
             from . import getNewfileHash
             db.query("UPDATE {p}files SET url=?,hash=? WHERE element_id=?",
                      str(newUrl), getNewfileHash(newUrl), elem.id)
@@ -90,7 +89,6 @@ class SetPathAction(treeactions.TreeAction):
             elem.url = newUrl
             levels.real.emitEvent(dataIds=(elem.id,))
             
-
 
 class RemoveMissingFilesAction(treeactions.TreeAction):
     """Action to remove elements from the database which are missing on the filesystem."""
@@ -126,17 +124,18 @@ class MissingFilesDialog(QtGui.QDialog):
     the missing elements should also be deleted from the database. If
     this leads to empty containers, the user is asked if they should
     be removed, too.
+
+    :param ids: List of file IDs.
     """
     def __init__(self, ids):
-        """Open the dialog for the files given by *ids*, a list of file IDs."""
         super().__init__(application.mainWindow)
         self.setModal(True)
         self.setWindowTitle(self.tr('Missing Files Detected'))
         layout = QtGui.QVBoxLayout()
         label = QtGui.QLabel(self.tr(
-                    "Some files from Maestro's database could not be found anymore in your "
-                    "filesystem. They are shown in red below. For each file, you can either "
-                    "provide a new path manually or delete it from the database."))
+            "Some files from Maestro's database could not be found anymore in your "
+            "filesystem. They are shown in red below. For each file, you can either "
+            "provide a new path manually or delete it from the database."))
         label.setWordWrap(True)
         layout.addWidget(label)
         
@@ -150,7 +149,6 @@ class MissingFilesDialog(QtGui.QDialog):
                 if file in files:
                     files.remove(file)
         self.model = LevelTreeModel(levels.real, containers + files)
-        # TODO: containerless files don't disappear in view after deleting
         
         self.view = treeview.TreeView(levels.real, affectGlobalSelection=False)        
         self.view.setModel(self.model)
@@ -186,10 +184,13 @@ class MissingFilesDialog(QtGui.QDialog):
 
 
 class ModifiedTagsDialog(QtGui.QDialog):
-    
-    def __init__(self, track, dbTags, fsTags):
+    """A dialog displayed when modification of tags has been detected on the filesystem.
+
+    Allows user to choose between tags from Maestro's database and the tags in the file.
+    """
+    def __init__(self, file, dbTags, fsTags):
         super().__init__(application.mainWindow)
-        self.track = track
+        self.file = file
         self.dbTags = dbTags
         self.fsTags = fsTags
         self.setModal(True)
@@ -200,7 +201,7 @@ class ModifiedTagsDialog(QtGui.QDialog):
         
         delegateProfile = delegates.profiles.category.getFromStorage(
                                 None, editordelegate.EditorDelegate.profileType)
-        dbElem = levels.real.get(track.id)
+        dbElem = levels.real.collect(file.id)
         
         dbModel = LevelTreeModel(levels.real, [dbElem])
         dbTree = treeview.TreeView(levels.real, affectGlobalSelection=False)
@@ -208,14 +209,14 @@ class ModifiedTagsDialog(QtGui.QDialog):
         dbTree.setModel(dbModel)
         dbTree.setItemDelegate(editordelegate.EditorDelegate(dbTree, delegateProfile))
         fsLevel = levels.Level('tmp', levels.real, [dbElem])
-        fsElem = fsLevel[track.id]
+        fsElem = fsLevel[file.id]
         fsElemTags = fsElem.tags
         nonPrivateTags = [tag for tag in fsElemTags if not tag.private]
         for tag in nonPrivateTags:
             del fsElemTags[tag]
         for tag, values in fsTags.items():
             fsElemTags[tag] = values
-        fsModel = LevelTreeModel(fsLevel, [fsLevel[track.id]])
+        fsModel = LevelTreeModel(fsLevel, [fsLevel[file.id]])
         fsTree = treeview.TreeView(fsLevel, affectGlobalSelection=False)
         fsTree.setRootIsDecorated(False)
         fsTree.setModel(fsModel)
@@ -236,9 +237,32 @@ class ModifiedTagsDialog(QtGui.QDialog):
         self.setLayout(layout)
         
     def useDBTags(self):
-        self.choice = 'DB'
+        backendFile = self.file.url.backendFile()
+        backendFile.readTags()
+        backendFile.tags = self.dbTags.withoutPrivateTags()
+        backendFile.saveTags()
         self.accept()
     
     def useFSTags(self):
-        self.choice = 'FS'
+        """Use the tags from filesystem. Here, we need to first check if there are any not-in-DB
+        tags in the file. In that case, we display a dialog to add those to the database.
+        """
+        while True:
+            newTags = [tag for tag in self.fsTags if not tag.isInDb()]
+            if len(newTags) == 0:
+                break
+            from ..gui.tagwidgets import AddTagTypeDialog
+            for tag in newTags:
+                ans = AddTagTypeDialog.addTagType(tag, text=self.tr('Please configure the new tag '
+                    '"{}" found in this file'.format(tag)))
+                if not ans:
+                    return
+                elif ans != tag:
+                    # user has renamed tag -> restart the check from the beginning of the while loop
+                    self.fsTags[ans] = self.fsTags[tag]
+                    del self.fsTags[tag]
+                    break
+        stack.clear()
+        diff = tags.TagStorageDifference(self.dbTags.withoutPrivateTags(), self.fsTags)
+        levels.real._changeTags({levels.real.collect(self.file.id): diff}, dbOnly=True)
         self.accept()

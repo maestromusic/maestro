@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2012-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2012-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,9 +17,11 @@
 #
 
 import itertools
+import collections.abc
 
-from . import elements, levels, tags, flags, domains
-from .. import application, database as db, filebackends, stack
+from maestro.core import elements, levels, tags, flags, domains
+from maestro.core.urls import URL, TagWriteError, changeTags
+from maestro import application, database as db, stack
 
 
 # The ids of all elements that are in the database and have been loaded to some level 
@@ -77,14 +79,13 @@ class RealLevel(levels.Level):
     def emitFilesystemEvent(self, **kwArgs):
         """Simple shortcut to emit a FileSystemEvent."""
         stack.addEvent(self.filesystemDispatcher, RealFileEvent(**kwArgs))
-        
-    def collect(self, param):
-        self._ensureLoaded([param])
-        return self[param]
-    
-    def collectMany(self, params):
+
+    def collect(self, params):
         # We need to iterate params twice
-        if not isinstance(params, (list, tuple)):
+        if not isinstance(params, collections.abc.Iterable):
+            self._ensureLoaded([params])
+            return self[params]
+        if not isinstance(params, collections.abc.Sized):  # exclude one-time generators
             params = list(params)
         self._ensureLoaded(params)
         return [self[param] for param in params]
@@ -92,15 +93,13 @@ class RealLevel(levels.Level):
     # The difference between fetch, _fetch and collect is only important on levels below real.
     fetch = collect
     _fetch = collect
-    fetchMany = collectMany
-    get = collect #TODO deprecated
     
     def _ensureLoaded(self, params):
         # note that __contains__ (p not in self) ensures that p is either int or url 
         ids = [p for p in params if isinstance(p, int) and p not in self]
         urls = []
         for p in params:
-            if isinstance(p, filebackends.BackendURL) and p not in self:
+            if isinstance(p, URL) and p not in self:
                 id = db.idFromUrl(p)
                 if id is not None:
                     ids.append(id)
@@ -137,12 +136,11 @@ class RealLevel(levels.Level):
             _dbIds.add(id)
             if file:
                 level.elements[id] = elements.File(domains.domainById(domainId), level, id,
-                                                   url = filebackends.BackendURL.fromString(url),
-                                                   length = length,
-                                                   type = elementType)
+                                                   url=URL(url), length=length,
+                                                   type=elements.ContainerType(elementType))
             else:
                 level.elements[id] = elements.Container(domains.domainById(domainId), level, id,
-                                                        type=elementType)
+                                                        type=elements.ContainerType(elementType))
                 
         # contents
         result = db.query("""
@@ -220,7 +218,7 @@ class RealLevel(levels.Level):
             level = self
         result = []
         for url in urls:
-            backendFile = url.getBackendFile()
+            backendFile = url.backendFile()
             backendFile.readTags()
             fTags = backendFile.tags
             fLength = backendFile.length
@@ -228,8 +226,8 @@ class RealLevel(levels.Level):
                 raise RuntimeError("loadFromURLs called on '{}', which is in DB.".format(url))
             id = levels.idFromUrl(url, create=True)
             from .. import filesystem
-            folder = filesystem.sourceByPath(url.path)
-            domain = folder.domain if folder is not None else None
+            source = filesystem.sourceByPath(url.path)
+            domain = source.domain if source else domains.default()
             elem = elements.File(domain, level, id, url=url, length=fLength, tags=fTags)
             elem.specialTags = backendFile.specialTags           
             level.elements[id] = elem
@@ -283,7 +281,7 @@ class RealLevel(levels.Level):
         # 2.-4.
         try:
             self.changeTags(fileTagChanges)
-        except (filebackends.TagWriteError, OSError) as e:
+        except (TagWriteError, OSError) as e:
             stack.abortMacro()
             raise e
         self.addToDb(addToDbElements)
@@ -351,10 +349,10 @@ class RealLevel(levels.Level):
             else: assert element.isFile() 
         
         with db.transaction():
-            data = [(element.domain.id if element.domain is not None else None,
+            data = [(element.domain.id,
                      element.id,
                      element.isFile(),
-                     element.type if element.isContainer() else 0,
+                     element.type.value if element.isContainer() else 0,
                      len(element.contents) if element.isContainer() else 0)
                             for element in elements]
             db.multiQuery("INSERT INTO {p}elements (domain, id, file, type, elements) VALUES (?,?,?,?,?)",
@@ -387,8 +385,8 @@ class RealLevel(levels.Level):
             if len(newFiles) > 0:
                 from .. import filesystem
                 db.multiQuery("INSERT INTO {p}files (element_id, url, hash, length) VALUES (?,?,?,?)",
-                              ((element.id, str(element.url), filesystem.getNewfileHash(element.url),
-                                element.length) for element in newFiles))
+                              [(element.id, str(element.url), filesystem.getNewfileHash(element.url),
+                                element.length) for element in newFiles])
                 self.emitFilesystemEvent(added=(f for f in newFiles if f.url.scheme == "file"))
             
             contentData = []
@@ -424,10 +422,11 @@ class RealLevel(levels.Level):
                                                             and element.url.scheme == "file"]
         if len(removedFiles) > 0:
             self.emitFilesystemEvent(removed=removedFiles)
+        self.checkGlobalSelection(elements)
         self.emit(levels.LevelChangeEvent(dbRemovedIds=[el.id for el in elements]))
         
     def deleteElements(self, elements, fromDisk=False):
-        elements = list(elements)
+        elements = tuple(elements)
         stack.beginMacro("delete elements")
         # 1st step: isolate the elements (remove contents & parents)
         for element in elements:
@@ -439,15 +438,19 @@ class RealLevel(levels.Level):
                     self.removeContents(parent, parent.contents.positionsOf(id=element.id))
         self.removeFromDb([element for element in elements if element.isInDb()])
         stack.endMacro()
-        if fromDisk and any(element.isFile() for element in elements):
+        if fromDisk:
             for element in elements:
                 if element.isFile():
-                    element.url.getBackendFile().delete()
+                    element.url.backendFile().delete()
             stack.clear()
 
     def _changeTags(self, changes, dbOnly=False):
+        """Change tags without undo/redo support.
+
+        :param bool dbOnly: If *True*, only change tags in database, not in the actual file.
+        """
         if not dbOnly:
-            filebackends.changeTags(changes) # might raise TagWriteError
+            changeTags(changes) # might raise TagWriteError
         
         dbChanges = {el: diffs for el, diffs in changes.items() if el.isInDb()}
         if len(dbChanges) > 0:
@@ -456,18 +459,18 @@ class RealLevel(levels.Level):
                               for el, diff in dbChanges.items()
                               for tag, value in diff.getRemovals() if tag.isInDb()]
                 if len(dbRemovals):
-                    db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?",
+                    db.multiQuery('DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?',
                                   dbRemovals)
                     
                 dbAdditions = [(el.id, tag.id, db.idFromValue(tag, value, insert=True))
                                for el, diff in dbChanges.items()
                                for tag, value in diff.getAdditions() if tag.isInDb()]
                 if len(dbAdditions):
-                    db.multiQuery("INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)",
+                    db.multiQuery('INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)',
                                   dbAdditions)
                 files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
                 if len(files) > 0:
-                    db.multiQuery("UPDATE {p}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?",
+                    db.multiQuery('UPDATE {p}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?',
                                   files)
 
         super()._changeTags(changes)
@@ -522,7 +525,7 @@ class RealLevel(levels.Level):
     def _setTypes(self, containerTypes):
         if len(containerTypes) > 0:
             db.multiQuery("UPDATE {p}elements SET type = ? WHERE id = ?",
-                          ((type, c.id) for c, type in containerTypes.items()))
+                          ((type.value, c.id) for c, type in containerTypes.items()))
             super()._setTypes(containerTypes)
     
     def _setContents(self, parent, contents):
@@ -570,20 +573,21 @@ class RealLevel(levels.Level):
                         for (oldPos, newPos) in sorted(changes, key=lambda chng: chng[1])
                         if newPos < oldPos ]
         for data in changesOne, changesTwo:
-            db.multiQuery("UPDATE {p}contents SET position=? WHERE container_id=? AND position=?", data)
+            if len(data):
+                db.multiQuery("UPDATE {p}contents SET position=? WHERE container_id=? AND position=?", data)
     
     def _renameFiles(self, renamings):
         """On the real level, files are renamed both on disk and in DB."""
         doneFiles = []
         try:
             for elem, (oldUrl, newUrl) in renamings.items():
-                oldUrl.getBackendFile().rename(newUrl)
+                oldUrl.backendFile().rename(newUrl)
                 doneFiles.append(elem)
         except OSError as e:
             # rollback changes and throw error
             for elem in doneFiles:
                 oldUrl, newUrl = renamings[elem]
-                newUrl.getBackendFile().rename(oldUrl)
+                newUrl.backendFile().rename(oldUrl)
             raise levels.RenameFilesError(oldUrl, newUrl, str(e))
         db.multiQuery("UPDATE {p}files SET url=? WHERE element_id=?",
                       [ (str(newUrl), element.id) for element, (_, newUrl) in renamings.items() ])

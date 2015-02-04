@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -316,7 +316,7 @@ class Node:
                 return selfString
             else: return ''
         
-    def printStructure(self, indent = ''):
+    def printStructure(self, indent=''):
         """Debug method: print the tree below this node using indentation."""
         print(indent + str(self))
         for child in self.getContents():
@@ -382,27 +382,21 @@ class Wrapper(Node):
                 copy.setContents([child.copy(level=level) for child in self.contents])
             else: copy.setContents(contents)
         return copy
-    
-    
+
     def isFile(self):
         return self.element.isFile()
-    
     
     def isContainer(self):
         return self.element.isContainer()
     
-    
     def hasContents(self):
         return self.element.isContainer() and len(self.contents) > 0
-    
     
     def getContentsCount(self):
         return len(self.contents) if self.element.isContainer() else 0
     
-    
     def getContents(self):
         return self.contents if self.element.isContainer() else []
-    
     
     def loadContents(self, recursive):
         """Ensure that this wrapper has exactly the contents of the underlying element.
@@ -411,12 +405,12 @@ class Wrapper(Node):
         """
         if self.element.isContainer():
             if self.contents is None or len(self.contents) == 0:
-                self.setContents([Wrapper(self.element.level.collect(id), position=pos)
+                self.element.level.collect(self.element.contents.ids)
+                self.setContents([Wrapper(self.element.level[id], position=pos)
                                   for pos, id in self.element.contents.items()])
             if recursive:
                 for child in self.contents:
-                    child.loadContents(recursive)
-    
+                    child.loadContents(True)
     
     def getTitle(self, prependPosition=False, usePath=True):
         """Return the title of the wrapped element. If *prependPosition* is True and this wrapper has a
@@ -426,8 +420,7 @@ class Wrapper(Node):
         if prependPosition and self.position is not None:
             return "{} - {}".format(self.position, title)
         else: return title
-    
-    
+
     def getLength(self):
         """Return the length of this element, i.e. the sum of the lengths of all contents. Return None if
         length can not be computed because not all contents have been loaded."""
@@ -455,7 +448,6 @@ class Wrapper(Node):
                 elif extension != ext:
                     return None
             return extension
-
 
     def __repr__(self):
         return "<W: {}>".format(self.getTitle()) 

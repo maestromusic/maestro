@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -68,6 +68,7 @@ def disable():
 class FormatSyntaxError(SyntaxError):
     pass
 
+
 class GrammarRenamer(profiles.Profile):
         
     def levelDefAction(self, s, loc, toks):
@@ -124,7 +125,7 @@ class GrammarRenamer(profiles.Profile):
             state = {}
         if 'formatString' in state:
             self.formatString = state['formatString']
-        else: self.formatString = "<1.artist>/<1.title>/<#> - <title>"
+        else: self.formatString = "/tmp/<1.artist>/<1.title>/<#> - <title>"
         if 'replaceChars' in state:
             self.replaceChars = state['replaceChars']
         else: self.replaceChars = '\\:/'

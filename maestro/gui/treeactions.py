@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@ import os.path
 from PyQt4 import QtGui
 from PyQt4.QtCore import Qt
 
-from .. import utils, filebackends, config, stack
-from ..core import levels, tags, elements, domains
+from .. import utils, stack
+from maestro.core import levels, tags, elements, domains, urls
 from ..core.nodes import RootNode, Wrapper
 from ..models import leveltreemodel
 from ..models.browser import BrowserModel
-from . import dialogs, widgets
+from . import dialogs
 
 translate = QtGui.QApplication.translate
 
@@ -34,7 +34,7 @@ translate = QtGui.QApplication.translate
 class TreeAction(QtGui.QAction):
     """Super class for TreeActions, i.e. Actions for TreeViews.
     """
-    def __init__(self, parent, text=None, shortcut=None, icon=None, tooltip=None):
+    def __init__(self, parent, shortcut=None, icon=None, tooltip=None):
         super().__init__(parent)
         if shortcut:
             self.setShortcut(shortcut)
@@ -86,11 +86,11 @@ class ChangeFileUrlsAction(TreeAction):
         if selection.singleWrapper():
             self.setText(self.tr("Change file URL"))
             element = selection.wrappers()[0].element
-            if element.isFile() and element.url is not None and element.url.CAN_RENAME:
+            if element.isFile():
                 self.setEnabled(True)
         elif selection.hasFiles():
             elements = list(selection.files())
-            if all(isinstance(el.url, filebackends.filesystem.FileURL) for el in elements):
+            if all(el.url.scheme == 'file' for el in elements):
                 dir = self._getDirectory(elements)
                 if dir is not None:
                     self.setEnabled(True)
@@ -108,13 +108,13 @@ class ChangeFileUrlsAction(TreeAction):
         return dir if len(dir) > 0 else None
     
     def doAction(self):
-        from ..filebackends.filesystem import FileURL
         selection = self.parent().selection
         if selection.singleWrapper():
             element = next(selection.fileWrappers()).element
-            if isinstance(element.url, FileURL):
+            if element.url.scheme == 'file':
                 self.changeFileUrl(element)
-            else: self.changeOtherUrl(element)
+            else:
+                self.changeOtherUrl(element)
         else:
             elements = list(selection.files())
             self.changeElementsDirectory(elements)
@@ -132,7 +132,7 @@ class ChangeFileUrlsAction(TreeAction):
             QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("The given path does not exists."))
             return False
-        source = core.domains.getSource(oldPath)
+        source = domains.getSource(oldPath)
         if not path.startswith(source.path):
             QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("Path must be inside collection directory"))
@@ -141,13 +141,12 @@ class ChangeFileUrlsAction(TreeAction):
         
     def changeFileUrl(self, element):
         """Ask the user for a new URL for *element* and change the URL. Element must be a filesystem-file."""
-        from ..filebackends.filesystem import FileURL
         path = QtGui.QFileDialog.getSaveFileName(None,
                                                  self.tr("Select new file location"),
                                                  element.url.path,
                                                  options=QtGui.QFileDialog.DontConfirmOverwrite)
         if self._checkFilePath(path, shouldExist=False, oldPath=element.url.path):
-            self.level().renameFiles( {element: (element.url, FileURL(path)) })
+            self.level().renameFiles( {element: (element.url, urls.URL.fileURL(path)) })
             
     def changeOtherUrl(self, element):
         """Ask the user for a new URL for *element* and change the URL. For filesystem-files use
@@ -158,12 +157,12 @@ class ChangeFileUrlsAction(TreeAction):
         if not ok or path is None or path == '':
             return
         try:
-            newUrl = filebackends.BackendURL.fromString(path)
+            newUrl = urls.URL(path)
         except ValueError:
             QtGui.QMessageBox.warning(None, self.tr("Invalid URL"), self.tr("Please enter a valid URL."))
             return
         
-        self.level().renameFiles( {element: (element.url, newUrl) })
+        self.level().renameFiles({element: (element.url, newUrl)})
         
     def changeElementsDirectory(self, elements):
         """Given a list of elements from the same directory, ask the user for a new directory and move
@@ -173,8 +172,7 @@ class ChangeFileUrlsAction(TreeAction):
             return
         path = QtGui.QFileDialog.getExistingDirectory(None, self.tr("Select new files directory"), dir)
         if self._checkFilePath(path, shouldExist=True, oldPath=dir):
-            from ..filebackends.filesystem import FileURL
-            changes = {element: (element.url, FileURL(os.path.join(path, os.path.basename(element.url.path))))
+            changes = {element: (element.url, urls.URL.fileURL(os.path.join(path, os.path.basename(element.url.path))))
                        for element in elements}
             for oldUrl, newUrl in changes.values():
                 if os.path.exists(newUrl.path):
@@ -248,6 +246,7 @@ class DeleteAction(TreeAction):
         selection = self.parent().selection
         insertPending = False
         self.level().stack.beginMacro(self.tr('delete elements'))
+        files = list(selection.files())
         if selection.singleWrapper() and selection.hasContainers():
             container = selection.wrappers()[0]
             container.loadContents(recursive=True)
@@ -257,14 +256,10 @@ class DeleteAction(TreeAction):
                                  'Do you want to append its children to its parent?'))
                 if ans:
                     insertPos = container.position
-                    print(insertPos)
                     insertParent = container.parent.element
                     insertIndex = insertParent.contents.positions.index(insertPos)
                     insertChildren = [wrapper.element for wrapper in container.contents]
                     insertPending = True
-
-        files = [wrap.element for wrap in selection.fileWrappers()
-                              if wrap.element.url.CAN_DELETE]
         self.level().deleteElements(selection.elements())
         if insertPending:
             self.level().insertContentsAuto(insertParent, insertIndex, insertChildren)
@@ -338,7 +333,7 @@ class CommitTreeAction(TreeAction):
     """Commit the contents of a LevelTreeModel."""
     
     def __init__(self, parent):
-        super().__init__(parent, shortcut="Shift+Enter")
+        super().__init__(parent, shortcut='Shift+Enter')
         self.setIcon(QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_DialogSaveButton))
         self.setText(self.tr('Commit'))
         
@@ -350,12 +345,13 @@ class CommitTreeAction(TreeAction):
         if not model.containsExternalTags():
             try:
                 model.commit()
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
+                e.displayMessage()
+            except levels.RenameFilesError as e:
                 e.displayMessage()
         else:
-            dialogs.warning(self.tr("No commit possible"),
-                            self.tr("While the editor contains external tags, no commit is possible. "
-                                    "Delete those tags or add their tagtype to the database."))
+            dialogs.warning(self.tr('No commit possible'),
+                            self.tr("Can't commit while editor contains external tags."))
 
         
 class FlattenAction(TreeAction):
@@ -363,16 +359,29 @@ class FlattenAction(TreeAction):
     children."""
     def __init__(self, parent):
         super().__init__(parent)
-        self.setText(self.tr("Flatten..."))
+        self.setText(self.tr("Flatten"))
         
     def initialize(self, selection):
-        self.setEnabled(selection.hasContainers())
+        self.setEnabled(not selection.hasFiles() and selection.singleParent(True))
         
     def doAction(self):
-        from ..gui.dialogs import FlattenDialog
-        dialog = FlattenDialog(parent = self.parent())
-        if dialog.exec_() == QtGui.QDialog.Accepted:
-            flatten(self.parent().level, self.parent().selection.wrappers(), dialog.recursive())
+        stack = self.level().stack
+        stack.beginMacro(self.tr('flatten container(s)'))
+        wrappers = self.parent().selection.wrappers()
+        elements = [wrapper.element for wrapper in wrappers]
+        positions = [wrapper.position for wrapper in wrappers]
+        parent = wrappers[0].parent.element
+        indices = sorted([parent.contents.positions.index(pos) for pos in positions], reverse=True)
+        for i, index in enumerate(indices, start=1):
+            element = self.level().collect(parent.contents.ids[index])
+            pos = parent.contents.positions[index]
+            children = list(element.getContents())
+            self.level().removeContents(parent, [pos])
+            self.level().removeContents(element, element.contents.positions)
+            if element not in elements[:-i]:
+                self.level().removeElements([element])
+            self.level().insertContentsAuto(parent, index, children)
+        stack.endMacro()
             
 
 class ChangePositionAction(TreeAction):
@@ -418,34 +427,14 @@ class ChangePositionAction(TreeAction):
                                              ChangePositionAction, mode=mode)
 
 
-class MatchTagsFromFilenamesAction(TreeAction):
-    """An action to trigger a dialog that matches tags from file names. Will be enabled only if at least
-    one file is selected."""
-    
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setText(self.tr('match tags from filename'))
-    
-    def initialize(self, selection):
-        self.setEnabled(selection.hasFiles())
-        
-    def doAction(self):
-        """Open a TagMatchDialog for the selected elements."""
-        from ..gui import tagmatchdialog
-        dialog = tagmatchdialog.TagMatchDialog(self.parent().level,
-                                               self.parent().selection.wrappers(),
-                                               self.parent())
-        dialog.exec_()
-
-
 class SetElementTypeAction(TreeAction):
     """Action to set the element type of one or more elements."""
     
     def __init__(self, parent, type):
-        """Constructor. *type* is one of elements.CONTAINER_TYPES."""
+        """Constructor. *type* is one of elements.ContainerType."""
         super().__init__(parent)
         self.type = type
-        self.setText(elements.getTypeTitle(type))
+        self.setText(type.title())
         
     
     def initialize(self, selection):
@@ -462,10 +451,10 @@ class SetElementTypeAction(TreeAction):
     def addSubmenu(actionConfig, section):
         """Create a submenu in the given action configuration with entries for each type.""" 
         typeSection = translate("TreeActions", "set element type ...")
-        for type in elements.CONTAINER_TYPES:
+        for type in elements.ContainerType:
             actionConfig.addActionDefinition(((section, typeSection), 
-                                              (typeSection, "setType{}".format(type))),
-                                             SetElementTypeAction, type)
+                                              (typeSection, "setType{}".format(type.name))),
+                                               SetElementTypeAction, type)
 
 
 

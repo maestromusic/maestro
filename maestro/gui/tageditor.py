@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,12 +20,14 @@ import os.path, functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
+from maestro.core import urls
+
 translate = QtCore.QCoreApplication.translate
 
-from .. import utils, config, logging, filebackends, stack
+from .. import utils, config, logging, stack
 from ..core import tags, levels
 from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from . import singletageditor, tagwidgets, treeactions, mainwindow, flageditor, dialogs, dockwidget
+from . import singletageditor, tagwidgets, mainwindow, flageditor, dialogs
 from .misc import widgetlist
         
         
@@ -37,9 +39,7 @@ class TagEditorWidget(mainwindow.Widget):
     
     Arguments:
     
-        - vertical: Whether the tageditor should at the beginning be in vertical mode.
         - includeContents: Whether the "Include contents" button should be pressed down at the beginning.
-        - flagEditorInTitleLine: Whether the FlagEditor should be put in the title (button) line.
         - stack: The stack that should be used. If None, the applications's stack is used.
         
     """
@@ -47,15 +47,11 @@ class TagEditorWidget(mainwindow.Widget):
     # confer _handleTagChanged and _handleTagChangedByUser.
     _ignoreHandleTagChangedByUser = False
     
-    def __init__(self, state=None, vertical=False,
-                 flagEditorInTitleLine=True, stack=None, useGlobalSelection=True, **args):
+    def __init__(self, state=None, stack=None, useGlobalSelection=True, **args):
         super().__init__(**args)
         self.level = None
         self.elements = None
         self.elementsWithContents = None
-        self.vertical = None # will be set in setVertical below
-        self.flagEditorInTitleLine = flagEditorInTitleLine
-        self.areaChanged.connect(self._handleAreaChanged)
         self.setAcceptDrops(True)
         
         self.model = tageditormodel.TagEditorModel(stack=stack)
@@ -101,11 +97,7 @@ class TagEditorWidget(mainwindow.Widget):
         self.includeContentsButton.setIcon(utils.getIcon('recursive.png'))
         self.includeContentsButton.toggled.connect(self._updateElements)
         self.topLayout.addWidget(self.includeContentsButton)
-        
-        self.horizontalFlagEditor = flageditor.FlagEditor(self.flagModel, vertical=False)
-        self.topLayout.addWidget(self.horizontalFlagEditor, 1)
-        # This stretch will be activated in vertical mode to fill the place of the horizontal flageditor
-        self.topLayout.addStretch(0)
+        self.topLayout.addStretch(1)
         
         scrollArea = QtGui.QScrollArea()
         scrollArea.setWidgetResizable(True)
@@ -120,44 +112,16 @@ class TagEditorWidget(mainwindow.Widget):
         self.flagWidget.layout().setContentsMargins(0,0,0,0)
         self.layout().addWidget(self.flagWidget)
         
-        # Vertical mode of the flageditor is not used
-        self.verticalFlagEditor = flageditor.FlagEditor(self.flagModel, vertical=False)   
-        self.layout().addWidget(self.verticalFlagEditor)
+        self.flagEditor = flageditor.FlagEditor(self.flagModel) 
+        self.layout().addWidget(self.flagEditor)
         
         self.singleTagEditors = {}
         self.tagBoxes = {}
-        
-        self.setVertical(self.area in ['left', 'right'])
         
         if useGlobalSelection:
             from . import selection
             selection.changed.connect(self._handleSelectionChanged)
             self._handleSelectionChanged(selection.getGlobalSelection())
-    
-    def setVertical(self, vertical):
-        """Set whether this tageditor should be displayed in vertical model."""
-        if vertical == self.vertical:
-            return
-        for box in self.tagBoxes.values():
-            box.setIconOnly(vertical)
-            
-        if vertical:
-            for button in ['addButton', 'removeButton']:
-                getattr(self, button).setText('')
-        else:
-            self.addButton.setText(self.tr("Add tag value"))
-            self.removeButton.setText(self.tr("Remove selected"))
-        
-        self.horizontalFlagEditor.setVisible(self.flagEditorInTitleLine and not vertical)
-        # The place left by the horizontalFlagEditor is filled by the stretch we put there
-        self.topLayout.setStretch(self.topLayout.count()-2, int(vertical))
-        self.verticalFlagEditor.setVisible(not self.flagEditorInTitleLine or vertical)
-            
-        self.vertical = vertical
-        
-    def _handleAreaChanged(self, area):
-        """Handle changes in the dock's position."""
-        self.setVertical(self.area in ['left', 'right'])
         
     def saveState(self):
         return {'includeContents': self.includeContents}
@@ -165,11 +129,11 @@ class TagEditorWidget(mainwindow.Widget):
     def _handleSelectionChanged(self, selection):
         """React to changes to the global selection: Load the elements of the selected wrappers
         into the TagEditorWidget."""
-        if selection is not None and selection.hasElements():
-            self.setElements(selection.level,
-                            list(selection.elements(recursive=False)),
-                            list(selection.elements(recursive=True)))
-        
+        if selection is None or not selection.hasElements():
+            self.setElements(None, [])
+        else:
+            self.useElementsFromSelection(selection)
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat(config.options.gui.mime) or event.mimeData().hasUrls():
             event.acceptProposedAction()
@@ -181,7 +145,7 @@ class TagEditorWidget(mainwindow.Widget):
             allElements = (w.element for w in mimeData.wrappers())
             level = mimeData.level
         elif mimeData.hasUrls():
-            allElements = levels.real.collectMany(url for url in event.mimeData().urls()
+            allElements = levels.real.collect(url for url in event.mimeData().urls()
                            if url.isValid() and url.scheme() == 'file' and os.path.exists(url.toLocalFile()))
             level = levels.real
         else:
@@ -204,8 +168,8 @@ class TagEditorWidget(mainwindow.Widget):
         elements. *elements* and *elementsWithContents* are the lists of elements that will be edited when
         the "Include contents" button is not pressed / pressed, respectively.
         """
-        self.levelLabel.setPixmap(utils.getPixmap('real.png' if level == levels.real or level is None
-                                                   else 'editor.png'))
+        self.levelLabel.setPixmap(utils.getPixmap('real.png' if level in (levels.real, None)
+                                                  else 'editor.png'))
         self.level = level
         self.elements = elements
         if elementsWithContents is not None and elementsWithContents != elements:
@@ -217,8 +181,8 @@ class TagEditorWidget(mainwindow.Widget):
     def useElementsFromSelection(self, selection):
         """Use the elements in the given Selection in the tageditor."""
         self.setElements(selection.level,
-                         selection.elements(recursive=False),
-                         selection.elements(recursive=True))
+                         list(selection.elements(recursive=False)),
+                         list(selection.elements(recursive=True)))
         
     def _updateElements(self):
         """Update the element display."""
@@ -232,7 +196,7 @@ class TagEditorWidget(mainwindow.Widget):
     def _insertSingleTagEditor(self, row, tag):
         """Insert a TagTypeBox and a SingleTagEditor for *tag* at the given row."""
         # Create the tagbox
-        self.tagBoxes[tag] = SmallTagTypeBox(tag, self.vertical)
+        self.tagBoxes[tag] = SmallTagTypeBox(tag, True) #TODO
         self.tagBoxes[tag].tagChanged.connect(self._handleTagChangedByUser)
         
         # Create the Tag-Editor
@@ -269,8 +233,7 @@ class TagEditorWidget(mainwindow.Widget):
         count = len(self.model.getElements())
         self.addButton.setEnabled(count > 0)
         self.removeButton.setEnabled(count > 0)
-        self.horizontalFlagEditor.setEnabled(count > 0)
-        self.verticalFlagEditor.setEnabled(count > 0)
+        self.flagEditor.setEnabled(count > 0)
     
     def _handleError(self, error):
         """Handle TagWriteErrors raised in methods of the model."""
@@ -285,7 +248,7 @@ class TagEditorWidget(mainwindow.Widget):
         if dialog.exec_() == QtGui.QDialog.Accepted:
             try:
                 self.model.addRecord(dialog.getRecord())
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 self._handleError(e)
 
     def _handleRemoveSelected(self):
@@ -294,7 +257,7 @@ class TagEditorWidget(mainwindow.Widget):
         if len(records) > 0:
             try:
                 self.model.removeRecords(records)
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 self._handleError(e)
         
     # Note that the following _handle-functions only add new SingleTagEditors or remove SingleTagEditors
@@ -355,7 +318,7 @@ class TagEditorWidget(mainwindow.Widget):
         
         try:
             result = self.model.changeTag(oldTag, newTag)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
             
         if result:
@@ -404,18 +367,13 @@ class TagEditorWidget(mainwindow.Widget):
                 if len(commonPrefix) > 0:
                     action = fancyMenu.addAction(self.tr("Edit common start..."))
                     action.triggered.connect(self._editCommonStart)
-                    
-                    commonPrefix = utils.strings.commonPrefix([record.value for record in selectedRecords],
-                                                              separated=True)
                     if len(commonPrefix) > 0:
                         rests = [record.value[len(commonPrefix):] for record in selectedRecords]
                         if any(utils.strings.numberFromPrefix(rest)[0] is not None for rest in rests):
                             newValues = []
                             for record, rest in zip(selectedRecords, rests):
-                                number, prefix = utils.strings.numberFromPrefix(rest)
-                                if number is not None:
-                                    newValues.append(record.value[len(commonPrefix)+len(prefix):])
-                                else: newValues.append(record.value[len(commonPrefix):])
+                                prefix = utils.strings.numberFromPrefix(rest)[1]
+                                newValues.append(record.value[len(commonPrefix)+len(prefix):])
                             if all(record.tag.isValid(value)
                                    for record, value in zip(selectedRecords, newValues)):
                                 action = fancyMenu.addAction(
@@ -456,21 +414,21 @@ class TagEditorWidget(mainwindow.Widget):
         """Handle 'extend records' action from context menu."""
         try:
             self.model.extendRecords(records)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
             
     def _editMany(self, records, newValues):
         """Handle 'edit many' action from context menu."""
         try:
             self.model.editMany(records, newValues)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
             
     def _splitMany(self, records, separator):
         """Handle 'split' action from context menu."""
         try:
             self.model.splitMany(records, separator)
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             self._handleError(e)
 
     def _editCommonStart(self):
@@ -493,7 +451,7 @@ class TagEditorWidget(mainwindow.Widget):
         if dialog.exec_() == QtGui.QDialog.Accepted:
             try:
                 self.model.changeRecord(record, dialog.getRecord())
-            except filebackends.TagWriteError as e:
+            except urls.TagWriteError as e:
                 self._handleError(e)
         
     def _getSelectedRecords(self):
@@ -511,14 +469,15 @@ class TagEditorWidget(mainwindow.Widget):
         self.includeContentsButton.setChecked(value)
 
 
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
+widgetClass = mainwindow.WidgetClass(
         id = "tageditor",
         name = translate("Tageditor", "Tageditor"),
         icon = utils.getIcon('widgets/tageditor.png'),
         theClass = TagEditorWidget,
         unique = True,
         areas = 'dock',
-        preferredDockArea = 'right'))
+        preferredDockArea = 'right')
+mainwindow.addWidgetClass(widgetClass)
 
 
 class RecordDialog(QtGui.QDialog):
@@ -634,8 +593,8 @@ class TagEditorDialog(QtGui.QDialog):
         self.setLayout(QtGui.QVBoxLayout())
         self.tagedit = TagEditorWidget(state={'includeContents': includeContents},
                                        stack=self.stack,
-                                       flagEditorInTitleLine=False,
-                                       useGlobalSelection=False)
+                                       useGlobalSelection=False,
+                                       widgetClass=widgetClass)
         self.layout().addWidget(self.tagedit)
         
         style = QtGui.QApplication.style()
@@ -700,7 +659,7 @@ class TagEditorDialog(QtGui.QDialog):
             self.level.commit()
             super().accept()
             config.storage.gui.tag_editor_include_contents = self.tagedit.includeContentsButton.isChecked()
-        except filebackends.TagWriteError as e:
+        except urls.TagWriteError as e:
             e.displayMessage()
             self.level.stack = self.stack
     
@@ -708,7 +667,7 @@ class TagEditorDialog(QtGui.QDialog):
         """Handle clicks on the reset button: Reload all elements and clear the stack."""
         ids = list(self.level.elements.keys())
         self.level.elements = {}
-        elements = self.level.collectMany(ids)
+        elements = self.level.collect(ids)
         self.stack.resetSubstack(self.stack)
         self.tagedit.setElements(self.level, elements)
 
@@ -716,9 +675,9 @@ class TagEditorDialog(QtGui.QDialog):
 class SmallTagTypeBox(tagwidgets.TagTypeBox):
     """Special TagTypeBox for the tageditor. Contrary to regular StackedWidgets it will consume only the
     space necessary to display the current widget. Usually this is a TagLabel and thus much smaller than a
-    combobox. In the tageditor's vertical mode the labels' iconOnly-mode is used to save further space.
+    combobox.
     """
-    def __init__(self, tag, iconOnly, parent = None):
+    def __init__(self, tag, iconOnly, parent=None):
         super().__init__(tag, parent, useCoverLabel=True)
         self.currentChanged.connect(self.updateGeometry)
         self.label.setIconOnly(iconOnly)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -50,9 +50,8 @@ from functools import reduce
 
 from PyQt4 import QtGui
 
-from .. import application, config, constants, logging, utils, stack
-from ..constants import ADDED, REMOVED, CHANGED
-from ..application import ChangeEvent
+from .. import application, config, logging, utils, stack
+from ..application import ChangeEvent, ChangeType
 
 translate = QtGui.QApplication.translate
 
@@ -276,7 +275,7 @@ class Tag:
         self.name = name
         self.type = type
         self.rawTitle = title
-        self.iconPath = iconPath # invoke iconPath.setter
+        self.iconPath = iconPath
         self.private = private
     
     def _getData(self):
@@ -429,9 +428,18 @@ def get(identifier, addDialogIfNew=False):
                             .format(identifier, type(identifier)))
 
 
-def isTitle(title):
-    """Return whether *title* is the raw title of a tag (comparison is case-insensitive!)."""
-    return title.lower() in (str.lower(tag.rawTitle) for tag in tagList if tag.rawTitle is not None)
+def titleAllowed(title: str, forTag: Tag=None) -> bool:
+    """Return whether *title* is an allowed tag title. Checks if any other tag has the same title
+    already (case-insensitive). If *forTag* is given, that tag is excluded from the check (allows
+    to change casing of a tag title).
+    """
+    if title is None:
+        return True
+    for tag in tagList:
+        if tag.rawTitle is not None and tag is not forTag:
+            if title.lower() == tag.rawTitle.lower():
+                return False
+    return True
 
 
 def fromTitle(title):
@@ -460,7 +468,7 @@ def addTagType(tagType, type, **data):
     if tagType.isInDb():
         raise ValueError("Cannot add tag '{}' because it is already in the DB.".format(tagType))
     if 'title' in data:
-        if data['title'] is not None and isTitle(data['title']):
+        if not titleAllowed(data['title']):
             raise ValueError("Cannot add tag '{}' with title '{}' because that title exists already."
                              .format(tagType, data['title']))
             
@@ -513,7 +521,7 @@ def _addTagType(tagType, data):
     logging.info(__name__, "Added new tag '{}' of type '{}'.".format(tagType.name, tagType.type.name))
 
     _tagsById[tagType.id] = tagType
-    application.dispatcher.emit(TagTypeChangeEvent(ADDED, tagType))
+    application.dispatcher.emit(TagTypeChangeEvent(ChangeType.added, tagType))
     
 
 def removeTagType(tagType):
@@ -549,7 +557,7 @@ def _removeTagType(tagType):
     del _tagsById[tagType.id]
     tagList.remove(tagType)
     tagType._clearData()
-    application.dispatcher.emit(TagTypeChangeEvent(REMOVED, tagType))
+    application.dispatcher.emit(TagTypeChangeEvent(ChangeType.deleted, tagType))
     
 
 def changeTagType(tagType, **data):
@@ -578,11 +586,12 @@ def changeTagType(tagType, **data):
             stack.abortMacro()
             raise error
         
-    stack.push('', stack.Call(tagType, data), stack.Call(tagType, tagType._getData()))
+    stack.push('', stack.Call(_changeTagType, tagType, data),
+               stack.Call(_changeTagType, tagType, tagType._getData()))
     stack.endMacro()
     
     
-def _changeTagType(tagType, ata):
+def _changeTagType(tagType, data):
     """Like changeTagType, but not undoable."""
     assert tagType.isInDb()
     
@@ -605,7 +614,6 @@ def _changeTagType(tagType, ata):
         title = data['title']
         if title is not None and len(title) == 0:
             title = None
-        assert title is None or not isTitle(title) # titles must be unique
         assignments.append('title = ?')
         params.append(title)
         tagType.rawTitle = title
@@ -622,7 +630,7 @@ def _changeTagType(tagType, ata):
     if len(assignments) > 0:
         params.append(tagType.id) # for the WHERE clause
         db.query("UPDATE {p}tagids SET "+','.join(assignments)+" WHERE id = ?", *params)
-        application.dispatcher.emit(TagTypeChangeEvent(CHANGED, tagType))
+        application.dispatcher.emit(TagTypeChangeEvent(ChangeType.changed, tagType))
 
 
 def _convertTagTypeOnLevels(tagType, valueType):
@@ -657,7 +665,6 @@ class TagTypeChangeEvent(ChangeEvent):
     """TagTypeChangeEvents are used when a tag type (like artist, composer...) is added, changed or removed.
     """
     def __init__(self, action, tagType):
-        assert action in constants.CHANGE_TYPES
         self.action = action
         self.tagType = tagType
   

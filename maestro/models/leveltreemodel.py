@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -84,7 +84,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         # Get elements to insert
         if mimeData.hasFormat(config.options.gui.mime):
             ids = [ node.element.id for node in mimeData.wrappers() ]
-            elements = self.level.collectMany(ids)
+            elements = self.level.collect(ids)
         else:  # text/uri-list
             elements = self.prepareURLs(mimeData.urls(), parent)
 
@@ -184,7 +184,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 filesByFolder[folder] = []
                 for file in filesInOneFolder:
                     if progress.wasCanceled():
-                        macro.abort()
+                        self.level.stack.abortMacro()
                         return []
                     progress.setValue(progress.value() + 1)
                     element = self.loadFile(file)

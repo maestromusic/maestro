@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,18 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, collections, functools, weakref
+import functools, weakref
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui, browser
-from .misc import busyindicator
-from ..models import browser as browsermodel
-from .. import database as db, utils, config, search, logging
-from ..core import covers, levels, nodes, tags, elements, domains
-from ..search import criteria
+from .. import database as db, utils, search, logging
+from ..core import flags, levels, tags, domains
 
 _displayClasses = {}
 _coverBrowsers = weakref.WeakSet()
@@ -265,7 +261,7 @@ class CoverBrowser(mainwindow.Widget):
             """, filter=filterClause)
         coverPaths = {id: path for id, path in result}
         ids = list(coverPaths.keys())
-        levels.real.collectMany(ids)
+        levels.real.collect(ids)
         if tags.isInDb("artist") and tags.isInDb("date"):
             sortValues = {}
             artistTag = tags.get("artist")

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -89,7 +89,7 @@ class StandardDelegate(AbstractDelegate):
         if urlWarningItem is not None:
             self.addCenter(urlWarningItem)
         if self.profile.options['showType'] and element.isContainer():
-            pixmap = elements.getTypePixmap(element.type)
+            pixmap = element.type.pixmap()
             if pixmap is not None:
                 self.addCenter(ImageItem(pixmap))
         self.addCenter(titleItem)
@@ -207,7 +207,7 @@ class StandardDelegate(AbstractDelegate):
                 ancestor = element.level.fetch(id)
             except levels.ElementGetError: # this may happen if the parent has just been deleted
                 continue
-            if not onlyMajor or ancestor.isMajor():
+            if not onlyMajor or ancestor.type.major:
                 ancestorIds.append(id)
                 ancestors.append(ancestor)
             # Search for ancestors recursively even if the current ancestor is not major. It might have

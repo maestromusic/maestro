@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -64,7 +64,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
         if option.type is bool:
             self.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             self.setCheckState(Qt.Checked if option.getValue() else Qt.Unchecked)
-        self.setText(option.export())
+        self.setText(str(option.getValue()))
         if option.getValue() != option.default:
             f = self.font()
             f.setBold(True)
@@ -104,7 +104,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
         super().setData(Qt.EditRole,self.option.export())
         
     def save(self):
-        self.option.fromString(self.text())
+        self.option.setValue(self.option.parseString(self.text()))
         self.dirty = False
         
         

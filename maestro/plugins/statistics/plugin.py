@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import collections, datetime, math
+import collections, datetime
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
@@ -178,7 +178,7 @@ class StatisticsWidget(mainwindow.Widget):
             GROUP BY type
             ORDER BY count DESC
             """)
-        return [(row[0], elements.getTypeTitle(row[1])) for row in result]
+        return [(row[0], elements.ContainerType(row[1]).title()) for row in result]
     
     def getDates(self):
         """Return heights and labels of the bars in the date chart."""

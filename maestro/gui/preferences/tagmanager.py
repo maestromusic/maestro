@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@ from PyQt4.QtCore import Qt
 from ... import application, database as db, utils, stack
 from ...core import tags
 from .. import tagwidgets, dialogs, misc
-from ..misc import iconbuttonbar
 
 CUSTOM_MIME = 'application/x-maestrotagtype'
 
@@ -278,7 +277,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             tag = self.getTag(item.row())
             itemText = item.text() if item.text() != '' else None
             if itemText != tag.rawTitle:
-                if itemText is not None and tags.isTitle(itemText):
+                if not tags.titleAllowed(itemText, tag):
                     dialogs.warning(self.tr("Cannot change title"),
                                     self.tr("A tag with this title exists already."),
                                     self)

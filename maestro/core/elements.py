@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,44 +16,54 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, bisect
+import os.path
+import bisect
+import enum
 
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import tags as tagsModule
-from .. import config, filebackends, utils
+from . import tags as tagsModule, urls
+from .. import config, utils
 
-CONTAINER_TYPES = range(4)
-TYPE_CONTAINER, TYPE_ALBUM, TYPE_WORK, TYPE_COLLECTION = CONTAINER_TYPES
-MAJOR_TYPES = (TYPE_ALBUM, TYPE_WORK)
 
-def getTypeTitle(type):
-    """Return the human-readable and translated title for the given type."""
-    return {
-            TYPE_CONTAINER: translate("Elements", "Container"),
-            TYPE_ALBUM: translate("Elements", "Album"),
-            TYPE_WORK: translate("Elements", "Work"),
-            TYPE_COLLECTION: translate("Elements", "Collection")
-    }[type]
+class ContainerType(enum.Enum):
+    Container = 0
+    Album = 1
+    Work = 2
+    Collection = 3
 
-_typeIcons = {
-    TYPE_ALBUM: 'cd.png',
-    TYPE_WORK: 'work.png',
-    TYPE_COLLECTION: 'cdbox.png'              
-}
+    @property
+    def major(self):
+        return self is not ContainerType.Collection
 
-def getTypeIcon(type):
-    """Return an icon as QIcon for the given container type. Return None for TYPE_CONTAINER."""
-    if type in _typeIcons:
-        return utils.getIcon(_typeIcons[type])
-    else: return None
+    def title(self):
+        if self == ContainerType.Container:
+            return translate('Elements', 'Container')
+        elif self == ContainerType.Album:
+            return translate('Elements', 'Album')
+        elif self == ContainerType.Work:
+            return translate('Elements', 'Work')
+        elif self == ContainerType.Collection:
+            return translate('Elements', 'Collection')
 
-def getTypePixmap(type):
-    """Return an icon as QPixmap for the given container type. Return None for TYPE_CONTAINER."""
-    if type in _typeIcons:
-        return utils.getPixmap(_typeIcons[type])
-    else: return None
+    def iconPath(self):
+        if self == ContainerType.Album:
+            return 'cd.png'
+        elif self == ContainerType.Work:
+            return 'work.png'
+        elif self == ContainerType.Collection:
+            return 'cdbox.png'
+
+    def icon(self):
+        path = self.iconPath()
+        if path:
+            return utils.getIcon(path)
+
+    def pixmap(self):
+        path = self.iconPath()
+        if path:
+            return utils.getPixmap(path)
 
 
 class Element:
@@ -61,7 +71,7 @@ class Element:
     def __init__(self):
         raise RuntimeError("Cannot instantiate abstract base class Element.")
     
-    def isFile(self):
+    def isFile(self) -> bool:
         """Return whether this element is a file."""
         raise NotImplementedError()
     
@@ -73,10 +83,6 @@ class Element:
         """Return whether this element (or rather its version on real level) is stored in the database."""
         from . import reallevel
         return self.id in reallevel._dbIds
-    
-    def isMajor(self):
-        """Return whether the type of this element implies the 'major'-property."""
-        return self.isContainer() and self.type in MAJOR_TYPES
         
     def getTitle(self, usePath=True, neverShowIds=False):
         """Return the title of this element or some dummy title, if the element does not have a title tag.
@@ -164,12 +170,9 @@ class Element:
     def inParentLevel(self):
         """If this element is also loaded in the parent level of this element's level, return its version
         there."""
-        if self.level.parent is None:
-            return None
-        elif self.id not in self.level.parent:
-            return None
-        else: return self.level.parent[self.id]
-    
+        if self.level.parent and self.id in self.level.parent:
+            return self.level.parent[self.id]
+
     def equalsButLevel(self, other):
         """Return True if this element equals *other* in all aspects but possibly the level."""
         if self.domain != other.domain:
@@ -206,7 +209,7 @@ class Container(Element):
         self.id = id
         
         if type is None:
-            type = TYPE_CONTAINER
+            type = ContainerType.Container
         self.type = type
         if contents is None:
             contents = ContentList()
@@ -225,6 +228,8 @@ class Container(Element):
         if stickers is None:
             stickers = {}
         self.stickers = stickers
+        if domain is None:
+            raise ValueError('container needs a domain')
     
     def copy(self, level=None):
         """Create a copy of this container. Create copies of all attributes. Because contents are stored as
@@ -266,7 +271,7 @@ class File(Element):
     will be used. Valid keyword-arguments are parents, tags, flags, stickers.
     """
     def __init__(self, domain, level, id, url, length, **kwargs):
-        if not isinstance(id, int) or not isinstance(url, filebackends.BackendURL) \
+        if not isinstance(id, int) or not isinstance(url, urls.URL) \
                 or not isinstance(length, int):
             raise TypeError("Invalid type (id, url, length): ({}, {}, {}) of types ({}, {}, {})"
                             .format(id, url, length, type(id), type(url), type(length)))
@@ -280,6 +285,9 @@ class File(Element):
         self.tags = kwargs.get('tags', tagsModule.Storage())
         self.flags = kwargs.get('flags', [])
         self.stickers = kwargs.get('stickers', {})
+        if domain is None:
+            raise ValueError('file needs a domain')
+
         
     def copy(self, level=None):
         """Create a copy of this file. Create copies of all attributes. If *level* is not None, the copy
@@ -418,19 +426,7 @@ class ContentList:
     
     def __getitem__(self, i):
         return self.ids[i]
-    
-    def __setitem__(self, i, pair):
-        raise NotImplementedError()
-# This is a possible implementation, but maybe it's best that this method is nowhere used.
-#        pos, id = pair
-#        if (i > 0 and self.positions[i-1] >= pos) or \
-#            (i < len(self.positions)-1 and self.positions[i+1] <= pos):
-#            raise ValueError("id/position ({}, {}) cannot be inserted at index {} because positions "
-#                             " must be strictly monotonically increasing."""
-#                             .format(id, pos, i))
-#        self.positions[i] = pos
-#        self.ids[i] = id
-    
+
     def __delitem__(self, i):
         del self.ids[i]
         del self.positions[i]

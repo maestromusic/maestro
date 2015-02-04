@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, config, database as db, logging, utils, search, constants
+from .. import application, config, database as db, logging, utils, search
 from ..core import tags, flags, levels, domains
 from ..core.elements import Element, Container
 from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget, search as searchgui
@@ -327,7 +327,7 @@ class Browser(mainwindow.Widget):
             view.expander = RestoreExpander(view)
         # When a flag is deleted it must be removed from the flagfilter
         if self.flagCriterion is not None and isinstance(event, flags.FlagTypeChangeEvent)\
-                 and event.action == constants.DELETED:
+                 and event.action == application.ChangeType.deleted:
             flagList = list(self.flagCriterion.flags) # criteria must not be changed (threading)
             if event.flagType in flagList:
                 flagList.remove(event.flagType)

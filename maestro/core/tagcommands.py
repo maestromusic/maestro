@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2012-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2012-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ from .. import application, database as db, stack
 
 translate = QtGui.QApplication.translate
 
+
 class SortValueChangeEvent(application.ChangeEvent):
     """This event is emitted when a sortvalue changes."""
     def __init__(self,tag,valueId,oldValue,newValue):
@@ -40,10 +41,10 @@ class ChangeSortValueCommand:
         self.newSort = newSort
 
     def redo(self):
-        self.setSortValue(self.newSort,self.oldSort)
+        self.setSortValue(self.newSort, self.oldSort)
        
     def undo(self):
-        self.setSortValue(self.oldSort,self.newSort)
+        self.setSortValue(self.oldSort, self.newSort)
     
     def setSortValue(self, new, old):
         db.query("UPDATE {}values_{} SET sort_value = ? WHERE tag_id = ? AND id = ?"

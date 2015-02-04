@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ from PyQt4.QtCore import Qt
 from . import selection, treeactions
 
 
-class Selection(selection.Selection):
+class TreeviewSelection(selection.Selection):
     """Objects of this class store a selection of nodes in a TreeView. Different than a QItemSelectionModel,
     a Selection knows about Nodes, Elements etc and provides special methods to determine properties
     of the selection. Actions can use this information to decide whether they are enabled or not.
@@ -198,15 +198,11 @@ class TreeView(QtGui.QTreeView):
         if isinstance(self.itemDelegate(), delegates.abstractdelegate.AbstractDelegate):
             self.itemDelegate().model = model
         self.updateSelection()
-    
-    def focusInEvent(self, event):
-        self.updateSelection()
-        super().focusInEvent(event)
 
     def updateSelection(self):
         selectionModel = self.selectionModel()
         if selectionModel is not None: # happens if the view is empty
-            self.selection = Selection(self.level, selectionModel)
+            self.selection = TreeviewSelection(self.level, selectionModel)
             for action in self.treeActions.values():
                 if isinstance(action, treeactions.TreeAction) or \
                    isinstance(action, TreeActionConfiguration):
@@ -228,14 +224,15 @@ class TreeView(QtGui.QTreeView):
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
         self.updateSelection()
-        if self.affectGlobalSelection and not self.selection.empty():
+        if self.affectGlobalSelection:
             selection.setGlobalSelection(self.selection)  
     
-    def focusInEvent(self, event):
-        super().focusInEvent(event)
-        if self.affectGlobalSelection and not self.selection.empty():
-            selection.setGlobalSelection(self.selection)  
-        
+    # def focusInEvent(self, event):
+    #     super().focusInEvent(event)
+    #     #self.updateSelection() #TODO: raises a strange segfault bug without any exceptions
+    #     if self.affectGlobalSelection:
+    #         selection.setGlobalSelection(self.selection)
+    #
     def currentNode(self):
         current = self.currentIndex()
         if current.isValid():

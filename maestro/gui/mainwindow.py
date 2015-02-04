@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 QWIDGETSIZE_MAX = 16777215
 
-from .. import config, constants, logging, utils, stack
+from .. import config, logging, utils, stack, VERSION
 from . import selection, dialogs
 
 # This will contain the single instance of MainWindow once it is initialized
@@ -239,9 +239,8 @@ class Widget(QtGui.QWidget):
         """
         if self._dialog is None:
             self._dialog = self.createOptionDialog(button)
-            # The window title is not visible within the application, but might be visible in the taskbar.
-            self._dialog.setWindowTitle(self.tr("{} Options").format(self.widgetClass.name))
             if self._dialog is not None:
+                self._dialog.setWindowTitle(self.tr("{} Options").format(self.widgetClass.name))
                 self._dialog.installEventFilter(self)
                 if isinstance(self._dialog, dialogs.FancyTabbedPopup):
                     self._dialog.tabWidget.setCurrentIndex(self._lastDialogTabIndex)
@@ -278,14 +277,14 @@ class MainWindow(QtGui.QMainWindow):
     """The main window of Maestro. It contains a CentralTabWidget as actual central widget (in Qt sense)
     so that several widgets (in tabs) can be displayed as central widgets (in Maestro's sense)."""
     # Do not use this! Use gui.selection.changed instead. We just need a QObject to put the signal in.
-    _globalSelectionChanged = QtCore.pyqtSignal(selection.Selection)
+    _globalSelectionChanged = QtCore.pyqtSignal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._isClosing = False
 
         self.setDockNestingEnabled(True)
-        self.setWindowTitle(self.tr('Maestro version {}').format(constants.VERSION))
+        self.setWindowTitle(self.tr('Maestro version {}').format(VERSION))
         self.setWindowIcon(QtGui.QIcon(":maestro/omg_square.svg"))
 
         selection.changed = self._globalSelectionChanged
@@ -720,23 +719,24 @@ class MainWindow(QtGui.QMainWindow):
         
     def _handlePlayPause(self):
         from .. import player
-        backends = [b for b in player.profileCategory.profiles() if b.connectionState == player.CONNECTED]
-        if any(backend.state() == player.PLAY for backend in backends):
+        backends = [b for b in player.profileCategory.profiles()
+                    if b.connectionState is player.ConnectionState.Connected]
+        if any(backend.state() == player.PlayState.Play for backend in backends):
             # When a single backend is playing, stop all
             for backend in backends:
-                backend.setState(player.PAUSE)
+                backend.setState(player.PlayState.Pause)
         else:
             # otherwise start only the current one
             if 'playback' in self._currentWidgets:
                 backend = self._currentWidgets['playback'].backend
                 if backend is not None:
-                    backend.setState(player.PLAY)
+                    backend.setState(player.PlayState.Play)
                     
     def _handleStop(self):
         from .. import player
         for backend in player.profileCategory.profiles():
-            if backend.connectionState == player.CONNECTED:
-                backend.setState(player.STOP)
+            if backend.connectionState == player.ConnectionState.Connected:
+                backend.setState(player.PlayState.Stop)
             
     def _handleSkipBackward(self):
         if 'playback' in self._currentWidgets:
@@ -764,7 +764,7 @@ class MainWindow(QtGui.QMainWindow):
         box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon, self.tr("About Maestro"),
                 '<div align="center"><img src=":maestro/omg.png" /><br />'
                 + self.tr("This is Maestro version {} by Martin Altmayer and Michael Helmling.")
-                             .format(constants.VERSION)
+                             .format(VERSION)
                 + '</div>',
                 QtGui.QMessageBox.Ok)
         box.exec_()

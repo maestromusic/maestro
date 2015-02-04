@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +19,10 @@
 from PyQt4 import QtCore, QtGui
 
 from ..core import domains, elements
-from .. import application, filesystem
+from .. import application
+from maestro.filesystem import sources
+from maestro import filesystem
+
 
 class ContainerTypeBox(QtGui.QComboBox):
     """ComboBox to select a container type."""
@@ -33,12 +36,12 @@ class ContainerTypeBox(QtGui.QComboBox):
         super().__init__()
         if currentType is None:
             self.addItem('')
-        for type in elements.CONTAINER_TYPES:
-            if type == elements.TYPE_CONTAINER:
+        for type in elements.ContainerType:
+            if type == elements.ContainerType.Container:
                 title = self.tr('(General) container')
             else:
-                title = elements.getTypeTitle(type)
-            icon = elements.getTypeIcon(type)
+                title = type.title()
+            icon = type.icon()
             if icon is not None:
                 self.addItem(icon, title, type)
             else:
@@ -98,10 +101,10 @@ class DomainBox(QtGui.QComboBox):
 
 class SourceBox(QtGui.QComboBox):
     """ComboBox to select a filesystem source."""
-    sourceChanged = QtCore.pyqtSignal(filesystem.Source)
+    sourceChanged = QtCore.pyqtSignal(sources.Source)
     
     def __init__(self, currentSource=None):
-        """Create the DomainBox with *currentDomain* selected."""
+        """Create the SourceBox with *currentSource* selected."""
         super().__init__()
         self._fillBox(currentSource)
         self.highlighted.connect(self._activated)
@@ -111,8 +114,8 @@ class SourceBox(QtGui.QComboBox):
     def _fillBox(self, currentSource):
         """Fill the box with all existing domains."""
         self.clear()
-        if len(filesystem.sources) > 0:
-            for source in filesystem.sources:
+        if len(filesystem._sources) > 0:
+            for source in filesystem._sources:
                 self.addItem(source.name, source)
                 if source == currentSource:
                     self.setCurrentIndex(self.count() - 1)
@@ -131,7 +134,7 @@ class SourceBox(QtGui.QComboBox):
             self.sourceChanged.emit(source)
         
     def _activated(self, i):
-        if len(filesystem.sources) == 0 and i == 0:
+        if len(filesystem._sources) == 0 and i == 0:
             from . import preferences
             preferences.show("main/filesystem")
             

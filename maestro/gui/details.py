@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2014-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,9 +22,9 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import mainwindow, dockwidget, selection, browser
+from . import mainwindow, selection
 from .. import logging, utils
-from ..core import levels, tags, elements
+from ..core import levels, tags
 
 
 class DetailsView(mainwindow.Widget):
@@ -145,7 +145,7 @@ class DetailsView(mainwindow.Widget):
         # Type
         text.append('<tr><td>'+self.tr("Type: ")+'</td><td>')
         if el.isContainer():
-            text.append(elements.getTypeTitle(el.type))
+            text.append(el.type.title())
         else: text.append(Qt.escape(el.url.extension))
         text.append('</td></tr>')
         
@@ -178,7 +178,7 @@ class DetailsView(mainwindow.Widget):
         # Parents
         if len(el.parents) > 0:
             text.append('<tr><td>'+self.tr("Parents: ")+'</td><td>')
-            parents = el.level.fetchMany(el.parents)
+            parents = el.level.fetch(el.parents)
             text.append('<br />'.join(link(p.id, Qt.escape(p.getTitle())) for p in parents))
             text.append('</td></tr>')
             
@@ -228,7 +228,7 @@ class DetailsView(mainwindow.Widget):
             ln = link("contents", utils.images.html(collapser if self.contentsVisible else expander))
             text.append('<tr><td>' + ln + self.tr("Contents: ") + '</td><td>')
             if self.contentsVisible:
-                contents = el.level.fetchMany(el.contents)
+                contents = el.level.fetch(el.contents)
                 contents = ["{} - {}".format(pos, link(id, Qt.escape(c.getTitle())))
                             for (pos, id), c in zip(el.contents.items(), contents)]
                 text.append('<br />'.join(contents))
@@ -246,7 +246,7 @@ class DetailsView(mainwindow.Widget):
                 text.append('<br />'.join(stickerLines))
             else: text.append(str(sum(len(stickerList) for stickerList in el.stickers.values())))
             text.append('</td></tr>')
-            
+        text.append('<tr><td>Level</td><td>{}</td></tr>'.format(el.level))
         text.append('</table>')
         self.label.setText(''.join(text))
 

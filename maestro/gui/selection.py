@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,20 +33,7 @@ changed = None
 # Because a signal must be bound to a QObject, this signal is defined in MainWindow.
 # We cannot import mainwindow here because we have to import this module there to define
 # MainWindow._globalSelectionChanged = QtCore.pyqtSignal(selection.Selection)
-# For this reason this signal is initialized in MainWindow.__init__ 
-
-
-def getGlobalSelection():
-    """Return the Selection-instance that is globally selected."""
-    return _globalSelection
-
-
-def setGlobalSelection(selection):
-    """Set the global selection."""
-    global _globalSelection
-    if _globalSelection != selection:
-        _globalSelection = selection
-        changed.emit(_globalSelection)
+# For this reason this signal is initialized in MainWindow.__init__
 
 
 class Selection:
@@ -205,6 +192,22 @@ class Selection:
         for wrapper in wrappers:
             wrapper.loadContents(recursive=True)
         return Selection(level, wrappers)
+
+    def __str__(self):
+        return 'Selection({})'.format(','.join(str(node) for node in self.nodes()))
+
+
+def getGlobalSelection() -> Selection:
+    """Return the Selection-instance that is globally selected."""
+    return _globalSelection
+
+
+def setGlobalSelection(selection: Selection):
+    """Set the global selection."""
+    global _globalSelection
+    if _globalSelection != selection:
+        _globalSelection = selection
+        changed.emit(_globalSelection)
 
 
 class MimeData(QtCore.QMimeData):

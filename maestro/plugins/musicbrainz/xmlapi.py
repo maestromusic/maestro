@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,16 +22,13 @@ import urllib.error
 from lxml import etree
 
 from ... import config, database as db, logging
-from ...core import elements, tags
-from ...core.elements import TYPE_ALBUM
+from ...core import tags, urls
+from ...core.elements import ContainerType
 from ...utils import FlexiDate
-from ...filebackends import BackendURL
 
 from . import plugin as mbplugin
 
-logger = logging.getLogger("musicbrainz.xmlapi")
-
-wsURL = "http://musicbrainz.org/ws/2" # the base URL for MusicBrainz' web service
+wsURL = "http://musicbrainz.org/ws/2"  # the base URL for MusicBrainz' web service
 
 queryCallback = None
 
@@ -51,16 +48,21 @@ def query(resource, mbid, includes=[]):
         queryCallback(url)
     if len(includes) > 0:
         url += "?inc={}".format("+".join(includes))
-    logger.debug('querying {}'.format(url))
+    logging.debug(__name__, 'querying {}'.format(url))
     ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
-    if len(ans):
+    try:
         data = ans.getSingle()
-    else:
+    except db.EmptyResultException:
         try:
-            with urllib.request.urlopen(url) as response:
+            request = urllib.request.Request(url)
+            request.add_header('User-Agent', 'Maestro/0.4.0 (https://github.com/maestromusic/maestro)')
+            with urllib.request.urlopen(request) as response:
                 data = response.readall()
         except urllib.error.HTTPError as e:
-            raise ConnectionError(e.msg)
+            if e.code == 404:
+                raise e
+            else:
+                raise ConnectionError(e.msg)
         db.query("INSERT INTO {}musicbrainzqueries (url, xml) VALUES (?,?)"
                  .format(db.prefix), url, data)
     root = etree.fromstring(data)
@@ -210,6 +212,71 @@ class AliasEntity:
         return "http://www.musicbrainz.org/{}/{}".format(self.type, self.mbid)
 
 
+def tagsFromQuery(xml):
+    typeMap = {'performing orchestra': 'performer:orchestra',
+               'chorus master':        'chorusmaster',
+               'mix':                  'mixer',
+               'recording':            'recordingengineer',
+               'sound':                'soundengineer',
+               'balance':              'balanceengineer'}
+    for relType in ('arranger', 'performer', 'engineer', 'producer', 'editor', 'mastering',
+                    'conductor', 'composer', 'lyricist', 'orchestrator', 'librettist', 'writer'):
+        typeMap[relType] = relType
+    voices = 'soprano', 'mezzo-soprano', 'tenor', 'baritone', 'bass'
+    artistFlags = ('solo', 'guest')
+
+    def logWarning(msg, xml):
+        logging.warning(__name__, msg + '\n' + etree.tostring(xml, pretty_print=True, encoding=str))
+
+    # artist credits
+    for artistcredit in xml.iterfind('artist-credit'):
+        for child in artistcredit:
+            if child.tag == 'name-credit':
+                ent = AliasEntity.get(child.find('artist'))
+                ent.asTag.add('artist')
+                yield 'artist', ent
+            else:
+                logWarning('unknown artist-credit {}'.format(child.tag), artistcredit)
+    # artist relations
+    for relation in xml.iterfind('relation-list[@target-type="artist"]/relation'):
+        artist = AliasEntity.get(relation.find('artist'))
+        reltype = relation.get('type')
+        if reltype == 'instrument':
+            for attr in relation.iterfind('attribute-list/attribute'):
+                if attr.text not in artistFlags:
+                    tag = 'performer:' + attr.text
+                    break
+            else:
+                tag = 'instruments'
+        elif reltype in typeMap:
+            tag = typeMap[reltype]
+        elif reltype == 'vocal':
+            voice = None
+            for attr in relation.iterfind('attribute-list/attribute'):
+                if attr.text not in artistFlags:
+                    voice = attr.text
+            if not voice:
+                tag = 'vocals'
+            else:
+                for vtype in voices:
+                    if voice.startswith(vtype):
+                        tag = 'performer:' + vtype
+                        break
+                else:
+                    if voice == 'choir vocals':
+                        tag = 'performer:choir'
+                    elif voice == 'lead vocals':
+                        tag = 'vocals'
+                    else:
+                        logWarning('unknown voice {}'.format(voice), relation)
+                        continue
+        else:
+            logWarning('unknown artist relation {}'.format(relation.get('type')), relation)
+            continue
+        artist.asTag.add(tag)
+        yield tag, artist
+
+
 def findReleasesForDiscid(discid):
     """Finds releases containing specified disc using MusicBrainz.
     
@@ -223,7 +290,6 @@ def findReleasesForDiscid(discid):
             raise UnknownDiscException()
         else:
             raise e
-        
     releases = []
     from .elements import Release, Medium
     for release in root.iter("release"):
@@ -250,10 +316,11 @@ def findReleasesForDiscid(discid):
             mbit.tags.add("barcode", release.findtext('barcode'))
         relGroup = release.find('release-group')
         if relGroup is not None and relGroup.get("type") == "Compilation":
-            mbit.containerType = elements.TYPE_COLLECTION
+            mbit.containerType = ContainerType.Collection
             for medium in mbit.children.values():
-                medium.containerType = elements.TYPE_ALBUM
-                medium.tags.add('album', medium.tags['title'][0])
+                medium.containerType = ContainerType.Album
+                if 'title' in medium.tags:
+                    medium.tags.add('album', medium.tags['title'][0])
         else:
             mbit.tags.add('album', title)
         releases.append(mbit)
@@ -280,21 +347,18 @@ def fillReleaseForDisc(MBrelease, discid):
         tracknr = int(track.findtext('number'))
         MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, tracknr)
         MBrec.tags.add("title", recording.findtext("title"))
-        MBrec.backendUrl = BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac"
-                                                 .format(discid, tracknr, config.options.audiocd.rippath))
+        MBrec.backendUrl = urls.URL("audiocd://{0}.{1}/{2}/{0}/{1}.flac"
+                                    .format(discid, tracknr, config.options.audiocd.rippath))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
-    if MBmedium.containerType == TYPE_ALBUM:
-        MBmedium.passTags(excludes=['title'])
     MBmedium.insertWorks()
-    
     if len(MBrelease.children) == 1:
-        logger.debug("single child release -> removing release container")
+        logging.debug(__name__, 'single child release -> removing release container')
         del MBrelease.children[pos]
         for p, child in MBmedium.children.items():
             MBrelease.insertChild(p, child)
+        MBrelease.passTags(excludes=['title'])
     for p in list(MBrelease.children.keys()):
         if isinstance(MBrelease.children[p], Medium) and MBrelease.children[p] != MBmedium:
-            logger.debug("ignoring other child {}".format(MBrelease.children[p]))
             MBrelease.children[p].ignore = True
             

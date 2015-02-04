@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,11 +20,14 @@ import os
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
+from maestro.core import urls
+
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, filebackends, filesystem, utils, constants
-from . import mainwindow, selection, dockwidget, widgets
+from .. import application, filesystem, utils
+from . import mainwindow, selection, widgets
 from ..core import levels
+from maestro.filesystem.sources import FilesystemState
 
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
@@ -41,45 +44,46 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
     """
     
     folderIcons = {
-        'unsynced' : utils.getIcon("folder_unsynced.svg"),
-        'ok'       : utils.getIcon("folder_ok.svg"),
-        'nomusic'  : utils.getIcon("folder.svg"),
-        'unknown'  : utils.getIcon("folder_unknown.svg"),
-        'problem'  : utils.getIcon("folder_problem.svg") }
+        FilesystemState.unsynced : utils.getIcon("folder_unsynced.svg"),
+        FilesystemState.synced   : utils.getIcon("folder_ok.svg"),
+        FilesystemState.empty    : utils.getIcon("folder.svg"),
+        FilesystemState.unknown  : utils.getIcon("folder_unknown.svg")}
     
     fileIcons = {
-        'unsynced' : utils.getIcon("file_unsynced.svg"),
-        'ok'       : utils.getIcon("file_ok.svg"),
-        'unknown'  : utils.getIcon("file_unknown.svg"),
-        'problem'  : utils.getIcon("file_problem.svg") }
+        FilesystemState.unsynced : utils.getIcon("file_unsynced.svg"),
+        FilesystemState.synced   : utils.getIcon("file_ok.svg"),
+        FilesystemState.unknown  : utils.getIcon("file_unknown.svg")}
     
     descriptions = {
-        'unsynced' : translate("FileSystemBrowserModel", "contains music which is not in Maestro's database"),
-        'ok'       : translate("FileSystemBrowserModel", "in sync with Maestro's database"),
-        'nomusic'  : translate("FileSystemBrowserModel", "does not contain music"),
-        'unknown'  : translate("FileSystemBrowserModel", "unknown status"),
-        'problem'  : translate("FileSystemBrowserModel", "in conflict with database") }
+        FilesystemState.unsynced : translate("FileSystemBrowserModel",
+                                             "contains files that are not in Maestro's database"),
+        FilesystemState.synced   : translate("FileSystemBrowserModel",
+                                             "in sync with Maestro's database"),
+        FilesystemState.empty    : translate("FileSystemBrowserModel",
+                                             "empty directory"),
+        FilesystemState.unknown  : translate("FileSystemBrowserModel", "unknown status")}
     
     def __init__(self, parent=None):
         QtGui.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
         self.source = None
-        #filesystem.synchronizer.folderStateChanged.connect(self.handleStateChange)
-        #filesystem.synchronizer.fileStateChanged.connect(self.handleStateChange)
-        #self.rescanRequested.connect(filesystem.synchronizer.recheck)
         self.setRootPath(None)
         
     def setSource(self, source):
         if source != self.source:
+            if self.source is not None:
+                self.source.fileStateChanged.disconnect(self.handleStateChange)
+                self.source.folderStateChanged.disconnect(self.handleStateChange)
             self.source = source
             self.setRootPath(source.path)
+            source.folderStateChanged.connect(self.handleStateChange)
+            source.fileStateChanged.connect(self.handleStateChange)
             
     def columnCount(self, index):
         return 1
-    
-    @QtCore.pyqtSlot(object)
-    def handleStateChange(self, url):
-        index = self.index(url.path)
+
+    def handleStateChange(self, path):
+        index = self.index(path)
         self.dataChanged.emit(index, index)   
     
     def data(self, index, role=Qt.DisplayRole):
@@ -90,7 +94,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
                 dirpath = info.absoluteFilePath()
                 if dirpath == '..':
                     return super().data(index, role)
-                status = self.source.dirState(dirpath)
+                status = self.source.folderState(dirpath)
                 if role == Qt.DecorationRole:
                     return self.folderIcons[status]
                 else:
@@ -121,6 +125,9 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         self.rescanDirectoryAction = QtGui.QAction(self.tr("rescan"), self)
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
+        self.deleteFileAction = QtGui.QAction(self.tr('delete'), self)
+        self.addAction(self.deleteFileAction)
+        self.deleteFileAction.triggered.connect(self._handleDelete)
         application.dispatcher.connect(self._handleDispatcher)
         self.setRootIndex(QtCore.QModelIndex())
     
@@ -142,30 +149,36 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
             
     def _handleDispatcher(self, event):
         if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.getSource():
-            if event.action == constants.DELETED:
+            if event.action == application.ChangeType.deleted:
                 self.setSource(None)
             else: self.setRootIndex(self.model().index(event.source.path))
     
     def contextMenuEvent(self, event):
         index = self.indexAt(event.pos())
+        menu = QtGui.QMenu(self)
         if self.model().isDir(index):
-            menu = QtGui.QMenu(self)
             menu.addAction(self.rescanDirectoryAction)
-            menu.popup(event.globalPos())
-            event.accept()
         else:
-            event.ignore()
+            menu.addAction(self.deleteFileAction)
+        menu.popup(event.globalPos())
+        event.accept()
             
     def _handleRescan(self):
         path = self.model().filePath(self.currentIndex())
         self.rescanRequested.emit(path)
-        
+
+    def _handleDelete(self):
+        path = self.model().filePath(self.currentIndex())
+        url = urls.URL.fileURL(path)
+        elem = levels.real.collect(url)
+        levels.real.deleteElements([elem], fromDisk=True)
+
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
         paths = [self.model().filePath(index)
                  for index in self.selectedIndexes()
                  if not self.model().isDir(index)] # TODO: remove this restriction
-        s = FileSystemSelection([filebackends.filesystem.FileURL(path) for path in paths])
+        s = FileSystemSelection([urls.URL.fileURL(path) for path in paths])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
     
@@ -223,7 +236,7 @@ class FileSystemSelection(selection.Selection):
     
     def __init__(self, urls):
         super().__init__(levels.real,[])
-        self._files = levels.real.collectMany(urls)
+        self._files = levels.real.collect(urls)
         
     def elements(self,recursive=False):
         return self._files

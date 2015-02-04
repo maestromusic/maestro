@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,15 +20,15 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
-from ... import config, logging
-from ...core import levels, tags
-from ...gui import dialogs, delegates, mainwindow, treeactions, treeview
+from ... import config
+from ...core import levels, tags, domains, urls
+from ...core.elements import ContainerType
+from ...gui import dialogs, delegates, mainwindow, treeactions, tagwidgets, treeview
 from ...gui.delegates.abstractdelegate import *
-from ...models import leveltreemodel, rootedtreemodel
+from ...models import leveltreemodel
 from ...plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
 
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 class ImportAudioCDAction(treeactions.TreeAction):
@@ -89,8 +89,6 @@ class ImportAudioCDAction(treeactions.TreeAction):
                 return
             progress = dialogs.WaitingDialog("Querying MusicBrainz", "please wait", False)
             progress.open()
-            stack = self.level().stack.createSubstack(modalDialog=True)
-            level = levels.Level("audiocd", self.level(), stack=stack)
 
             def callback(url):
                 progress.setText(self.tr("Fetching data from:\n{}").format(url))
@@ -101,6 +99,8 @@ class ImportAudioCDAction(treeactions.TreeAction):
             progress.close()
             xmlapi.queryCallback = None
             QtGui.qApp.processEvents()
+            stack = self.level().stack.createSubstack(modalDialog=True)
+            level = levels.Level("audiocd", self.level(), stack=stack)
             dialog = ImportAudioCDDialog(level, release)
             if dialog.exec_():
                 model = self.parent().model()
@@ -109,23 +109,18 @@ class ImportAudioCDAction(treeactions.TreeAction):
                     self.ripper.start()
             stack.close()
         except xmlapi.UnknownDiscException:
-            ans = dialogs.question(self.tr("Disc not found"),
-                                   self.tr("The disc was not found in the MusicBrainz database. "
-                                           "You need to tag the album yourself. Proceed?"))
-            if not ans:
-                return False
-            from .plugin import simpleDiscContainer
-
-            if not config.options.audiocd.earlyrip and False:  #TODO: only for debugging
-                self.ripper.start()
-
-            self.level().stack.beginMacro(self.tr("Load Audio CD"))
-            container = simpleDiscContainer(theDiscid, trackCount, self.level())
-            model = self.parent().model()
-            model.insertElements(model.root, len(model.root.contents), [container])
-            self.level().stack.endMacro()
+            dialog = SimpleRipDialog(theDiscid, trackCount, self.level())
+            if dialog.exec_():
+                if not config.options.audiocd.earlyrip:
+                    self.ripper.start()
+                self.level().stack.beginMacro(self.tr("Load Audio CD"))
+                model = self.parent().model()
+                model.insertElements(model.root, len(model.root.contents), [dialog.container])
+                self.level().stack.endMacro()
         except ConnectionError as e:
             dialogs.warning(self.tr('Error communicating with MusicBrainz'), str(e))
+            if 'progress' in locals():
+                progress.close()
 
 
 class ReleaseSelectionDialog(QtGui.QDialog):
@@ -310,14 +305,16 @@ class TagMapWidget(QtGui.QTableWidget):
         from ...gui.tagwidgets import TagTypeBox
 
         for row, tagname in enumerate(newtags):
-
-            tag = tags.get(tagname)
+            if tagname in self.tagMapping:
+                tag = self.tagMapping[tagname]
+            else:
+                tag = tags.get(tagname)
             checkbox = QtGui.QTableWidgetItem()
             ttBox = TagTypeBox(tag, editable=True)
             ttBox.tagChanged.connect(self._handleTagTypeChanged)
             mbname = QtGui.QTableWidgetItem(tagname)
             self.setCellWidget(row, 2, ttBox)
-            if tagname in self.tagMapping and self.tagMapping[tagname] is None:
+            if tag is None:
                 checkbox.setCheckState(Qt.Unchecked)
                 ttBox.setEnabled(False)
                 mbname.setFlags(mbname.flags() ^ Qt.ItemIsEnabled)
@@ -370,7 +367,6 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.maestroView = treeview.TreeView(level, affectGlobalSelection=False)
         self.maestroView.setModel(self.maestroModel)
         self.maestroView.setItemDelegate(CDROMDelegate(self.maestroView))
-
         # collect alias entities in this release
         entities = set()
         for item in release.walk():
@@ -378,23 +374,21 @@ class ImportAudioCDDialog(QtGui.QDialog):
                 entities.update(val for val in itertools.chain.from_iterable(item.tags.values())
                                 if isinstance(val, xmlapi.AliasEntity))
         self.aliasWidget = AliasWidget(entities)
+        self.aliasWidget.aliasChanged.connect(self.makeElements)
         self.newTagWidget = TagMapWidget(release.collectExternalTags())
         self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
-
+        self.newTagWidget.tagConfigChanged.connect(self.makeElements)
         configLayout = QtGui.QVBoxLayout()
-        makeElementsButton = QtGui.QPushButton(
-            QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_ArrowRight),
-            self.tr('Re-generate elements'))
-        makeElementsButton.clicked.connect(self.makeElements)
-        configLayout.addWidget(makeElementsButton)
         self.searchReleaseBox = QtGui.QCheckBox(self.tr('search for existing release'))
         self.searchReleaseBox.setChecked(True)
+        self.searchReleaseBox.stateChanged.connect(self.makeElements)
         configLayout.addWidget(self.searchReleaseBox)
         self.mediumContainerBox = QtGui.QCheckBox(self.tr('add containers for discs'))
+        self.mediumContainerBox.stateChanged.connect(self.makeElements)
         self.forceBox = QtGui.QCheckBox(self.tr('...even without title'))
+        self.forceBox.stateChanged.connect(self.makeElements)
         configLayout.addWidget(self.mediumContainerBox)
         configLayout.addWidget(self.forceBox)
-
         btbx = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btbx.accepted.connect(self.finalize)
         btbx.rejected.connect(self.reject)
@@ -413,7 +407,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.makeElements()
         self.resize(mainwindow.mainWindow.size() * 0.9)
 
-    def makeElements(self):
+    def makeElements(self, *args, **kwargs):
         self.maestroModel.clear()
         self.level.removeElements(list(self.level.elements.values()))
         elemConfig = elements.ElementConfiguration(self.newTagWidget.tagMapping)
@@ -422,7 +416,6 @@ class ImportAudioCDDialog(QtGui.QDialog):
         elemConfig.forceMediumContainer = self.forceBox.isChecked()
         self.container = self.release.makeElements(self.level, elemConfig)
         self.maestroModel.insertElements(self.maestroModel.root, 0, [self.container])
-        self.maestroView.expandAll()
 
     def finalize(self):
         mbplugin.updateDBAliases(self.aliasWidget.activeEntities())
@@ -430,4 +423,76 @@ class ImportAudioCDDialog(QtGui.QDialog):
             config.storage.musicbrainz.tagmap[mbname] = maestroTag.name if maestroTag else None
         self.level.commit()
         self.accept()
-                
+
+
+class SimpleRipDialog(QtGui.QDialog):
+    """Dialog for ripping CDs that are not found in the MusicBrainz database. Allows to enter album
+    title, artist, date, and a title for each track,
+    """
+    def __init__(self, discId, trackCount, level):
+        super().__init__(mainwindow.mainWindow)
+        self.setModal(True)
+        self.level = level
+        self.discid = discId
+        topLayout = QtGui.QHBoxLayout()
+        topLayout.addWidget(QtGui.QLabel(self.tr('Album title:')))
+        self.titleEdit = tagwidgets.TagValueEditor(tags.TITLE)
+        self.titleEdit.setValue('unknown album')
+        topLayout.addWidget(self.titleEdit)
+        midLayout = QtGui.QHBoxLayout()
+        midLayout.addWidget(QtGui.QLabel(self.tr('Artist:')))
+        self.artistEdit = tagwidgets.TagValueEditor(tags.get('artist'))
+        self.artistEdit.setValue('unknown artist')
+        midLayout.addWidget(self.artistEdit)
+        midLayout.addStretch()
+        midLayout.addWidget(QtGui.QLabel(self.tr('Date:')))
+        self.dateEdit = tagwidgets.TagValueEditor(tags.get('date'))
+        self.dateEdit.setValue(utils.FlexiDate(1900))
+        midLayout.addWidget(self.dateEdit)
+        layout = QtGui.QVBoxLayout()
+        description = QtGui.QLabel(self.tr('The MusicBrainz database does not contain a release '
+            'for this disc. Please fill the tags manually.'))
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        layout.addLayout(topLayout)
+        layout.addLayout(midLayout)
+
+        tableLayout = QtGui.QGridLayout()
+        edits = []
+        for i in range(1, trackCount+1):
+            tableLayout.addWidget(QtGui.QLabel(self.tr('Track {:2d}:').format(i)), i-1, 0)
+            edits.append(tagwidgets.TagValueEditor(tags.TITLE))
+            edits[-1].setValue('unknown title')
+            tableLayout.addWidget(edits[-1], i-1, 1)
+        layout.addLayout(tableLayout)
+        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        box.accepted.connect(self.finish)
+        box.rejected.connect(self.reject)
+        layout.addWidget(box)
+        self.setLayout(layout)
+        self.edits = edits
+
+    def finish(self):
+        elems = []
+        for i, edit in enumerate(self.edits, start=1):
+            url = urls.URL("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
+                            self.discid, i, config.options.audiocd.rippath))
+            elem = self.level.collect(url)
+            elTags = tags.Storage()
+            elTags[tags.TITLE] = [edit.getValue()]
+            elTags[tags.ALBUM] = [self.titleEdit.getValue()]
+            elTags[tags.get('artist')] = [self.artistEdit.getValue()]
+            elTags[tags.get('date')] = [self.dateEdit.getValue()]
+            diff = tags.TagStorageDifference(None, elTags)
+            self.level.changeTags({elem: diff})
+            elems.append(elem)
+        contTags = tags.Storage()
+        contTags[tags.TITLE] = [self.titleEdit.getValue()]
+        contTags[tags.ALBUM] = [self.titleEdit.getValue()]
+        contTags[tags.get('date')] = [self.dateEdit.getValue()]
+        contTags[tags.get('artist')] = [self.artistEdit.getValue()]
+        cont = self.level.createContainer(contents=elems, type=ContainerType.Album,
+                                          domain=domains.default(), tags=contTags)
+        self.container = cont
+        self.accept()
+

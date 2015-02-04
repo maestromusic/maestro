@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,9 +22,10 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from .. import config, profiles, utils
-from ..core import flags, tags
-from ..core.elements import ContentList, TYPE_ALBUM, TYPE_CONTAINER
+from maestro import config, profiles, utils
+from maestro.core import flags, tags
+from maestro.core.elements import ContentList, ContainerType
+from maestro.gui.tagwidgets import TagTypeButton
 
 translate = QtCore.QCoreApplication.translate
 
@@ -36,6 +37,7 @@ class StandardGuesser(profiles.Profile):
     detect meta-containers."""
     
     defaultMetaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?"
+
     def __init__(self, name, type, state):
         """Initialize a guesser profile with the given *name*.
         
@@ -60,21 +62,16 @@ class StandardGuesser(profiles.Profile):
             self.metaRegex = state['metaRegex']
         else:
             self.metaRegex = self.defaultMetaRegex
-        if "compilationFlag" in state:
-            try:
-                self.compilationFlag = flags.get(state["compilationFlag"])
-            except (KeyError, ValueError):
-                self.compilationFlag = None
-        else:
+        try:
+            self.compilationFlag = flags.get(state['compilationFlag'])
+        except (KeyError, ValueError):
             self.compilationFlag = None
-            
         
     def save(self):
-        return {'groupTags': [tag.name for tag in self.groupTags],
-                'directoryMode': self.directoryMode,
-                'metaRegex': self.metaRegex,
-                'compilationFlag': None if self.compilationFlag is None else self.compilationFlag.name
-                }
+        return dict(groupTags=[tag.name for tag in self.groupTags],
+                    directoryMode=self.directoryMode,
+                    metaRegex=self.metaRegex,
+                    compilationFlag=None if self.compilationFlag is None else self.compilationFlag.name)
     
     def guessAlbums(self, level, files):
         """Perform the album guessing on *level*. *files* is a dictionary mapping
@@ -122,7 +119,7 @@ class StandardGuesser(profiles.Profile):
                 if key not in byKey:
                     byKey[key] = []
                 byKey[key].append(element)
-        existing = self.level.collectMany(existingParents)
+        existing = self.level.collect(existingParents)
         for elem in existing:
             self.orders[elem] = self.currentOrder
             self.currentOrder += 1
@@ -148,6 +145,7 @@ class StandardGuesser(profiles.Profile):
                         from ..gui.dialogs import warning
                         warning(self.tr("Error guessing albums"),
                                 self.tr("position {} appears twice in {}").format(position(element), key))
+                        self.level.removeElements([element])
                     else:
                         children[position(element)] = element.id
                 firstFreePosition = position(elementsWithPos[-1])+1 if len(elementsWithPos) > 0 else 1
@@ -155,8 +153,9 @@ class StandardGuesser(profiles.Profile):
                     children[i] = element.id
                 albumTags = tags.findCommonTags(elements)
                 albumTags[tags.TITLE] = [key] if pureDirMode else elements[0].tags[self.albumTag]
-                container = self.level.createContainer(domain = domain, tags=albumTags, 
-                                                       flags=list(flags), type=TYPE_ALBUM,
+                cType = ContainerType.Work if tags.get('composer') in albumTags else ContainerType.Work
+                container = self.level.createContainer(domain=domain, tags=albumTags,
+                                                       flags=list(flags), type=cType,
                                                        contents=ContentList.fromPairs(children.items()))
                 self.orders[container] = self.orders[elements[0]]
                 self.albums.append(container)
@@ -188,10 +187,11 @@ class StandardGuesser(profiles.Profile):
         for key, contents in byKey.items():
             metaTags = tags.findCommonTags(contents.values())
             metaTags[tags.TITLE] = [key[1]]
-            self.level.setTypes({album: TYPE_CONTAINER for album in contents.values()})
-            container = self.level.createContainer(tags=metaTags,
+            self.level.setTypes({album: ContainerType.Container for album in contents.values()})
+            domain = next(iter(contents.values())).domain
+            container = self.level.createContainer(domain=domain, tags=metaTags,
                                                    contents=ContentList.fromPairs(contents.items()),
-                                                   type=TYPE_ALBUM)
+                                                   type=ContainerType.Album)
             self.orders[container] = self.orders[contents[min(contents)]]
             self.albums.append(container)
             self.toplevels.add(container)
@@ -223,161 +223,119 @@ if len(profileCategory.profiles()) == 0:
 
 
 class GuessProfileConfigWidget(QtGui.QWidget):
-    """A widget to configure the profiles used for "guessing" album structures.
-    
-    Each profile is determined by its name, and contains a list of tags by which albums are grouped. One
-    tag is the "main" grouper tag; this one is used to determine the TITLE-tag of the new album as well as
-    for automatic meta-container guessing. Additionally, each profile sets the "directory mode" flag. If 
-    that is enabled, only albums within the same directory on the filesystem will be grouped together."""
+    """A widget to configure the profiles used for guessing album structures."""
     
     def __init__(self, profile, parent):
         super().__init__(parent)
-        self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding,QtGui.QSizePolicy.MinimumExpanding)
         mainLayout = QtGui.QVBoxLayout(self)
-        descriptionLabel = QtGui.QLabel(self.tr("""\
-Album guessing is done by means of a list of tags; all files whose tags coincide for this list will then be \
-considered an album. The "main" grouper tag determines the TITLE tag of the new album. If "directory mode" \
-is on, files will only be grouped together if they are in the same directory."""))
+        descriptionLabel = QtGui.QLabel(self.tr('Album guessing is done by means of a list of tags; all files '
+                                        'whose tags coincide for this list will then be considered an album.'))
         descriptionLabel.setWordWrap(True)
         mainLayout.addWidget(descriptionLabel)
-        
-        configLayout = QtGui.QHBoxLayout()
-        self.preview = QtGui.QListWidget()
-        configSideLayout = QtGui.QVBoxLayout()
-        self.addTagButton = QtGui.QPushButton(self.tr("add tag..."))
-        self.tagMenu = QtGui.QMenu()
-        self.tagActions = []
-        actionGroup = QtGui.QActionGroup(self)
-        for tag in tags.tagList:
-            tagAction = QtGui.QAction(self)
-            tagAction.setText(tag.title)
-            tagAction.setData(tag.name)
-            actionGroup.addAction(tagAction)
-            self.tagMenu.addAction(tagAction)
-            self.tagActions.append(tagAction)
-        self.addTagButton.setMenu(self.tagMenu)
-        actionGroup.triggered.connect(self.addTag)
-        self.removeTagButton = QtGui.QPushButton(self.tr("remove tag"))
-        self.removeTagButton.clicked.connect(self.removeTag)
-        self.directoryModeButton = QtGui.QPushButton(self.tr("directory mode"))
-        self.directoryModeButton.setCheckable(True)
-        self.directoryModeButton.setToolTip(self.tr(
-"""If this is checked, only files within the same directory will be considered for automatic album
-guessing. This is useful in most cases, unless you have albums that are split across several folders."""))
-        configSideLayout.addWidget(self.addTagButton)
-        configSideLayout.addWidget(self.removeTagButton)
-        configSideLayout.addWidget(self.directoryModeButton)
-        self.setMainGrouperButton = QtGui.QPushButton(self.tr("set to main"))
-        self.setMainGrouperButton.clicked.connect(self.setMain)
-        configSideLayout.addWidget(self.setMainGrouperButton)
-        configSideLayout.addStretch()
-        configLayout.addWidget(self.preview)
-        configLayout.addLayout(configSideLayout)
-        mainLayout.addLayout(configLayout)
+        toolBar = QtGui.QToolBar()
+
+        addTagButton = TagTypeButton()
+        addTagButton.setToolTip(self.tr('Add a tag to the grouping conditions'))
+        addTagButton.tagChosen.connect(self.addTag)
+        toolBar.addWidget(addTagButton)
+
+        removeTagButton = QtGui.QToolButton()
+        removeTagButton.setIcon(utils.getIcon('delete.png'))
+        removeTagButton.setToolTip(self.tr('Remove tag from grouping conditions'))
+        removeTagButton.clicked.connect(self.removeTag)
+        toolBar.addWidget(removeTagButton)
+        self.dirModeButton = QtGui.QPushButton()
+        self.dirModeButton.setIcon(utils.getIcon('folder.svg'))
+        self.dirModeButton.setCheckable(True)
+        self.dirModeButton.setToolTip(self.tr('Only files inside a common directory'))
+        self.dirModeButton.clicked.connect(self.updateProfile)
+        toolBar.addWidget(self.dirModeButton)
+        mainButton = QtGui.QToolButton()
+        mainButton.setIcon(utils.getIcon('cd.png'))
+        mainButton.setToolTip(self.tr("Album tag: use this tag's value as container title"))
+        mainButton.clicked.connect(self.setMain)
+        toolBar.addWidget(mainButton)
+        mainLayout.addWidget(toolBar)
         regexLayout = QtGui.QHBoxLayout()
-        self.regexCheck = QtGui.QCheckBox(self.tr("Find Meta-Containers"))
+        self.regexCheck = QtGui.QCheckBox(self.tr('Detect meta-containers:'))
         self.regexEdit = QtGui.QLineEdit()
+        self.regexEdit.textChanged.connect(self.updateProfile)
         self.regexCheck.toggled.connect(self.regexEdit.setEnabled)
-        self.resetRegexButton = QtGui.QPushButton(self.tr("default"))
-        self.regexCheck.toggled.connect(self.resetRegexButton.setEnabled)
-        self.resetRegexButton.clicked.connect(self._handleRegexReset)
+        self.regexCheck.clicked.connect(self.updateProfile)
+        resetRegexButton = QtGui.QToolButton()
+        resetRegexButton.setIcon(utils.getIcon('undo.png'))
+        resetRegexButton.setToolTip(self.tr('Reset to default regular expression'))
+        self.regexCheck.toggled.connect(resetRegexButton.setEnabled)
+        resetRegexButton.clicked.connect(self._handleRegexReset)
         regexLayout.addWidget(self.regexCheck)
         regexLayout.addWidget(self.regexEdit)
-        regexLayout.addWidget(self.resetRegexButton)
+        regexLayout.addWidget(resetRegexButton)
         mainLayout.addLayout(regexLayout)
-        compilationLayout = QtGui.QHBoxLayout()
-        self.compilationCheck = QtGui.QCheckBox(self.tr("Assing flag to compilations:"))
-        self.compilationFlagChooser = QtGui.QComboBox()
-        self.flagnames = sorted(flag.name for flag in flags.allFlags())
-        self.compilationFlagChooser.addItems(self.flagnames)
-        compilationLayout.addWidget(self.compilationCheck)
-        compilationLayout.addWidget(self.compilationFlagChooser)
-        self.compilationCheck.toggled.connect(self.compilationFlagChooser.setEnabled)
-        saveBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Save)
-        saveBox.accepted.connect(self._updateProfile)
-        mainLayout.addLayout(compilationLayout)
-        mainLayout.addWidget(saveBox)   
-        self.setCurrentProfile(profile)
+        self.tagListView = QtGui.QListWidget()
+        mainLayout.addWidget(self.tagListView)
+        self.profile = profile
+        self.setProfile(profile)
     
     def _handleRegexReset(self):
         self.regexCheck.setChecked(True)
         self.regexEdit.setText(self.profile.defaultMetaRegex)
         
-    def setCurrentProfile(self, profile):
+    def setProfile(self, profile: StandardGuesser):
         self.profile = profile
-        self.preview.setEnabled(profile != None)
-        self.preview.clear()
-        
-        if profile != None:
-            self.directoryModeButton.setChecked(profile.directoryMode)
-            for tag in profile.groupTags:
-                item = QtGui.QListWidgetItem(tag.title)
-                item.setData(Qt.UserRole, tag.name)
-                self.preview.addItem(item)
-            if self.preview.count() > 0:
-                mainItem = self.preview.item(0)
-                f = mainItem.font()
-                f.setBold(True)
-                mainItem.setFont(f)
-                self.preview.setCurrentRow(0)
-            for action in self.tagActions:
-                action.setDisabled(action.data() in profile.groupTags)
-            if profile.metaRegex is not None:
-                self.regexCheck.setChecked(True)
-                self.regexEdit.setText(profile.metaRegex)
-            else:
-                self.regexCheck.setChecked(False)
-                self.regexEdit.setDisabled(True)
-            if profile.compilationFlag is not None:
-                self.compilationCheck.setChecked(True)
-                self.compilationFlagChooser.setEnabled(True)
-                self.compilationFlagChooser.setCurrentIndex(
-                                    self.flagnames.index(profile.compilationFlag.name))
-            else:
-                self.compilationCheck.setChecked(False)
-                self.compilationFlagChooser.setEnabled(False)
-    
-    def _updateProfile(self, *args):
+        self.tagListView.clear()
+        self.dirModeButton.setChecked(profile.directoryMode)
+        for tag in profile.groupTags:
+            item = QtGui.QListWidgetItem(tag.title)
+            item.setData(Qt.UserRole, tag)
+            self.tagListView.addItem(item)
+        if self.tagListView.count() > 0:
+            mainItem = self.tagListView.item(0)
+            mainItem.setIcon(utils.getIcon('cd.png'))
+        if profile.metaRegex:
+            self.regexCheck.setChecked(True)
+            self.regexEdit.setText(profile.metaRegex)
+        else:
+            self.regexCheck.setChecked(False)
+            self.regexEdit.setDisabled(True)
+
+    def updateProfile(self):
         selectedTags = []
-        for i in range(self.preview.count()):
-            item = self.preview.item(i)
-            if item.font().bold():
-                selectedTags.insert(0, tags.get(item.data(Qt.UserRole)))
+        for i in range(self.tagListView.count()):
+            item = self.tagListView.item(i)
+            if item.icon():
+                selectedTags.insert(0, item.data(Qt.UserRole))
             else:
-                selectedTags.append(tags.get(item.data(Qt.UserRole)))
+                selectedTags.append(item.data(Qt.UserRole))
         self.profile.groupTags = selectedTags
         self.profile.albumTag = selectedTags[0] if len(selectedTags) > 0 else None
-        if self.regexCheck.isChecked() and self.regexEdit.text() != "":
+        if self.regexCheck.isChecked() and len(self.regexEdit.text()):
             self.profile.metaRegex = self.regexEdit.text()
         else:
             self.profile.metaRegex = None
-        self.profile.directoryMode = self.directoryModeButton.isChecked()
-        if self.compilationCheck.isChecked():
-            self.profile.compilationFlag = flags.get(self.compilationFlagChooser.currentText())
-        else:
-            self.profile.compilationFlag = None
+        self.profile.directoryMode = self.dirModeButton.isChecked()
     
-    def addTag(self, action):
-        newItem = QtGui.QListWidgetItem(action.text())
-        newItem.setData(Qt.UserRole, action.data())
-        self.preview.addItem(newItem)
-        action.setDisabled(True)
-        if self.preview.count() == 1:
-            self.preview.setCurrentRow(0)
+    def addTag(self, tag: tags.Tag):
+        if tag in self.profile.groupTags:
+            return
+        newItem = QtGui.QListWidgetItem(tag.title)
+        newItem.setData(Qt.UserRole, tag)
+        self.tagListView.addItem(newItem)
+        if self.tagListView.count() == 1:
+            self.tagListView.setCurrentRow(0)
             self.setMain()
+        self.updateProfile()
         
     def removeTag(self):
-        tagName = self.preview.currentItem().text()
-        tag = tags.get(tagName)
-        for action in self.tagActions:
-            if action.data() == tag:
-                action.setEnabled(True)
-        self.preview.takeItem(self.preview.currentRow())
+        self.tagListView.takeItem(self.tagListView.currentRow())
+        self.updateProfile()
     
     def setMain(self):
-        item = self.preview.currentItem()
-        for i in range(self.preview.count()):
-            item = self.preview.item(i)
-            font = item.font()
-            font.setBold(i == self.preview.currentRow())
-            item.setFont(font)
+        if self.tagListView.currentRow() < 0:
+            return
+        for i in range(self.tagListView.count()):
+            item = self.tagListView.item(i)
+            if i == self.tagListView.currentRow():
+                item.setIcon(utils.getIcon('cd.png'))
+            else:
+                item.setIcon(QtGui.QIcon())
+        self.updateProfile()

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -59,19 +59,17 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
         del parent.contents[start:end+1]
         self.endRemoveRows()
     
-    def insert(self,parent,position,wrappers):
+    def insert(self, parent, position, wrappers):
         """Insert *wrappers* at the given position into the wrapper *parent*.""" 
-        command = InsertCommand(self,parent,position,wrappers)
+        command = InsertCommand(self, parent, position, wrappers)
         stack.push(command)
     
-    def removeWrappers(self,wrappers,*args,**kwargs):
+    def removeWrappers(self, wrappers, *args, **kwargs):
         """Remove the given wrappers from the model. When possible its usually faster to use the range-based
         methods remove or removeMany.
         
         Any further arguments will be passed on to removeMany.
         """
-        # TODO: Maybe detect adjacent wrappers here and create a single range for them. This is not really
-        # necessary as RemoveCommand will merge adjacent ranges. 
         ranges = []
         for wrapper in wrappers:
             parent = wrapper.parent
@@ -79,10 +77,10 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
             ranges.append((parent,index,index))
         self.removeMany(ranges,*args,**kwargs)
     
-    def remove(self,parent,first,last):
+    def remove(self, parent, first, last):
         """Remove contents from the wrapper *parent*. *start* and *end* are the first and last index that
         is removed, respectively."""
-        self.removeMany([(parent,first,last)])
+        self.removeMany([(parent, first, last)])
         
     def removeMany(self, ranges):   
         """Remove arbitrary wrappers from the model. *ranges* is a list of tuples consisting of a parent,
@@ -113,7 +111,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
             wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
         else:
             urls = utils.files.collectAsList(mimeData.urls())
-            wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
+            wrappers = [Wrapper(element) for element in self.level.collect(urls)]
         
         # Compute drop position
         if parentIndex.isValid():

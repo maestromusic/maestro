@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,8 +20,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
 from . import treeview, mainwindow, treeactions, delegates
-from . import dockwidget
-from ..core import levels, nodes
+from ..core import nodes
 from .delegates import playlist as playlistdelegate
 from .preferences import profiles as profilesgui
 from .treeactions import *
@@ -42,7 +41,7 @@ def appendToDefaultPlaylist(wrappers, replace=False):
     if defaultPlaylist is None:
         return
     model = defaultPlaylist.model()
-    if model.backend.connectionState != player.CONNECTED:
+    if model.backend.connectionState != player.ConnectionState.Connected:
         return
     if replace:
         model.stack.beginMacro(translate("PlaylistWidget", "Replace Playlist"))
@@ -52,7 +51,7 @@ def appendToDefaultPlaylist(wrappers, replace=False):
     if replace:
         model.backend.play()            
         model.stack.endMacro()
-    elif model.backend.state() is player.STOP:
+    elif model.backend.state() is player.PlayState.Stop:
         model.backend.setCurrent(insertOffset)
         model.backend.play()
 
@@ -183,7 +182,7 @@ class PlaylistWidget(mainwindow.Widget):
         current = self.mainLayout.itemAt(self.mainWidgetIndex).widget()
         self.mainLayout.removeWidget(current)
         current.hide()
-        if state is player.CONNECTED:
+        if state is player.ConnectionState.Connected:
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.treeview)
             self.treeview.show()
         else:

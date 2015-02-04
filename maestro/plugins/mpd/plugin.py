@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import re, time, select, contextlib, os.path
+import re
+import time
+import select
+import contextlib
+import os.path
 
 try:
     import mpd
@@ -26,36 +30,42 @@ except ImportError:
     raise ImportError("python-mpd2 not installed.")
 
 import pkg_resources
-mpd_version = [ int(x) for x in pkg_resources.get_distribution("python-mpd2").version.split(".")]
-if mpd_version < [0,5,1]:
+mpd_version = [int(x) for x in pkg_resources.get_distribution("python-mpd2").version.split(".")]
+if mpd_version < [0, 5, 1]:
     raise ImportError("The installed version of python-mpd2 is too old. Maestro needs at least "
                       "python-mpd2-0.5.1 to function properly.")
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
 
-from ... import application, database as db, filebackends, player, logging, profiles, stack
-from ...filebackends import filesystem as filesystembackend
-from ...gui.misc import lineedits
-from ...core import domains, tags
-from ...models import playlist
-from . import filebackend as mpdfilebackend
+from maestro import application, player, logging, profiles, stack
+from maestro.gui.misc import lineedits
+from maestro.core import tags, urls
+from maestro.models import playlist
 
 translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
 
 
 def enable():
     player.profileCategory.addType(profiles.ProfileType(
-                'mpd', translate('MPDPlayerBackend','MPD'), MPDPlayerBackend))
-    filebackends.urlTypes["mpd"] = mpdfilebackend.MPDURL
+                                   'mpd', translate('MPDPlayerBackend', 'MPD'), MPDPlayerBackend))
+    urls.fileBackends.append(MPDFile)
 
 
 def disable():
     player.profileCategory.removeType('mpd')
-    del filebackends.urlTypes["mpd"]
+    urls.fileBackends.remove(MPDFile)
 
-MPD_STATES = { 'play': player.PLAY, 'stop': player.STOP, 'pause': player.PAUSE}
+
+class MPDFile(urls.BackendFile):
+
+    scheme = 'mpd'
+
+    def readTags(self):
+        mpdProfile = player.profileCategory.get(self.url.profile)
+        self.tags, self.length = mpdProfile.getInfo(self.url.path)
+
+
+MPDState = {item.name.lower(): item for item in player.PlayState}
 
             
 class MPDPlayerBackend(player.PlayerBackend):
@@ -131,7 +141,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.host = host
         self.port = port
         self.password = password
-        if self.connectionState == player.CONNECTED:
+        if self.connectionState == player.ConnectionState.Connected:
             self.disconnectClient()
         self.connectBackend()
         player.profileCategory.profileChanged.emit(self)
@@ -169,8 +179,8 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.updatePlaylist()
         self.updatePlayer()
         self.updateOutputs()
-        self.connectionState = player.CONNECTED
-        self.connectionStateChanged.emit(player.CONNECTED)
+        self.connectionState = player.ConnectionState.Connected
+        self.connectionStateChanged.emit(player.ConnectionState.Connected)
         self.client.send_idle()
         self.idling = True
         self.idleTimer.start()
@@ -180,7 +190,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         If *skipSocket* is True, nothing is done on the socket (useful after connection failures).
         """ 
-        logger.debug("calling MPD disconnect host {}".format(self.host))
+        logging.debug(__name__, "calling MPD disconnect host {}".format(self.host))
         if self.idleTimer.isActive():
             self.idleTimer.stop()
         if not skipSocket:
@@ -188,8 +198,8 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.client.close()
             self.client.disconnect()
         self.client = None
-        self.connectionState = player.DISCONNECTED
-        self.connectionStateChanged.emit(player.DISCONNECTED)
+        self.connectionState = player.ConnectionState.Connected
+        self.connectionStateChanged.emit(player.ConnectionState.Disconnected)
         stack.resetSubstack(self.stack)
        
     def checkIdle(self, resumeIdle=True):
@@ -246,7 +256,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.updateOutputs()
             changed.remove('output')
         if len(changed) > 0:
-            logger.warning('unhandled MPD changes: {}'.format(changed))
+            logging.warning(__name__, 'unhandled MPD changes: {}'.format(changed))
     
     @contextlib.contextmanager
     def getClient(self):
@@ -281,7 +291,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         newVersion = int(self.mpdStatus["playlist"])
         if newVersion == self.playlistVersion:
             return
-        logger.debug("detected new plVersion: {}-->{}".format(self.playlistVersion, newVersion))
+        logging.debug(__name__, "detected new plVersion: {}-->{}".format(self.playlistVersion, newVersion))
         
         if self.playlistVersion is None:
             # this happens only on initialization.
@@ -321,7 +331,7 @@ class MPDPlayerBackend(player.PlayerBackend):
                 self.playlist.insertUrlsAtOffset(pos, urls, updateBackend='onundoredo')
                 return
         if len(plChanges) == 0:
-            logger.warning('no changes???')
+            logging.warning(__name__, 'no changes???')
             return
         # other cases: update self.mpdPlaylist and perform a general playlist change
         reallyChange = False
@@ -361,11 +371,11 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.elapsedChanged.emit(self.elapsed())
              
         # check for a change of playing state
-        state = MPD_STATES[self.mpdStatus["state"]]
+        state = MPDState[self.mpdStatus["state"]]
         if state != self._state:
             self._state = state
             self.stateChanged.emit(state)
-            if state == player.STOP:
+            if state == player.PlayState.Stop:
                 self._currentLength = 0
                 self.playlist.setCurrent(None)
                 self.currentChanged.emit(None)
@@ -382,11 +392,11 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def setState(self, state):
         with self.getClient() as client:
-            if state is player.PLAY:
+            if state is player.PlayState.Play:
                 client.play()
-            elif state is player.PAUSE:
+            elif state is player.PlayState.Pause:
                 client.pause(1)
-            elif state is player.STOP:
+            elif state is player.PlayState.Stop:
                 client.stop()
     
     def volume(self):
@@ -397,7 +407,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             try:
                 client.setvol(volume)
             except mpd.CommandError:
-                logger.error("Problems setting volume. Does MPD allow setting the volume?")
+                logging.error(__name__, "Problems setting volume. Does MPD allow setting the volume?")
 
     def current(self):
         return self.playlist.current
@@ -415,7 +425,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             client.previous()        
     
     def elapsed(self):
-        if self._state == player.STOP:
+        if self._state is player.PlayState.Stop:
             return 0
         return time.time() - self._currentStart
     
@@ -435,7 +445,7 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.elapsedChanged.emit(self.elapsed())
     
     def checkElapsedTimer(self, newState):
-        if newState is player.PLAY:
+        if newState is player.PlayState.Play:
             self.elapsedTimer.start()
         else:
             self.elapsedTimer.stop()
@@ -451,24 +461,20 @@ class MPDPlayerBackend(player.PlayerBackend):
     def makeUrls(self, paths):
         """Create Maestro URLs for the given paths reported by MPD.
         
-        If an MPD path has the form of a non-default URL (i.e. proto://path), it is tried to load
-        an appropriate URL using BackendURL.fromString().
-        Otherwise, if *path* refers to a normal file in MPDs database, an MPDURL is created.
-        If the file is also found on the local filesystem, then a normal FileURL is returned.
+        MPD paths of non-default form (i.e. proto://path) are mapped to URLs with scheme 'proto'.
+        If *path* refers to a normal file in MPDs database, a URL with scheme 'MPD' is created.  If the file
+        is also found on the local filesystem, then a normal 'file' URL is returned.
         """
-        urls = []
+        returned = []
         for path in paths:
             if re.match("[a-zA-Z]{2,5}://", path) is not None:
-                try:
-                    urls.append(filebackends.BackendURL.fromString(path))
-                except KeyError:
-                    logger.warning("Unsupported MPD URL type: {}".format(path))
+                returned.append(urls.URL(path))
             else:
                 if os.path.exists(os.path.join(self.path, path)):
-                    urls.append(filesystembackend.FileURL(os.path.join(self.path, path)))
+                    returned.append(urls.URL.fileURL(os.path.join(self.path, path)))
                 else:
-                    urls.append(mpdfilebackend.MPDURL("mpd://" + self.name + "/" + path))
-        return urls
+                    returned.append(urls.URL('mpd://{}/{}'.format(self.name, path)))
+        return returned
         
     def treeActions(self):
         yield self.separator
@@ -482,7 +488,7 @@ class MPDPlayerBackend(player.PlayerBackend):
     
     def unregisterFrontend(self, obj):
         self._numFrontends -= 1
-        if self._numFrontends == 0 and self.connectionState == player.CONNECTED:
+        if self._numFrontends == 0 and self.connectionState is player.ConnectionState.Connected:
             self.disconnectClient()
     
     def setPlaylist(self, urls):

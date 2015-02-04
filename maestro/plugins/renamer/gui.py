@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,12 +19,12 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from ... import config, logging
-from ...gui import treeview, treeactions, delegates
-from ...gui.delegates import abstractdelegate
-from ...gui.preferences import profiles as profilesgui
-from ...models import leveltreemodel
-from ...core import levels
+from maestro import config, logging
+from maestro.gui import treeview, treeactions, delegates
+from maestro.gui.delegates import abstractdelegate
+from maestro.gui.preferences import profiles
+from maestro.models import leveltreemodel
+from maestro.core import levels
 from . import plugin
 
 
@@ -34,25 +34,12 @@ class RenameFilesAction(treeactions.TreeAction):
     def __init__(self, parent):
         super().__init__(parent)
         self.setText(self.tr("Rename files"))
-    
-    def initialize(self, selection):
-        for fileW in selection.fileWrappers(True):
-            if fileW.element.url.CAN_RENAME:
-                self.setEnabled(True)
-                return
-        self.setEnabled(False)
+        self.setEnabled(True)
     
     def doAction(self):
-        def check(element):
-            """Check if all files under this parent can be renamed."""
-            for file in element.getAllFiles():
-                if not file.url.CAN_RENAME:
-                    return False
-            return True
-        elements = [elem for elem in self.parent().selection.elements() if check(elem)]
+        elements = self.parent().selection.elements()
         dialog = RenameDialog(self.parent(), self.level(), elements)
-        dialog.exec_()
-        if dialog.result() == dialog.Accepted:
+        if dialog.exec_():
             try:
                 dialog.sublevel.commit()
             except levels.RenameFilesError as e:
@@ -74,7 +61,7 @@ class PathDelegate(delegates.StandardDelegate):
     def addPath(self, element):
         if element.isFile():
             if not element.inParentLevel():
-                logger.warning('?')
+                logging.warning(__name__, '{} not in parent level'.format(element))
                 return
             oldPath = element.inParentLevel().url.path
             newPath = element.url.path
@@ -129,8 +116,7 @@ class RenameDialog(QtGui.QDialog):
         self.model = leveltreemodel.LevelTreeModel(self.sublevel, self.elementsSub)
         self.tree = treeview.TreeView(self.sublevel, affectGlobalSelection=False)
         self.tree.setModel(self.model)
-        self.delegate = PathDelegate(self.tree)
-        self.tree.setItemDelegate(self.delegate)
+        self.tree.setItemDelegate(PathDelegate(self.tree))
         self.tree.expandAll()
         
         self.bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
@@ -144,7 +130,7 @@ class RenameDialog(QtGui.QDialog):
         self.setLayout(mainLayout)
         self.resize(800,700)
         self._handleTemporaryChanged()
-        
+
     def _handleTemporaryChanged(self):
         """Handle changes to the temporary profile of self.configDisplay."""
         profile = self.configDisplay.tempProfile
@@ -156,7 +142,7 @@ class RenameDialog(QtGui.QDialog):
             for elem, newPath in totalResult.items():
                 if elem.id in self.sublevel:
                     subelem = self.sublevel[elem.id]
-                    subelem.url = subelem.url.renamed(newPath)
+                    subelem.url = subelem.url.copy(path=newPath)
             if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
                 self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
                 self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))
@@ -179,8 +165,8 @@ class RenameDialog(QtGui.QDialog):
                         self.tr("Save modified profile {}?").format(self.configDisplay.profile.name)):
                 self.configDisplay._handleSave()
         self.accept()
-    
-    
+
+
 class GrammarConfigurationWidget(QtGui.QWidget):
     """This widget is used in two places to configure grammar profiles:
     
@@ -212,7 +198,7 @@ class GrammarConfigurationWidget(QtGui.QWidget):
             topLayout = QtGui.QHBoxLayout()
             layout.addLayout(topLayout)
             topLayout.addWidget(QtGui.QLabel(self.tr("Choose a profile:")))
-            self.profileChooser = profilesgui.ProfileComboBox(plugin.profileCategory)
+            self.profileChooser = profiles.ProfileComboBox(plugin.profileCategory)
             self.profileChooser.profileChosen.connect(self.setProfile)
             if profile is not None:
                 self.profileChooser.setCurrentProfile(profile)

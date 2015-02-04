@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,13 +16,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import enum
+
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from . import config, profiles
+from maestro import config, profiles
 
-STOP, PLAY, PAUSE = range(3)
-DISCONNECTED, CONNECTING, CONNECTED = range(3)
+
+class PlayState(enum.Enum):
+    Stop = 0
+    Play = 1
+    Pause = 2
+
+
+class ConnectionState(enum.Enum):
+    Disconnected = 0
+    Connecting = 1
+    Connected = 2
 
 profileCategory = profiles.TypedProfileCategory(
     name = 'playback',
@@ -51,32 +62,32 @@ class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend
     providing audio playback and playlist management.
     """
-    stateChanged = QtCore.pyqtSignal(int) #Emits one of {PLAY, STOP,PAUSE} if the backend's state has changed
+    stateChanged = QtCore.pyqtSignal(PlayState)
     volumeChanged = QtCore.pyqtSignal(int)
     currentChanged = QtCore.pyqtSignal(int)
     elapsedChanged = QtCore.pyqtSignal(float)
-    connectionStateChanged = QtCore.pyqtSignal(int)
+    connectionStateChanged = QtCore.pyqtSignal(ConnectionState)
     
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
-        self.connectionState = DISCONNECTED
+        self.connectionState = ConnectionState.Disconnected
     
-    def state(self):
-        """Return the current player state from STOP, PLAY, PAUSE."""
+    def state(self) -> PlayState:
+        """Return the current player state."""
         raise NotImplementedError()
     
-    def setState(self, state):
-        """Set the state of the player to one of STOP, PLAY, PAUSE."""
+    def setState(self, state: PlayState):
+        """Set the state of the player."""
         raise NotImplementedError()
      
     def play(self):
-        self.setState(PLAY)
+        self.setState(PlayState.Play)
     
     def stop(self):
-        self.setState(STOP)
+        self.setState(PlayState.Stop)
     
     def pause(self):
-        self.setState(PAUSE)
+        self.setState(PlayState.Pause)
         
     def volume(self):
         """Return the current volume as integer between 0 and 100."""

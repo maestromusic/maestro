@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, delegates
-from . import dockwidget
 from .. import utils
 from ..core import levels, tags
 from ..models import albumguesser
@@ -38,6 +37,7 @@ class EditorTreeView(treeview.DraggingTreeView):
     actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
     actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
     actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
+    actionConfig.addActionDefinition(((sect, 'flatten'),), treeactions.FlattenAction)
     treeactions.SetElementTypeAction.addSubmenu(actionConfig, sect)
     treeactions.ChangePositionAction.addSubmenu(actionConfig, sect)
     sect = translate("EditorTreeView", "editor")
@@ -65,19 +65,6 @@ class EditorTreeView(treeview.DraggingTreeView):
                                                           self.model().index(end, 0, parent)),
                                      QtGui.QItemSelectionModel.ClearAndSelect)   
         self.setFocus(Qt.MouseFocusReason)
-        
-    def commitData(self, lineEdit):
-        newTitle = lineEdit.text()
-        oldTitle = lineEdit.element.tags[tags.TITLE][0] if tags.TITLE in lineEdit.element.tags else ''
-        if newTitle == oldTitle:
-            return
-        if len(newTitle) > 0 and len(oldTitle) > 0:
-            difference = tags.SingleTagDifference(tags.TITLE, replacements=[(oldTitle, newTitle)])
-        elif len(newTitle) > 0:
-            difference = tags.SingleTagDifference(tags.TITLE, additions=[newTitle])
-        else: difference = tags.SingleTagDifference(tags.TITLE, removals=[oldTitle])
-        levels.editor.changeTags({lineEdit.element: difference})
-        
 
     
 class EditorWidget(mainwindow.Widget):
@@ -93,11 +80,11 @@ class EditorWidget(mainwindow.Widget):
         if state is None:
             state = {}
         expand = 'expand' not in state or state['expand'] # by default expand
-        guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled'] # by default guess 
+        guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled']
         guessProfile = albumguesser.profileCategory.getFromStorage(state.get('guessProfile'))
         delegateProfile = delegates.profiles.category.getFromStorage(
-                                                    state.get('delegate'),
-                                                    editordelegate.EditorDelegate.profileType)
+            state.get('delegate'),
+            editordelegate.EditorDelegate.profileType)
         
         buttonLayout = QtGui.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
@@ -122,7 +109,7 @@ class EditorWidget(mainwindow.Widget):
         self.toolbar = QtGui.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearEditor'])
         
-        self.toolbar.addAction(self.editor.treeActions["commit"])
+        self.toolbar.addAction(self.editor.treeActions['commit'])
         buttonLayout.addWidget(self.toolbar)
         buttonLayout.addStretch()
     
@@ -259,8 +246,6 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         elif action == 'delete':
             levels.editor.changeTags({el: tags.SingleTagDifference(info.tag,removals=el.tags[info.tag])
                                       for el in info.elements})
-        elif action == 'undo':
-            self.editor.model().undoExtTagInfo(info)
         elif action == 'select':
             # Construct a QItemSelection storing the whole selection and add it to the model at once.
             # Otherwise a selectionChanged signal would be emitted after each selected wrapper. 

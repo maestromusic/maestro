@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -273,7 +273,7 @@ class ElementTypeCriterion(Criterion):
             query = "SELECT id FROM {p}elements AS el"
         else: query = "SELECT id FROM {table} JOIN {p}elements AS el USING(id)"
         # Add where clause
-        query += " WHERE el.file={}".format(value)
+        query += " WHERE el.file={}".format(int(value))
         if domain is not None:
             query += " AND el.domain={}".format(domain.id)
         self.result = set(db.query(query, table=fromTable).getSingleColumn())

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@ or, if the connection was already established in another module:
 """
 
 import os, threading
+import datetime
 import sqlalchemy
 
 from .. import config, utils
@@ -53,6 +54,7 @@ _nextIdLock = threading.Lock()
 
 DBException = sqlalchemy.exc.DBAPIError
 
+
 class EmptyResultException(Exception):
     """This exception is executed if getSingle, getSingleRow or getSingleColumn are
     performed on a result which does not contain any row.
@@ -69,7 +71,7 @@ class FlexiDateType(sqlalchemy.types.TypeDecorator):
         return utils.FlexiDate.fromSql(value)
 
     def copy(self):
-        return FlexiDateDecorator()
+        return FlexiDateType()
 
 
 def createEngine(**kwargs):
@@ -186,6 +188,8 @@ def isNull(value):
     return value is None
 
 def getDate(value):
+    if isinstance(value, str):
+        value = datetime.datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
     return value.replace(tzinfo=datetime.timezone.utc)
 
 
@@ -330,6 +334,24 @@ def updateElementsCounter(elids=None):
         {1}
         """.format(prefix, whereClause))
 
+
+def deleteSuperfluousTagValues():
+    """Remove unused entries from the values_* tables."""
+    for valueType in tagsModule.TYPES:
+        tableName = "{}values_{}".format(prefix, valueType)
+        # This is complicated because we need different queries for MySQL and SQLite.
+        # Neither query works in both.
+        mainPart = """ FROM {1} LEFT JOIN {0}tags ON {1}.tag_id = {0}tags.tag_id
+                                                 AND {1}.id = {0}tags.value_id
+                    WHERE element_id IS NULL
+                    """.format(prefix, tableName)
+        if type == 'mysql':
+            # Cannot use DELETE together with JOIN in SQLite
+            query("DELETE {} {}".format(tableName, mainPart))
+        else:
+            # Cannot delete from a table used in a subquery in MySQL
+            query("DELETE FROM {0} WHERE id IN (SELECT {0}.id {1})".format(tableName, mainPart))
+    
 
 # Files-Table
 #================================================

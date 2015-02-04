@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2014-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -96,7 +96,7 @@ def html(pixmap, attributes=''):
 
 def renderSvg(fileOrRenderer, name, width, height, background=Qt.transparent):
     """Load the object with the given name from *file* and render it into a pixmap of the given
-    dimensions. Return that pixmap."""#TODO
+    dimensions. Return that pixmap."""
     if isinstance(fileOrRenderer, str):
         renderer = QtSvg.QSvgRenderer(fileOrRenderer)
     else: renderer = fileOrRenderer

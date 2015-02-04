@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -629,7 +629,7 @@ class AddTagTypeDialog(QtGui.QDialog):
                                       self.tr("'{}' is not a valid tagname.").format(tagName))
             return
         title = self.titleLineEdit.text()
-        if tags.isTitle(title):
+        if not tags.titleAllowed(title):
             QtGui.QMessageBox.warning(self, self.tr("Title exists already"),
                                       self.tr("There is already a tag with title '{}'.").format(title))
             return

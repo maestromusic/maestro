@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -59,8 +59,7 @@ if exists(join(dirname(__file__), '.git')):
                         print(e)
                         print("Warning: Could not update translations")
                         return
-        
-    
+
     def updateResources():
         """Update resource files with pyrcc4 if necessary."""
         resources = [ (["images/images.qrc"], "maestro/resources.py"),
@@ -78,7 +77,7 @@ if exists(join(dirname(__file__), '.git')):
                     subprocess.check_call(["pyrcc4", "-py3", "-o", py, sources[0]])
                     break
     
-    # Now we monkey-path the relevant commands to update i18n & resources on demand
+    # Now we monkey-patch the relevant commands to update i18n & resources on demand
     sdist_run = sdist.sdist.run
     def wrapped_sdist_run(self):
         updateTranslations()

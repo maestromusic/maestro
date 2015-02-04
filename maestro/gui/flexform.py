@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -211,7 +211,7 @@ class FlexTableModel(QtCore.QAbstractTableModel):
     
     def setItemData(self, item, field, value):
         setattr(item, field.name, value)
-        row = self.items.index(row)
+        row = self.items.index(item)
         column = self.fields.index(field)
         index = self.index(row, column)
         self.dataChanged.emit(index, index)
@@ -638,9 +638,6 @@ class ImageField(Field):
         removeAction.triggered.connect(lambda: view.model.setItemData(item, self, None))
         menu.addAction(removeAction)
         return menu
-        
-    def _changeAction(self, item):
-        image = ImageChooser.getImage(self.folders, default, view)
 
 
 class ImageLabel(QtGui.QLabel):

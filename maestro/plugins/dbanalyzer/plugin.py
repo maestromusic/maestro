@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from ... import database as db, application, constants, config, utils
+from ... import database as db, application, config, utils, VERSION
 from ...gui import mainwindow
 from . import resources, checks
 
@@ -51,7 +51,7 @@ def disable():
 
 def defaultStorage():
     return {"dbanalyzer": {
-            "size": (800,600),
+            "size": [800,600],
             "pos": None # Position of the window as tuple or None to center the window
         }}
     
@@ -176,6 +176,7 @@ class DBAnalyzer(mainwindow.Widget):
 
         # Problems
         self.checks = [checkClass() for checkClass in checks.Check.__subclasses__()]
+        self.checks.sort(key=lambda check: check.getName())
         checkData = [(check.getName(),check.getInfo(),check.getNumber()) for check in self.checks]
         self.problemDetails = {}
         self.problemsTable.setRowCount(len(checkData))
@@ -319,7 +320,7 @@ class DBAnalyzerDialog(QtGui.QDialog):
     """A dialog containing a DBAnalyzer."""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Maestro version {} – Database Analyzer".format(constants.VERSION))
+        self.setWindowTitle("Maestro version {} – Database Analyzer".format(VERSION))
         self.setWindowIcon(QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
         layout = QtGui.QVBoxLayout(self)
         analyzer = DBAnalyzer(widgetClass=_getWidgetClass())

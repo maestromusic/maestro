@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ files = Table(prefix+'files', metadata,
 tagids = Table(prefix+'tagids', metadata,
     Column('id', Integer, primary_key=True),
     Column('tagname', String(tagsModule.MAX_NAME_LENGTH), nullable=False, index=True, unique=True),
-    Column('tagtype', Enum('varchar', 'date', 'text'), default='varchar', nullable=False),
+    Column('tagtype', Enum('varchar', 'date', 'text'), server_default='varchar', nullable=False),
     Column('title', String(tagsModule.MAX_NAME_LENGTH)),
     Column('icon', String(255)),
     Column('private', Boolean, nullable=False),
@@ -84,7 +84,7 @@ values_varchar = Table(prefix+'values_varchar', metadata,
     Column('value', String(tagsModule.TAG_VARCHAR_LENGTH), nullable=False),
     Column('sort_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
     Column('search_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
-    Column('hide', Boolean, nullable=False, default=0),
+    Column('hide', Boolean, nullable=False, server_default='0'),
     mysql_engine='InnoDB'
 )
 Index(prefix+'values_varchar_idx', values_varchar.c.tag_id, values_varchar.c.value)

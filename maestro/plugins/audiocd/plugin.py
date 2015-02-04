@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@ try:
 except ImportError:
     raise ImportError('discid module not installed')
 from PyQt4 import QtCore, QtGui
-from ... import application, database as db, filebackends
-from ...gui import editor
-from ... import config
-from ...core import domains
+from maestro import application, database as db
+from maestro.gui import editor
+from maestro.core import urls, tags
 
 translate = QtCore.QCoreApplication.translate
+
 
 def defaultConfig():
     return {"audiocd": {
@@ -37,13 +37,13 @@ def defaultConfig():
 
 
 def enable():
-    from . import filebackend as cdfilebackend
-    filebackends.urlTypes["audiocd"] = cdfilebackend.AudioCDURL
+    urls.fileBackends.append(AudioCDTrack)
     from .gui import ImportAudioCDAction
     editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'audiocd'),), ImportAudioCDAction)
     from ...core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.append(fileChangerHook)
+
 
 def mainWindowInit():
     global _action
@@ -51,25 +51,32 @@ def mainWindowInit():
     _action.setText(translate("AudioCD Plugin", "rip missing tracks..."))
     _action.triggered.connect(showRipMissingDialog)
     application.mainWindow.menus['extras'].addAction(_action)
-    
+
+
 def disable():
-    del filebackends.urlTypes["audiocd"]
+    urls.fileBackends.remove(AudioCDTrack)
     editor.EditorTreeView.actionConfig.removeActionDefinition( (("plugins", "audiocd"),) )
     from ...core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.remove(fileChangerHook)
     application.mainWindow.menus['extras'].removeAction(_action)
 
-def simpleDiscContainer(discid, trackCount, level):
-    from ...core.elements import TYPE_ALBUM
-    
-    elems = []
-    for i in range(1, trackCount+1):
-        url = filebackends.BackendURL.fromString("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
-                        discid, i, config.options.audiocd.rippath))
-        elems.append(level.collect(url))
-    return level.createContainer(contents=elems, type=TYPE_ALBUM)
-    
+
+def parseNetloc(url):
+    a, b = url.netloc.split('.')
+    return a, int(b)
+
+
+class AudioCDTrack(urls.BackendFile):
+
+    scheme = 'audiocd'
+
+    def readTags(self):
+        self.tags, self.length = tags.Storage(), 0
+
+    def saveTags(self):
+        pass
+
 
 def showRipMissingDialog():
     ans = list(db.query("SELECT url, element_id FROM {p}files WHERE url LIKE 'audiocd://%'"))
@@ -80,11 +87,12 @@ def showRipMissingDialog():
         return
     discids = {}
     for url, id in ans:
-        url = filebackends.BackendURL.fromString(url)
-        if url.discid not in discids:
-            discids[url.discid] = (id, set())
-        assert url.tracknr not in discids[url.discid][1]
-        discids[url.discid][1].add(url.tracknr)
+        url = urls.URL(url)
+        discid, tracknr = parseNetloc(url)
+        if discid not in discids:
+            discids[discid] = (id, set())
+        assert tracknr not in discids[discid][1]
+        discids[discid][1].add(tracknr)
     from . import gui
     dev, discid, ntracks = gui.ImportAudioCDAction.askForDiscId()
     if discid in discids:

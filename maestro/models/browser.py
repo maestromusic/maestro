@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,10 +23,9 @@ from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import rootedtreemodel
-from .. import config, search, database as db, logging, utils, search
+from .. import config, database as db, logging, utils, search
 from ..core import tags, levels, elements
-from ..core.elements import Element
-from ..core.nodes import Node, RootNode, Wrapper, TextNode
+from ..core.nodes import Node, Wrapper, TextNode
 from ..gui import selection, dialogs
 
 
@@ -232,8 +231,6 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             node.setContents([])
             self.endRemoveRows()
             self.beginInsertRows(self.getIndex(node), 0, len(contents)-1)
-            if node is self.root:
-                print("SETTING ROOT CONTENTS", len(node.contents), len(contents))
             node.setContents(contents)
             self.endInsertRows()
         else:
@@ -379,10 +376,11 @@ class TagLayer(Layer):
         new = toplevel
         while len(new):
             new = set(db.query("""
-                    SELECT c.element_id
-                    FROM {p}contents AS c JOIN {p}elements AS el ON c.container_id = el.id
-                    WHERE el.type IN ({collection},{container}) AND el.id IN ({parents})
-                    """, collection=elements.TYPE_COLLECTION, container=elements.TYPE_CONTAINER,
+                SELECT c.element_id
+                FROM {p}contents AS c JOIN {p}elements AS el ON c.container_id = el.id
+                WHERE el.type IN ({collection},{container}) AND el.id IN ({parents})""",
+                    collection=elements.ContainerType.Collection.value,
+                    container=elements.ContainerType.Container.value,
                     parents=db.csList(new)).getSingleColumn())
             # Restrict to search result. If the node's value only appears in contents of a permeable
             # node in the search result and these contents are not in the result themselves,
@@ -536,7 +534,7 @@ def _buildContainerTree(domain, elids):
     # Load all toplevel elements and all of their ancestors
     newIds = toplevel
     while len(newIds) > 0:
-        levels.real.collectMany(newIds)
+        levels.real.collect(newIds)
         nextIds = []
         for id in newIds:
             nextIds.extend(levels.real[id].parents)
@@ -566,7 +564,7 @@ def _buildContainerTree(domain, elids):
                 result = True
                 cDict[pid].append(id)
                 toplevel.discard(id)
-            elif levels.real[pid].isMajor(): # This is a major parent. Add it to toplevel
+            elif levels.real[pid].type.major: # This is a major parent. Add it to toplevel
                 result = True
                 cDict[pid].append(id)
                 toplevel.discard(id)
@@ -595,7 +593,7 @@ def _buildContainerTree(domain, elids):
         """Intelligent sort: sort albums by their date, everything else by name."""
         element = wrapper.element
         date = 0
-        if element.isContainer() and element.type == elements.TYPE_ALBUM:
+        if element.isContainer() and element.type == elements.ContainerType.Album:
             dateTag = tags.get("date")
             if dateTag.type == tags.TYPE_DATE and dateTag in element.tags: 
                 date = -element.tags[dateTag][0].toSql() # minus leads to descending sort
@@ -812,7 +810,7 @@ class BrowserWrapper(Wrapper):
         else:
             # Contrary to the parent implementation use BrowserWrapper-instances
             # for non-empty containers in the contents
-            elements = levels.real.collectMany(self.element.contents)
+            elements = levels.real.collect(self.element.contents)
             self.setContents([(BrowserWrapper if el.isContainer() and len(el.contents) > 0 else Wrapper)
                               (el, position=pos)
                           for el, pos in zip(elements, self.element.contents.positions)])

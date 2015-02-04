@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import urllib.parse
 import os.path
 
 from PyQt4 import QtCore
@@ -26,9 +25,7 @@ except ImportError as e:
     raise ImportError("PyQt4-phonon is not installed.")
 
 from ... import player, profiles
-from ...filebackends.filesystem import FileURL
 from ...models import playlist
-from ...core import elements
         
 translate = QtCore.QCoreApplication.translate
 
@@ -73,7 +70,6 @@ class PhononPlayerBackend(player.PlayerBackend):
             state = {}
         self._initState = state
         self._numFrontends = 0
-        self.connectionState = player.DISCONNECTED
         
     def registerFrontend(self, frontend):
         self._numFrontends += 1
@@ -93,8 +89,8 @@ class PhononPlayerBackend(player.PlayerBackend):
                     self.setCurrent(state.get('current', None), play=False)
             self.setVolume(state.get('volume', 100))
             self._nextSource = None # used in self._handleSourceChanged
-            self.connectionState = player.CONNECTED
-            self.connectionStateChanged.emit(player.CONNECTED)
+            self.connectionState = player.ConnectionState.Connected
+            self.connectionStateChanged.emit(player.ConnectionState.Connected)
     
     def unregisterFrontend(self, frontend):
         self._numFrontends -= 1
@@ -102,9 +98,8 @@ class PhononPlayerBackend(player.PlayerBackend):
     # Insert etc. are handled by the PlaylistModel.
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
-        print(urls)
         for i, url in enumerate(urls):
-            if not isinstance(url, FileURL):
+            if url.scheme != 'file':
                 raise player.InsertError("URL type {} not supported".format(type(url)))
             elif not os.path.exists(url.path):
                 raise player.InsertError(self.tr("Cannot play '{}': File does not exist.")
@@ -112,27 +107,27 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     def removeFromPlaylist(self, begin, end):
         if self.playlist.current is None:
-            self.setState(player.STOP)
+            self.setState(player.PlayState.Stop)
             
     def setPlaylist(self, urls):
         if self.playlist.current is None:
-            self.setState(player.STOP)
+            self.setState(player.PlayState.Stop)
     
-    phononToStateMap = { phonon.LoadingState: player.STOP,
-                         phonon.StoppedState: player.STOP,
-                         phonon.PlayingState: player.PLAY,
-                         phonon.BufferingState: player.PLAY,
-                         phonon.PausedState: player.PAUSE,
-                         phonon.ErrorState: player.STOP }
+    phononToStateMap = { phonon.LoadingState: player.PlayState.Stop,
+                         phonon.StoppedState: player.PlayState.Stop,
+                         phonon.PlayingState: player.PlayState.Play,
+                         phonon.BufferingState: player.PlayState.Play,
+                         phonon.PausedState: player.PlayState.Pause,
+                         phonon.ErrorState: player.PlayState.Stop }
     def state(self):
-        """Return the current state (one of player.STOP, player.PLAY, player.PAUSE)."""
+        """Return the current state"""
         return self.phononToStateMap[self.mediaObject.state()]
         
-    def setState(self, state):
+    def setState(self, state: player.PlayState):
         if state != self.state():
-            if state == player.STOP:
+            if state is player.PlayState.Stop:
                 self.mediaObject.stop()
-            elif state == player.PLAY:
+            elif state == player.PlayState.Play:
                 if self.current() is None:
                     offset = self._nextOffset()
                     if offset is not None:
@@ -143,7 +138,7 @@ class PhononPlayerBackend(player.PlayerBackend):
             self.stateChanged.emit(state)
     
     def checkPlaying(self):
-        if self.state() != player.PLAY:
+        if self.state() != player.PlayState.Play:
             from ...gui.dialogs import warning
             warning(self.tr("Error Playing Song"),
                     self.tr("Phonon could not play back the selected file."))
@@ -172,9 +167,9 @@ class PhononPlayerBackend(player.PlayerBackend):
                 source = phonon.MediaSource(self._getPath(offset))
                 self.mediaObject.setCurrentSource(source)
                 if play:
-                    self.setState(player.PLAY)
+                    self.setState(player.PlayState.Play)
             else:
-                self.setState(player.STOP)
+                self.setState(player.PlayState.Stop)
             self.currentChanged.emit(offset)
         elif offset is not None \
                 and self._getPath(offset) != self.mediaObject.currentSource().url().toString():
@@ -191,12 +186,12 @@ class PhononPlayerBackend(player.PlayerBackend):
         self.elapsedChanged.emit(seconds)
     
     def skipForward(self):
-        if self.state() != player.STOP:
+        if self.state() is not player.PlayState.Stop:
             # This may be None in which case playback is stopped
             self.setCurrent(self._nextOffset())
     
     def skipBackward(self):
-        if self.state() != player.STOP:
+        if self.state() is not player.PlayState.Stop:
             if self.currentOffset() > 0:
                 self.setCurrent(self.currentOffset()-1)
     
@@ -231,7 +226,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     def _getPath(self, offset):
         """Return the absolute path of the file at the given offset."""
         url = self.playlist.root.fileAtOffset(offset).element.url
-        if isinstance(url, FileURL):
+        if url.scheme == 'file':
             return url.path
         raise ValueError("Phonon can not play file {} of URL type {}".format(url, type(url)))
     

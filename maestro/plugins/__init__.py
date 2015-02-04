@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2009-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ import collections, importlib
 from PyQt4 import QtCore
 translate = QtCore.QCoreApplication.translate
 
-from .. import logging, config, constants
+from .. import logging, config, compareVersion
 
 
 class Plugin(object):
@@ -36,10 +36,10 @@ class Plugin(object):
         
         self.versionOk = True
         if (hasattr(self.package,'MINVERSION')):
-            if constants.compareVersion(self.package.MINVERSION) < 0:
+            if compareVersion(self.package.MINVERSION) < 0:
                 self.versionOk = False
         if (hasattr(self.package,'MAXVERSION')):
-            if constants.compareVersion(self.package.MAXVERSION) > 0:
+            if compareVersion(self.package.MAXVERSION) > 0:
                 self.versionOk = False
     
     def load(self):

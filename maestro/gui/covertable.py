@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Maestro Music Manager  -  https://github.com/maestromusic/maestro
-# Copyright (C) 2013-2014 Martin Altmayer, Michael Helmling
+# Copyright (C) 2013-2015 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -186,7 +186,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
     def selection(self):
         """Return a selection.Selection object based on the selected covers."""
         return selection.Selection.fromElements(levels.real,
-                                    levels.real.collectMany([item.elid for item in self.selectedItems()]))
+                                    levels.real.collect([item.elid for item in self.selectedItems()]))
         
     def helpEvent(self, helpEvent):
         # Note: Setting all tooltips when the scene is generated takes much too long. Reimplementing
@@ -205,7 +205,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
         if el.isFile() and el.url is not None:
             lines.append(str(el.url))
         elif el.isContainer():
-            lines.append(elements.getTypeTitle(el.type))
+            lines.append(el.type.title())
         if showTags and el.tags is not None:
             lines.extend("{}: {}".format(tag.title, ', '.join(map(str, values)))
                          for tag, values in el.tags.items() if tag != tags.TITLE)
@@ -215,7 +215,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
             
         if showParents and el.parents is not None:
             parentIds = list(el.parents)
-            parents = levels.real.collectMany(parentIds)
+            parents = levels.real.collect(parentIds)
             parents.sort(key=elements.Element.getTitle)
             lines.extend(translate("RootedTreeModel", "#{} in {}").format(p.contents.positionOf(el.id),
                                                                           p.getTitle())
@@ -345,7 +345,7 @@ class CoverItem(QtGui.QGraphicsItem):
             self.setCursor(Qt.OpenHandCursor)
             
     def mouseDoubleClickEvent(self, event):
-        wrapper = nodes.Wrapper(levels.real.get(self.elid))
+        wrapper = nodes.Wrapper(levels.real.collect(self.elid))
         wrapper.loadContents(recursive=True)
         from . import playlist
         playlist.appendToDefaultPlaylist([wrapper], replace=event.modifiers() & Qt.ControlModifier)
