@@ -719,23 +719,24 @@ class MainWindow(QtGui.QMainWindow):
         
     def _handlePlayPause(self):
         from .. import player
-        backends = [b for b in player.profileCategory.profiles() if b.connectionState == player.CONNECTED]
-        if any(backend.state() == player.PLAY for backend in backends):
+        backends = [b for b in player.profileCategory.profiles()
+                    if b.connectionState is player.ConnectionState.Connected]
+        if any(backend.state() == player.PlayState.Play for backend in backends):
             # When a single backend is playing, stop all
             for backend in backends:
-                backend.setState(player.PAUSE)
+                backend.setState(player.PlayState.Pause)
         else:
             # otherwise start only the current one
             if 'playback' in self._currentWidgets:
                 backend = self._currentWidgets['playback'].backend
                 if backend is not None:
-                    backend.setState(player.PLAY)
+                    backend.setState(player.PlayState.Play)
                     
     def _handleStop(self):
         from .. import player
         for backend in player.profileCategory.profiles():
-            if backend.connectionState == player.CONNECTED:
-                backend.setState(player.STOP)
+            if backend.connectionState == player.ConnectionState.Connected:
+                backend.setState(player.PlayState.Stop)
             
     def _handleSkipBackward(self):
         if 'playback' in self._currentWidgets:

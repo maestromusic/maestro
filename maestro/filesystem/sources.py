@@ -642,6 +642,11 @@ class Source(QtCore.QObject):
                 db.multiQuery("DELETE FROM {p}newfiles WHERE url=?", urls)
         self.updateFolders(updatedDirs)
 
+    def relPath(self, path):
+        """Return the relative path to this source's directory. *path* must be within this source
+        (see self.contains)."""
+        return os.path.normpath(path)[len(self.path):]
+    
 
 def readFilesystem(path, files: dict):
     """Helper function that walks *path* and stores, for each found music file, an entry in *files*

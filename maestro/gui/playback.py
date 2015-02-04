@@ -132,7 +132,7 @@ class PlaybackWidget(mainwindow.Widget):
     
     def updateTitleLabel(self):
         """Display the title of the currently playing song."""
-        if self.backend.connectionState == player.CONNECTED:
+        if self.backend.connectionState == player.ConnectionState.Connected:
             current = self.backend.current()
             if current is not None:
                 self.titleLabel.setText(current.getTitle())
@@ -149,8 +149,8 @@ class PlaybackWidget(mainwindow.Widget):
     
     def handleStateChange(self, state):
         """Update labels, buttons etc. when the playback state has changed."""
-        self.ppButton.setPlaying(state == player.PLAY)
-        if state == player.STOP:
+        self.ppButton.setPlaying(state == player.PlayState.Play)
+        if state == player.PlayState.Stop:
             self.updateSlider(0)
             self.seekSlider.setEnabled(False)
         else:
@@ -160,10 +160,10 @@ class PlaybackWidget(mainwindow.Widget):
         """Update GUI elements when the connection state has changed."""
         for item in self.skipBackwardButton, self.ppButton, self.stopButton, \
                     self.skipForwardButton, self.seekSlider, self.seekLabel, self.volumeButton:
-            item.setEnabled(state is player.CONNECTED)
-        if state == player.CONNECTING:
+            item.setEnabled(state is player.ConnectionState.Connected)
+        if state is player.ConnectionState.Connecting:
             self.titleLabel.setText(self.tr("connecting..."))
-        elif state == player.DISCONNECTED:
+        elif state is player.ConnectionState.Disconnected:
             self.titleLabel.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
         else:
             self.updateTitleLabel()
@@ -226,10 +226,10 @@ class PlaybackWidget(mainwindow.Widget):
         for source, sink in PlaybackWidget.signals:
             eval(source).connect(eval(sink))
         self.backend.registerFrontend(self)
-        if self.backend.connectionState == player.CONNECTED:
-            self.handleConnectionChange(player.CONNECTED)
+        if self.backend.connectionState == player.ConnectionState.Connected:
+            self.handleConnectionChange(player.ConnectionState.Connected)
         else:
-            self.handleConnectionChange(player.DISCONNECTED)
+            self.handleConnectionChange(player.ConnectionState.Disconnected)
         self.setWindowTitle("Playback [{}]".format(backend.name))
         self.handlePlaylistChange()
         
@@ -275,7 +275,7 @@ class PlayPauseButton(QtGui.QToolButton):
         super().__init__(parent)
         self.setIcon(self.playIcon)
         self.playing = False
-        self.clicked.connect(lambda: self.stateChanged.emit(player.PAUSE if self.playing else player.PLAY))
+        self.clicked.connect(lambda: self.stateChanged.emit(player.PlayState.Pause if self.playing else player.PlayState.Play))
 
     def setPlaying(self, playing):
         """Set the state of this button to play if *playing* is true or pause otherwise."""

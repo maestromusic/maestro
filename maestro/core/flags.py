@@ -157,7 +157,7 @@ def deleteFlagType(flagType):
         if level == levels.real:
             elementIds = db.query("SELECT element_id FROM {p}flags WHERE flag_id=?", flagType.id)\
                                   .getSingleColumn()
-            elements = level.collectMany(elementIds)
+            elements = level.collect(elementIds)
         else: elements = [el for el in level.elements.values() if flagType in el.flags]
         if len(elements) > 0:
             level.changeFlags({element: difference for element in elements})

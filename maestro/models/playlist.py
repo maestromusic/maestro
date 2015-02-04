@@ -104,7 +104,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         """Build wrappers for the given urls and if possible add containers.
         In other words: convert a flat playlist to a tree playlist.
         """
-        files = [Wrapper(element) for element in self.level.collectMany(urls)]
+        files = [Wrapper(element) for element in self.level.collect(urls)]
         wrappers = treebuilder.buildTree(self.level, files)
         for i in range(len(wrappers)):
             while wrappers[i].getContentsCount() == 1:
@@ -205,7 +205,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                             for wrapper in mimeData.fileWrappers()]   
         else:
             urls = utils.files.collectAsList(mimeData.urls())
-            wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
+            wrappers = [Wrapper(element) for element in self.level.collect(urls)]
         
         if len(wrappers) == 0:
             return True
@@ -306,7 +306,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     
     def insertUrlsAtOffset(self, offset, urls, updateBackend='always'):
         """Insert the given paths at the given offset."""
-        wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
+        wrappers = [Wrapper(element) for element in self.level.collect(urls)]
         file = self.root.fileAtOffset(offset, allowFileCount=True)
         if file is None:
             parent = self.root

@@ -68,6 +68,7 @@ def disable():
 class FormatSyntaxError(SyntaxError):
     pass
 
+
 class GrammarRenamer(profiles.Profile):
         
     def levelDefAction(self, s, loc, toks):

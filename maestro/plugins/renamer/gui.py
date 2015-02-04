@@ -19,12 +19,12 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from ... import config, logging
-from ...gui import treeview, treeactions, delegates
-from ...gui.delegates import abstractdelegate
-from ...gui.preferences import profiles as profilesgui
-from ...models import leveltreemodel
-from ...core import levels
+from maestro import config, logging
+from maestro.gui import treeview, treeactions, delegates
+from maestro.gui.delegates import abstractdelegate
+from maestro.gui.preferences import profiles
+from maestro.models import leveltreemodel
+from maestro.core import levels
 from . import plugin
 
 
@@ -198,7 +198,7 @@ class GrammarConfigurationWidget(QtGui.QWidget):
             topLayout = QtGui.QHBoxLayout()
             layout.addLayout(topLayout)
             topLayout.addWidget(QtGui.QLabel(self.tr("Choose a profile:")))
-            self.profileChooser = profilesgui.ProfileComboBox(plugin.profileCategory)
+            self.profileChooser = profiles.ProfileComboBox(plugin.profileCategory)
             self.profileChooser.profileChosen.connect(self.setProfile)
             if profile is not None:
                 self.profileChooser.setCurrentProfile(profile)

@@ -41,7 +41,7 @@ def appendToDefaultPlaylist(wrappers, replace=False):
     if defaultPlaylist is None:
         return
     model = defaultPlaylist.model()
-    if model.backend.connectionState != player.CONNECTED:
+    if model.backend.connectionState != player.ConnectionState.Connected:
         return
     if replace:
         model.stack.beginMacro(translate("PlaylistWidget", "Replace Playlist"))
@@ -51,7 +51,7 @@ def appendToDefaultPlaylist(wrappers, replace=False):
     if replace:
         model.backend.play()            
         model.stack.endMacro()
-    elif model.backend.state() is player.STOP:
+    elif model.backend.state() is player.PlayState.Stop:
         model.backend.setCurrent(insertOffset)
         model.backend.play()
 
@@ -112,7 +112,6 @@ class PlaylistTreeView(treeview.DraggingTreeView):
             model = self.emptyModel
             self.setRootIsDecorated(False)
         self.setModel(model)
-        self.itemDelegate().model = model
         self.updateSelection()
         self.model().modelReset.connect(self.expandAll) 
 
@@ -183,7 +182,7 @@ class PlaylistWidget(mainwindow.Widget):
         current = self.mainLayout.itemAt(self.mainWidgetIndex).widget()
         self.mainLayout.removeWidget(current)
         current.hide()
-        if state is player.CONNECTED:
+        if state is player.ConnectionState.Connected:
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.treeview)
             self.treeview.show()
         else:

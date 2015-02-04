@@ -534,7 +534,7 @@ def _buildContainerTree(domain, elids):
     # Load all toplevel elements and all of their ancestors
     newIds = toplevel
     while len(newIds) > 0:
-        levels.real.collectMany(newIds)
+        levels.real.collect(newIds)
         nextIds = []
         for id in newIds:
             nextIds.extend(levels.real[id].parents)
@@ -810,7 +810,7 @@ class BrowserWrapper(Wrapper):
         else:
             # Contrary to the parent implementation use BrowserWrapper-instances
             # for non-empty containers in the contents
-            elements = levels.real.collectMany(self.element.contents)
+            elements = levels.real.collect(self.element.contents)
             self.setContents([(BrowserWrapper if el.isContainer() and len(el.contents) > 0 else Wrapper)
                               (el, position=pos)
                           for el, pos in zip(elements, self.element.contents.positions)])

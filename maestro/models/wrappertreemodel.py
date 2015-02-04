@@ -111,7 +111,7 @@ class WrapperTreeModel(rootedtreemodel.RootedTreeModel):
             wrappers = [wrapper.copy() for wrapper in mimeData.wrappers()]
         else:
             urls = utils.files.collectAsList(mimeData.urls())
-            wrappers = [Wrapper(element) for element in self.level.collectMany(urls)]
+            wrappers = [Wrapper(element) for element in self.level.collect(urls)]
         
         # Compute drop position
         if parentIndex.isValid():

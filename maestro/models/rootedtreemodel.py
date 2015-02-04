@@ -120,7 +120,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
             parentIds = list(el.parents)
             if isinstance(wrapper.parent, Wrapper) and wrapper.parent.element.id in parentIds:
                 parentIds.remove(wrapper.parent.element.id)
-            parents = levels.real.collectMany(parentIds)
+            parents = levels.real.collect(parentIds)
             parents.sort(key=elements.Element.getTitle)
             lines.extend(self.tr("#{} in {}").format(p.contents.positionOf(el.id), p.getTitle())
                          for p in parents)

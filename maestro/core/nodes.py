@@ -405,7 +405,7 @@ class Wrapper(Node):
         """
         if self.element.isContainer():
             if self.contents is None or len(self.contents) == 0:
-                self.element.level.collectMany(self.element.contents.ids)
+                self.element.level.collect(self.element.contents.ids)
                 self.setContents([Wrapper(self.element.level[id], position=pos)
                                   for pos, id in self.element.contents.items()])
             if recursive:
