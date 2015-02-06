@@ -55,42 +55,47 @@ def _setupWords():
     ('{file}', ElementTypeCriterion('file')),
     ('{container}', ElementTypeCriterion('container')),
     ('{id=10}', IdCriterion(Interval(10,10))),
-    ('{id=<20}', IdCriterion(Interval(None, 19))),
-    ('{id= >=2000}', IdCriterion(Interval(2000, None))),
+    ('{id<=20}', IdCriterion(Interval(None, 20))),
+    ('{id>=2000}', IdCriterion(Interval(2000, None))),
     ('{id=10-100}', IdCriterion(Interval(10,100))),
     ('{flag}', AnyCriterion('flag')),
     ('{flag=testflag}', FlagCriterion([flags.get('testflag')])),
     ('{sticker}', AnyCriterion('sticker')),
     ('{sticker=COVER}', StickerCriterion(['COVER'])),
     ('{tag}', AnyCriterion('tag')),
-    ('{tag=artist}', TagCriterion(tagList=[tags.get('artist')])),
+    ('{tag=artist}', AnyTagCriterion([tags.get('artist')])),
     ('{tag=artist=Harry}', TagCriterion('Harry', [tags.get('artist')])),
     ('{tag = artist = White space}', TagCriterion('White space', [tags.get('artist')])),
-    ('{tag=artist=_Harry}', TagCriterion('Harry', [tags.get('artist')], caseSensitive=True)),
+    ('{tag=artist=_Harry}', TagCriterion('Harry', [tags.get('artist')], binary=True)),
     ('{tag=artist=#Harry}', TagCriterion('Harry', [tags.get('artist')], singleWord=True)),
-    ('{tag=artist=_#Harry}', TagCriterion('Harry', [tags.get('artist')], singleWord=True, caseSensitive=True)),
-    ('{tag=artist=#_Harry}', TagCriterion('Harry', [tags.get('artist')], singleWord=True, caseSensitive=True)),
+    ('{tag=artist=_#Harry}', TagCriterion('Harry', [tags.get('artist')], singleWord=True, binary=True)),
+    ('{tag=artist=#_Harry}', TagCriterion('Harry', [tags.get('artist')], singleWord=True, binary=True)),
     
     ('artist=Harry', TagCriterion('Harry', [tags.get('artist')])),
     ('artist="Harry Potter"', TagCriterion('Harry Potter', [tags.get('artist')])),
     ('artist=Harry" Potter"', TagCriterion('Harry Potter', [tags.get('artist')])),  
     ('a=Harry', TagCriterion('Harry', [tags.get('artist')])),
-    ('a=_#"Harry Potter"', TagCriterion('Harry Potter', [tags.get('artist')], singleWord=True, caseSensitive=True)),
+    ('a=_#"Harry Potter"', TagCriterion('Harry Potter', [tags.get('artist')], singleWord=True, binary=True)),
     
     ('1600-1800', DateCriterion(Interval(1600,1800))),
     ('>1900', DateCriterion(Interval(1901, None))),
     ('<= 1750', DateCriterion(Interval(None, 1750))),
-    ('{tag=date=1700}', DateCriterion(Interval(1700, 1700))),
-    # Only create DateCriteria for valid ranges of 4-digit years
+    ('{tag=date=1700}', DateCriterion(Interval(1700, 1700), [tags.get("date")])),
+    ('1799', DateCriterion(Interval(1799, 1799))),
+    # Only create TagCriteria for valid 4-digit ranges
     ('2000-1950', TagCriterion('2000-1950')),
-    ('100-200', TagCriterion('100-200')),
-    ('<3', TagCriterion('<3')),
+    ('1-2', TagCriterion('1-2')),
+#    ('<3', TagCriterion('<3')),
     
-    ('_#abc"def"gh', TagCriterion('abcdefgh', singleWord=True, caseSensitive=True)),  
+    ('_#abc"def"gh', TagCriterion('abcdefgh', singleWord=True, binary=True)),  
     ]
 
     INVALID_TEST_WORDS = [
-        "{file=True}", "{id}", "{id=-20}", "{flag=noflag}", "{flag=theflag=True}", "{nokey=value}"
+        "{file=True}", 
+        "{id}",
+        "{flag=noflag}",
+        "{flag=theflag=True}",
+        "{nokey=value}"
     ]
 
 

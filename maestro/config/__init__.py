@@ -86,7 +86,9 @@ def init(cmdConfig=[], testMode=False):
                 ]
 
     for name, type, fileName, defaults in fileData:
-        file = addFile(type, os.path.join(CONFDIR, fileName), globals()[defaults],
+        if fileName is not None:
+            fileName = os.path.join(CONFDIR, fileName)
+        file = addFile(type, fileName, globals()[defaults],
                        allowUndefinedSections=True, version=VERSION,
                        errorMethod=functools.partial(logging.error, __name__))
         globals()[name] = file.getAccess()
@@ -140,8 +142,6 @@ configOptions = collections.OrderedDict((
 ("tags", {
     "title_tag": (str, "title", "Key of the title-tag."),
     "album_tag": (str, "album", "Key of the album-tag."),
-    "search_tags": (list, ["album", "performer", "conductor", "title", "lyricist", "composer", "date", "artist"],
-                    "Tags that will be searched, if you type a text without prefix in a searchbox. Use prefixes to search for other tags."),
     "auto_delete": (list, [], "list of tags that will be removed from files when they are imported into the editor"),
     "auto_replace": (str, '', "list of of tag pairs. When files are imported to the editor, tags are replaced according to these pairs. Each list entry must be of the form '(albumartist,performer)'.")
 }),

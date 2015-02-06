@@ -549,6 +549,11 @@ class Source(QtCore.QObject):
         if len(event.deleted) > 0:
             self.removeFiles([self.files[url.path] for url in event.deleted if url.path in self.files])
 
+    def relPath(self, path):
+        """Return the relative path to this source's directory. *path* must be within this source
+        (see self.contains)."""
+        return os.path.normpath(path)[len(self.path):]
+    
 
 def readFilesystem(path, files: dict):
     """Helper function that walks *path* and stores, for each found music file, an entry in *files*

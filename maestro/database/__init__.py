@@ -168,6 +168,12 @@ def listTables():
     return engine.table_names()
 
 
+def createTables():
+    """Create all tables which do not exist yet."""
+    from . import tables
+    tables.metadata.create_all(checkfirst=True)
+    
+    
 def query(queryString, *args, **kwargs):
     kwargs['p'] = prefix
     queryString = queryString.format(**kwargs)

@@ -578,12 +578,17 @@ class ProfileComboBox(QtGui.QComboBox):
             event.accept()
         else:
             return super().mousePressEvent(event)
-
-
-class ProfileActionDialog(QtGui.QDialog):
-    def __init__(self, category, parent=None, actionText=None):
-        super().__init__(parent)
-        self.setMinimumSize(400, 300)
+        
+        
+class ProfileActionWidget(QtGui.QDialog):
+    """A ProfileActionWidget is used for profile categories which configure an action (e.g. export, renamer).
+    The widget allows the user to make temporary changes before performing the action. To this end it
+    contains a configuration widget for the specified category. This widget will however not modify
+    existing categories, but always work with a temporary copy. A menu at the top allows the user to save
+    the temporary profile as a normal persistent profile or to load (copies of) normal profiles.
+    """ 
+    def __init__(self, category, actionText=None):
+        super().__init__()
         self.category = category
         self.category.profileAdded.connect(self._makeMenu)
         self.category.profileRemoved.connect(self._makeMenu)
@@ -611,7 +616,6 @@ class ProfileActionDialog(QtGui.QDialog):
         layout.addLayout(topLayout)
 
         layout.addWidget(self.configWidget)
-
         self.layout().addStretch(1)
         buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
         if actionText is None:
@@ -647,7 +651,32 @@ class ProfileActionDialog(QtGui.QDialog):
         showPreferences(self.category)
 
 
+class ProfileActionDialog(QtGui.QDialog):
+    """This dialog contains a ProfileActionWidget for the given category, together with a Cancel-button
+    and an accept-button. The text on the latter can be changed with the *actionText* argument. Users
+    should subclass this dialog and implement 'accept' do perform the action.
+    """
+    def __init__(self, category, parent=None, actionText=None):
+        super().__init__(parent)
+        self.setMinimumSize(400, 300)
+        layout = QtGui.QVBoxLayout(self)
+        layout.setContentsMargins(0,0,0,0)
+        self.widget = ProfileActionWidget(category, actionText)
+        layout.addWidget(widget)
+        
+        layout.addStretch(1)
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
+        if actionText is None:
+            buttonBox.addButton(QtGui.QDialogButtonBox.Ok)
+        else: buttonBox.addButton(actionText, QtGui.QDialogButtonBox.AcceptRole)
+        layout.addWidget(buttonBox)
+        buttonBox.rejected.connect(self.reject)
+        buttonBox.accepted.connect(self.accept)
+        
+
 class SaveProfileDialog(QtGui.QDialog):
+    """This dialog is used to save the temporary configuration in a ProfileActionWidget as normal
+    (persistent) profile."""
     def __init__(self, category, profile, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Save configuration as profile"))

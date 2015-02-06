@@ -24,9 +24,6 @@ from pyparsing import Literal, Combine, ZeroOrMore, Group, Forward, OneOrMore
 from .. import database as db, utils
 from ..core import tags, flags
 
-# Initialized in search.init
-SEARCH_TAGS = set()
-
 PREFIX_NEGATE = '!'
 PREFIX_BINARY = '_'
 PREFIX_SINGLE_WORD = '#'
@@ -52,7 +49,6 @@ def parse(string):
     """Parse a string into a criterion. If the string is ill-formatted, raise a ParseException."""
     words = parseToWords(string)
     return parseWords(words)
-    
     
     
 def _nestedExpr():
@@ -93,11 +89,19 @@ def parseWords(wordOrList):
     Return None if the list is empty.
     """
     if isinstance(wordOrList, str):
-        for parseFunction in outerParsers:
-            criterion = parseFunction(wordOrList)
+        negate = wordOrList.startswith('!')
+        if negate:
+            wordOrList = wordOrList[1:]
+        for parseFunction in parsers:
+            try:
+                criterion = parseFunction(wordOrList)
+            except ParseException as e:
+                raise ParseException("Exception during parsing '{}': {}".format(wordOrList, str(e)))
             if criterion is not None:
+                criterion.negate = negate
                 return criterion
-        else: assert False # the last parser should always return a criterion
+        else:
+            raise ParseException("Could not parse '{}'".format(wordOrList))
     else:
         if len(wordOrList) == 0:
             return None
@@ -279,12 +283,13 @@ class ElementTypeCriterion(Criterion):
         self.result = set(db.query(query, table=fromTable).getSingleColumn())
     
     @staticmethod
-    def parse(key, data):
-        """Parser function for innerParsers. Parses {file} and {container}."""
+    def parse(string):
+        """Parse either {container} or {file}."""
+        key, operator, data = _splitBracedCriterion(string)
         if key in ('container', 'file'):
-            if data is not None:
-                raise ParseException("ElementTypeCriterion does not accept data.")
-            return ElementTypeCriterion(key)
+            if data is None:
+                return ElementTypeCriterion(key)
+            else: raise ParseException("Invalid ElementTypeCriterion")
         else: return None
     
     
@@ -305,9 +310,10 @@ class IdCriterion(Criterion):
         
     def __repr__(self):
         if self.interval is not None:
-            idSpec = str(self.interval)
-        else: idSpec = ','.join(str(id) for id in self.idList)
-        return _negHelper(self, '{id='+idSpec+'}')
+            return _negHelper('{id'+interval.toString(includeOperator=True)+'}')
+        else:
+            ids = ','.join(str(id) for id in self.idList)
+            return _negHelper(self, '{id='+'ids'+'}')
     
     def __eq__(self, other):
         return isinstance(other, IdCriterion) and other.interval == self.interval \
@@ -330,22 +336,23 @@ class IdCriterion(Criterion):
         self.result = set(db.query(query, table=fromTable).getSingleColumn())
     
     @staticmethod
-    def parse(key, data):
-        """Parser function for innerParsers. Parses {id=<interval>}, where <interval> must is handled by
-        Interval.parse."""
+    def parse(string):
+        """Parse e.g. {id=100-150}, {id>=2000} or {id=2,3,5,7}."""
+        key, operator, data = _splitBracedCriterion(string)
         if key == 'id':
-            if data is not None:
-                interval = Interval.parse(data)
-                if interval is not None:
-                    if interval.isValid():
-                        return IdCriterion(interval=interval)
-                    else: raise ParseException("IdCriterion's interval must be valid.")
-                else:
-                    try:
-                        idList = [int(v) for v in data.split(',')]
-                    except ValueError:
-                        pass
-                    else: return IdCriterion(idList=idList)        
+            if operator is None:
+                raise ParseException("Invalid IdCriterion")
+            interval = Interval.parse(operator, data)
+            if interval is not None:
+                if interval.isValid():
+                    return IdCriterion(interval=interval)
+                else: raise ParseException("IdCriterion's interval must be valid.")
+            elif operator == '=':
+                try:
+                    idList = [int(v) for v in data.split(',')]
+                except ValueError:
+                    pass
+                else: return IdCriterion(idList=idList)        
             raise ParseException("IdCriterion needs a valid interval or id-list.")
         else: return None
         
@@ -387,88 +394,74 @@ class AnyCriterion(Criterion):
         self.result = set(db.query(query, table=fromTable, join=joinTable).getSingleColumn())
     
     @staticmethod
-    def parse(key, data):
-        """Parser function for innerParsers. Parses {tag}, {flag}, {sticker}."""
+    def parse(string):
+        """Parse {tag}, {flag}, {sticker}."""
+        key, operator, data = _splitBracedCriterion(string)
         if key in ('tag', 'flag', 'sticker') and data is None:
             return AnyCriterion(key)
-            # if data is given, use a TagCriterion, FlagCriterion, StickerCriterion instead
         else: return None
-        
 
-class TagCriterion(Criterion):
-    """This most important criterion matches elements based on their tag values. It matches elements which
-    contain *value* in at least one of the tags in *tagList* (which defaults to SEARCH_TAGS). If *value*
-    is None it matches tags which have at least one tag of *tagList*.
-    
-    Usually a tag value must simply contain *value* as substring in order to be matched by this criterion.
-    With the optional arguments *singleWord* and *binary* this behavior can be changed.
-    
-    If the list of tags contains date-tags and value is an interval, the criterion will also search for
-    matching date values.
+            
+class AnyTagCriterion(Criterion):
+    """Search for elements that have at least one value in one tag of *tagList*. At least one tag must
+    be specified.
     """
-    def __init__(self, value=None, tagList=None, singleWord=False, binary=False):
-        assert value is None or (isinstance(value, str) and len(value) > 0)
-        self.value = value
-        if tagList is None:
-            self.tagList = SEARCH_TAGS
-        elif len(tagList) == 0 and tagList is not SEARCH_TAGS: # empty SEACH_TAGS is a nasty corner case
-            raise ValueError("TagCriterion must have at least one tag. Use AnyCriterion instead.")
-        else: self.tagList = tagList
-        
-        self.interval = None
-        if any(tag.type == tags.TYPE_DATE for tag in self.tagList):
-            interval = Interval.parse(self.value)
-            if interval is not None and interval.isValid() \
-                    and (interval.start is None or 1000 <= interval.start <= 9999) \
-                    and (interval.end is None or 1000 <= interval.end <= 9999):
-                self.interval = interval
-                
-        self.singleWord = singleWord
-        self.binary = binary
-        self.matchingTags = None
+    def __init__(self, tagList):
+        assert len(tagList) > 0
+        self.tagList = tagList
         
     def isUsingTag(self, tag):
         return tag in self.tagList
-        
-    def __repr__(self):
-        if self.value is not None and self.tagList == SEARCH_TAGS: 
-            return _negHelper(self, _quoteIfNecessary(self.value)) # use short notation for this common case
-        else:
-            assert len(self.tagList) > 0
-            tagNames = ','.join(tag.name for tag in self.tagList)
-            if self.value is None:
-                return _negHelper(self, '{tag='+tagNames+'}')
-            else:
-                prefixes = ''
-                if self.singleWord:
-                    prefixes += PREFIX_SINGLE_WORD
-                if self.binary:
-                    prefixes += PREFIX_BINARY
-                return _negHelper(self, '{tag='+tagNames+'='+prefixes+_quoteIfNecessary(self.value)+'}')
-            
+    
     def __eq__(self, other):
-        return type(other) is type(self) and other.value == self.value\
-                and other.tagList == self.tagList and other.negate == self.negate\
-                and other.binary == self.binary and other.singleWord == self.singleWord
-            
+        return type(other) is type(self) and other.tagList == self.tagList and other.negate == self.negate
+    
     def __ne__(self, other):
         return not self.__eq__(other)
     
-    def process(self, fromTable, domain):
-        import time
-        # First handle the case where we search only for existence or non-existence of a given tag
-        if self.value is None:
-            joinClause = "{}tags AS t ON el.id = t.element_id AND t.tag_id IN ({})"\
-                            .format(db.prefix, db.csIdList(self.tagList))
-            domainWhereClause = "domain={}".format(domain.id) if domain is not None else '1'
-            if not self.negate:
-                query = "SELECT DISTINCT id FROM {table} AS el JOIN {join} WHERE {domain}"
-            else: query = "SELECT id FROM {table} AS el LEFT JOIN {join}"\
-                                " WHERE {domain} AND t.element_id IS NULL"
-            self.result = set(db.query(query, table=fromTable, join=joinClause, domain=domainWhereClause)
-                                .getSingleColumn())
-            return
+    def __repr__(self):
+        return '{tag='+','.join(tag.name for tag in self.tagList)+'}'
         
+    def __repr__(self):
+        tagNames = ','.join(tag.name for tag in self.tagList)
+        return _negHelper(self, '{tag='+tagNames+'}')
+    
+    def process(self, fromTable, domain):
+        joinClause = "{}tags AS t ON el.id = t.element_id AND t.tag_id IN ({})"\
+                        .format(db.prefix, db.csIdList(self.tagList))
+        domainWhereClause = "domain={}".format(domain.id) if domain is not None else '1'
+        if not self.negate:
+            query = "SELECT DISTINCT id FROM {table} AS el JOIN {join} WHERE {domain}"
+        else: query = "SELECT id FROM {table} AS el LEFT JOIN {join}"\
+                            " WHERE {domain} AND t.element_id IS NULL"
+        self.result = set(db.query(query, table=fromTable, join=joinClause, domain=domainWhereClause)
+                            .getSingleColumn())
+
+    @staticmethod
+    def parse(string):
+        """Parse e.g. {tag=date,comment}."""
+        key, operator, content = _splitBracedCriterion(string)
+        if key == 'tag':
+            if operator == '=':
+                try:
+                    tagList = _parseTagList(content)
+                    return AnyTagCriterion(tagList)
+                except ParseException:
+                    return None # let AbstractParseCriterion.parse handle this. E.g. {tag=artist=B}
+            elif operator is None: # '{tag}'; use AnyCriterion instead
+                return None
+            else:
+                raise ParseException("Invalid AnyTagCriterion")
+        else: return None
+
+
+class AbstractTagCriterion(Criterion):
+    """This abstract super class provides common functions for TagCriterion and DateCriterion. Note that
+    'process' can search for texts (self.value; in varchar- or text-tags) and date-intervals (self.interval;
+    for date-tags). A search-string like "1799" will be parsed to a DateCriterion having set both
+    self.value and self.interval, leading to both a date-search and a text-search.
+    """
+    def process(self, fromTable, domain):
         # Truncate help table
         #==================
         from . import TT_HELP
@@ -481,24 +474,34 @@ class TagCriterion(Criterion):
         #====================================================
         pragmaNecessary = False
         for valueType in tags.TYPES:
-            tagList = [tag for tag in self.tagList if tag.type == valueType]
-            if len(tagList) == 0:
-                continue
+            whereClauses = []
+            args = []
+            
+            # Filter tag type
+            if self.tagList is not None:
+                tagList = [tag for tag in self.tagList if tag.type == valueType]
+                if len(tagList) == 0:
+                    continue # no search for this valueType
+                else: whereClauses.append("tag_id IN ({})".format(db.csIdList(tagList)))
+            
+            # Filter values
             if valueType == tags.TYPE_VARCHAR:
+                if self.value is None: # may happen for DateCriterion
+                    continue
                 if self.binary:
                    value = self.value
                 else: value = utils.strings.removeDiacritics(self.value) 
                 if db.type == 'mysql':
                     if not self.singleWord:
                         if self.binary:
-                            whereClause = 'INSTR(value, BINARY ?)'
-                        else: whereClause = "INSTR(COALESCE(search_value, value), ?)"
-                        args = [value]
+                            whereClauses.append('INSTR(value, BINARY ?)')
+                        else: whereClauses.append("INSTR(COALESCE(search_value, value), ?)")
+                        args.append(value)
                     else:
                         if self.binary:
-                            whereClause = 'value REGEXP BINARY ?' # case-sensitive
-                        else: whereClause = 'COALESCE(search_value, value) REGEXP ?'
-                        args = ['[[:<:]]{}[[:>:]]'.format(re.escape(value))]
+                            whereClauses.append('value REGEXP BINARY ?') # case-sensitive
+                        else: whereClauses.append('COALESCE(search_value, value) REGEXP ?')
+                        args.append('[[:<:]]{}[[:>:]]'.format(re.escape(value)))
                         
                 else: # SQLite
                     if not self.singleWord:
@@ -506,34 +509,34 @@ class TagCriterion(Criterion):
                             # INSTR exists only in SQLite 3.7.15 and later
                             pragmaNecessary = True
                             db.query('PRAGMA case_sensitive_like = 1')
-                            whereClause = "value LIKE ?"
-                        else: whereClause = "COALESCE(search_value, value) LIKE ?"
-                        args = ['%{}%'.format(self._escapeParameter(value))]
+                            whereClauses.append("value LIKE ?")
+                        else: whereClauses.append("COALESCE(search_value, value) LIKE ?")
+                        args.append('%{}%'.format(self._escapeParameter(value)))
                     else:
                         if self.binary:
-                            whereClause = "value REGEXP ?"
-                            args = ['\\b{}\\b'.format(re.escape(value))]
+                            whereClauses.append("value REGEXP ?")
+                            args.append('\\b{}\\b'.format(re.escape(value)))
                         else:
-                            whereClause = "COALESCE(search_value, value) REGEXP ?" 
-                            args = ['(?i)\\b{}\\b'.format(re.escape(value))]
+                            whereClauses.append("COALESCE(search_value, value) REGEXP ?")
+                            args.append('(?i)\\b{}\\b'.format(re.escape(value)))
                 
             elif valueType == tags.TYPE_TEXT:
-                whereClause = "value LIKE ?"
-                args = ['%{}%'.format(self._escapeParameter(self.value))]
+                if self.tagList is None:
+                    continue # don't search for text tags unless explicitly specified
+                whereClauses.append("value LIKE ?")
+                args.append('%{}%'.format(self._escapeParameter(self.value)))
                 
             elif valueType == tags.TYPE_DATE:
                 if self.interval is None:
-                    continue
-                whereClause = "value " + self.interval.toDateSql().queryPart()
-                args = []
+                    continue # can't search for dates without an interval
+                whereClauses.append("value " + self.interval.toDateSql().queryPart()) 
             #perf = time.perf_counter()
             db.query("""
                     INSERT INTO {help} (value_id, tag_id)
                         SELECT id, tag_id
                         FROM {p}values_{type}
-                        WHERE tag_id IN({tags}) AND {where}
-                    """, *args, help=TT_HELP, type=valueType.name,
-                                tags=db.csIdList(tagList), where=whereClause)
+                        WHERE {where}
+                    """, *args, help=TT_HELP, type=valueType.name, where=' AND '.join(whereClauses))
             #print("1: "+str(time.perf_counter()-perf))
             if pragmaNecessary:
                 db.query('PRAGMA case_sensitive_like = 0')
@@ -579,31 +582,139 @@ class TagCriterion(Criterion):
         return self.matchingTags
     
     @staticmethod
-    def parse(key, data):
-        """Parser function for innerParsers."""
-        if key == 'tag' and data is not None: # use AnyCriterion if data is None
-            if '=' in data:
-                tagNames, value = data.split('=', 1)
-            else: tagNames, value = data, None
-            tagNames = [name.strip() for name in tagNames.split(',') if len(name) > 0]
-            if len(tagNames) == 0:
-                raise ParseException("TagCriterion needs at least one tag.")
-            try:
-                tagList = [tags.get(name) for name in tagNames] # raises ValueError if a name is invalid
-                if any(not tag.isInDb() for tag in tagList):
-                    raise ValueError()
-            except ValueError:
-                raise ParseException("TagCriterion can only use tags which are in the database.")
-            
-            if value is None:
-                return TagCriterion(tagList=tagList)
-            else:
-                # Note: negate is handled by parseBracedCriterion
-                return parseTextCriterion(value, tagList, negate=False)
+    def parse(string):   
+        """Parse either a TagCriterion or a DateCriterion.
+        Parse from full braced syntax {tag=<content>} or from short notation (only <content>).
+        The content can first contain an optional list of tagnames (the search will be restricted to these
+        tags). Afterwards it must contain either an interval, e.g.
+            date>=1950     or  date=1700-1800
+        in which case a DateCriterion will be created; or a text, e.g. "title=music", in which case a 
+        TagCriterion is created. The text may be preceded by the prefixes '#' and '_' to set the attributes
+        'singleWord' or 'binary', respectively, of TagCriterion.
+        In the special case of a text like "1700" a DateCriterion will be created that has both an interval
+        1700-1700 and a text "1700" set. It will perform a date- and a text-search.
+        """
+        if string.startswith('{'):
+            key, operator, content = _splitBracedCriterion(string)
+            if key != 'tag':
+                return None
+            if operator != '=':
+                raise ParseException("Invalid TagCriterion")
         else:
-            return None
-          
+            # unbraced criteria are short notations for TagCriteria
+            content = string
+        
+        # Parse content
+        tagNames, operator, value = _findOperator(content)
+        
+        # Determine list of tags
+        if tagNames is None or len(tagNames.strip()) == 0:
+            tagList = None
+        else:
+            tagList = _parseTagList(tagNames)
             
+        # First try to parse an interval and return a DateCriterion
+        if tagList is None or any(tag.type == tags.TYPE_DATE for tag in tagList):
+            # Restrict to 4-digit dates to avoid false positives
+            interval = Interval.parse(operator, value, digits=4)
+            if interval is not None and interval.isValid():
+                return DateCriterion(interval, tagList)
+            elif operator in ('<=', '>=', '<', '>'):
+                raise ParseException("Must specify a valid interval") 
+        
+        # Now parse a text value
+        assert operator == '=' or operator is None
+        value = _unquote(value)
+        prefixes, value = _splitPrefixes(value)
+        if len(value) == 0:
+            raise ParseException("Empty text criterion")
+        criterion = TagCriterion(value, tagList)
+        if PREFIX_SINGLE_WORD in prefixes:
+            criterion.singleWord = True
+        if PREFIX_BINARY in prefixes:
+            criterion.binary = True
+        return criterion
+
+
+class TagCriterion(AbstractTagCriterion):
+    """This most important criterion matches elements based on their tag values. It matches elements which
+    contain *value* in one of the tags specified in *tagList* (defaults to varchar tags).
+    Usually *value* must be contained as a substring in any tag-value. If *singleWord* is True, it must
+    be contained as a word on its own. Usually the search will ignore case and diacritics, but if *binary*
+    is set to True, it will search for *value* exactly as given.
+    """
+    def __init__(self, value, tagList=None, singleWord=False, binary=False):
+        assert value is not None
+        self.value = value
+        self.interval = None
+        self.tagList = tagList
+        if self.tagList is not None and len(self.tagList) == 0:
+            self.tagList = None
+        self.singleWord = singleWord
+        self.binary = binary
+        self.matchingTags = None
+        
+    def isUsingTag(self, tag):
+        if self.tagList is not None:
+            return tag in self.tagList
+        else: return tag.type == tags.TYPE_VARCHAR \
+                        or (self.interval is not None and tag.type == tags.TYPE_DATE)
+            
+    def __eq__(self, other):
+        return type(other) is type(self) and other.value == self.value\
+                and other.tagList == self.tagList and other.negate == self.negate\
+                and other.binary == self.binary and other.singleWord == self.singleWord
+            
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    
+    def __repr__(self):
+        if self.tagList is not None:
+            tagNames = ','.join(tag.name for name in self.tagList) + '='
+        else: tagNames = ''
+        value = _quoteIfNecessary(self.value)
+        if self.singleWord:
+            value = PREFIX_SINGLE_WORD + value
+        if self.binary:
+            value = PREFIX_BINARY + value
+        return _negHelper(self, '{tag='+tagNames+value+'}')
+    
+    
+class DateCriterion(AbstractTagCriterion):
+    """Search for elements which have a date-tag in the given interval. Unless restricted with *tagList*
+    all tags of valuetype date are searched.
+    If *additionalTextSearch* is True and the interval consists of a single year, the
+    criterion will also perform a text search for this year. All varchar/text-tags in *tagList* will be
+    searched. If *tagList* is None, then all varchar-tags will be searched.
+    """
+    def __init__(self, interval, tagList=None, additionalTextSearch=True):
+        self.interval = interval
+        if additionalTextSearch and interval.start == interval.end:
+            self.value = str(interval.start)
+        else: self.value = None
+        self.tagList = tagList
+        self.matchingTags = None
+        
+    def isUsingTag(self, tag):
+        if self.tagList is not None:
+            return tag in self.tagList
+        else: return tag.type == tags.TYPE_DATE
+            
+    def __eq__(self, other):
+        return type(other) is type(self) and other.interval == self.interval \
+                and other.tagList == self.tagList and other.negate == self.negate \
+                and other.value == self.value
+            
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    
+    def __repr__(self):
+        if self.tagList is not None:
+            tagNames = '=' + ','.join(tag.name for name in self.tagList)
+        else: tagNames = ''
+        return _negHelper(self, '{tag'+tagNames+interval.toString(includeOperator=True)+'}')
+    
+
 class FlagCriterion(Criterion):
     """Match elements which have at least one (or all) of the given flags. *junction* must be either 'AND'
     or 'OR', the latter being the default."""
@@ -651,11 +762,14 @@ class FlagCriterion(Criterion):
             return _negHelper(self, '({})'+' '.join(parts))
     
     @staticmethod
-    def parse(key, data):
+    def parse(string):
         """Parser function for innerParsers. Parses {flag=list-of-flags}, where list-of-flags must be
         flag names separated by flags.FLAG_SEPARATOR. Currently only OR is used as junction.
         """
-        if key == 'flag' and data is not None: # use AnyCriterion if data is None
+        key, operator, data = _splitBracedCriterion(string)
+        if key == 'flag' and data is not None:
+            if operator != '=':
+                raise ParseException("Invalid FlagCriterion")
             flagNames = data.split(flags.FLAG_SEPARATOR)
             try:
                 theFlags = [flags.get(name) for name in flagNames if len(name) > 0]
@@ -704,72 +818,19 @@ class StickerCriterion(Criterion):
         self.result = set(db.query(query, table=fromTable, join=joinClause).getSingleColumn())
         
     @staticmethod
-    def parse(key, data):
+    def parse(string):
         """Parser function for criteria.innerParsers. Parses {sticker=list-of-stickerTypes}."""
-        if key == 'sticker' and data is not None: # use AnyCriterion if data is None
-            types = [t for t in data.split(',') if len(t) > 0]
+        key, operator, data = _splitBracedCriterion(string)
+        if key == 'sticker' and data is not None:
+            if operator != '=':
+                raise ParseException("Invalid StickerCriterion")
+            types = [t.strip() for t in data.split(',') if len(t.strip()) > 0]
             if len(types) == 0:
                 raise ParseException("StickerCriterion needs at least one type.")
             return StickerCriterion(types)
         else: return None
     
     
-class DateCriterion(TagCriterion):
-    """Match elements which have a 'date tag' within the given interval. *interval* must be valid (see
-    Interval.isValid). Usually all SEARCH_TAGS of valuetype tags.TYPE_DATE will be used, but this can be
-    changed with the *tagList* argument.
-    """
-    def __init__(self, interval, tagList=None):
-        assert interval.isValid()
-        self.interval = self.value = interval  # self.value is needed by TagCriterion.getQueries
-        if tagList is None:
-            tagList = SEARCH_TAGS
-        self.tagList = [tag for tag in tagList if tag.type == tags.TYPE_DATE]
-        self.matchingTags = None
-        
-    @staticmethod
-    def parse(string, certainlyDate=False):
-        """Parse a DateCriterion from a string. To avoid false positives, only accept valid ranges of
-        4-digit dates. If no such date is found, return None. In places where you really expect a date,
-        you can set *certainlyDate* to True, to change this behavior: Then all valid ranges are accepted
-        and a ParseException is emitted when no date is found.
-        """
-        prefix, string = _splitPrefixes(string, PREFIX_NEGATE)
-        for i,c in enumerate(string):
-            if c in '=<>':
-                break
-        else: return None
-        tagNames, value = string[:i], string[i:]
-        tagNames = [name.strip() for name in tagNames.split(',') if len(name) > 0]
-        try:
-            tagList = [tags.get(name) for name in tagNames] # raises ValueError if a name is invalid
-            if any(not tag.isInDb() for tag in tagList):
-                raise ValueError()
-        except ValueError:
-            raise ParseException("TagCriterion can only use tags which are in the database.")
-        
-        interval = Interval.parse(value)
-        if interval is not None and interval.isValid():
-            if not certainlyDate and not all(number is None or 1000 <= number <= 9999
-                                             for number in (interval.start, interval.end)):
-                # To avoid false positives, restrict DateCriteria to 4-digit numbers
-                return None
-            criterion = DateCriterion(interval, tagList=tagList if len(tagList) else None)
-            if PREFIX_NEGATE in prefix:
-                criterion.negate = not criterion.negate
-            return criterion
-        
-        if certainlyDate:
-            raise ParseException("DateCriterion requires a valid interval.")
-        else: return None
-    
-    def __repr__(self):
-        return _negHelper(self, self.interval.__repr__())
-    
-    def __eq__(self, other):
-        return isinstance(other, DateCriterion) and other.interval == self.interval \
-                 and other.tagList == self.tagList
-
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -804,109 +865,52 @@ class TagIdCriterion(Criterion):
     def __repr__(self):
         return "<TagIdCriterion {}>".format(self.tagPairs)
     
-
-def parseBracedCriterion(string):
-    """Parser function for criteria enclosed in braces. It will split words like '{id=2000}' into a
-    keyword and a data part and call the functions in 'innerParsers' with these arguments until one of
-    them returns a criterion. Thus to implement your own BracedCriteria you simply need to add a function
-    to that list. It will be called with
-        - the keyword (lower case, whitespace stripped),
-        - the data part (whitespace stripped, None if no data, or only whitespace is given).
-    """ 
-    prefix, string = _splitPrefixes(string, PREFIX_NEGATE)
+        
+def _findOperator(string):
+    """Split a string like date>=2000 into three parts: *key* ('date'), *operator* ('>=') and *value*
+    ('2000') and return these three parts. Ignore whitespace around parts. If no operator is found,
+    *key* and *operator* will be None.
+    """
+    operators = ('=', '>=', '<=', '>', '<')
+    for i in range(len(string)):
+        for op in operators:
+            if string[i:].startswith(op):
+                key = string[:i].strip().lower()
+                value = string[i+len(op):].strip()
+                return (key, op, value)
+    else: return (None, None, string)
+    
+    
+def _splitBracedCriterion(string):
+    """Split a braced criterion like {id>=2000} into three parts: key ('id'), operator ('>=') and value
+    ('2000') and return these three parts. Ignore whitespace around parts. Return the key always in lower
+    case. Value and operator may be None (only simultaneously). If the criterion is not a braced criterion
+    all parts will be None.
+    """
     if not string.startswith('{') or not string.endswith('}'):
-        return None
-    string = string[1:-1] # remove { and }
-    if '=' in string:
-        keyWord, data = string.split('=', 1)
-        data = data.strip()
-        if len(data) == 0:
-            data = None
-    else:
-        keyWord, data = string, None
-    keyWord = keyWord.strip().lower()
+        return (None, None, None)
+    string = string[1:-1].strip() # remove braces
+    key, operator, value = _findOperator(string)
+    if operator is None: # special case, e.g. {file}
+        return value.strip().lower(), None, None
+    
+    key = key.strip().lower()
+    if len(key) == 0:
+        raise ParseException("Invalid braced criterion")
+    if operator is not None:
+        assert value is not None
+        value = value.strip()
+        if len(value) == 0:
+            raise ParseException("'{}' must be followed by a value".format(operator))
+    return key, operator, value
 
-    for parseFunction in innerParsers:
-        criterion = parseFunction(keyWord, data)
-        if criterion is not None:
-            if PREFIX_NEGATE in prefix:
-                criterion.negate = not criterion.negate
-            return criterion
-    else: raise ParseException("No inner parser returned a criterion for '{}'."
-                               .format(prefix+'{'+string+'}'))
-        
-        
-def parseTagShortNotation(string): 
-    """Parse a Criterion from a string using tag short notation (e.g. 'composer=Beethoven'). If *string*
-    does not match this short notation, return None.
-    Instead of the full tag name an abbreviation from TAG_ABBREVIATIONS may be used.
-    """
-    if '=' in string:
-        prefix, string = _splitPrefixes(string, PREFIX_NEGATE)
-        tagName, string = string.split('=', 1)
-        if len(string) == 0:
-            raise ParseException("Tag short notation requires a value.")
-        if tagName in TAG_ABBREVIATIONS:
-            tagName = TAG_ABBREVIATIONS[tagName]
-        try:
-            tag = tags.get(tagName)
-            if not tag.isInDb():
-                raise ValueError()
-        except ValueError:
-            raise ParseException("Tag short notation requires a tag which is in the database.")
-        
-        return parseTextCriterion(string, [tag], negate=PREFIX_NEGATE in prefix)
-    else:
-        return None
-        
-        
-def parseTextCriterion(origString, tagList=None, negate=None):
-    """Parse a Criterion from *origString*. Usually this returns a TagCriterion which matches elements
-    with *origString* in at least one of their SEARCH_TAGS. The list of tags may be specified with
-    *tagList*. If all tags are of type tags.TYPE_DATE, a DateCriterion will be created instead.
-    
-    *negate* specifies whether the created criterion should be negated. It may be True, False or None. In
-    the last case the criterion is negated if it is prefixed with PREFIX_NEGATE.
-    
-    This parser never returns None. It might raise a ParseException, though.
-    """
-    if tagList is None:
-        tagList = SEARCH_TAGS
-    string = origString.strip()
-    prefixes = PREFIX_SINGLE_WORD + PREFIX_BINARY
-    if negate is None:
-        prefixes += PREFIX_NEGATE
-    prefixes, string = _splitPrefixes(string, prefixes)
-    string = _unquote(string)
-    if len(string) == 0:
-        raise ParseException("TagCriterion got an invalid value: '{}'".format(origString))
-    
-    if len(tagList) > 0 and all(tag.type == tags.TYPE_DATE for tag in tagList):
-        # in this special case this method creates a DateCriterion
-        # Note that this only happens if *tagList* is explicitly specified, e.g. when this method is called
-        # from TagCriterion.parse or parseTagShortNotation.
-        criterion = DateCriterion.parse(string, certainlyDate=True)
-        criterion.tagList = tagList
-        if negate or PREFIX_NEGATE in prefixes:
-            criterion.negate = True
-        return criterion
-    
-    criterion = TagCriterion(string, tagList)
-    if negate or PREFIX_NEGATE in prefixes:
-        criterion.negate = True
-    if PREFIX_SINGLE_WORD in prefixes:
-        criterion.singleWord = True
-    if PREFIX_BINARY in prefixes:
-        criterion.binary = True
-    return criterion
-        
-    
+
 class Interval:
     """An interval defined by a start integer and an end integer. One of them may be None, indicating that
     the interval stretches to infinity in this direction.
     """
     DATE_CRITERION = Word(pyparsing.nums)
-    CRITERION1 = Optional(MatchFirst([Literal(s) for s in ['>=', '<=', '>', '<']])) + DATE_CRITERION
+    CRITERION1 = Optional(MatchFirst([Literal(s) for s in ['>=', '<=', '=', '>', '<']])) + DATE_CRITERION
     CRITERION2 = DATE_CRITERION + Suppress('-') + DATE_CRITERION
     
     def __init__(self, start, end):
@@ -918,29 +922,39 @@ class Interval:
         """Return whether this interval is valid. It is invalid, if both start and end are given, but
         start > end."""
         return self.start is None or self.end is None or self.start <= self.end
-        
+
     @staticmethod
-    def parse(string):
-        """Parse an interval from strings like '1800-1900', '>=100' or simply '123'. Return None if this 
-        is not possible."""
+    def parse(operator, string, digits=None):
+        """Parse a valid interval from strings like '1800-1900' or '12'. If operator is one of 
+        ('<=', '>=', '>', '<'), only a single number will be parsed and an open interval will be constructed.
+        If the optional paramater *digits* is specified, only numbers having exactly this number of digits
+        will be considered.
+        """
+        string = string.strip()
+        if digits is not None:
+            number = Word(pyparsing.nums, exact=digits)
+        else: number = Word(pyparsing.nums)
         try:
-            result = Interval.CRITERION1.parseString(string, parseAll=True)
-            if len(result) == 1:
+            if operator not in ('<=', '>=', '>', '<'):
+                # the ^ means xor. | does not work together with parseAll=True (bug in pyparsing?)
+                parser = number ^ (number + Suppress('-') + number)
+                result = parser.parseString(string, parseAll=True).asList()
+                result = [int(r) for r in result]
+                if len(result) == 1:
+                    return Interval(result[0], result[0])
+                else: return Interval(result[0], result[1])
+            else:
+                result = number.parseString(string)
                 date = int(result[0])
-                return Interval(date, date)
-            else: prefix, date = result[0], int(result[1])
-            if prefix == '>=':
-                return Interval(date, None)
-            elif prefix == '<=':
-                return Interval(None, date)
-            elif prefix == '>':
-                return Interval(date+1, None)
-            else: return Interval(None, date-1)
-        except pyparsing.ParseException:
-            pass
-        try:
-            start, end = Interval.CRITERION2.parseString(string, parseAll=True)
-            return Interval(int(start), int(end)) # allow invalid intervals! (start > end)
+                if operator == '>=':
+                    return Interval(date, None)
+                elif operator == '<=':
+                    return Interval(None, date)
+                elif operator == '>':
+                    return Interval(date+1, None)
+                elif operator == '<':
+                    return Interval(None, date-1)
+                else: assert False
         except pyparsing.ParseException:
             return None
         
@@ -962,13 +976,21 @@ class Interval:
         start = utils.FlexiDate(self.start).toSql() if self.start is not None else None
         end = utils.FlexiDate(self.end).toSql() if self.end is not None else None
         return Interval(start, end)
-        
-    def __repr__(self):
+    
+    def toString(self, includeOperator=False):
+        """Return a string representation of this interval. If *includeOperator* is True, it will always
+        start with an operator ('=' when in doubt).
+        """
         if self.start is not None and self.end is not None:
-            return "{}-{}".format(self.start, self.end)
+            if self.start != self.end:
+                return ('=' if includeOperator else '') + "{}-{}".format(self.start, self.end)
+            else: return ('=' if includeOperator else '') + str(self.start)
         elif self.start is None:
             return "<={}".format(self.end)
         else: return ">={}".format(self.start)
+        
+    def __repr__(self):
+        return self.toString()
         
     def __eq__(self, other):
         return isinstance(other, Interval) and other.start == self.start and other.end == self.end
@@ -977,15 +999,32 @@ class Interval:
         return not self.__eq__(other)
 
 
-def _splitPrefixes(string, allowed):
+def _splitPrefixes(string):
     """Look whether any of the prefixes in *allowed* appear at the beginning of *string*. Return a tuple
     consisting of the prefixes as string (or the empty string) and the rest of the string. Multiple prefixes
     are possible."""
     i = 0
-    while i < len(string) and string[i] in allowed:
+    while i < len(string) and string[i] in PREFIX_BINARY + PREFIX_SINGLE_WORD:
         i += 1
     return string[:i], string[i:]
 
+
+# These functions will be invoked with a single search criterion string (len > 0, no whitespace) to create
+# a Criterion-instance. As soon as a function returns not None, this criterion is used.
+parsers = [
+    ElementTypeCriterion.parse,
+    IdCriterion.parse,
+    AnyCriterion.parse,
+    AnyTagCriterion.parse,
+    FlagCriterion.parse,
+    StickerCriterion.parse,
+    AbstractTagCriterion.parse # must be last, because this handles non-braced criteria
+]
+
+
+#=================
+# Helper functions
+#=================
 
 def _splitList(token, theList):
     """Split *theList* at each item which equals *token* and return a generator that yields the resulting
@@ -998,6 +1037,25 @@ def _splitList(token, theList):
             yield result
             result = []
     yield result
+
+
+def _parseTagList(string):
+    """Parse a list of tag names, e.g. 'title, album,artist' to a list of tags. Raise a ParseException
+    if the list is empty or contains external tags.
+    Allow a fixed set of one-letter abbreviations (e.g. 'g' for 'genre').
+    """
+    tagNames = [name.strip() for name in string.split(',') if len(name.strip()) > 0]
+    # Replace abbreviations. Do not use abbreviations if they would hide an internal tag.
+    tagNames = [TAG_ABBREVIATIONS.get(name, name) if not tags.isInDb(name) else name for name in tagNames]
+    if len(tagNames) == 0:
+        raise ParseException("Invalid list of tags")
+    try:
+        tagList = [tags.get(name) for name in tagNames]
+    except ValueError:
+        raise ParseException("Invalid tagname")
+    if not all(tag.isInDb() for tag in tagList):
+        raise ParseException("Cannot search for tags which are not in the database.")
+    return tagList
 
 
 def _quoteIfNecessary(string):
@@ -1015,35 +1073,23 @@ def _quote(string):
 def _unquote(string):
     """Restore a string quoted with _quote: Remove double quotes except if they are escaped. Unescape
     the latter."""
-    parts = string.split('"')
-    for i, part in enumerate(parts[:-1]):
-        if len(part) > 0 and part[-1] == '\\':
-            parts[i] = part[:-1]+'"'
-    return ''.join(parts)
-
-
+    result = ''
+    escape = False
+    for c in string:
+        if escape:
+            result += c
+            escape = False
+        elif c == '\\':
+            escape = True
+        elif c == '"':
+            escape = False
+        else:
+            result += c
+            escape = False
+    return result
+        
 def _negHelper(criterion, string):
     """Helper function for the __repr__ functions of all criteria."""
     if criterion.negate:
         return PREFIX_NEGATE + string
     else: return string
-
-
-# These functions will be invoked with a single search criterion string (len > 0, no whitespace) to create
-# a Criterion-instance. As soon as a function returns not None, this criterion is used.
-outerParsers = [
-    parseBracedCriterion,
-    DateCriterion.parse,
-    parseTagShortNotation,
-    parseTextCriterion
-]
-
-innerParsers = [
-    ElementTypeCriterion.parse,
-    IdCriterion.parse,
-    AnyCriterion.parse,
-    TagCriterion.parse,
-    FlagCriterion.parse,
-    StickerCriterion.parse
-]
-    

@@ -112,7 +112,6 @@ class PlaylistTreeView(treeview.DraggingTreeView):
             model = self.emptyModel
             self.setRootIsDecorated(False)
         self.setModel(model)
-        self.itemDelegate().model = model
         self.updateSelection()
         self.model().modelReset.connect(self.expandAll) 
 

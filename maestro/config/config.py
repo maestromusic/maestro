@@ -281,7 +281,7 @@ class File:
     sectionClass = Section
     
     def __init__(self, path, options, allowUndefinedSections=False, version=None, errorMethod=None):
-        if version is not None:
+        if path is not None and version is not None:
             versionPath = path+'.'+version
             if os.path.exists(versionPath):
                 path = versionPath
@@ -289,7 +289,8 @@ class File:
         self.allowUndefinedSections = allowUndefinedSections
         self.errorMethod = errorMethod
         # name of the main section is only relevant for debugging
-        self.section = self.sectionClass("<Main({})>".format(os.path.basename(self.path)), options)
+        mainSection = "<Main({})>".format(os.path.basename(self.path) if self.path is not None else '')
+        self.section = self.sectionClass(mainSection, options)
         # store the raw dict found in the file. When sections are added later on, we can lookup the values
         # without reading the file again.
         self._rawDict = None

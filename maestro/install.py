@@ -325,7 +325,7 @@ class DatabaseWidget(SettingsWidget):
                     return False
         
         try:
-            tables.metadata.create_all(checkfirst=True)
+            database.createTables()
         except db.DBException as e:
             logger.error("I cannot create database tables. SQL error: {}".format(e.message))
             QtGui.QMessageBox.warning(self, self.tr("Cannot create tables"),

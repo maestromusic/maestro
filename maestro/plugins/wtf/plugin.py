@@ -24,12 +24,13 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from ... import utils, profiles, config, application, database as db, search, logging
-from ...core import levels
-from ...gui import search as searchgui, dialogs
-from ...gui.misc import collapsiblepanel
+from ... import utils, profiles, config, application, database as db, search, logging, filesystem
+from ...core import levels, domains, elements, tags
+from ...gui import search as searchgui, dialogs, widgets
+from ...gui.misc import lineedits
 from ...gui.preferences import profiles as profilesgui
 from ...search import criteria
+from . import filetree
 
 
 _action = None # the action that is inserted into the Extras menu
@@ -39,6 +40,9 @@ profileCategory = None
 
 STRUCTURE_KEEP, STRUCTURE_FLAT = range(2)
 
+OPTION_DELETE = 'delete'
+OPTION_INCLUDE_WORK_TITLES = 'includeWorkTitles'
+OPTIONS_ALL = [OPTION_DELETE, OPTION_INCLUDE_WORK_TITLES]
 
 def enable():
     global _action, profileCategory
@@ -80,24 +84,31 @@ def defaultStorage():
 class Profile(profiles.Profile):
     def __init__(self, name, type=None, state=None):
         super().__init__(name, type, state)
+        self.domain = None
         self.criterion = None
         self.path = ''
         self.structure = STRUCTURE_KEEP
-        self.delete = False
+        self.options = []
         self.read(state)
             
     def configurationWidget(self, parent):
         return ConfigWidget(self, parent)
     
     def save(self):
-        return {'criterion': repr(self.criterion),
-                'path': self.path,
-                'structure': self.structure,
-                'delete': self.delete
+        state = {'path': self.path,
+                 'structure': self.structure,
+                 'options': ','.join(self.options)
                 }
+        if self.domain is not None:
+            state['domain'] = self.domain.name
+        if self.criterion is not None:
+            state['criterion'] = repr(self.criterion)
+        return state
     
     def read(self, state):
         if state is not None:
+            if 'domain' in state:
+                self.domain = domains.domainByName(state['domain'])
             if 'criterion' in state:
                 try:
                     self.criterion = criteria.parse(state['criterion'])
@@ -107,67 +118,193 @@ class Profile(profiles.Profile):
                 self.path = state['path']
             if 'structure' in state:
                 self.structure = state['structure']
-            if 'delete' in state:
-                self.delete = state['delete']
+            if 'options' in state:
+                self.options = [s for s in state['options'].split(',') if s in OPTIONS_ALL]
+                
+    def setOption(self, option, enabled):
+        if enabled:
+            if option not in self.options:
+                self.options.append(option)
+        else:
+            if option in self.options:
+                self.options.remove(option)
 
     
-class Dialog(profilesgui.ProfileActionDialog):
-    def __init__(self):
-        super().__init__(profileCategory)
+class Dialog(QtGui.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle(self.tr("Export"))
+        layout = QtGui.QVBoxLayout(self)
+        self.stackedLayout = QtGui.QStackedLayout(self)
+        layout.addLayout(self.stackedLayout, 1)
+        self.profileActionWidget = profilesgui.ProfileActionWidget(profileCategory)
+        self.configWidget = self.profileActionWidget.configWidget
+        self.stackedLayout.addWidget(self.profileActionWidget)
+        self.stackedLayout.setContentsMargins(0,0,0,0)
+        fileTreePage = QtGui.QWidget()
+        fileTreeLayout = QtGui.QVBoxLayout(fileTreePage)
+        self.statLabel = QtGui.QLabel()
+        fileTreeLayout.addWidget(self.statLabel)
+        self.fileTree = filetree.FileTreeView()
+        fileTreeLayout.addWidget(self.fileTree)
+        self.stackedLayout.addWidget(fileTreePage)
         
-    def accept(self):
-        if not self.configWidget.criterionLineEdit.isValid():
-            dialogs.warning(translate("wtf", "Invalid criterion"),
-                            translate("wtf", "The given filter criterion is invalid"))
+        buttonLayout = QtGui.QHBoxLayout()
+        layout.addLayout(buttonLayout)
+        cancelButton = QtGui.QPushButton(self.tr("Cancel"))
+        cancelButton.clicked.connect(self.reject)
+        buttonLayout.addWidget(cancelButton)
+        buttonLayout.addStretch()
+        
+        self.previousButton = QtGui.QPushButton(self.tr("Previous"))
+        self.previousButton.clicked.connect(self.previous)
+        self.previousButton.setEnabled(False)
+        buttonLayout.addWidget(self.previousButton)
+        
+        self.nextButton = QtGui.QPushButton(self.tr("Next"))
+        self.nextButton.clicked.connect(self.next)
+        buttonLayout.addWidget(self.nextButton)
+        
+    def previous(self):
+        self.stackedLayout.setCurrentIndex(0)
+        self.previousButton.setEnabled(False)
+        self.nextButton.setText(self.tr("Next"))
+        
+    def next(self):
+        if self.stackedLayout.currentIndex() == 0:
+            if not self.configWidget.criterionLineEdit.isValid():
+                dialogs.warning(translate("wtf", "Invalid criterion"),
+                                translate("wtf", "The given filter criterion is invalid"))
+                return
+            model = buildFileTree(self.configWidget.getProfile())
+            if not model:
+                return
+            self.fileTree.setModel(model)
+            self.statLabel.setText(self.tr("Exporting {} files with a total length of {}.")
+                                           .format(model.fileCount,
+                                                   utils.strings.formatLength(model.totalLength)))
+            self.stackedLayout.setCurrentIndex(1)
+            self.previousButton.setEnabled(True)
+            self.nextButton.setText(self.tr("Finish"))
             return
-        if export(self.configWidget.getProfile()):
-            super().accept() # This will close the dialog
-        # otherwise something went wrong. Keep the dialog open.
-    
+        else:
+            #TODO
+            self.accept()
+            #if export(self.configWidget.getProfile()):
+            #    super().accept() # This will close the dialog
+            # otherwise something went wrong. Keep the dialog open.
+        
     @staticmethod
     def execute():
-        dialog = Dialog()
+        dialog = Dialog(application.mainWindow)
         dialog.exec_()
 
-    
+
+def buildFileTree(profile):
+    if profile.criterion is not None:
+        search.search(profile.criterion, profile.domain)
+    else:
+        raise NotImplementedError()
+    result = profile.criterion.result
+    profile.criterion.result = None # save memory when result is not needed anymore
+    print("Found {} elements for export".format(len(result)))
+    if len(result) == 0:
+        dialogs.warning(translate("wtf", "No elements found"),
+                        translate("wtf", "The given filter criterion does not match any elements."))
+        return False
+     
+    fileTree = filetree.FileTreeModel()
+    exported = set()
+    if profile.structure == STRUCTURE_FLAT or OPTION_DELETE in profile.options:
+        exportedPaths = set()
+    toExport = levels.real.collect(result)
+    while len(toExport) > 0:
+        element = toExport.pop()
+        if element.id in exported:
+            continue
+        exported.add(element.id)
+        if element.isContainer():
+            toExport.extend(levels.real.collect(element.contents))
+            continue
+        if element.url.scheme != 'file':
+            print("I can only export regular files. Skipping", str(element.url))
+            continue
+        
+        if profile.structure == STRUCTURE_FLAT:
+            exportPath = os.path.basename(element.url.path)
+            if exportPath in exportedPaths:
+                exportPath, ext = os.path.splitext(exportPath)
+                i = 1
+                while exportPath+"-" + str(i) + ext in exportedPaths:
+                    i += 1
+                exportPath += "-" + str(i) + ext 
+            assert exportPath not in exportedPaths
+            exportedPaths.add(exportPath)
+        else:
+            exportPath = element.url.path
+            source = filesystem.sourceByPath(exportPath)
+            if source is not None:
+                exportPath = source.relPath(exportPath)
+            else:
+                print("No source", exportPath)
+            if OPTION_DELETE in profile.options:
+                exportedPaths.add(exportPath)
+        
+        # Tag changes
+        if OPTION_INCLUDE_WORK_TITLES in profile.options:
+            titlesToAdd = []
+            parentIds = element.parents
+            while len(parentIds) > 0:
+                parents = levels.real.collect(parentIds)
+                parentIds = set() 
+                for p in parents:
+                    if p.type == elements.TYPE_WORK and tags.TITLE in p.tags:
+                        titlesToAdd.extend(p.tags[tags.TITLE])
+                    parentIds.update(p.parents)
+            if len(titlesToAdd) > 0: 
+                element = element.copy() # don't modify the element stored in levels.real
+                element.tags[tags.TITLE] = [' - '.join(itertools.chain(reversed(titlesToAdd),
+                                                                       element.tags[tags.TITLE]))]
+        
+        fileTree.addFile(exportPath, element)
+    fileTree.sort()
+    return fileTree
+
+
 class ConfigWidget(QtGui.QWidget):
     def __init__(self, profile, parent):
         super().__init__(parent)
-        
+        print(id(profile))
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setContentsMargins(1,1,1,1)
         
-        layout = QtGui.QVBoxLayout()
+        layout = QtGui.QFormLayout()
+        self.domainBox = widgets.DomainBox(profile.domain)
+        self.domainBox.domainChanged.connect(self._handleDomainChanged)
+        if profile.domain is None:
+            profile.domain = self.domainBox.currentDomain()
+        layout.addRow(self.tr("Domain:"), self.domainBox)
         lineLayout = QtGui.QHBoxLayout()
-        layout.addLayout(lineLayout)
-        lineLayout.addWidget(QtGui.QLabel(self.tr("Filter:")))
-        lineLayout.addSpacing(QtGui.QApplication.style()
-                              .pixelMetric(QtGui.QStyle.PM_LayoutHorizontalSpacing))
-        lineLayout.setSpacing(0)
         self.criterionLineEdit = searchgui.CriterionLineEdit(profile.criterion)
         self.criterionLineEdit.criterionChanged.connect(self._handleCriterionLineEdit)
         self.criterionLineEdit.criterionCleared.connect(self._handleCriterionLineEdit)
         lineLayout.addWidget(self.criterionLineEdit, 1)
+        layout.addRow(self.tr("Filter:"), lineLayout)
         self.flagButton = QtGui.QPushButton()
         self.flagButton.setIcon(utils.getIcon("flag_blue.png"))
-        # Make the button as high as the QLineEdit
-        self.flagButton.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        self.flagButton.setIconSize(QtCore.QSize(16, 16))
         self.flagButton.clicked.connect(self._handleFlagButton)
         lineLayout.addWidget(self.flagButton)
-        self.layout().addWidget(
-                            collapsiblepanel.CollapsiblePanel(self.tr("Choose elements to export"), layout))
+        self.layout().addLayout(layout)
+        #self.layout().addWidget(
+        #                    collapsiblepanel.CollapsiblePanel(self.tr("Choose elements to export"), layout))
         
         layout = QtGui.QFormLayout()
-        lineLayout = QtGui.QHBoxLayout()
-        self.pathLineEdit = QtGui.QLineEdit(profile.path)
-        self.pathLineEdit.editingFinished.connect(self._handlePathEditingFinished)
-        lineLayout.addWidget(self.pathLineEdit)
-        pathChooserButton = QtGui.QPushButton()
-        pathChooserButton.setIcon(QtGui.QApplication.style().standardIcon(QtGui.QStyle.SP_DirIcon))
-        pathChooserButton.clicked.connect(self._handlePathChooserButton)
-        lineLayout.addWidget(pathChooserButton)
-        layout.addRow(self.tr("Path:"), lineLayout)
+        self.pathLineEdit = lineedits.PathLineEdit(self.tr("Choose an export directory"),
+                                                   pathType="existingDirectory",
+                                                   path=profile.path)
+        self.pathLineEdit.textChanged.connect(self._handlePathEditingFinished)
+        layout.addRow(self.tr("Path:"), self.pathLineEdit)
         self.structureBox = QtGui.QComboBox()
         self.structureBox.addItem(self.tr("Keep directory structure"), STRUCTURE_KEEP)
         self.structureBox.addItem(self.tr("Put all files into target directory"), STRUCTURE_FLAT)
@@ -175,10 +312,19 @@ class ConfigWidget(QtGui.QWidget):
         self.structureBox.currentIndexChanged.connect(self._handleStructureBox)
         layout.addRow(self.tr("Structure:"), self.structureBox)
         self.deleteBox = QtGui.QCheckBox(self.tr("Delete unexported files from target directory"))
-        self.deleteBox.setChecked(profile.delete)
-        self.deleteBox.toggled.connect(self._handleDeleteBox)
+        self.deleteBox.toggled.connect(lambda x: self.profile.setOption(OPTION_DELETE, x))
         layout.addRow(self.deleteBox)
-        self.layout().addWidget(collapsiblepanel.CollapsiblePanel(self.tr("Export location"), layout))
+        self.layout().addLayout(layout)
+        #self.layout().addWidget(collapsiblepanel.CollapsiblePanel(self.tr("Export location"), layout))
+        
+        layout = QtGui.QFormLayout()
+        self.includeWorkTitlesBox = QtGui.QCheckBox(
+                                            self.tr("Include titles of works into the works' contents."))
+        self.includeWorkTitlesBox.toggled.connect(
+                                        lambda x: self.profile.setOption(OPTION_INCLUDE_WORK_TITLES, x))
+        layout.addRow(self.includeWorkTitlesBox)
+        self.layout().addLayout(layout)
+        #self.layout().addWidget(collapsiblepanel.CollapsiblePanel(self.tr("Tag modifications"), layout))
         
         self.layout().addStretch(1)
         self.setProfile(profile)
@@ -191,8 +337,12 @@ class ConfigWidget(QtGui.QWidget):
         self.criterionLineEdit.setCriterion(profile.criterion)
         self.pathLineEdit.setText(profile.path)
         self.structureBox.setCurrentIndex(profile.structure)
-        self.deleteBox.setChecked(profile.delete)
+        self.deleteBox.setChecked(OPTION_DELETE in profile.options)
+        self.includeWorkTitlesBox.setChecked(OPTION_INCLUDE_WORK_TITLES in profile.options)
     
+    def _handleDomainChanged(self, domain):
+        self.profile.domain = domain
+        
     def _handleCriterionLineEdit(self):
         self.profile.criterion = self.criterionLineEdit.getCriterion()
     
@@ -202,19 +352,9 @@ class ConfigWidget(QtGui.QWidget):
         
     def _handlePathEditingFinished(self):
         self.profile.path = self.pathLineEdit.text()
-        
-    def _handlePathChooserButton(self):
-        """Handle the button next to the path field: Open a file dialog."""
-        result = QtGui.QFileDialog.getExistingDirectory(self, self.tr("Choose export path"),
-                                                        self.pathLineEdit.text())
-        if result:
-            self.pathLineEdit.setText(result)
     
     def _handleStructureBox(self, index):
         self.profile.structure = self.structureBox.itemData(index)
-        
-    def _handleDeleteBox(self, checked):
-        self.profile.delete = checked
             
 
 class FlagDialog(dialogs.FancyPopup):
