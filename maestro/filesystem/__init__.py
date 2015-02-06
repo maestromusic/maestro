@@ -23,7 +23,7 @@ import taglib
 from maestro import utils
 from maestro.core import levels, urls, tags
 from maestro import application, logging, config, stack
-from maestro.filesystem.identification import AcoustIDIdentifier
+from maestro.filesystem.identification import AudioFileIdentifier
 
 translate = QtCore.QCoreApplication.translate
 _sources = None

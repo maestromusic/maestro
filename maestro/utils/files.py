@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, os.path, datetime, itertools, collections, re
-from .. import config
+import os, os.path, itertools, collections, re
+from maestro import config
     
 
 def isMusicFile(path):
@@ -29,29 +29,20 @@ def isMusicFile(path):
     return ext in config.options.main.music_extensions
 
 
-def mTimeStamp(file):
-    """Get the modification timestamp of *file* as UTC datetime. *file* might be either a BackendURL
-    or a path."""
-    from maestro.core.urls import URL
-    if isinstance(file, URL):
-        file = file.path
-    return datetime.datetime.fromtimestamp(os.path.getmtime(file),
-                                           tz=datetime.timezone.utc).replace(microsecond=0)
-
-
-def collect(urls):
+def collect(qUrls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
     are received. Return a dict mapping directory to list of URLs within. Sort directories and files.
     """
     filePaths = collections.OrderedDict()
-    
+    from maestro.core import urls
+
     def add(file, parent=None):
         dir = parent or os.path.dirname(file)
         if dir not in filePaths:
             filePaths[dir] = []
         filePaths[dir].append(urls.URL.fileURL(file))
         
-    for url in urls:
+    for url in qUrls:
         path = url.path()
         if os.path.isfile(path):
             add(path)

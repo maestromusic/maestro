@@ -42,7 +42,7 @@ def exists(name):
     return any(domain.name == name for domain in domains)
     
     
-def domainById(id):
+def domainById(id: int):
     for domain in domains:
         if domain.id == id:
             return domain

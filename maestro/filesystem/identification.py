@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 _logOSError = True
 
 
-class AcoustIDIdentifier:
+class AudioFileIdentifier:
     """An identifier using the AcoustID fingerprinter and web service.
     
     First, the fingerprint of a file is generated using the "fpcalc" utility which must be
