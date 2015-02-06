@@ -119,16 +119,10 @@ flags = Table(prefix+'flags', metadata,
 )
 Index(prefix+'flags_idx', flags.c.element_id, flags.c.flag_id, unique=True)
 
-folders = Table(prefix+'folders', metadata,
-    Column('path', String(500), nullable=False),
-    Column('state', SmallInteger, nullable=False),
-    mysql_engine='InnoDB'
-)
-
 newfiles = Table(prefix+'newfiles', metadata,
     Column('url', String(500), nullable=False, index=True),
     Column('hash', String(63), index=True),
-    Column('verified', TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP')),
+    Column('verified', Float),
     mysql_engine='InnoDB'
 )
 

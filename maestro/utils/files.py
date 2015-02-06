@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, os.path, datetime, itertools, collections, re
+import os, os.path, itertools, collections, re
 from .. import config
     
 
@@ -27,16 +27,6 @@ def isMusicFile(path):
         return False
     ext = ext[1:].lower()
     return ext in config.options.main.music_extensions
-
-
-def mTimeStamp(file):
-    """Get the modification timestamp of *file* as UTC datetime. *file* might be either a BackendURL
-    or a path."""
-    from maestro.core.urls import URL
-    if isinstance(file, URL):
-        file = file.path
-    return datetime.datetime.fromtimestamp(os.path.getmtime(file),
-                                           tz=datetime.timezone.utc).replace(microsecond=0)
 
 
 def collect(urls):

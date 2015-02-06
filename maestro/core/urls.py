@@ -114,7 +114,7 @@ class TagWriteError(RuntimeError):
         dialogs.warning(title, msg1 + (msgReadonly if self.problems is None else msgProblem))
 
 
-class BackendFile(metaclass=abc.ABCMeta):
+class BackendFile:
     """Abstract base for a file representation in a specific backend."""
 
     scheme = None
@@ -128,7 +128,6 @@ class BackendFile(metaclass=abc.ABCMeta):
         self.length = 0
         self.position = None
 
-    @abc.abstractmethod
     def readTags(self):
         """Read the tags which will be available in the *tags* attribute afterwards."""
         pass
