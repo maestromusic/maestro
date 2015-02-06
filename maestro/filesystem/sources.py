@@ -181,7 +181,7 @@ class Source(QtCore.QObject):
         if self.scanState != ScanState.notScanning:
             self.scanTimer.stop()
         self.hashThread.stop()
-        levels.real.filesystemDispatcher.connect(self.handleRealFileEvent)
+        levels.real.filesystemDispatcher.disconnect(self.handleRealFileEvent)
 
     def setPath(self, path):
         """Change the path of this source to *path*. Will recreate internal structures if changed.
@@ -544,6 +544,7 @@ class Source(QtCore.QObject):
                 newFiles.append(file)
                 file.id = None
                 self.fileStateChanged.emit(url.path)
+                file.folder.updateState(True, emit=self.folderStateChanged)
             self.storeNewFiles(newFiles)
 
         if len(event.deleted) > 0:

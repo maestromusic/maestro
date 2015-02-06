@@ -53,7 +53,7 @@ files = Table(prefix+'files', metadata,
     Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), primary_key=True),
     Column('url', String(500), nullable=False, index=True),
     Column('hash', String(63), index=True),
-    Column('verified', TIMESTAMP, server_onupdate=text('CURRENT_TIMESTAMP')),
+    Column('verified', Float, default=0.0, nullable=False),
     Column('length', Integer, nullable=False),
     mysql_engine='InnoDB'
 )
@@ -122,7 +122,7 @@ Index(prefix+'flags_idx', flags.c.element_id, flags.c.flag_id, unique=True)
 newfiles = Table(prefix+'newfiles', metadata,
     Column('url', String(500), nullable=False, index=True),
     Column('hash', String(63), index=True),
-    Column('verified', Float),
+    Column('verified', Float, default=0.0, nullable=False),
     mysql_engine='InnoDB'
 )
 

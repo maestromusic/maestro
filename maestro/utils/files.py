@@ -17,7 +17,7 @@
 #
 
 import os, os.path, itertools, collections, re
-from .. import config
+from maestro import config
     
 
 def isMusicFile(path):
@@ -29,19 +29,20 @@ def isMusicFile(path):
     return ext in config.options.main.music_extensions
 
 
-def collect(urls):
+def collect(qUrls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when urls
     are received. Return a dict mapping directory to list of URLs within. Sort directories and files.
     """
     filePaths = collections.OrderedDict()
-    
+    from maestro.core import urls
+
     def add(file, parent=None):
         dir = parent or os.path.dirname(file)
         if dir not in filePaths:
             filePaths[dir] = []
         filePaths[dir].append(urls.URL.fileURL(file))
         
-    for url in urls:
+    for url in qUrls:
         path = url.path()
         if os.path.isfile(path):
             add(path)
