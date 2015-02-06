@@ -121,6 +121,7 @@ def init(**kwargs):
         # Replace 'config:' prefix in path
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR, path[len('config:'):])
+        else: path = os.path.expanduser(path)
         kwargs['path'] = path
     else:
         args = ["user", "password", "name", "host", "port"]
