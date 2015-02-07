@@ -757,7 +757,7 @@ class VariousNode(CriterionNode):
         self.tagSet = tagSet
 
     def getCriterion(self):
-        criterion = search.criteria.TagCriterion(value=None, tagList=list(self.tagSet))
+        criterion = search.criteria.AnyTagCriterion(tagList=list(self.tagSet))
         criterion.negate = True
         return criterion
     
