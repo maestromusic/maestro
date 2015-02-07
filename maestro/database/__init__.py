@@ -46,6 +46,7 @@ type = None
 prefix = None
 engine = None # engine to the main database (other databases may be used during synchronization)
 driver = None
+tags = None # tags submodule
 
 # Next id that will be returned by nextId() and lock to make that method threadsafe
 _nextId = None
@@ -105,7 +106,8 @@ def connect(**kwargs):
 
 def init(**kwargs):
     # connect to default database with args from config
-    global type, prefix, engine, driver
+    global type, prefix, engine, driver, tags
+    import maestro.database.tags
     type = kwargs['type'] = kwargs.get('type', config.options.database.type)
     prefix = kwargs.get('prefix', config.options.database.prefix)
     driver = kwargs.get('driver', config.options.database.driver)
@@ -121,7 +123,8 @@ def init(**kwargs):
         # Replace 'config:' prefix in path
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR, path[len('config:'):])
-        else: path = os.path.expanduser(path)
+        else:
+            path = os.path.expanduser(path)
         kwargs['path'] = path
     else:
         args = ["user", "password", "name", "host", "port"]
@@ -137,7 +140,7 @@ def init(**kwargs):
         if _nextId is None:
             try:
                 _nextId = query("SELECT MAX(id) FROM {p}elements").getSingle()
-                if isNull(_nextId): # this happens when elements is empty
+                if _nextId is None: # this happens when elements is empty
                     _nextId = 1
                 else: _nextId += 1    
             except DBException: # table does not exist yet (in the install tool, test scripts...)
@@ -190,9 +193,6 @@ def multiQuery(queryString, args, **kwargs):
 
 def transaction():
     return engine.begin()
-
-def isNull(value):
-    return value is None
 
 def getDate(value):
     if isinstance(value, str):
@@ -340,24 +340,6 @@ def updateElementsCounter(elids=None):
         SET elements = (SELECT COUNT(*) FROM {0}contents WHERE container_id = id)
         {1}
         """.format(prefix, whereClause))
-
-
-def deleteSuperfluousTagValues():
-    """Remove unused entries from the values_* tables."""
-    for valueType in tagsModule.TYPES:
-        tableName = "{}values_{}".format(prefix, valueType)
-        # This is complicated because we need different queries for MySQL and SQLite.
-        # Neither query works in both.
-        mainPart = """ FROM {1} LEFT JOIN {0}tags ON {1}.tag_id = {0}tags.tag_id
-                                                 AND {1}.id = {0}tags.value_id
-                    WHERE element_id IS NULL
-                    """.format(prefix, tableName)
-        if type == 'mysql':
-            # Cannot use DELETE together with JOIN in SQLite
-            query("DELETE {} {}".format(tableName, mainPart))
-        else:
-            # Cannot delete from a table used in a subquery in MySQL
-            query("DELETE FROM {0} WHERE id IN (SELECT {0}.id {1})".format(tableName, mainPart))
     
 
 # Files-Table
@@ -402,156 +384,6 @@ def idFromHash(hash):
         return None
     else: raise RuntimeError("Hash not unique upon filenames!")
 
-
-# values_* tables
-#=======================================================================
-_idToValue = {}
-_valueToId = {}
-
-def cacheTagValues():
-    """Cache all id<->value relations from the values_varchar table."""
-    for tag in tagsModule.tagList:
-        if tag.type == tagsModule.TYPE_VARCHAR:
-            result = query("SELECT id,value FROM {p}values_varchar WHERE tag_id = ?", tag.id)
-            _idToValue[tag] = {id: value for id,value in result}
-            # do not traverse result twice
-            _valueToId[tag] = {value: id for id,value in _idToValue[tag].items()}
-      
-
-def valueFromId(tagSpec, valueId):
-    """Return the value from the tag *tagSpec* with id *valueId* or raise an EmptyResultException if
-    that id does not exist. Date tags will be returned as FlexiDate.
-    """
-    tag = tagsModule.get(tagSpec)
-    
-    # Check cache
-    if tag in _idToValue:
-        value = _idToValue[tag].get(valueId)
-        if value is not None:
-            return value
-        
-    # Look up value
-    try:
-        value = query("SELECT value FROM {}values_{} WHERE tag_id = ? AND id = ?"
-                        .format(prefix, tag.type.name), tag.id,valueId).getSingle()
-    except EmptyResultException:
-        raise KeyError("There is no value of tag '{}' for id {}".format(tag,valueId))
-                    
-    # Store value in cache
-    if tag.type is tagsModule.TYPE_VARCHAR:
-        if tag not in _idToValue:
-            _idToValue[tag] = {}
-        _idToValue[tag][id] = value
-    elif tag.type is tagsModule.TYPE_DATE:
-        value = utils.FlexiDate.fromSql(value)
-    return value
-
-
-def idFromValue(tagSpec, value, insert=False):
-    """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
-    raise an EmptyResultException, unless the optional parameter *insert* is set to True. In that case
-    insert the value into the table and return its id.
-    """
-    tag = tagsModule.get(tagSpec)
-    value = tag.sqlFormat(value)
-    
-    # Check cache
-    if tag in _valueToId:
-        id = _valueToId[tag].get(value)
-        if id is not None:
-            return id
-
-    # Look up id
-    try:
-        if type == 'mysql' and tag.type in (tagsModule.TYPE_VARCHAR,tagsModule.TYPE_TEXT):
-            # Compare exactly (using binary collation)
-            q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value COLLATE utf8_bin = ?"\
-                 .format(prefix, tag.type.name)
-        else: q = "SELECT id FROM {}values_{} WHERE tag_id = ? AND value = ?".format(prefix,tag.type)
-        id = query(q,tag.id,value).getSingle()
-    except EmptyResultException:
-        if insert:
-            if tag.type is tagsModule.TYPE_VARCHAR:
-                searchValue = utils.strings.removeDiacritics(value)
-                if searchValue == value:
-                    searchValue = None
-                result = query("INSERT INTO {p}values_varchar (tag_id,value,search_value) VALUES (?,?,?)",
-                               tag.id, value, searchValue)
-            else:
-                result = query("INSERT INTO {}values_{} (tag_id, value) VALUES (?,?)"
-                              .format(prefix, tag.type.name), tag.id, value)
-            id = result.insertId()
-        else: raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
-    
-    # Store id in cache
-    if tag.type is tagsModule.TYPE_VARCHAR:
-        if tag not in _valueToId:
-            _valueToId[tag] = {}
-        _valueToId[tag][value] = id
-    return id
-
-
-def hidden(tagSpec, valueId):
-    """Returns True iff the given tag value is set hidden."""
-    tag = tagsModule.get(tagSpec)
-    return query("SELECT hide FROM {}values_{} WHERE tag_id = ? AND id = ?".format(prefix, tag.type),
-                 tag.id, valueId).getSingle() 
-
-
-def sortValue(tagSpec, valueId, valueIfNone = False):
-    """Returns the sort value for the given tag value, or None if it is not set.
-    
-    If *valueIfNone=True*, the value itself is returned if no sort value is set."""
-    tag = tagsModule.get(tagSpec)
-    ans = query("SELECT sort_value FROM {}values_{} WHERE tag_id = ? AND id = ?".format(prefix, tag.type),
-                 tag.id, valueId).getSingle()
-    if isNull(ans):
-        ans = None
-    if ans or not valueIfNone:
-        return ans
-    elif valueIfNone:
-        return valueFromId(tag, valueId)
-    
-    
-# tags-Table
-#=======================================================================
-def tags(elid):
-    result = tagsModule.Storage()
-    for (tagId,value) in listTags(elid):
-        result.add(tagId,value)
-    return result
-
-
-def listTags(elid,tagList=None):
-    if tagList is not None:
-        if isinstance(tagList,int) or isinstance(tagList,str) or isinstance(tagList,tagsModule.Tag):
-            tagid = tagsModule.get(tagList).id
-            additionalWhereClause = " AND tag_id = {0}".format(tagid)
-        else:
-            tagList = [tagsModule.get(tag).id for tag in tagList]
-            additionalWhereClause = " AND tag_id IN ({0})".format(csList(tagList))
-    else: additionalWhereClause = ''
-    result = query("""
-                SELECT tag_id,value_id 
-                FROM {}tags
-                WHERE element_id = {} {}
-                """.format(prefix, elid,additionalWhereClause))
-    tags = []
-    for tagid,valueid in result:
-        tag = tagsModule.get(tagid)
-        val = valueFromId(tag, valueid)
-        if val is None:
-            print('value for tag {} with id {} not found'.format(tag, valueid))
-        else: tags.append((tag,val))
-    return tags
-
-
-def allTagValues(tagSpec):
-    """Return all tag values in the database for the given tag."""
-    tag = tagsModule.get(tagSpec)
-    return query("SELECT value FROM {}values_{} WHERE tag_id = ?"
-                 .format(prefix, tag.type.name), tag.id).getSingleColumn()
-    
 
 # flags table
 #=======================================================================

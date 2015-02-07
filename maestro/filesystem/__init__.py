@@ -16,8 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os, shutil
-from collections import OrderedDict
+import os, shutil, collections
 from PyQt4 import QtCore
 import taglib
 from maestro.core import levels, urls, tags
@@ -163,7 +162,7 @@ class RealFile(urls.BackendFile):
         Special tags (tracknumber, compilation, discnumber) are stored in the "specialTags" attribute.
         """
         self.tags = tags.Storage()
-        self.specialTags = OrderedDict()
+        self.specialTags = collections.OrderedDict()
         try:
             self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True)
         except OSError as e:

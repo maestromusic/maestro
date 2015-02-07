@@ -41,8 +41,6 @@ def init():
     _flagsByName = {}
     for row in db.query("SELECT id, name, icon FROM {p}flag_names"):
         id, name, iconPath = row
-        if db.isNull(iconPath):
-            iconPath = None
         flagType = Flag(id, name, iconPath)
         _flagsById[flagType.id] = flagType
         _flagsByName[flagType.name] = flagType

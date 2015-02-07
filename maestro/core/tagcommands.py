@@ -69,7 +69,7 @@ class HiddenAttributeCommand:
         self.text = translate("HiddenAttributeCommand", "change hidden flag")
         self.tag = tag
         self.valueId = valueId
-        self.newState = db.hidden(tag, valueId) if newState is None else newState
+        self.newState = db.tags.hidden(tag, valueId) if newState is None else newState
        
     def redo(self):
         self.setHidden(self.newState)
@@ -88,8 +88,8 @@ def renameTagValue(tag, oldValue, newValue):
     
     The most prominent use is to correct the spelling of (foreign language) artists, composers etc.
     """
-    oldId = db.idFromValue(tag, oldValue)
-    newId = db.idFromValue(tag, newValue, insert=True)
+    oldId = db.tags.id(tag, oldValue)
+    newId = db.tags.id(tag, newValue, insert=True)
     
     result = db.query("SELECT element_id, value_id FROM {}tags WHERE tag_id=? AND "
                         "(value_id=? OR value_id=?)".format(db.prefix),

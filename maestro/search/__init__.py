@@ -22,7 +22,7 @@ from ..core import tags
 
 # Name of the temporary search table
 # The table is created in the search thread and temporary, so that it does not conflict with other threads.
-TT_HELP = 'tmp_help'
+TT_HELP = db.prefix+'tmp_help'
 
 
 def init():
@@ -39,7 +39,7 @@ def init():
             """.format(TT_HELP))
     else:
         db.query("""
-            CREATE TEMPORARY TABLE IF NOT EXISTS {} (
+            CREATE TABLE IF NOT EXISTS {} (
                 value_id  MEDIUMINT UNSIGNED NOT NULL,
                 tag_id MEDIUMINT UNSIGNED NULL)
             """.format(TT_HELP))

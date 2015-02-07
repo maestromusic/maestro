@@ -241,7 +241,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
             runInstaller()
             
         # In most test scripts these caches would only be overhead.
-        database.cacheTagValues()
+        database.tags.cacheValues()
         
     flags.init()
     
@@ -301,7 +301,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     plugins.shutdown()
     covers.shutdown()
     profiles.manager.save()
-    database.deleteSuperfluousTagValues()
+    database.tags.deleteSuperfluousValues()
     database.shutdown()
     config.shutdown()
     logging.shutdown()

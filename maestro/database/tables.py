@@ -51,7 +51,8 @@ contents = Table(prefix+'contents', metadata,
 
 files = Table(prefix+'files', metadata,
     Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), primary_key=True),
-    Column('url', String(500), nullable=False, index=True),
+    Column('url', String(500), nullable=False),
+        Index(prefix+"files_url_idx", text("url(200)")),  # length must be specified, or MySQL will complain
     Column('hash', String(63), index=True),
     Column('verified', Float, default=0.0, nullable=False),
     Column('length', Integer, nullable=False),
@@ -74,9 +75,9 @@ tags = Table(prefix+'tags', metadata,
            nullable=False, index=True),
     Column('tag_id', Integer, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
     Column('value_id', Integer, nullable=False),
+    Index(prefix+'tags_tag_value_idx', "tag_id", "value_id"),
     mysql_engine='InnoDB'
 )
-Index(prefix+'tags_tag_value_idx', tags.c.tag_id, tags.c.value_id)
 
 values_varchar = Table(prefix+'values_varchar', metadata,
     Column('id', Integer, primary_key=True),
@@ -85,25 +86,25 @@ values_varchar = Table(prefix+'values_varchar', metadata,
     Column('sort_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
     Column('search_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
     Column('hide', Boolean, nullable=False, server_default='0'),
+    Index(prefix+'values_varchar_idx', "tag_id", "parameter", "value"),
     mysql_engine='InnoDB'
 )
-Index(prefix+'values_varchar_idx', values_varchar.c.tag_id, values_varchar.c.value)
 
 values_text = Table(prefix+'values_text', metadata,
     Column('id', Integer, primary_key=True),
     Column('tag_id', Integer, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
     Column('value', Text, nullable=False),
+    Index(prefix+'values_text_idx', "tag_id", text("value(200)")),
     mysql_engine='InnoDB'
 )
-Index(prefix+'values_text_idx', values_text.c.tag_id, values_text.c.value)
    
 values_date = Table(prefix+'values_date', metadata,
     Column('id', Integer, primary_key=True),
     Column('tag_id', Integer, ForeignKey(prefix+'tagids.id', ondelete='CASCADE'), nullable=False),
     Column('value', FlexiDateType, nullable=False),
+    Index(prefix+'values_date_idx', "tag_id", "value"),
     mysql_engine='InnoDB'
 )
-Index(prefix+'values_date_idx', values_date.c.tag_id, values_date.c.value)
    
 flag_names = Table(prefix+'flag_names', metadata,
     Column('id', Integer, primary_key=True),
@@ -115,12 +116,13 @@ flag_names = Table(prefix+'flag_names', metadata,
 flags = Table(prefix+'flags', metadata,
     Column('element_id', Integer, ForeignKey(prefix+'elements.id', ondelete='CASCADE'), nullable=False),
     Column('flag_id', Integer, ForeignKey(prefix+'flag_names.id', ondelete='CASCADE'), nullable=False),
+    Index(prefix+'flags_idx', "element_id", "flag_id", unique=True),
     mysql_engine='InnoDB'
 )
-Index(prefix+'flags_idx', flags.c.element_id, flags.c.flag_id, unique=True)
 
 newfiles = Table(prefix+'newfiles', metadata,
-    Column('url', String(500), nullable=False, index=True),
+    Column('url', String(500), nullable=False),
+        Index(prefix+"newfiles_url_idx", text("url(200)")),# length must be specified, or MySQL will complain
     Column('hash', String(63), index=True),
     Column('verified', Float, default=0.0, nullable=False),
     mysql_engine='InnoDB'
@@ -131,6 +133,6 @@ stickers = Table(prefix+'stickers', metadata,
     Column('type', String(255), nullable=False),
     Column('sort', SmallInteger, nullable=False),
     Column('data', Text, nullable=False),
+    Index(prefix+'stickers_idx', "element_id", "type", "sort"),
     mysql_engine='InnoDB'
 )
-Index(prefix+'stickers_idx', stickers.c.element_id, stickers.c.type, stickers.c.sort)

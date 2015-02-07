@@ -284,7 +284,7 @@ class DoubleTagsCheck(Check):
         if not data:
             return len(result)
         else:
-            return [(row[0], getTitle(row[0]), row[1], row[2], str(db.valueFromId(row[1], row[2])))
+            return [(row[0], getTitle(row[0]), row[1], row[2], str(db.tags.value(row[1], row[2])))
                     for row in result]
 
     def _fix(self):
@@ -369,8 +369,6 @@ class SearchValuesCheck(Check):
         tuples = []
         counter = 0
         for id, value, searchValue in result:
-            if db.isNull(searchValue):
-                searchValue = None
             correct = utils.strings.removeDiacritics(value)
             if correct == value:
                 correct = None

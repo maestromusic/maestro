@@ -170,7 +170,7 @@ class RealLevel(levels.Level):
                 """.format(db.prefix, csIdList))
         for id, tagId, valueId in result:
             tag = tags.get(tagId)
-            level.elements[id].tags.add(tag, db.valueFromId(tag, valueId))
+            level.elements[id].tags.add(tag, db.tags.value(tag, valueId))
             
         # flags
         result = db.query("""
@@ -367,7 +367,7 @@ class RealLevel(levels.Level):
                 db.query("DELETE FROM {p}tags WHERE element_id = ?", element.id)
                 for tag in element.tags:
                     db.multiQuery("INSERT INTO {p}tags (element_id,tag_id,value_id) VALUES (?,?,?)",
-                          [(element.id, tag.id, db.idFromValue(tag, value, insert=True))
+                          [(element.id, tag.id, db.tags.id(tag, value, insert=True))
                            for value in element.tags[tag]])
                 
                 # Set flags
@@ -456,14 +456,14 @@ class RealLevel(levels.Level):
         dbChanges = {el: diffs for el, diffs in changes.items() if el.isInDb()}
         if len(dbChanges) > 0:
             with db.transaction():
-                dbRemovals = [(el.id, tag.id, db.idFromValue(tag, value))
+                dbRemovals = [(el.id, tag.id, db.tags.id(tag, value))
                               for el, diff in dbChanges.items()
                               for tag, value in diff.getRemovals() if tag.isInDb()]
                 if len(dbRemovals):
                     db.multiQuery('DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?',
                                   dbRemovals)
                     
-                dbAdditions = [(el.id, tag.id, db.idFromValue(tag, value, insert=True))
+                dbAdditions = [(el.id, tag.id, db.tags.id(tag, value, insert=True))
                                for el, diff in dbChanges.items()
                                for tag, value in diff.getAdditions() if tag.isInDb()]
                 if len(dbAdditions):

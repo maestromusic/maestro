@@ -167,7 +167,7 @@ class FlexiDate:
     def fromSql(value):
         """Create a FlexiDate from an int as used to store FlexiDates in the database."""
         from .. import database
-        if database.isNull(value):
+        if value is None:
             return None
         try:
             value = int(value)

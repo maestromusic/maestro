@@ -534,9 +534,11 @@ class AbstractTagCriterion(Criterion):
             db.query("""
                     INSERT INTO {help} (value_id, tag_id)
                         SELECT id, tag_id
-                        FROM {p}values_{type}
+                        FROM {table}
                         WHERE {where}
-                    """, *args, help=TT_HELP, type=valueType.name, where=' AND '.join(whereClauses))
+                    """, *args,
+                    help=TT_HELP, table=valueType.table,
+                    where=' AND '.join(whereClauses) if len(whereClauses) > 0 else '1')
             #print("1: "+str(time.perf_counter()-perf))
             if pragmaNecessary:
                 db.query('PRAGMA case_sensitive_like = 0')
