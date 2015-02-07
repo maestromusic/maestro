@@ -22,15 +22,16 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from ... import application, filesystem, config, stack, utils
+from maestro import application, filesystem, config, stack, utils
 
 
 class FilesystemSettings(QtGui.QWidget):
     columns = [
-        ("name",   translate("FilesystemSettings", "Name")),
-        ("path",   translate("FilesystemSettings", "Path")),
-        ("domain", translate("FilesystemSettings", "Domain")),
-        ("enable", translate("FilesystemSettings", "Check"))
+        ('name',   translate('FilesystemSettings', 'Name')),
+        ('path',   translate('FilesystemSettings', 'Path')),
+        ('domain', translate('FilesystemSettings', 'Domain')),
+        ('extensions', translate('FilesystemSettings', 'Extensions')),
+        ('enable', translate('FilesystemSettings', 'Check'))
     ]
 
     def __init__(self, dialog, panel):
@@ -41,8 +42,8 @@ class FilesystemSettings(QtGui.QWidget):
         buttonBar = QtGui.QToolBar()
         self.layout().addWidget(buttonBar)
         addButton = QtGui.QToolButton()
-        addButton.setIcon(utils.getIcon("add.png"))
-        addButton.setToolTip("Add source")
+        addButton.setIcon(utils.getIcon('add.png'))
+        addButton.setToolTip('Add source')
         addButton.clicked.connect(self._handleAddButton)
         buttonBar.addWidget(addButton)
         self.undoButton = QtGui.QToolButton()
@@ -71,25 +72,25 @@ class FilesystemSettings(QtGui.QWidget):
         self.tableWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
         self.tableWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
         self.layout().addWidget(self.tableWidget)
-        
-        self.recheckButton = QtGui.QPushButton(self.tr("Force recheck of all files"))
-        self.recheckButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
-        self.recheckButton.clicked.connect(self._handleRecheckButton)
-        self.scanIntervalBox = QtGui.QSpinBox()
-        self.scanIntervalBox.setMinimum(0)
-        self.scanIntervalBox.setMaximum(24*3600)
-        self.scanIntervalLabel = QtGui.QLabel()
-        self.scanIntervalText = self.tr("Rescan filesystem every {} seconds (set to 0 to disable scans).")
-        self.scanDisabledText = self.tr("No periodic rescans.")
-        self.scanIntervalBox.valueChanged[int].connect(self._handleIntervalChanged)
-        self.scanIntervalBox.setValue(config.options.filesystem.scan_interval)
-            
-        intervalLayout = QtGui.QHBoxLayout()
-        intervalLayout.addWidget(self.scanIntervalBox)
-        intervalLayout.addWidget(self.scanIntervalLabel)
-        
-        layout.addLayout(intervalLayout)
-        layout.addWidget(self.recheckButton)
+
+        #TODO: reimplement force recheck and scan interval configuration (should now be per-source)
+        # self.recheckButton = QtGui.QPushButton(self.tr("Force recheck of all files"))
+        # self.recheckButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        # self.recheckButton.clicked.connect(self._handleRecheckButton)
+        # self.scanIntervalBox = QtGui.QSpinBox()
+        # self.scanIntervalBox.setMinimum(0)
+        # self.scanIntervalBox.setMaximum(24*3600)
+        # self.scanIntervalLabel = QtGui.QLabel()
+        # self.scanIntervalText = self.tr("Rescan filesystem every {} seconds (set to 0 to disable scans).")
+        # self.scanDisabledText = self.tr("No periodic rescans.")
+        # self.scanIntervalBox.valueChanged[int].connect(self._handleIntervalChanged)
+        #
+        # intervalLayout = QtGui.QHBoxLayout()
+        # intervalLayout.addWidget(self.scanIntervalBox)
+        # intervalLayout.addWidget(self.scanIntervalLabel)
+        #
+        # layout.addLayout(intervalLayout)
+        # layout.addWidget(self.recheckButton)
         layout.addStretch()
         
         self._loadSources()
@@ -102,7 +103,7 @@ class FilesystemSettings(QtGui.QWidget):
     def _loadSources(self):
         """Load sources information from filesystem.sources."""
         self.tableWidget.itemChanged.disconnect(self._handleItemChanged)
-        self._sources = list(filesystem.sources)
+        self._sources = list(filesystem._sources)
         self.tableWidget.clear()
         self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
         self.tableWidget.setRowCount(len(self._sources))
@@ -120,6 +121,11 @@ class FilesystemSettings(QtGui.QWidget):
             
             column = self._getColumnIndex("domain")
             item = QtGui.QTableWidgetItem(source.domain.name if source.domain is not None else '')
+            item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            self.tableWidget.setItem(row, column, item)
+
+            column = self._getColumnIndex('extensions')
+            item = QtGui.QTableWidgetItem(', '.join(source.extensions))
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
 
@@ -160,16 +166,21 @@ class FilesystemSettings(QtGui.QWidget):
             oldName = source.name
             newName = item.text().strip()
             if oldName != newName:
-                if _checkSourceName(self, newName, source):
+                if checkSourceName(self, newName, source):
                     filesystem.changeSource(source, name=newName)
                 else: item.setText(oldName) # reset
         elif item.column() == self._getColumnIndex("path"):
             oldPath = source.path
             newPath = item.text()
             if oldPath != newPath:
-                if _checkSourcePath(self, newPath, source):
+                if checkSourcePath(self, newPath, source):
                     filesystem.changeSource(source, path=newPath)
                 else: item.setText(oldPath) # reset
+        elif item.column() == self._getColumnIndex('extensions'):
+            oldExt = source.extensions
+            newExt = [ext.strip() for ext in item.text().split(',')]
+            if oldExt != newExt:
+                filesystem.changeSource(source, extensions=newExt)
         elif item.column() == self._getColumnIndex("enable"):
             filesystem.changeSource(source, enabled=item.checkState() == Qt.Checked)
                 
@@ -179,26 +190,6 @@ class FilesystemSettings(QtGui.QWidget):
         self.undoButton.setToolTip(self.tr("Undo: {}").format(stack.undoText()))
         self.redoButton.setEnabled(stack.canRedo())
         self.redoButton.setToolTip(self.tr("Redo: {}").format(stack.redoText()))
-           
-    def _handleRecheckButton(self):
-        if filesystem.moduleEnabled:
-            QtCore.QMetaObject.invokeMethod(filesystem.synchronizer,
-                                            "recheck", Qt.QueuedConnection,
-                                            QtCore.Q_ARG("QString", ""))
-    
-    def _handleIntervalChanged(self, val):
-        if val == 0:
-            self.scanIntervalLabel.setText(self.scanDisabledText)
-        else:
-            self.scanIntervalLabel.setText(self.scanIntervalText.format(val))
-        config.options.filesystem.scan_interval = val
-        return #TODO
-        if filesystem.moduleEnabled:
-            timer = filesystem.synchronizer.timer
-            timer.stop()
-            if val != 0:
-                timer.setInterval(val*1000)
-                timer.start()
 
     @staticmethod
     def _getColumnIndex(columnKey):
@@ -216,12 +207,12 @@ class DomainItemDelegate(QtGui.QStyledItemDelegate):
         return widgets.DomainBox(parent=parent)
         
     def setEditorData(self, editor, index):
-        domain = filesystem.sources[index.row()].domain
+        domain = filesystem._sources[index.row()].domain
         editor.setCurrentDomain(domain)
         
     def setModelData(self, editor, model, index):
         domain = editor.currentDomain()
-        source = filesystem.sources[index.row()]
+        source = filesystem._sources[index.row()]
         filesystem.changeSource(source, domain=domain)
 
 
@@ -239,6 +230,9 @@ class SourceDialog(QtGui.QDialog):
         from .. import widgets
         self.domainChooser =  widgets.DomainBox()
         formLayout.addRow(self.tr("Domain:"), self.domainChooser)
+        self.extensionsEdit = QtGui.QLineEdit()
+        self.extensionsEdit.setText(', '.join(config.options.main.audio_extensions))
+        formLayout.addRow(self.tr("Extensions:"), self.extensionsEdit)
         self.enableBox = QtGui.QCheckBox()
         formLayout.addRow(self.tr("Enabled:"), self.enableBox)
         
@@ -249,24 +243,26 @@ class SourceDialog(QtGui.QDialog):
       
     def accept(self):
         name = self.nameLineEdit.text()
-        if not _checkSourceName(self, name):
+        if not checkSourceName(self, name):
             return
         path = self.pathLineEdit.text()
-        if not _checkSourcePath(self, path):
+        if not checkSourcePath(self, path):
             return
         domain = self.domainChooser.currentDomain()
+        extensions = [ext.strip() for ext in self.extensionsEdit.text().split(',')]
         enabled = self.enableBox.isChecked()
-        filesystem.addSource(name=name, path=path, domain=domain, enabled=enabled)
+        filesystem.addSource(name=name, path=path, domain=domain, extensions=extensions, enabled=enabled)
         super().accept()
         
             
-def _checkSourceName(parent, name, source=None):
+def checkSourceName(parent, name, source=None):
+    """Check whether the given source name is valid."""
     if not filesystem.isValidSourceName(name):
         QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                     translate("Filesystem", "'{}' is not a valid source name.").format(name))
         return False
     
-    for s in filesystem.sources:
+    for s in filesystem._sources:
         if s != source and s.name == name:
             QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                    translate("Filesystem", "A source named '{}' already exists.").format(name))
@@ -274,12 +270,13 @@ def _checkSourceName(parent, name, source=None):
     return True
 
 
-def _checkSourcePath(parent, path, source=None):
+def checkSourcePath(parent, path, source=None):
+    """Check whether the given source path is valid."""
     if not os.path.exists(path):
         QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                     translate("Filesystem", "The path '{}' does not exist.").format(path))
         return False
-    if any(s.contains(path) for s in filesystem.sources if s != source):
+    if any(s.contains(path) for s in filesystem._sources if s != source):
         QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                 translate("Filesystem", "The path '{}' is contained in an existing source.").format(path))
         return False

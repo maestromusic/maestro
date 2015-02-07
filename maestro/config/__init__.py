@@ -118,8 +118,11 @@ def shutdown():
 # No use to translate strings here, as this is executed before any translators have been loaded.
 configOptions = collections.OrderedDict((
 ("main", {
-    "plugins": (list, [], "List of plugin names (i.e. the name of the corresponding directory in /maestro/plugins/."),
-    "music_extensions": (list, ["flac", "m4a", "mp3", "mp4", "mpc", "oga", "ogg", "spx", "wma"], "music file extensions")
+    'plugins': (list, [], 'List of plugin names (i.e. the name of the corresponding directory in /maestro/plugins/'),
+    'audio_extensions': (list, ['ogg', 'flac', 'oga', 'mp3', 'mpc', 'wv', 'spx', 'tta', 'm4a', 'm4r', 'm4b',
+                                'm4p', '3g2', 'mp4', 'wma', 'asf', 'aif', 'aiff', 'wav', 'ape', 'mod',
+                                'module', 'nst', 'wow', 's3m', 's3m', 'it', 'xm'],
+                         'List of file extensions treated as audio files')
 }),
     
 ("i18n", {
@@ -158,7 +161,6 @@ configOptions = collections.OrderedDict((
     }
 }),
 ("filesystem", {
-    "scan_interval": (int, 1800, "Interval (in seconds) in which the filesystem will be rescanned for changes"),
     "acoustid_apikey": (str, "VGPeEVtB", "API key for AcoustID web service"),
 }),
 ("misc", {

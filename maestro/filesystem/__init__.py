@@ -26,7 +26,7 @@ from maestro import application, logging, config, stack
 from maestro.filesystem.identification import AudioFileIdentifier
 
 translate = QtCore.QCoreApplication.translate
-_sources = None
+_sources = []
 
 
 def init():
@@ -88,7 +88,7 @@ def _deleteSource(source):
 
 
 def changeSource(source, **data):
-    oldData = {attr: getattr(source, attr) for attr in ['name', 'path', 'domain', 'enabled']}
+    oldData = {attr: getattr(source, attr) for attr in ['name', 'path', 'domain', 'extensions', 'enabled']}
     stack.push(translate('filesystem', "Change source"),
                stack.Call(_changeSource, source, data),
                stack.Call(_changeSource, source, oldData))
@@ -101,6 +101,8 @@ def _changeSource(source, data):
         source.setPath(data['path'])
     if 'domain' in data:
         source.domain = data['domain']
+    if 'extensions' in data:
+        source.extensions = data['extensions']
     if 'enabled' in data:
         source.setEnabled(data['enabled'])
     application.dispatcher.emit(SourceChangeEvent(application.ChangeType.changed, source))
@@ -144,7 +146,7 @@ def parseAutoReplace():
 
 
 class RealFile(urls.BackendFile):
-    """A normal file that is accessed directly on the filesystem."""
+    """A normal file that is accessed directly on the local filesystem."""
 
     scheme = 'file'
 
@@ -152,7 +154,7 @@ class RealFile(urls.BackendFile):
         super().__init__(url)
         self._taglibFile = None
 
-    specialTagNames = "tracknumber", "compilation", "discnumber"
+    specialTagNames = 'tracknumber', 'compilation', 'discnumber'
 
     def readTags(self):
         """Load the tags from disk using pytaglib.
@@ -160,11 +162,13 @@ class RealFile(urls.BackendFile):
         Special tags (tracknumber, compilation, discnumber) are stored in the "specialTags" attribute.
         """
         self.tags = tags.Storage()
-        if not utils.files.isMusicFile(self.url.path):
-            return
-        self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True)
-        self.length = self._taglibFile.length
         self.specialTags = OrderedDict()
+        try:
+            self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True)
+        except OSError as e:
+            logging.warning(__name__, 'TagLib failed to open "{}". Tags will be stored in database only')
+            return
+        self.length = self._taglibFile.length
         autoProcessingDone = False
         for key, values in self._taglibFile.tags.items():
             key = key.lower()

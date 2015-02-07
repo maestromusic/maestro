@@ -22,10 +22,9 @@ import hashlib
 import subprocess
 import sys
 
-from .. import logging, config
-from ..utils.files import isMusicFile
+from maestro import logging, config
+import maestro.utils.files
 
-logger = logging.getLogger(__name__)
 _logOSError = True
 
 
@@ -48,7 +47,7 @@ class AudioFileIdentifier:
         self.apikey = config.options.filesystem.acoustid_apikey
 
     def __call__(self, path):
-        if not isMusicFile(path):
+        if not maestro.utils.files.isMusicFile(path):
             return 'nomusic'
         try:
             data = subprocess.check_output(['fpcalc', path], stderr=subprocess.DEVNULL)
@@ -56,40 +55,40 @@ class AudioFileIdentifier:
             global _logOSError
             if _logOSError:
                 _logOSError = False # This error will always occur  - don't print it again.
-            logger.exception("Exception when computing audio fingerprint.")
+            logging.warning(__name__, 'Error computing AcoustID fingerprint: fpcalc unavailable?')
             return self.fallbackHash(path)
         except subprocess.CalledProcessError:
             # fpcalc returned non-zero exit status
-            logger.warning("Exception when computing audio fingerprint.")
+            logging.warning(__name__,
+                            'Error computing AcoustID fingerprint: fpcalc returned non-zero exit status')
             return self.fallbackHash(path)
         data = data.decode(sys.getfilesystemencoding())
         if len(data) == 0:
-            logger.warning("fpcalc did not return any data")
+            logging.warning(__name__, 'Error computing AcoustID fingerprint: fpcalc output is empty')
             return self.fallbackHash(path)
         duration, fingerprint = (line.split("=", 1)[1] for line in data.splitlines()[1:] )
         import urllib.request, urllib.error, json
         try:
             req = urllib.request.urlopen(self.requestURL.format(self.apikey, duration, fingerprint))
         except (urllib.error.HTTPError, urllib.error.URLError) as e:
-            logger.warning(str(e))
-            logger.warning(self.requestURL.format(self.apikey, duration, fingerprint))
+            logging.warning(__name__,
+                'Error opening {}'.format(self.requestURL.format(self.apikey, duration, fingerprint)))
             return self.fallbackHash(path)
         ans = req.readall().decode("utf-8")
         req.close()
         ans = json.loads(ans)
         if ans['status'] != 'ok':
-            logger.warning("Error retrieving AcoustID fingerprint for {}".format(path))
+            logging.warning(__name__, 'Error retrieving AcoustID fingerprint for "{}"'.format(path))
             return self.fallbackHash(path)
         results = ans['results']
         if len(results) == 0:
-            logger.warning("No AcoustID fingerprint found for {}".format(path))
+            logging.warning(__name__, 'No AcoustID fingerprint found for "{}"'.format(path))
             return self.fallbackHash(path)
         bestResult = max(results, key=lambda x: x['score'])
         if "recordings" in bestResult and len(bestResult["recordings"]) > 0:
             ans = "mbid:{}".format(bestResult["recordings"][0]["id"])
         else:
             ans = "acoustid:{}".format(bestResult["id"])
-        logger.debug("found  hash {} for {}".format(ans, path))
         return ans
 
     def fallbackHash(self, path):
@@ -98,12 +97,11 @@ class AudioFileIdentifier:
         This method uses the "ffmpeg" binary ot extract the first 15 seconds in raw PCM format and
         then creates the MD5 hash of that data.
         """
-        logger.warning("Using fallback FFMPEG method")
         try:
             ans = subprocess.check_output(['ffmpeg', '-i', path, '-v', 'quiet',
                                            '-f', 's16le', '-t', '15', '-'])
             return 'hash:{}'.format(hashlib.md5(ans).hexdigest())
         except OSError:
-            logger.warning('ffmpeg not installed - could not compute fallback audio hash')
+            logging.warning(__name__, 'ffmpeg not installed - could not compute fallback audio hash')
         except subprocess.CalledProcessError:
-            logger.warning('ffmpeg failed')
+            logging.warning(__name__, 'ffmpeg run failed')

@@ -25,8 +25,7 @@ def isMusicFile(path):
     _, ext = os.path.splitext(path)
     if not ext.startswith('.'):
         return False
-    ext = ext[1:].lower()
-    return ext in config.options.main.music_extensions
+    return ext[1:].lower() in config.options.main.audio_extensions
 
 
 def collect(qUrls):

@@ -20,10 +20,11 @@ import enum, collections
 import os.path
 import time
 import threading, queue
+from collections.abc import Iterable
 
 from PyQt4 import QtCore
 
-from maestro import logging, stack, utils
+from maestro import logging, stack, utils, config
 from maestro import database as db
 from maestro.core import domains, levels, urls
 from maestro.filesystem.identification import AudioFileIdentifier
@@ -143,7 +144,7 @@ class Source(QtCore.QObject):
     folderStateChanged = QtCore.pyqtSignal(object)
     fileStateChanged = QtCore.pyqtSignal(object)
 
-    def __init__(self, name, path, domain, enabled: bool):
+    def __init__(self, name, path, domain, extensions, enabled: bool):
         super().__init__()
         self.name = name
         self.path = path
@@ -151,6 +152,7 @@ class Source(QtCore.QObject):
         self.scanTimer = QtCore.QTimer()
         self.scanTimer.setInterval(200)
         self.scanTimer.timeout.connect(self.checkScan)
+        self.extensions = list(extensions)
         self.enabled = False
         if enabled:
             self.enable()
@@ -197,16 +199,18 @@ class Source(QtCore.QObject):
                     'SELECT element_id, url, hash, verified FROM {p}files WHERE url LIKE ' +
                         "'{}%'".format('file://' + self.path.replace("'", "\\'"))):
             url = urls.URL(urlstring)
-            self.addFile(url, id=elid, verified=verified, hash=elhash, store=False)
+            if url.extension in self.extensions:
+                self.addFile(url, id=elid, verified=verified, hash=elhash, store=False)
 
         toDelete = []
         for urlstring, elhash, verified in db.query("SELECT url, hash, verified FROM {p}newfiles "
             + "WHERE url LIKE '{}%'".format('file://' + self.path.replace("'", "\\'"))):
             url = urls.URL(urlstring)
-            if url.path in self.files:
-                toDelete.append((urlstring,))
-                continue
-            self.addFile(url, hash=elhash, verified=verified, store=False)
+            if url.extension in self.extensions:
+                if url.path in self.files:
+                    toDelete.append((urlstring,))
+                    continue
+                self.addFile(url, hash=elhash, verified=verified, store=False)
         if len(toDelete):
             db.multiQuery('DELETE FROM {p}newfiles WHERE url=?', toDelete)
 
@@ -249,7 +253,7 @@ class Source(QtCore.QObject):
         self.modifiedTags = {}
         self.changedHash = {}
         self.missingDB = []
-        self.fsThread = threading.Thread(target=readFilesystem, args=(self.path, self.fsFiles), daemon=True)
+        self.fsThread = threading.Thread(target=readFilesystem, args=(self.path, self), daemon=True)
         self.fsThread.start()
         self.scanInterrupted = False
         self.scanState = ScanState.initialScan
@@ -283,6 +287,7 @@ class Source(QtCore.QObject):
             if path in self.files:
                 file = self.files[path]
             else:
+                url = urls.URL.fileURL(path)
                 file = self.addFile(urls.URL.fileURL(path), store=False)
                 newfiles.append(file)
             if file.hash is None or (file.id is None and file.verified < stamp):
@@ -351,9 +356,7 @@ class Source(QtCore.QObject):
                 logging.debug(__name__, 'track {} modified'.format(os.path.basename(path)))
                 toCheck.append(file)
         if len(toCheck):
-            self.fsThread = threading.Thread(target=checkFiles,
-                                             args=(toCheck, self.modifiedTags, self.changedHash),
-                                             daemon=True)
+            self.fsThread = threading.Thread(target=checkFiles, args=(toCheck, self), daemon=True)
             self.fsThread.start()
             self.scanTimer.start(1000)
         else:
@@ -407,7 +410,8 @@ class Source(QtCore.QObject):
         logging.debug(__name__, 'scan of source {} finished'.format(self.name))
 
     def save(self):
-        return dict(name=self.name, path=self.path, domain=self.domain.id, enabled=self.enabled)
+        return dict(name=self.name, path=self.path, domain=self.domain.id, extensions=self.extensions,
+                    enabled=self.enabled)
 
     def contains(self, path) -> bool:
         """Tells whether the given *path* is contained in this source."""
@@ -530,7 +534,7 @@ class Source(QtCore.QObject):
         if len(updateHash) > 0:
             self.hashThread.lastJobDone.clear()
             for path in updateHash:
-                self.hashThread.jobQueue.put((-1, path))
+                self.hashThread.jobQueue.put(HashRequest(priority=-1, path=path))
             if self.scanState == ScanState.notScanning:
                 self.scanState = ScanState.realHashOnly
                 self.scanTimer.start(5000)
@@ -556,19 +560,20 @@ class Source(QtCore.QObject):
         return os.path.normpath(path)[len(self.path):]
     
 
-def readFilesystem(path, files: dict):
-    """Helper function that walks *path* and stores, for each found music file, an entry in *files*
+def readFilesystem(path, source: Source):
+    """Helper function that walks *path* and stores, for each found music file, an entry in source.fsFiles
     mapping its path to its modification timestamp.
     """
     for dirpath, dirnames, filenames in os.walk(path):
         for filename in filenames:
-            if utils.files.isMusicFile(filename):
+            _, ext = os.path.splitext(filename)
+            if len(ext) > 0 and ext[1:] in source.extensions:
                 absFilename = os.path.join(dirpath, filename)
                 stamp = os.path.getmtime(absFilename)
-                files[absFilename] = stamp
+                source.fsFiles[absFilename] = stamp
 
 
-def checkFiles(files: list, tagDiffs: dict, newHash: dict):
+def checkFiles(files: list, source: Source):
     """Compares database and filesystem state of *files*. If tags differ, adds an entry in
     *tagDiffs*. If the hash is different, adds an entry in *newHash*.
     """
@@ -583,11 +588,11 @@ def checkFiles(files: list, tagDiffs: dict, newHash: dict):
         backendFile.readTags()
         if dbTags.withoutPrivateTags() != backendFile.tags:
             logging.debug(__name__, 'Detected modification on file "{}": tags differ'.format(file.url))
-            tagDiffs[file] = (hash, dbTags, backendFile.tags)
+            source.modifiedTags[file] = (hash, dbTags, backendFile.tags)
         else:
             if hash != file.hash:
                 logging.debug(__name__, "audio data of {} modified!".format(file.url.path))
-            newHash[file] = hash
+            source.changedHash[file] = hash
 
 
 class HashThread(threading.Thread):

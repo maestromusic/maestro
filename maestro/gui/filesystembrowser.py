@@ -204,7 +204,7 @@ class FileSystemBrowser(mainwindow.Widget):
         source = None
         if state is not None and 'source' in state:
             source = filesystem.sourceByName(state['source'])
-        if source is None and len(filesystem.sources) > 0:
+        if source is None and len(filesystem._sources) > 0:
             source = filesystem.sources[0]
         self._handleSourceChanged(source) # initialize
         
