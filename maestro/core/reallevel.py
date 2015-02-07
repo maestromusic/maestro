@@ -17,6 +17,7 @@
 #
 
 import itertools
+import time
 import collections.abc
 
 from maestro.core import elements, levels, tags, flags, domains
@@ -468,10 +469,9 @@ class RealLevel(levels.Level):
                 if len(dbAdditions):
                     db.multiQuery('INSERT INTO {p}tags (element_id, tag_id, value_id) VALUES (?,?,?)',
                                   dbAdditions)
-                files = [ (elem.id, ) for elem in dbChanges if elem.isFile() ]
+                files = [ (elem.id, time.time()) for elem in dbChanges if elem.isFile() ]
                 if len(files) > 0:
-                    db.multiQuery('UPDATE {p}files SET verified=CURRENT_TIMESTAMP WHERE element_id=?',
-                                  files)
+                    db.multiQuery('UPDATE {p}files SET verified=? WHERE element_id=?', files)
 
         super()._changeTags(changes)
         

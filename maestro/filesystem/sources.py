@@ -20,7 +20,6 @@ import enum, collections
 import os.path
 import time
 import threading, queue
-from collections.abc import Iterable
 
 from PyQt4 import QtCore
 
@@ -193,6 +192,12 @@ class Source(QtCore.QObject):
             self.disable()
             self.enable()
 
+    def setExtensions(self, extensions):
+        self.extensions = extensions
+        if self.enabled:
+            self.disable()
+            self.enable()
+
     def load(self):
         """Load files and newfiles tables, creating the internal structure of File and Folder objects."""
         for elid, urlstring, elhash, verified in db.query(
@@ -211,6 +216,8 @@ class Source(QtCore.QObject):
                     toDelete.append((urlstring,))
                     continue
                 self.addFile(url, hash=elhash, verified=verified, store=False)
+            else:
+                toDelete.append((urlstring,))
         if len(toDelete):
             db.multiQuery('DELETE FROM {p}newfiles WHERE url=?', toDelete)
 
@@ -333,6 +340,9 @@ class Source(QtCore.QObject):
                 else:
                     hashUrls.append((hash, time.time(), str(file.url)))
         except queue.Empty:
+            if len(hashIds) + len(hashUrls):
+                logging.debug(__name__,
+                        'Adding {} new file hashes to the database'.format(len(hashIds) + len(hashUrls)))
             if len(hashIds):
                 db.multiQuery('UPDATE {p}files SET hash=?, verified=? WHERE element_id=?', hashIds)
             if len(hashUrls):

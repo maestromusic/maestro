@@ -20,7 +20,6 @@ import os, shutil
 from collections import OrderedDict
 from PyQt4 import QtCore
 import taglib
-from maestro import utils
 from maestro.core import levels, urls, tags
 from maestro import application, logging, config, stack
 from maestro.filesystem.identification import AudioFileIdentifier
@@ -35,6 +34,8 @@ def init():
     global _sources
     from maestro.filesystem.sources import Source
     _sources = [Source(**data) for data in config.storage.filesystem.sources]
+    #TODO: remove entries in newfiles that are not contained in any source (may happen if sources are deleted,
+    #path changed, ...
     _sources.sort(key=lambda s: s.name)
         # register the file:// URL scheme
     urls.fileBackends.append(RealFile)
@@ -88,7 +89,7 @@ def _deleteSource(source):
 
 
 def changeSource(source, **data):
-    oldData = {attr: getattr(source, attr) for attr in ['name', 'path', 'domain', 'extensions', 'enabled']}
+    oldData = {attr: getattr(source, attr) for attr in ('name', 'path', 'domain', 'extensions', 'enabled')}
     stack.push(translate('filesystem', "Change source"),
                stack.Call(_changeSource, source, data),
                stack.Call(_changeSource, source, oldData))
@@ -102,7 +103,7 @@ def _changeSource(source, data):
     if 'domain' in data:
         source.domain = data['domain']
     if 'extensions' in data:
-        source.extensions = data['extensions']
+        source.setExtensions(data['extensions'])
     if 'enabled' in data:
         source.setEnabled(data['enabled'])
     application.dispatcher.emit(SourceChangeEvent(application.ChangeType.changed, source))
