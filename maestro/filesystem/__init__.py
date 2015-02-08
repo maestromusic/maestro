@@ -231,7 +231,8 @@ class RealFile(urls.BackendFile):
         If some tags cannot be saved due to restrictions of the underlying metadata format, those
         tags/values that remain unsaved will be returned.
         """
-        assert self._taglibFile is not None
+        if not self._taglibFile:
+            raise OSError('Unable to write tags to file {}'.format(self.url.path))
         self._taglibFile.tags = dict()
         for tag, values in self.specialTags.items():
             self._taglibFile.tags[tag.upper()] = values

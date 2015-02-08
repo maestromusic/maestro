@@ -239,8 +239,13 @@ class ModifiedTagsDialog(QtGui.QDialog):
         backendFile = self.file.url.backendFile()
         backendFile.readTags()
         backendFile.tags = self.dbTags.withoutPrivateTags()
-        backendFile.saveTags()
-        self.accept()
+        try:
+            backendFile.saveTags()
+            self.accept()
+        except OSError:
+            from maestro.gui.dialogs import warning
+            warning(self.tr('Unable to save tags'), 'Could not save tags: unknown OS error')
+            self.reject()
     
     def useFSTags(self):
         """Use the tags from filesystem. Here, we need to first check if there are any not-in-DB
