@@ -57,8 +57,8 @@ options. Use 'loadPlugins' and 'removePlugins' to add or remove plugin configura
 
 import functools
 
-from .config import *
-from .. import logging, VERSION
+from maestro.config.config import *
+from maestro import logging, VERSION
 
 # Directory of the configuration files.
 CONFDIR = None
@@ -100,13 +100,13 @@ def init(cmdConfig=[], testMode=False):
             option, value = (s.strip() for s in line.split('=', 2))
             getFile(options).setTemporaryValue(option, value)
         except KeyError:
-            logging.error(__name__, "Unknown config option on command line '{}'.".format(line))
+            logging.error(__name__, 'Unknown config option on command line "{}".'.format(line))
         except:
-            logging.error(__name__, "Invalid config option on command line '{}'.".format(line))
+            logging.error(__name__, 'Invalid config option on command line "{}".'.format(line))
   
   
 def shutdown():
-    """Store the configuration persistently on application shutdown."""
+    '''Store the configuration persistently on application shutdown.'''
     for file in [options, storage, binary]:
         file = getFile(file)
         try:
@@ -117,7 +117,7 @@ def shutdown():
 
 # No use to translate strings here, as this is executed before any translators have been loaded.
 configOptions = collections.OrderedDict((
-("main", {
+('main', {
     'plugins': (list, [], 'List of plugin names (i.e. the name of the corresponding directory in /maestro/plugins/'),
     'audio_extensions': (list, ['ogg', 'flac', 'oga', 'mp3', 'mpc', 'wv', 'spx', 'tta', 'm4a', 'm4r', 'm4b',
                                 'm4p', '3g2', 'mp4', 'wma', 'asf', 'aif', 'aiff', 'wav', 'ape', 'mod',
@@ -125,116 +125,117 @@ configOptions = collections.OrderedDict((
                          'List of file extensions treated as audio files')
 }),
     
-("i18n", {
+('i18n', {
     # An empty locale will start the install tool
-    "locale": (str, '', "The locale used by Maestro (e.g. de_DE)."),
+    'locale': (str, '', 'The locale used by Maestro (e.g. de_DE).'),
 }),
 
-("database", {
-    "type": (str, "sqlite", 'Database type, usually "sqlite" or "mysql".'),
-    "driver": (str, '', "(Optional) database driver to use, e.g. 'mysqldb', 'mysqlconnector'."),
-    "name": (str, "maestro", "Name of the database"),
-    "user": (str, "", "User name"),
-    "password": (str, "", "Password"),
-    "host": (str, "localhost", "Host name of the database server"),
-    "port": (int, 0, "Port of the database server"),    
-    "sqlite_path": (str, "config:maestro.db", "Path to the SQLite database. May start with 'config:' indicating that the path is relative to the configuration directory."),
-    "prefix":  (str, "", "Prefix which will be prepended to the table names."),
+('database', {
+    'type': (str, 'sqlite', "Database type, usually 'sqlite' or 'mysql'."),
+    'driver': (str, '', '(Optional) database driver to use, e.g. "mysqldb", "mysqlconnector".'),
+    'name': (str, 'maestro', 'Name of the database'),
+    'user': (str, '', 'User name'),
+    'password': (str, '', 'Password'),
+    'host': (str, 'localhost', 'Host name of the database server'),
+    'port': (int, 0, 'Port of the database server'),    
+    'sqlite_path': (str, 'config:maestro.db', 'Path to the SQLite database. May start with "config:" indicating that the path is relative to the configuration directory.'),
+    'prefix':  (str, '', 'Prefix which will be prepended to the table names.'),
 }),
 
-("tags", {
-    "title_tag": (str, "title", "Key of the title-tag."),
-    "album_tag": (str, "album", "Key of the album-tag."),
-    "auto_delete": (list, [], "list of tags that will be removed from files when they are imported into the editor"),
-    "auto_replace": (str, '', "list of of tag pairs. When files are imported to the editor, tags are replaced according to these pairs. Each list entry must be of the form '(albumartist,performer)'.")
+('tags', {
+    'title_tag': (str, 'title', 'Key of the title-tag.'),
+    'album_tag': (str, 'album', 'Key of the album-tag.'),
+    'auto_delete': (list, [], 'list of tags that will be removed from files when they are imported into the editor'),
+    'auto_replace': (str, '', 'list of of tag pairs. When files are imported to the editor, tags are replaced according to these pairs. Each list entry must be of the form "(albumartist,performer)".')
 }),
 
-("gui", {
-    "mime": (str, "application/x-maestroelementlist", "Mime-type used to copy and paste data within Maestro."),
-    "iconsize": (int, 16, "Size of various icons."),
-    "flageditor": {
-                "animation": (bool, True, "Enable/disable animations in the flageditor."),
-                "max_tooltip_lines": (int, 5, "Maximum number of lines that will be shown in a tooltip (containing element titles) in the flageditor.")
+('gui', {
+    'mime': (str, 'application/x-maestroelementlist', 'Mime-type used to copy and paste data within Maestro.'),
+    'iconsize': (int, 16, 'Size of various icons.'),
+    'flageditor': {
+                'animation': (bool, True, 'Enable/disable animations in the flageditor.'),
+                'max_tooltip_lines': (int, 5, 'Maximum number of lines that will be shown in a tooltip (containing element titles) in the flageditor.')
     },
-    "browser": {
-                "max_view_count": (int, 5, "The maximal number of views the browser will allow."),
+    'browser': {
+                'max_view_count': (int, 5, 'The maximal number of views the browser will allow.'),
     }
 }),
-("filesystem", {
-    "acoustid_apikey": (str, "VGPeEVtB", "API key for AcoustID web service"),
+('filesystem', {
+    'acoustid_apikey': (str, 'VGPeEVtB', 'API key for AcoustID web service'),
+    'disable': (bool, False, 'Disable all filesystem tracking, overriding the individuial sources\' configuration')
 }),
-("misc", {
-    "show_ids": (bool, False, "Whether Maestro should display element IDs"),
-    "cover_path": (str, "covers", "Path where Maestro stores and caches covers. Relative paths are interpreted as relative to the config directory."),
-    "cover_extension": (str, "png", "Extension that is used to save covers. Must be supported by Qt. Note that Last.fm, which is where covers are downloaded by default, uses png's."),
-    "consoleLogLevel": (str, "",
-                        "Log-messages of this loglevel and higher are additionally printed to stderr. Leave it empty to use the configuration specified in the logging configuration (storage.options.main.logging)."),
-    "debug_events": (bool, False, "Whether to print a debug message for each change event.")
+('misc', {
+    'show_ids': (bool, False, 'Whether Maestro should display element IDs'),
+    'cover_path': (str, 'covers', 'Path where Maestro stores and caches covers. Relative paths are interpreted as relative to the config directory.'),
+    'cover_extension': (str, 'png', 'Extension that is used to save covers. Must be supported by Qt. Note that Last.fm, which is where covers are downloaded by default, uses png\'s.'),
+    'consoleLogLevel': (str, '',
+                        'Log-messages of this loglevel and higher are additionally printed to stderr. Leave it empty to use the configuration specified in the logging configuration (storage.options.main.logging).'),
+    'debug_events': (bool, False, 'Whether to print a debug message for each change event.')
 }),
 ))
 
 
 # Remember that values of types tuple or dict must be enclosed in a tuple
 storageOptions = collections.OrderedDict((
-("main", {
+('main', {
     # Configuration for logging.config.dictConfig.
     # Confer http://docs.python.org/py3k/library/logging.config.html#logging-config-dictschema
     # To change logging temporarily, copy this into your storage file and change it.
     'logging': ({
-        "version": 1,
-        "formatters": {
-            "formatter": {"format": "%(asctime)s: %(levelname)s - %(message)s"},
+        'version': 1,
+        'formatters': {
+            'formatter': {'format': '%(asctime)s: %(levelname)s - %(message)s'},
         },
-        "handlers": {
-            "consoleHandler": {
-                "class": "logging.StreamHandler",
-                "level": "DEBUG",
-                "formatter": "formatter",
-                "stream": "ext://sys.stdout",
+        'handlers': {
+            'consoleHandler': {
+                'class': 'logging.StreamHandler',
+                'level': 'DEBUG',
+                'formatter': 'formatter',
+                'stream': 'ext://sys.stdout',
             },
-            "fileHandler": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "level": "DEBUG",
-                "formatter": "formatter",
-                "filename": os.path.join(os.path.expanduser("~"), ".config", "maestro", "maestro.log"),
-                "mode": 'a',
-                "maxBytes": 2000,
-                "backupCount": 2
+            'fileHandler': {
+                'class': 'logging.handlers.RotatingFileHandler',
+                'level': 'DEBUG',
+                'formatter': 'formatter',
+                'filename': os.path.join(os.path.expanduser('~'), '.config', 'maestro', 'maestro.log'),
+                'mode': 'a',
+                'maxBytes': 2000,
+                'backupCount': 2
             }
         },
-        "root": {
-            "level": "DEBUG",
-            "handlers": ["consoleHandler", "fileHandler"]
+        'root': {
+            'level': 'DEBUG',
+            'handlers': ['consoleHandler', 'fileHandler']
         }
       },),
 }),
-("editor", {
-    'format_string' : "%{artist}/%{date} - %{album}/%{tracknumber} - %{title}.%{*}",
+('editor', {
+    'format_string' : '%{artist}/%{date} - %{album}/%{tracknumber} - %{title}.%{*}',
     'albumguesser_profiles': [],
 }),
-("gui", {
+('gui', {
     'perspectives': ({},),
     'delegates': [],
     'layoutFrozen': False,
     'merge_dialog_container_type': None,
     'tag_editor_include_contents': True,
 }),
-("player", {
+('player', {
     'profiles': [],
 }),
-("filesystem", {
+('filesystem', {
     'sources': [],
 }),
-("misc", {
+('misc', {
     'last_cover_check': 0,
 }),
 ))
 
 binaryOptions = {
-"gui": {
-    "mainwindow_geometry": None,
-    "mainwindow_maximized": False,
-    "mainwindow_state": None,
-    "preferences_geometry": None,
+'gui': {
+    'mainwindow_geometry': None,
+    'mainwindow_maximized': False,
+    'mainwindow_state': None,
+    'preferences_geometry': None,
 }
 }

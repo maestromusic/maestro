@@ -153,7 +153,7 @@ class Source(QtCore.QObject):
         self.scanTimer.timeout.connect(self.checkScan)
         self.extensions = list(extensions)
         self.enabled = False
-        if enabled:
+        if enabled and not config.options.filesystem.disable:
             self.enable()
 
     def setEnabled(self, enabled: bool):
