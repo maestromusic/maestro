@@ -20,31 +20,6 @@ from . import criteria
 from .. import database as db, config, utils
 from ..core import tags
 
-# Name of the temporary search table
-# The table is created in the search thread and temporary, so that it does not conflict with other threads.
-TT_HELP = db.prefix+'tmp_help'
-
-
-def init():
-    """Initialize the search module."""
-    # Using temporary tables is important when several (worker) threads use the search function
-    # at the same time: With temporary tables each thread has its own help table.
-    if db.type == 'mysql':
-        db.query("""
-            CREATE TEMPORARY TABLE IF NOT EXISTS {} (
-                value_id MEDIUMINT UNSIGNED NOT NULL,
-                tag_id MEDIUMINT UNSIGNED NULL,
-                INDEX(value_id, tag_id))
-                CHARACTER SET 'utf8'
-            """.format(TT_HELP))
-    else:
-        db.query("""
-            CREATE TABLE IF NOT EXISTS {} (
-                value_id  MEDIUMINT UNSIGNED NOT NULL,
-                tag_id MEDIUMINT UNSIGNED NULL)
-            """.format(TT_HELP))
-        db.query("CREATE INDEX IF NOT EXISTS {0}_idx ON {0} (value_id, tag_id)".format(TT_HELP))
-
 
 def search(searchCriterion, domain=None):
     """Process the given search criterion. Store the results in the attribute 'result' of the criterion."""

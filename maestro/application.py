@@ -251,9 +251,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     # Load and initialize remaining modules
     from maestro.core import levels
     levels.init()
-    from . import search, profiles
+    from . import profiles
     from maestro.core import covers
-    search.init()
     covers.init()
 
     global network

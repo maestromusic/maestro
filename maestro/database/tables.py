@@ -86,7 +86,7 @@ values_varchar = Table(prefix+'values_varchar', metadata,
     Column('sort_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
     Column('search_value', String(tagsModule.TAG_VARCHAR_LENGTH)),
     Column('hide', Boolean, nullable=False, server_default='0'),
-    Index(prefix+'values_varchar_idx', "tag_id", "parameter", "value"),
+    Index(prefix+'values_varchar_idx', "tag_id", "value"),
     mysql_engine='InnoDB'
 )
 

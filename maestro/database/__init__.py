@@ -76,6 +76,7 @@ class FlexiDateType(sqlalchemy.types.TypeDecorator):
 
 
 def createEngine(**kwargs):
+    """Create an SqlAlchemy-engine. Usually you should use the module-level variable 'engine'."""
     if kwargs['type'] == 'sqlite':
         url = 'sqlite:///'+kwargs['path'] # absolute paths will have 4 slashes
         def creator():
@@ -85,7 +86,7 @@ def createEngine(**kwargs):
             connection.create_function('regexp', 2, lambda p, s: re.search(p, s) is not None)
             return connection
         
-        return sqlalchemy.create_engine(url, creator=creator)
+        return sqlalchemy.create_engine(url, creator=creator, poolclass=sqlalchemy.pool.SingletonThreadPool)
     else:
         # full url: {type}+{driver}://{user}:{password}@{host}:{port}/{name}
         # leave out driver and port parts if not specified
@@ -101,10 +102,16 @@ def createEngine(**kwargs):
 
 
 def connect(**kwargs):
-    return createEngine(**kwargs).connect()
+    """Return an SqlAlchemy-connection, creating the engine first if necessary. Each thread will have
+    exactly one connection."""
+    if engine is None:
+        init()
+    return engine.connect()
 
 
 def init(**kwargs):
+    """Initialize the database module: Create the global engine and connect to the main database using the
+    information from the config file."""
     # connect to default database with args from config
     global type, prefix, engine, driver, tags
     import maestro.database.tags
@@ -149,6 +156,7 @@ def init(**kwargs):
 
 
 def shutdown():
+    """Close database connection."""
     engine.dispose()
 
 def nextId():
@@ -179,6 +187,17 @@ def createTables():
     
     
 def query(queryString, *args, **kwargs):
+    """Execute an SQL query. *queryString* may contain two kinds of placeholders:
+    
+        - {name}: Named arguments in braces will be replaced by the corresponding *kwargs*. One argument is
+          always defined: {p} will be replaced by the database prefix.
+        - '?' remain in the query and mark a place where the database needs to insert a parameter.
+          The list of parameters is provided by *args* and is sent to the database separately. Thus, this
+          is faster than inserting *args* into *queryString* and letting the database parse the parameters
+          out of the query again. 
+    
+    In general you should use '?' for data and {...} to insert variable parts of the query logic.
+    """
     kwargs['p'] = prefix
     queryString = queryString.format(**kwargs)
     if len(args) > 0 and driver == 'mysqlconnector':
@@ -189,9 +208,12 @@ def query(queryString, *args, **kwargs):
     return SqlResult(result)
 
 def multiQuery(queryString, args, **kwargs):
+    """Like 'query', but *args* is an iterable of argument list. The method will execute one query per
+    argument list."""
     return query(queryString, *args, **kwargs)# = query # just submit tuples as *args
 
 def transaction():
+    """Start a database transaction."""
     return engine.begin()
 
 def getDate(value):
