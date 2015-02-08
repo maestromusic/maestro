@@ -227,7 +227,6 @@ class ModifiedTagsDialog(QtGui.QDialog):
         
         dbButton = QtGui.QPushButton(self.tr("use DB tags"))
         fsButton = QtGui.QPushButton(self.tr("use disk tags"))
-        
         layout.addWidget(dbButton, 2, 0)
         layout.addWidget(fsButton, 2, 1)
         
