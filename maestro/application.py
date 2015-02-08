@@ -241,7 +241,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
             runInstaller()
             
         # In most test scripts these caches would only be overhead.
-        database.cacheTagValues()
+        database.tags.cacheValues()
         
     flags.init()
     
@@ -251,9 +251,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     # Load and initialize remaining modules
     from maestro.core import levels
     levels.init()
-    from . import search, profiles
+    from . import profiles
     from maestro.core import covers
-    search.init()
     covers.init()
 
     global network
@@ -301,7 +300,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     plugins.shutdown()
     covers.shutdown()
     profiles.manager.save()
-    database.deleteSuperfluousTagValues()
+    database.tags.deleteSuperfluousValues()
     database.shutdown()
     config.shutdown()
     logging.shutdown()

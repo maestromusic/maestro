@@ -492,29 +492,28 @@ def export(profile):
         
 def exportSQLite():
     """Ask the user for an SQLite-database file and export the whole database to it."""
-    from ...gui import mainwindow
+    from maestro.gui import mainwindow
     path = QtGui.QFileDialog.getSaveFileName(mainwindow.mainWindow, "Choose export location",
                                              os.path.expanduser('~'))
     if not path:
         return
     if os.path.exists(path):
         os.remove(path)
-    from ...database.sql import sqlite
-    dbNew = sqlite.Sql()
-    dbNew.connect(path)
-    from ...database import tables
-    for table in tables.sortedList():
-        for query in table.createQueries['sqlite']:
-            print(query)
-            dbNew.query(query)
-    for table in tables.sortedList():
-        unprefixedTableName = table.name[len(db.prefix):]
-        dbNew.query("ALTER TABLE {} RENAME TO {}".format(table.name, unprefixedTableName))
-        columns = ','.join(table.columns)
-        result = list(db.query("SELECT {columns} FROM {table}", columns=columns, table=table.name))
-        print("INSERT INTO {table} ({columns}) VALUES ({qm})"\
-                        .format(table=unprefixedTableName, columns=columns,
-                                qm=','.join(['?']*len(table.columns))))
-        dbNew.multiQuery("INSERT INTO {table} ({columns}) VALUES ({qm})",
-                         result,
-                         table=unprefixedTableName, columns=columns, qm=','.join(['?']*len(table.columns)))
+        
+    from maestro.database import tables
+    from sqlalchemy import MetaData, Table
+    
+    engine = db.createEngine(type='sqlite', path=path)
+    metadata = MetaData(engine)
+    
+    for table in tables.metadata.sorted_tables:
+        newName = table.name[len(db.prefix):] # do not use a prefix in exported table
+        newTable = Table(newName, metadata)
+        for column in table.columns:
+            newTable.append_column(column.copy())
+        newTable.create()
+        
+        # Copy data
+        data = db.engine.execute(table.select()).fetchall()
+        if data:
+            engine.execute(newTable.insert(), data)

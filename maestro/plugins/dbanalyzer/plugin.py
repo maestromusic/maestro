@@ -251,7 +251,7 @@ class DBAnalyzer(mainwindow.Widget):
         """Gather and return the data for the statistics table."""
         length = db.query("SELECT SUM(length) FROM {}files".format(db.prefix)).getSingle()
         # SQL's SUM returns NULL if files is empty
-        if db.isNull(length):
+        if length is None:
             length = 0
             
         return [

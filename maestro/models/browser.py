@@ -399,8 +399,6 @@ class TagLayer(Layer):
             WHERE t.tag_id IN ({tagFilter}) AND t.element_id IN ({idFilter})
             """, tagFilter=tagFilter, idFilter=idFilter)
         for tagId, valueId, value, hide, sortValue in result:
-            if db.isNull(sortValue):
-                sortValue = None
             matching = (tagId,valueId) in matchingTags
             nodes[value].addTagValue(tagId, valueId, value, hide, sortValue, matching)
             

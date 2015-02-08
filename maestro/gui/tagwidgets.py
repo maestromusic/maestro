@@ -466,7 +466,7 @@ class TagValueEditor(QtGui.QWidget):
             else: completionStrings = []
 
             if tag.type == tags.TYPE_VARCHAR and tag != tags.TITLE:
-                ext = [str(value) for value in db.allTagValues(tag) if str(value) not in completionStrings]
+                ext = [str(value) for value in db.tags.getValues(tag) if str(value) not in completionStrings]
                 completionStrings.extend(ext)
 
             if len(completionStrings) > 0:
@@ -772,9 +772,9 @@ class TagValuePropertiesWidget(QtGui.QWidget):
     def setValue(self, tag, valueId):
         self.tag = tag
         self.valueId = valueId
-        self.orig_hidden = db.hidden(tag, valueId)
-        self.origSortValue = db.sortValue(tag, valueId)
-        self.origValue = db.valueFromId(tag, valueId)
+        self.orig_hidden = db.tags.hidden(tag, valueId)
+        self.origSortValue = db.tags.sortValue(tag, valueId)
+        self.origValue = db.tags.value(tag, valueId)
         self.valueEdit.setTag(tag)
         self.valueEdit.setEnabled(False)
         self.changeValueCheckbox.setChecked(False)
@@ -804,7 +804,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         if self.changeValueCheckbox.isChecked() and self.valueEdit.getValue() != self.origValue:
             tagcommands.renameTagValue(self.tag, self.origValue, self.valueEdit.getValue())
             self.origValue = self.valueEdit.getValue()
-            self.valueId = db.idFromValue(self.tag, self.origValue)
+            self.valueId = db.tags.id(self.tag, self.origValue)
         if self.sortValueCheckbox.isChecked():
             if self.sortEdit.text() != self.origSortValue:
                 command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.origSortValue,

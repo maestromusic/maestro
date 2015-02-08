@@ -111,8 +111,6 @@ class SearchAnalyzer(mainwindow.Widget):
             if i == 0:
                 self.table.setColumnCount(len(row))
             for j, data in enumerate(row):
-                if db.isNull(data):
-                    data = None
                 item = QtGui.QTableWidgetItem(str(data))
                 item.setFlags(Qt.ItemIsEnabled)
                 self.table.setItem(i, j, item)

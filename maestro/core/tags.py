@@ -126,11 +126,8 @@ def loadTagTypesFromDB():
         
     for row in result:
         id, tagName, valueType, title, iconPath, private = row
-        if db.isNull(title) or title == "":
+        if title == '':
             title = None
-            
-        if db.isNull(iconPath):
-            iconPath = None
         valueType = ValueType.byName(valueType)
         newTag = Tag(tagName, id, valueType, title, iconPath, private)
         _tagsById[newTag.id] = newTag
@@ -147,8 +144,9 @@ class ValueType:
         - *description* is a description that will be displayed to the user
         
     """
-    def __init__(self, name, description):
+    def __init__(self, name, table, description):
         self.name = name
+        self._table = table
         self.description = description
 
     @staticmethod
@@ -158,6 +156,11 @@ class ValueType:
             if type.name == name:
                 return type
         else: raise IndexError("There is no value type with name '{}'.".format(name))
+        
+    @property
+    def table(self):
+        """Return the name of the values_* table in which this type is stored."""
+        return db.prefix+self._table # db.prefix is only available after init
         
     def isValid(self, value):
         """Return whether the given value is a valid tag-value for tags of this type."""
@@ -177,18 +180,19 @@ class ValueType:
         if self.name == 'varchar':
             string = str(value)
             if len(string) == 0:
-                raise TagValueError("varchar tags must have length > 0")
+                raise TagValueError("{} tags must have length > 0".format(self.name))
             if len(string.encode()) > TAG_VARCHAR_LENGTH:
                 if crop:
                     if logCropping:
                         logging.warning(__name__,
-                                        'Cropping a string that is too long for varchar tags: {}...'
-                                       .format(string[:30]))
+                                        'Cropping a string that is too long for {} tags: {}...'
+                                       .format(self.name, string[:30]))
                     # Of course this might split in the middle of a unicode character. But errors='ignore'
                     # will silently remove the fragments 
                     encoded = string.encode()[:TAG_VARCHAR_LENGTH]
                     return encoded.decode(errors='ignore')
-                else: raise TagValueError("String is too long for a varchar tag: {}...".format(string[:30]))
+                else: raise TagValueError("String is too long for a {} tag: {}..."
+                                          .format(self.name, string[:30]))
             return string
         elif self.name == 'text':
             string = str(value)
@@ -246,9 +250,12 @@ class ValueType:
 
 
 # Module variables for the existing types
-TYPE_VARCHAR = ValueType('varchar', translate("tags", "Standard type for normal (not too long) text values"))
-TYPE_TEXT = ValueType('text', translate("tags", "Type for long texts (like e.g. lyrics)"))
-TYPE_DATE = ValueType('date', translate("tags", "Type for dates"))
+TYPE_VARCHAR = ValueType('varchar', 'values_varchar',
+                         translate("tags", "Standard type for normal (not too long) text values"))
+TYPE_TEXT = ValueType('text', 'values_text',
+                      translate("tags", "Type for long texts (like e.g. lyrics)"))
+TYPE_DATE = ValueType('date', 'values_date',
+                      translate("tags", "Type for dates"))
 TYPES = [TYPE_VARCHAR, TYPE_TEXT, TYPE_DATE]
     
     
@@ -345,7 +352,7 @@ class Tag:
         """
         if self.type is None:
             return str(value)
-        else: return self.type.convertValue(value, crop)
+        else: return self.type.convertValue(value, crop, logCropping)
     
     def canConvert(self, value, crop=False):
         """Return whether *value* can be converted into this type using convertValue. For *crop* see
@@ -357,18 +364,18 @@ class Tag:
             return False
         else: return True
         
+    def sqlFormat(self, value):
+        """Convert *value* into a string that can be inserted into database queries."""
+        if self.type is None:
+            raise ValueError("sqlFormat can only be used with internal tags, not for {}".format(self))
+        return self.type.sqlFormat(value)
+    
     def fileFormat(self, string):
         """Format a value suitable for writing to a file."""
         if self.type is not None:
             return self.type.fileFormat(string)
         return string
     
-    def sqlFormat(self, value):
-        """Convert *value* into a string that can be inserted into database queries."""
-        if self.type is None:
-            raise ValueError("sqlFormat can only be used with internal tags, not for {}".format(self))
-        return self.type.sqlFormat(value)
-
     def __repr__(self):
         return '"{}"'.format(self.name)
 
@@ -645,7 +652,8 @@ def _convertTagTypeOnLevels(tagType, valueType):
     changes = []
     for level in levels.allLevels:
         diffs = {}
-        for element in level.elements.values(): # only external elements possible => won't take too long
+        # note: changeTagType does not allow tag changes when the tag appears in elements 
+        for element in level.elements.values():
             if tagType in element.tags:
                 oldValues = element.tags[tagType]
                 newValues = list(map(valueType.convertValue if valueType is not None else str, oldValues))

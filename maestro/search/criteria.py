@@ -461,14 +461,29 @@ class AbstractTagCriterion(Criterion):
     for date-tags). A search-string like "1799" will be parsed to a DateCriterion having set both
     self.value and self.interval, leading to both a date-search and a text-search.
     """
+    
+    # Name of the temporary search table
+    # The table is created in the search thread and temporary, so that it does not conflict with other threads.
+    HELP_TABLE = db.prefix + "tmp_help" 
+    
     def process(self, fromTable, domain):
-        # Truncate help table
-        #==================
-        from . import TT_HELP
-        if db.type == 'mysql':
-            # truncate may be much faster than delete http://dev.mysql.com/doc/refman/5.6/en/delete.html
-            db.query("TRUNCATE {}".format(TT_HELP))
-        else: db.query("DELETE FROM {}".format(TT_HELP))
+        # Prepare help table
+        #===================
+        if not db.engine.dialect.has_table(db.engine.connect(), self.HELP_TABLE):
+            from sqlalchemy import MetaData, Integer, Table, Column, Index
+            metadata = MetaData(db.engine)
+            helpTable = Table(self.HELP_TABLE, metadata,
+                Column('value_id', Integer, nullable=False), 
+                Column('tag_id', Integer, nullable=False),     
+                Index('value_id', 'tag_id'),
+                prefixes=['TEMPORARY']  
+            )
+            helpTable.create()
+        else:
+            if db.type == 'mysql':
+                # truncate may be much faster than delete http://dev.mysql.com/doc/refman/5.6/en/delete.html
+                db.query("TRUNCATE {}".format(self.HELP_TABLE))
+            else: db.query("DELETE FROM {}".format(self.HELP_TABLE))
         
         # Select matching values and put them into help table
         #====================================================
@@ -534,9 +549,11 @@ class AbstractTagCriterion(Criterion):
             db.query("""
                     INSERT INTO {help} (value_id, tag_id)
                         SELECT id, tag_id
-                        FROM {p}values_{type}
+                        FROM {table}
                         WHERE {where}
-                    """, *args, help=TT_HELP, type=valueType.name, where=' AND '.join(whereClauses))
+                    """, *args,
+                    help=self.HELP_TABLE, table=valueType.table,
+                    where=' AND '.join(whereClauses) if len(whereClauses) > 0 else '1')
             #print("1: "+str(time.perf_counter()-perf))
             if pragmaNecessary:
                 db.query('PRAGMA case_sensitive_like = 0')
@@ -545,9 +562,9 @@ class AbstractTagCriterion(Criterion):
                 
         # Store values that match
         #=================================================
-        if db.query("SELECT COUNT(*) FROM {help}", help=TT_HELP).getSingle() <= MAX_MATCHING_TAGS:
+        if db.query("SELECT COUNT(*) FROM {help}", help=self.HELP_TABLE).getSingle() <= MAX_MATCHING_TAGS:
             self.matchingTags = set(tuple(r) for r in db.query("SELECT tag_id, value_id FROM {help}",
-                                                               help=TT_HELP))
+                                                               help=self.HELP_TABLE))
         yield
         
         # Select elements which have these values (or not)
@@ -561,7 +578,7 @@ class AbstractTagCriterion(Criterion):
                     JOIN {p}tags AS t ON el.id = t.element_id
                     JOIN {help} AS h USING(tag_id, value_id)
                     WHERE {where}
-                """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColumn())
+                """, table=fromTable, help=self.HELP_TABLE, where=domainWhereClause).getSingleColumn())
         else: 
             self.result = set(db.query("""
                 SELECT el.id
@@ -571,7 +588,7 @@ class AbstractTagCriterion(Criterion):
                 WHERE {where}
                 GROUP BY el.id
                 HAVING COUNT(h.value_id) = 0
-                """, table=fromTable, help=TT_HELP, where=domainWhereClause).getSingleColumn())
+                """, table=fromTable, help=self.HELP_TABLE, where=domainWhereClause).getSingleColumn())
         #print("2: "+str(time.perf_counter()-perf))
     
     def _escapeParameter(self, parameter):

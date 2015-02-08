@@ -610,7 +610,7 @@ def checkFiles(files: list, source: Source):
         if file.id in levels.real:
             dbTags = levels.real.collect(file.id).tags
         else:
-            dbTags = db.tags(file.id)
+            dbTags = db.tags.getStorage(file.id)
         backendFile = file.url.backendFile()
         backendFile.readTags()
         if dbTags.withoutPrivateTags() != backendFile.tags:
