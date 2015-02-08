@@ -367,9 +367,9 @@ class Source(QtCore.QObject):
         for path, stamp in self.fsFiles.items():
             file = self.files[path]
             if file.id and stamp > file.verified:
-                logging.debug(__name__, '"{}" modified since last check'.format(os.path.basename(path)))
                 toCheck.append(file)
         if len(toCheck):
+            logging.debug(__name__, '{} files modified since last check'.format(len(toCheck)))
             self.fsThread = threading.Thread(target=checkFiles, args=(toCheck, self), daemon=True)
             self.fsThread.start()
             self.scanTimer.start(1000)
@@ -384,7 +384,7 @@ class Source(QtCore.QObject):
                 from . import dialogs
                 dialog = dialogs.ModifiedTagsDialog(file, dbTags, fileTags)
                 dialog.exec_()
-                if dialog.Accepted:
+                if dialog.result() == dialog.Accepted:
                     file.verified = time.time()
                     file.hash = hash
                     updates.append(file)

@@ -188,7 +188,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
             self.stackedLayout.setCurrentIndex(0)
         else:
             if profile not in self.profileWidgets:
-                widget = profile.configurationWidget(self)
+                widget = profile.configurationWidget(profile, self)
                 if widget is None:
                     widget = QtGui.QLabel(self.tr("There are no options for this profile."))
                     widget.setAlignment(Qt.AlignLeft | Qt.AlignTop)
@@ -579,26 +579,33 @@ class ProfileComboBox(QtGui.QComboBox):
         else:
             return super().mousePressEvent(event)
         
-        
+
+class ProfileConfigurationWidget(QtGui.QWidget):
+    """Base class for widgets that configure profiles."""
+    def __init__(self, profile, parent=None):
+        super().__init__(parent)
+        self.profile = profile
+
+    def setProfile(self, profile: profiles.Profile):
+        raise NotImplementedError()
+
+
 class ProfileActionWidget(QtGui.QWidget):
     """A ProfileActionWidget is used for profile categories which configure an action (e.g. export, renamer).
     The widget allows the user to make temporary changes before performing the action. To this end it
     contains a configuration widget for the specified category. This widget will however not modify
     existing categories, but always work with a temporary copy. A menu at the top allows the user to save
     the temporary profile as a normal persistent profile or to load (copies of) normal profiles.
-    """ 
-    def __init__(self, category):
+    """
+
+    def __init__(self, category: profiles.ProfileCategory):
         super().__init__()
         self.category = category
         self.category.profileAdded.connect(self._makeMenu)
         self.category.profileRemoved.connect(self._makeMenu)
         self.category.profileRenamed.connect(self._makeMenu)
-
-        if len(category.profiles()) == 0:
-            profile = category.profileClass(category.suggestProfileName())
-        else:
-            profile = category.profiles()[0].copy()
-        self.configWidget = profile.configurationWidget(self)
+        self.baseProfile = None
+        self.profile = None
 
         layout = QtGui.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -609,11 +616,19 @@ class ProfileActionWidget(QtGui.QWidget):
                                      style.pixelMetric(style.PM_LayoutRightMargin),
                                      1)
 
+        self.profileNameLabel = QtGui.QLabel()
+        topLayout.addWidget(self.profileNameLabel)
         topLayout.addStretch(1)
         self.profileButton = QtGui.QPushButton(self.tr("Profiles..."))
         topLayout.addWidget(self.profileButton)
         self._makeMenu()
         layout.addLayout(topLayout)
+        if len(category.profiles()) == 0:
+            profile = category.profileClass(category.suggestProfileName())
+        else:
+            profile = category.profiles()[0]
+        self.configWidget = profile.configurationWidget(profile, self)
+        self.setProfile(profile)
         layout.addWidget(self.configWidget)
 
     def _makeMenu(self):
@@ -622,7 +637,7 @@ class ProfileActionWidget(QtGui.QWidget):
         menu = QtGui.QMenu()
         for profile in self.category.profiles():
             action = menu.addAction(self.tr("Load '{}'").format(profile.name))
-            action.triggered.connect(functools.partial(self._setProfile, profile))
+            action.triggered.connect(functools.partial(self.setProfile, profile))
         menu.addSeparator()
         action = menu.addAction(self.tr("Save current configuration..."))
         action.triggered.connect(self._handleSave)
@@ -630,11 +645,24 @@ class ProfileActionWidget(QtGui.QWidget):
         action.triggered.connect(self._handleConfigure)
         self.profileButton.setMenu(menu)
 
-    def _setProfile(self, profile):
-        self.configWidget.setProfile(profile.copy())
+    def setProfile(self, profile: profiles.Profile):
+        self.profileNameLabel.setText(profile.name)
+        self.baseProfile = profile
+        self.profile = profile.copy()
+        self.configWidget.setProfile(self.profile)
+
+    def askSaveIfModified(self):
+        """If the temporary profile is modified compared to the base profile it was copied from, ask the
+        user to store it."""
+        if self.baseProfile and self.profile != self.baseProfile:
+            if dialogs.question(
+                    self.tr('Save profile changes?'),
+                    self.tr('You have modified the profile "{}". Do you want to store the changes?')
+                            .format(self.baseProfile.name)):
+                self.category.changeProfile(self.baseProfile, self.profile)
 
     def _handleSave(self):
-        dialog = SaveProfileDialog(self.category, self.configWidget.getProfile(), self)
+        dialog = SaveProfileDialog(self.category, self.configWidget.profile, self)
         dialog.exec_()
 
     def _handleConfigure(self):

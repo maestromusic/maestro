@@ -539,10 +539,11 @@ class MPDPlayerBackend(player.PlayerBackend):
             self.mpdPlaylist.insert(toOffset, path)
             client.move(fromOffset, toOffset)
             self.playlistVersion += 1
-    
-    def configurationWidget(self, parent):
+
+    @classmethod
+    def configurationWidget(cls, profile, parent):
         """Return a config widget, initialized with the data of the given *profile*."""
-        return MPDConfigWidget(self, parent)
+        return MPDConfigWidget(profile, parent)
     
     def getInfo(self, path):
         """Query MPD to get tags & length of the file at *path* (relative to this MPD instance).

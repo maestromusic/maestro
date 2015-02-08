@@ -49,10 +49,12 @@ class Profile(QtCore.QObject):
         application starts.
         """
         return None
-    
-    def configurationWidget(self, parent):
-        """Return a widget that can be used to configure this profile."""
-        return None
+
+    @classmethod
+    def configurationWidget(cls, profile, parent):
+        """Return a widget that can be used to configure a profile. Should be a subclass
+        of gui.preferences.profiles.ProfileConfigurationWidget."""
+        raise NotImplementedError()
     
     def copy(self):
         """Return a copy of this profile."""
@@ -114,7 +116,7 @@ class ProfileCategory(QtCore.QObject):
     profileClass = Profile
     
     def __init__(self, name, title, storageOption, profileClass=None, defaultProfileName=None,
-                 description='', iconPath='', pixmapPath='', saveImmediately=True):
+                 description='', iconPath='', pixmapPath=''):
         super().__init__()
         self.name = name
         self.title = title
@@ -135,7 +137,6 @@ class ProfileCategory(QtCore.QObject):
         else: self.defaultProfileName = title
         
         self.description = description
-        self.saveImmediately = saveImmediately
     
     def get(self, name):
         """Return the profile with the given name or None if no such profile exists."""

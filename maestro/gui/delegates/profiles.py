@@ -233,10 +233,11 @@ class DelegateProfile(profiles.Profile):
         not work, if the profile does not have a type."""
         self._updateFromState(self.type.defaultState())
         category.profileChanged.emit(self)
-    
-    def configurationWidget(self, parent):
+
+    @classmethod
+    def configurationWidget(cls, profile, parent):
         from ..preferences.delegates import DelegateOptionsPanel
-        return DelegateOptionsPanel(self, parent)
+        return DelegateOptionsPanel(profile, parent)
         
 
 class DataPiece:
