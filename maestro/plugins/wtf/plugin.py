@@ -403,7 +403,7 @@ class FlagDialog(dialogs.FancyPopup):
                     cList.append(c)
             if len(selectedFlags) > 0:
                 cList.append(criteria.FlagCriterion(selectedFlags))
-            newCriterion = criteria.MultiCriterion('OR', newCriteria)
+            newCriterion = criteria.MultiCriterion('OR', cList)
         else:
             if len(selectedFlags) > 0:
                 cList = [criterion, criteria.FlagCriterion(selectedFlags)]

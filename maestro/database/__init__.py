@@ -517,8 +517,8 @@ def sortValue(tagSpec, valueId, valueIfNone = False):
 #=======================================================================
 def tags(elid):
     result = tagsModule.Storage()
-    for (tagId,value) in listTags(elid):
-        result.add(tagId,value)
+    for (tagId, value) in listTags(elid):
+        result.add(tagId, value)
     return result
 
 
