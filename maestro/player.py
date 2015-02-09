@@ -35,6 +35,7 @@ class ConnectionState(enum.Enum):
     Connecting = 1
     Connected = 2
 
+
 profileCategory = profiles.TypedProfileCategory(
     name = 'playback',
     title = translate('PlayerBackend','Playback'),

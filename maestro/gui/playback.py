@@ -268,14 +268,15 @@ class PlayPauseButton(QtGui.QToolButton):
     # Signals and icons used for the two states
     playIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_start", ICON_SIZE, ICON_SIZE))
     pauseIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_pause", ICON_SIZE, ICON_SIZE))
-    stateChanged = QtCore.pyqtSignal(int)
+    stateChanged = QtCore.pyqtSignal(player.PlayState)
     
     def __init__(self, parent=None):
         """Initialize this button with the given parent. The button will be in pause-state."""
         super().__init__(parent)
         self.setIcon(self.playIcon)
         self.playing = False
-        self.clicked.connect(lambda: self.stateChanged.emit(player.PlayState.Pause if self.playing else player.PlayState.Play))
+        self.clicked.connect(lambda: self.stateChanged.emit(player.PlayState.Pause if self.playing
+                                                            else player.PlayState.Play))
 
     def setPlaying(self, playing):
         """Set the state of this button to play if *playing* is true or pause otherwise."""
