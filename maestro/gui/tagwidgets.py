@@ -772,7 +772,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
     def setValue(self, tag, valueId):
         self.tag = tag
         self.valueId = valueId
-        self.orig_hidden = db.tags.hidden(tag, valueId)
+        self.orig_hidden = db.tags.isHidden(tag, valueId)
         self.origSortValue = db.tags.sortValue(tag, valueId)
         self.origValue = db.tags.value(tag, valueId)
         self.valueEdit.setTag(tag)

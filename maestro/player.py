@@ -44,8 +44,7 @@ profileCategory = profiles.TypedProfileCategory(
                     "Maestro can control more than one audio backend. To easily switch between them, "
                     "their configuration is stored in profiles."),
     iconPath = ':maestro/icons/preferences/audiobackends_small.png',
-    pixmapPath = ':maestro/icons/preferences/audiobackends.png',
-    saveImmediately=False)
+    pixmapPath = ':maestro/icons/preferences/audiobackends.png')
 profiles.manager.addCategory(profileCategory)
 
 

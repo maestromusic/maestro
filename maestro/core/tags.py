@@ -783,8 +783,10 @@ class Storage(dict):
         if not isinstance(tag, Tag):
             tag = get(tag)
         if tag not in self:
-            self[tag] = values
-        else: self[tag].extend(values)
+            self[tag] = sorted(values)
+        else:
+            self[tag].extend(values)
+            self[tag].sort()
 
     def addUnique(self, tag, *values):
         """Add one or more values to the list of the given tag. If a value is already contained in the list,

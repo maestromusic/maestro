@@ -175,9 +175,9 @@ def sortValue(tagSpec, valueId, valueIfNone=False):
 
 def getStorage(elid):
     """Return a tags.Storage object filled with the tags of the element with the given id."""
-    result = query("SELECT tag_id, value_id FROM {p}tags WHERE element_id = ?", elid)
+    result = db.query("SELECT tag_id, value_id FROM {p}tags WHERE element_id = ?", elid)
     storage = tagsModule.Storage()
     for tagId, valueId in result:
-        tag = tags.get(tagId)
+        tag = tagsModule.get(tagId)
         storage.add(tag, value(tag, valueId))
     return storage

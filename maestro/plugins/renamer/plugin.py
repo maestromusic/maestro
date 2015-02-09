@@ -70,7 +70,12 @@ class FormatSyntaxError(SyntaxError):
 
 
 class GrammarRenamer(profiles.Profile):
-        
+
+    def __init__(self, name, type=None, state=None):
+        super().__init__(name, type)
+        self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
+        self.read(state)
+
     def levelDefAction(self, s, loc, toks):
         level = int(toks[0])
         return [level]
@@ -114,27 +119,14 @@ class GrammarRenamer(profiles.Profile):
                 ret = toks["else"] if "else" in toks else []
         else: ret = tag.value
         return ret
-    
-    def __init__(self, name, type=None, state=None):
-        super().__init__(name,type)
-        
-        # grammar definition
-        self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
-        
+
+    def read(self, state):
         if state is None:
             state = {}
-        if 'formatString' in state:
-            self.formatString = state['formatString']
-        else: self.formatString = "/tmp/<1.artist>/<1.title>/<#> - <title>"
-        if 'replaceChars' in state:
-            self.replaceChars = state['replaceChars']
-        else: self.replaceChars = '\\:/'
-        if 'replaceBy' in state:
-            self.replaceBy = state['replaceBy']
-        else: self.replaceBy = '_.;'
-        if 'removeChars' in state:
-            self.removeChars = state['removeChars']
-        else: self.removeChars = '?*'
+        self.formatString = state.get('formatString', '/tmp/<1.artist>/<1.title>/<#> - <title>')
+        self.replaceChars = state.get('replaceChars', '\\:/')
+        self.replaceBy = state.get('replaceBy', '_.;')
+        self.removeChars = state.get('removeChars','?*')
         
         if len(self.replaceChars) != len(self.replaceBy):
             raise ValueError("replaceChars and replaceBy must equal in length")
@@ -171,11 +163,8 @@ class GrammarRenamer(profiles.Profile):
         pyparsing.ParserElement.setDefaultWhitespaceChars(oldDefaultWhitespaceChars)
     
     def save(self):
-        return {'formatString': self.formatString,
-                'replaceChars': self.replaceChars,
-                'replaceBy': self.replaceBy,
-                'removeChars': self.removeChars
-                }
+        return dict(formatString=self.formatString, replaceChars=self.replaceChars,
+                    replaceBy=self.replaceBy, removeChars=self.removeChars)
     
     def computeNewPath(self):
         """Computes the new path for the element defined by *self.currentElem* and *self.currentParents*."""
@@ -199,10 +188,11 @@ class GrammarRenamer(profiles.Profile):
         self.level = level
         self.traverse(element)
         return self.result
-    
-    def configurationWidget(self, parent):
+
+    @classmethod
+    def configurationWidget(cls, profile, parent):
         from . import gui
-        return gui.GrammarConfigurationWidget(temporary=False, profile=self)
+        return gui.GrammarConfigurationWidget(profile=profile, parent=parent)
     
     def __neq__(self, other):
         if not isinstance(other, GrammarRenamer):

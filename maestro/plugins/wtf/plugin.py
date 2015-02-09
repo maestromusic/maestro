@@ -90,9 +90,10 @@ class Profile(profiles.Profile):
         self.structure = STRUCTURE_KEEP
         self.options = []
         self.read(state)
-            
-    def configurationWidget(self, parent):
-        return ConfigWidget(self, parent)
+
+    @classmethod
+    def configurationWidget(cls, profile, parent):
+        return ConfigWidget(profile, parent)
     
     def save(self):
         state = {'path': self.path,
@@ -176,7 +177,7 @@ class Dialog(QtGui.QDialog):
                 dialogs.warning(translate("wtf", "Invalid criterion"),
                                 translate("wtf", "The given filter criterion is invalid"))
                 return
-            model = buildFileTree(self.configWidget.getProfile())
+            model = buildFileTree(self.configWidget.profile)
             if not model:
                 return
             self.fileTree.setModel(model)
@@ -271,10 +272,10 @@ def buildFileTree(profile):
     return fileTree
 
 
-class ConfigWidget(QtGui.QWidget):
-    def __init__(self, profile, parent):
-        super().__init__(parent)
-        print(id(profile))
+class ConfigWidget(profilesgui.ProfileConfigurationWidget):
+
+    def __init__(self, profile, parent=None):
+        super().__init__(profile, parent)
         self.setLayout(QtGui.QVBoxLayout())
         self.layout().setContentsMargins(1,1,1,1)
         
@@ -328,9 +329,6 @@ class ConfigWidget(QtGui.QWidget):
         
         self.layout().addStretch(1)
         self.setProfile(profile)
-        
-    def getProfile(self):
-        return self.profile
     
     def setProfile(self, profile):
         self.profile = profile
@@ -403,7 +401,7 @@ class FlagDialog(dialogs.FancyPopup):
                     cList.append(c)
             if len(selectedFlags) > 0:
                 cList.append(criteria.FlagCriterion(selectedFlags))
-            newCriterion = criteria.MultiCriterion('OR', newCriteria)
+            newCriterion = criteria.MultiCriterion('OR', cList)
         else:
             if len(selectedFlags) > 0:
                 cList = [criterion, criteria.FlagCriterion(selectedFlags)]

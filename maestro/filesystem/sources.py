@@ -153,7 +153,7 @@ class Source(QtCore.QObject):
         self.scanTimer.timeout.connect(self.checkScan)
         self.extensions = list(extensions)
         self.enabled = False
-        if enabled:
+        if enabled and not config.options.filesystem.disable:
             self.enable()
 
     def setEnabled(self, enabled: bool):
@@ -243,6 +243,17 @@ class Source(QtCore.QObject):
             db.multiQuery('INSERT INTO {p}newfiles (url, hash, verified) VALUES (?,?,?)',
                           [(str(file.url), file.hash, file.verified) for file in newfiles])
 
+    def updateHashesAndVerified(self, files):
+        """Updates hash and verification timestamp of given *files* in the database to the values stored in
+        the according File objects.
+        """
+        dbFiles = [(f.hash, f.verified, f.id) for f in files if f.id]
+        newFiles = [(f.hash, f.verified, str(f.url)) for f in files if not f.id]
+        if len(dbFiles):
+            db.multiQuery('UPDATE {p}files SET hash=?, verified=? WHERE element_id=?', dbFiles)
+        if len(newFiles):
+            db.multiQuery('UPDATE {p}newfiles SET hash=?, verified=? WHERE url=?', newFiles)
+
     def scan(self):
         """Initiates a filesystem scan in order to synchronize Maestro's database with the real
         filesystem layout.
@@ -257,8 +268,8 @@ class Source(QtCore.QObject):
         5. Finally,nalyzeScanResults() analyzes the results and, if necessary, displays dialogs.
         """
         self.fsFiles = {}
-        self.modifiedTags = {}
-        self.changedHash = {}
+        self.modifiedTags = queue.Queue()
+        self.changedHash = queue.Queue()
         self.missingDB = []
         self.fsThread = threading.Thread(target=readFilesystem, args=(self.path, self), daemon=True)
         self.fsThread.start()
@@ -279,8 +290,9 @@ class Source(QtCore.QObject):
             if not self.fsThread.is_alive():
                 self.handleInitialScan()
         elif self.scanState == ScanState.checkModified:
+            self.handleTagAndHashChanges()
             if not self.fsThread.is_alive():
-                self.analyzeScanResult()
+                self.handleMissingFiles()
 
     def handleInitialScan(self):
         """Called when the initial filesystem walk is finished. Removes newfiles that have not been
@@ -326,8 +338,7 @@ class Source(QtCore.QObject):
         the database. If hash computation is finished, calls the appropriate next function.
         """
         finish = self.hashThread.lastJobDone.is_set()
-        hashIds = []
-        hashUrls = []
+        changedFiles = []
         try:
             while True:
                 path, hash = self.hashThread.resultQueue.get(False)
@@ -335,18 +346,11 @@ class Source(QtCore.QObject):
                     continue
                 file = self.files[path]
                 file.hash = hash
-                if file.id:
-                    hashIds.append((hash, time.time(), file.id))
-                else:
-                    hashUrls.append((hash, time.time(), str(file.url)))
+                changedFiles.append(file)
         except queue.Empty:
-            if len(hashIds) + len(hashUrls):
-                logging.debug(__name__,
-                        'Adding {} new file hashes to the database'.format(len(hashIds) + len(hashUrls)))
-            if len(hashIds):
-                db.multiQuery('UPDATE {p}files SET hash=?, verified=? WHERE element_id=?', hashIds)
-            if len(hashUrls):
-                db.multiQuery('UPDATE {p}newfiles SET hash=?, verified=? WHERE url=?', hashUrls)
+            if len(changedFiles):
+                logging.debug(__name__, 'Adding {} new file hashes to the database'.format(len(changedFiles)))
+            self.updateHashesAndVerified(changedFiles)
         if finish:
             if self.scanInterrupted:
                 self.scan()  # re-initialize scan after all hashes are complete
@@ -363,31 +367,44 @@ class Source(QtCore.QObject):
         for path, stamp in self.fsFiles.items():
             file = self.files[path]
             if file.id and stamp > file.verified:
-                logging.debug(__name__, 'track {} modified'.format(os.path.basename(path)))
                 toCheck.append(file)
         if len(toCheck):
+            logging.debug(__name__, '{} files modified since last check'.format(len(toCheck)))
             self.fsThread = threading.Thread(target=checkFiles, args=(toCheck, self), daemon=True)
             self.fsThread.start()
             self.scanTimer.start(1000)
         else:
-            self.analyzeScanResult()
+            self.handleMissingFiles()
 
-    def analyzeScanResult(self):
-        """Called after all missing hashes have been computed and all modified files have been examined for
-        tag changes.
-        """
-        if len(self.modifiedTags) > 0:
-            logging.debug(__name__, "detected {} files with modified tags".format(len(self.modifiedTags)))
-            from . import dialogs
-            for file, (hash, dbTags, fsTags) in self.modifiedTags.items():
-                dialog = dialogs.ModifiedTagsDialog(file, dbTags, fsTags)
+    def handleTagAndHashChanges(self):
+        updates = []
+        try:
+            while True:
+                file, hash, dbTags, fileTags = self.modifiedTags.get(False)
+                from . import dialogs
+                dialog = dialogs.ModifiedTagsDialog(file, dbTags, fileTags)
                 dialog.exec_()
                 if dialog.result() == dialog.Accepted:
                     file.verified = time.time()
-                    self.changedHash[file] = hash
-        if len(self.changedHash):
-            db.multiQuery('UPDATE {p}files SET hash=?, verified=?, url=?',
-                          [(hash, time.time(), str(file.url)) for file, hash in self.changedHash.items()])
+                    file.hash = hash
+                    updates.append(file)
+        except queue.Empty:
+            pass
+        try:
+            while True:
+                file, hash = self.changedHash.get(False)
+                file.verified = time.time()
+                file.hash = hash
+                updates.append(file)
+        except queue.Empty:
+            pass
+        self.updateHashesAndVerified(updates)
+
+    def handleMissingFiles(self):
+        """Called after all missing hashes have been computed and all modified files have been examined for
+        tag changes.
+        """
+        self.handleTagAndHashChanges()
         if len(self.missingDB) > 0:  # some files have been (re)moved outside Maestro
             missingHashes = {}  # hashes of missing files mapped to Track objects
             for file in self.missingDB:
@@ -598,11 +615,13 @@ def checkFiles(files: list, source: Source):
         backendFile.readTags()
         if dbTags.withoutPrivateTags() != backendFile.tags:
             logging.debug(__name__, 'Detected modification on file "{}": tags differ'.format(file.url))
-            source.modifiedTags[file] = (hash, dbTags, backendFile.tags)
+            source.modifiedTags.put((file, hash, dbTags, backendFile.tags))
         else:
             if hash != file.hash:
                 logging.debug(__name__, "audio data of {} modified!".format(file.url.path))
-            source.changedHash[file] = hash
+            else:
+                logging.debug(__name__, 'updating verification timestamp of {}'.format(file.url.path))
+            source.changedHash.put((file, hash))
 
 
 class HashThread(threading.Thread):

@@ -201,8 +201,9 @@ class StandardGuesser(profiles.Profile):
                 if c in self.toplevels:
                     self.toplevels.remove(c)
 
-    def configurationWidget(self, parent):
-        return GuessProfileConfigWidget(self, parent)
+    @classmethod
+    def configurationWidget(cls, profile,parent):
+        return GuessProfileConfigWidget(profile, parent)
 
 
 profileCategory = profiles.TypedProfileCategory(

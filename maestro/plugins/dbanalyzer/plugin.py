@@ -155,7 +155,7 @@ class DBAnalyzer(mainwindow.Widget):
         # Statistics
         statistics = self.getStatistics()
         self.statisticsTable.setRowCount(len(statistics))
-        for i,tuple in enumerate(statistics):
+        for i, tuple in enumerate(statistics):
             for j,data in enumerate(tuple):
                 item = QtGui.QTableWidgetItem(str(data))
                 item.setFlags(Qt.ItemIsEnabled)
@@ -255,16 +255,12 @@ class DBAnalyzer(mainwindow.Widget):
             length = 0
             
         return [
-            (self.tr("Elements"),db.query(
-                    "SELECT COUNT(*) FROM {}elements"
-                        .format(db.prefix)).getSingle()),
-            (self.tr("Files"),db.query(
-                    "SELECT COUNT(*) FROM {}files"
-                        .format(db.prefix)).getSingle()),
+            (self.tr("Elements"), db.query("SELECT COUNT(*) FROM {}elements".format(db.prefix)).getSingle()),
+            (self.tr("Files"), db.query("SELECT COUNT(*) FROM {}files".format(db.prefix)).getSingle()),
             (self.tr("Total Length"), utils.strings.formatLength(length)),
             (self.tr("Containers"),db.query(
                     "SELECT COUNT(*) FROM {}elements WHERE file = 0"
-                        .format(db.prefix)).getSingle()),
+                    .format(db.prefix)).getSingle()),
             (self.tr("Toplevel elements"),db.query("""
                     SELECT COUNT(*)
                     FROM {0}elements AS el LEFT JOIN {0}contents AS c ON el.id = c.element_id
@@ -284,9 +280,6 @@ class DBAnalyzer(mainwindow.Widget):
             (self.tr("Tracked new files"),db.query(
                     "SELECT COUNT(*) FROM {}newfiles"
                         .format(db.prefix)).getSingle()),
-            (self.tr("Tracked folders"),db.query(
-                    "SELECT COUNT(*) FROM {}folders"
-                        .format(db.prefix)).getSingle())
             ]
 
     def getTags(self):

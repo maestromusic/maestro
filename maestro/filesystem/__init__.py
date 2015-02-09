@@ -165,8 +165,9 @@ class RealFile(urls.BackendFile):
         self.specialTags = collections.OrderedDict()
         try:
             self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True)
-        except OSError as e:
-            logging.warning(__name__, 'TagLib failed to open "{}". Tags will be stored in database only')
+        except OSError:
+            logging.warning(__name__, 'TagLib failed to open "{}". Tags will be stored in database only'
+                                      .format(self.url.path))
             return
         self.length = self._taglibFile.length
         autoProcessingDone = False
@@ -230,7 +231,8 @@ class RealFile(urls.BackendFile):
         If some tags cannot be saved due to restrictions of the underlying metadata format, those
         tags/values that remain unsaved will be returned.
         """
-        assert self._taglibFile is not None
+        if not self._taglibFile:
+            raise OSError('Unable to write tags to file {}'.format(self.url.path))
         self._taglibFile.tags = dict()
         for tag, values in self.specialTags.items():
             self._taglibFile.tags[tag.upper()] = values
