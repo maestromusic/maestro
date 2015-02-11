@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import itertools, collections, functools
+import itertools, collections, functools, locale
 
 from PyQt4 import QtCore
 from PyQt4.QtCore import Qt
@@ -460,8 +460,8 @@ class TagLayer(Layer):
         # 6. Create final list of nodes
         visibleNodes = [node for node in nodes.values() if not node.hide]
         hiddenNodes = [node for node in nodes.values() if node.hide]       
-        visibleNodes.sort(key=lambda node: node.sortValues[0])
-        hiddenNodes.sort(key=lambda node: node.sortValues[0])
+        visibleNodes.sort(key=lambda node: locale.strxfrm(node.sortValues[0][0]))
+        hiddenNodes.sort(key=lambda node: locale.strxfrm(node.sortValues[0][0]))
         
         if len(variousNodeElements) > 0:
             node = VariousNode(layerIndex, self.tagList)
