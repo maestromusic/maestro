@@ -279,7 +279,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     from .gui import mainwindow
     # First import all modules that want to register WidgetClass-instances
     from .gui import filesystembrowser, editor, browser, tageditor, playback, playlist, \
-                        coverbrowser, covertable, details
+                        coverbrowser, covertable, coverdesk, details
     
     global mainWindow
     splash.showMessage(translate("Splash", "Creating main window"))
