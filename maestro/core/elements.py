@@ -288,7 +288,6 @@ class File(Element):
         if domain is None:
             raise ValueError('file needs a domain')
 
-        
     def copy(self, level=None):
         """Create a copy of this file. Create copies of all attributes. If *level* is not None, the copy
         will have that level as 'level'-attribute.

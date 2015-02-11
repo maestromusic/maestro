@@ -230,7 +230,8 @@ class RealLevel(levels.Level):
             source = filesystem.sourceByPath(url.path)
             domain = source.domain if source else domains.default()
             elem = elements.File(domain, level, id, url=url, length=fLength, tags=fTags)
-            elem.specialTags = backendFile.specialTags           
+            if hasattr(backendFile, 'specialTags'):
+                elem.specialTags = backendFile.specialTags
             level.elements[id] = elem
             result.append(elem)
         return result

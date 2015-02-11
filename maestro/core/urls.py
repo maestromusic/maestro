@@ -30,7 +30,7 @@ class URL:
     """Each File in Maestro is identified by an URL of the form <scheme>://<netloc>/<path>. Different schemes
     can represent different backends for handling the files on filesystem level.
     """
-    urlRegex = re.compile(r'(\w+)://(\w*)(/.*)')
+    urlRegex = re.compile(r'(\w+)://([^/]*)(/.*)')
 
     def __init__(self, urlString):
         self.scheme, self.netloc, self.path = URL.urlRegex.match(urlString).groups()

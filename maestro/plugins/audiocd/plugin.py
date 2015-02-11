@@ -62,7 +62,8 @@ def disable():
     application.mainWindow.menus['extras'].removeAction(_action)
 
 
-def parseNetloc(url):
+def parseNetloc(url: urls.URL):
+    """Parse the netloc of an audiocd:// url into the disc id and track number, returned as tuple."""
     a, b = url.netloc.split('.')
     return a, int(b)
 
@@ -76,6 +77,9 @@ class AudioCDTrack(urls.BackendFile):
 
     def saveTags(self):
         pass
+
+    def rename(self, newpath: str):
+        self.url = self.url.copy(path=newpath)
 
 
 def showRipMissingDialog():
@@ -94,7 +98,11 @@ def showRipMissingDialog():
         assert tracknr not in discids[discid][1]
         discids[discid][1].add(tracknr)
     from . import gui
-    dev, discid, ntracks = gui.ImportAudioCDAction.askForDiscId()
+
+    ans = gui.ImportAudioCDAction.askForDiscId()
+    if not ans:
+        return
+    dev, discid, ntracks = ans
     if discid in discids:
         id, tracks = discids[discid]
         assert set(range(min(tracks), max(tracks)+1)) == tracks
