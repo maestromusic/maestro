@@ -27,6 +27,7 @@ from PyQt4 import QtCore, QtGui
 from maestro import database as db, logging, config, filesystem
 from maestro.core import urls, levels
 from maestro.gui import mainwindow
+from .plugin import parseNetloc
 
 translate = QtCore.QCoreApplication.translate
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ fromToRe = re.compile(r'from sector\s+(?P<fromSec>[0-9]+).*track\s+(?P<fromTrack
                           '.*\n.*to sector\s+(?P<toSec>[0-9]+).*track\s+(?P<toTrack>[0-9]+)')
 statusRe = re.compile(r'^##:\s-?[0-9]+\s\[(\w+)\]\s@\s([0-9]+)', re.M)
 currentRe = re.compile(r'outputting\sto\strack([0-9]+)\.')
+
 
 class RipperStatusWidget(QtGui.QWidget):
 
@@ -164,35 +166,36 @@ class Ripper(QtCore.QObject):
         mainwindow.mainWindow.statusBar().removeWidget(self.statusWidget)
 
 
-class InsertRippedFileCommand:
+class InsertRippedFileCommand(QtCore.QObject):
     """Command to replace a file of backend type `AudioCDURL` by the ripped real file.
     """
-    #TODO: when this happens while rename dialog is open, the file is not renamed properly
+
     def __init__(self, element, tmpPath):
+        super().__init__()
         self.element = element
         self.tmpPath = tmpPath
-        self.oldUrl = self.element.url
-        self.newUrl = urls.URL('file://' + self.element.url.targetPath)
-        self.text = translate("AudioCD Plugin", "Ripped Track {}".format(element.url.tracknr))
+        self.text = translate('AudioCD Plugin', 'Rip Track {}'.format(element.url.netloc))
 
     def redo(self):
-        target = self.element.url.targetPath
+        target = self.element.url.path
         if not exists(dirname(target)):
             os.makedirs(dirname(target))
         shutil.move(self.tmpPath, target)
-        tmpFile = filesystem.RealFile(self.newUrl)
+        newUrl = urls.URL.fileURL(target)
+        tmpFile = filesystem.RealFile(newUrl)
         tmpFile.readTags()
         length = tmpFile.length
         tmpFile.tags = self.element.tags.withoutPrivateTags(copy=True)
-        tmpFile.specialTags = {"tracknumber" : "{:02d}".format(self.element.url.tracknr)}
+        tracknr = parseNetloc(self.element.url)[1]
+        tmpFile.specialTags = dict(tracknumber=str(tracknr))
         tmpFile.saveTags()
-        db.query("UPDATE {p}files SET url=?,length=? WHERE element_id=?",
-                 str(self.newUrl), length, self.element.id)
+        db.query('UPDATE {p}files SET url=?, length=? WHERE element_id=?',
+                 str(newUrl), length, self.element.id)
         for level in levels.allLevels:
             if self.element.id in level:
                 levelElem = level[self.element.id]
                 levelElem.length = length
-                levelElem.url = self.newUrl
+                levelElem.url = newUrl
                 level.emitEvent(dataIds=[self.element.id])
         levels.real.emitFilesystemEvent(added=[self.element])
 
@@ -200,23 +203,22 @@ class InsertRippedFileCommand:
         if not exists(dirname(self.tmpPath)):
             os.makedirs(dirname(self.tmpPath))
         shutil.move(self.element.url.path, self.tmpPath)
-        db.query("UPDATE {}files SET url=? WHERE element_id=?".format(db.prefix),
-                 str(self.oldUrl), self.element.id)
+        tmpUrl = urls.URL.fileURL(self.tmpPath)
+        db.query('UPDATE {p}files SET url=? WHERE element_id=?', str(tmpUrl), self.element.id)
         for level in levels.allLevels:
             if self.element.id in level:
                 levelElem = level[self.element.id]
-                levelElem.url = self.oldUrl
+                levelElem.url = tmpUrl
                 level.emitEvent(dataIds=[self.element.id])
         levels.real.emitFilesystemEvent(deleted=[self.element])
 
 
 def fileChangerHook(level,elements):
     """Commit-hook for the real level."""
-    aFiles = list(filter(lambda el: el.isFile() and el.url.scheme == "audiocd", elements))
+    audioFiles = [el for el in elements if el.isFile() and el.url.scheme == 'audiocd']
     for i in reversed(range(len(finishedTracks))):
         discid, tracknr, encodedFile = finishedTracks[i]
-        for file in aFiles:
+        for file in audioFiles:
             if file.url.parsedUrl.netloc == "{}.{}".format(discid, tracknr):
                 level.stack.push(InsertRippedFileCommand(file, encodedFile))
                 del finishedTracks[i]
-

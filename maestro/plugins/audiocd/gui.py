@@ -16,16 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QDialogButtonBox
 
-from ... import config
-from ...core import levels, tags, domains, urls
-from ...core.elements import ContainerType
-from ...gui import dialogs, delegates, mainwindow, treeactions, tagwidgets, treeview
-from ...gui.delegates.abstractdelegate import *
-from ...models import leveltreemodel
+from maestro import config
+from maestro.core import levels, tags, domains, urls
+from maestro.core.elements import ContainerType
+from maestro.gui import dialogs, delegates, mainwindow, treeactions, tagwidgets, treeview
+from maestro.gui.delegates.abstractdelegate import *
+from maestro.models import leveltreemodel
 from ...plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
 
 translate = QtCore.QCoreApplication.translate
@@ -167,8 +165,10 @@ class CDROMDelegate(delegates.StandardDelegate):
 
     def getUrlWarningItem(self, wrapper):
         element = wrapper.element
-        if element.isFile() and element.url.scheme == "audiocd":
-            return TextItem(self.tr("[Track {:2d}]").format(element.url.tracknr),
+        from . import plugin
+        if element.isFile() and element.url.scheme == 'audiocd':
+            tracknr = plugin.parseNetloc(element.url)[1]
+            return TextItem(self.tr('[Track {:2d}]').format(tracknr),
                             DelegateStyle(bold=True, color=Qt.blue))
         return super().getUrlWarningItem(wrapper)
 
