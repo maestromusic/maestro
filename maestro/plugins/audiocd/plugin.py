@@ -64,7 +64,7 @@ def disable():
 
 def parseNetloc(url: urls.URL):
     """Parse the netloc of an audiocd:// url into the disc id and track number, returned as tuple."""
-    a, b = url.netloc.split('.')
+    a, b = url.netloc.rsplit('.', 1)
     return a, int(b)
 
 

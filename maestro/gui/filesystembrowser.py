@@ -214,7 +214,7 @@ class FileSystemBrowser(mainwindow.Widget):
             return {'source': source.name}
         else: return None
     
-    def createOptionDialog(self, parent):
+    def createOptionDialog(self, button=None):
         from . import preferences
         preferences.show("main/filesystem")
     

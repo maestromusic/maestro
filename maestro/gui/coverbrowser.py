@@ -280,8 +280,8 @@ class CoverBrowser(mainwindow.Widget):
         if s is not None:
             selection.setGlobalSelection(s)
 
-    def createOptionDialog(self, parent):
-        return BrowserDialog(parent, self)
+    def createOptionDialog(self, button=None):
+        return BrowserDialog(button, self)
             
     def _handleFilterButton(self):
         """React to the filter button: Activate/deactive filter."""

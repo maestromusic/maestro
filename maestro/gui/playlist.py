@@ -190,8 +190,8 @@ class PlaylistWidget(mainwindow.Widget):
             self.mainLayout.insertWidget(self.mainWidgetIndex, self.errorLabel)
             self.errorLabel.show()
     
-    def createOptionDialog(self, parent):
-        return OptionDialog(parent, self)
+    def createOptionDialog(self, button=None):
+        return OptionDialog(button, self)
         
         
 mainwindow.addWidgetClass(mainwindow.WidgetClass(

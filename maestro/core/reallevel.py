@@ -386,10 +386,11 @@ class RealLevel(levels.Level):
             newFiles = [element for element in elements if element.isFile()]
             if len(newFiles) > 0:
                 from .. import filesystem
-                db.multiQuery("INSERT INTO {p}files (element_id, url, hash, length) VALUES (?,?,?,?)",
+                db.multiQuery('INSERT INTO {p}files (element_id, url, hash, verified, length)'
+                              'VALUES (?, ?, ?, ?, ?)',
                               [(element.id, str(element.url), filesystem.getNewfileHash(element.url),
-                                element.length) for element in newFiles])
-                self.emitFilesystemEvent(added=(f for f in newFiles if f.url.scheme == "file"))
+                               time.time(), element.length) for element in newFiles])
+                self.emitFilesystemEvent(added=[f for f in newFiles if f.url.scheme == 'file'])
             
             contentData = []
             for element in elements:

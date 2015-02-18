@@ -113,9 +113,9 @@ class EditorWidget(mainwindow.Widget):
         buttonLayout.addWidget(self.toolbar)
         buttonLayout.addStretch()
     
-    def createOptionDialog(self, parent):
+    def createOptionDialog(self, button=None):
         """Open the option dialog."""
-        return OptionDialog(parent, self.editor)
+        return OptionDialog(button, self.editor)
         
     def saveState(self):
         guessProfile = self.editor.model().guessProfile

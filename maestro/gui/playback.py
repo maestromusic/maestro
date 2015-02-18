@@ -102,8 +102,8 @@ class PlaybackWidget(mainwindow.Widget):
             self.topLayout.setDirection(QtGui.QBoxLayout.RightToLeft)
             self.topLayout.setSpacing(30 + self.style().pixelMetric(QtGui.QStyle.PM_LayoutHorizontalSpacing))
     
-    def createOptionDialog(self, parent):
-        return OptionDialog(parent, self)
+    def createOptionDialog(self, button=None):
+        return OptionDialog(button, self)
     
     def updateSeekLabel(self, value):
         """Display elapsed and total time on the seek label."""
