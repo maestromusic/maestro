@@ -219,7 +219,7 @@ storageOptions = collections.OrderedDict((
     'layoutFrozen': False,
     'merge_dialog_container_type': None,
     'tag_editor_include_contents': True,
-    'shortcuts': {},
+    'shortcuts': ({},),
 }),
 ('player', {
     'profiles': [],

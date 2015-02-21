@@ -81,7 +81,7 @@ class ExpandOrCollapseAllAction(actions.TreeAction):
 
 ExpandOrCollapseAllAction.register('expandAll', context='browser', expand=True,
                                    description=translate('ExpandOrCollapseAllAction', 'Expand all nodes'),
-                                   shortcut=translate('ExpandOrCollapseAllAction', 'Ctrl++'))
+                                   shortcut=translate('QShortcut', 'Ctrl++'))
 ExpandOrCollapseAllAction.register('collapseAll', context='browser', expand=False,
                                    description=translate('ExpandOrCollapseAllAction', 'Collapse all nodes'),
-                                   shortcut=translate('ExpandOrCollapseAllAction', 'Ctrl+-'))
+                                   shortcut=translate('QShortcut', 'Ctrl+-'))

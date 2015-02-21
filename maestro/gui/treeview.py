@@ -57,7 +57,9 @@ class TreeView(QtGui.QTreeView):
     *affectGlobalSelection* determines whether the treeview will change the global selection whenever nodes
     in it are selected. This should be set to False for treeviews in dialogs.
     """
-    
+
+    actionConf = actions.TreeActionConfiguration()
+
     def __init__(self, level, parent=None, affectGlobalSelection=True):
         super().__init__(parent)
         self.level = level
@@ -70,7 +72,7 @@ class TreeView(QtGui.QTreeView):
         self.setDragEnabled(True)
         self.setDefaultDropAction(Qt.CopyAction)
         self.viewport().setMouseTracking(True)
-        
+
         self.treeActions = self.actionConf.createActions(self)
         self.actionConf.actionDefinitionAdded.connect(self._handleActionDefAdded)
         self.actionConf.actionDefinitionRemoved.connect(self._handleActionDefRemoved)

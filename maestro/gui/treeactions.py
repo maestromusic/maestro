@@ -48,7 +48,7 @@ class EditTagsAction(actions.TreeAction):
         dialog.useElementsFromSelection(self.parent().selection)
         dialog.exec_()
 
-EditTagsAction.register('editTags', shortcut=translate('EditTagsAction', 'Ctrl+T'))
+EditTagsAction.register('editTags', shortcut=translate('QShortcut', 'Ctrl+T'))
 
 
 class RemoveFromParentAction(actions.TreeAction):
@@ -87,7 +87,7 @@ class RemoveFromParentAction(actions.TreeAction):
             raise NotImplementedError()
         stack.endMacro()
 
-RemoveFromParentAction.register('remove', shortcut=translate('RemoveFromParentAction', 'Del'))
+RemoveFromParentAction.register('remove', shortcut=QtGui.QKeySequence(QtGui.QKeySequence.Delete))
 
 
 class MergeAction(actions.TreeAction):
@@ -106,7 +106,7 @@ class MergeAction(actions.TreeAction):
         dialog.exec_()
 
 MergeAction.register('merge', description=translate('MergeAction', 'Merge elements into a new container'),
-                     shortcut=translate('MergeAction', 'Ctrl+M'))
+                     shortcut=translate('QShortcut', 'Ctrl+M'))
 
 
 class FlattenAction(actions.TreeAction):
@@ -137,7 +137,7 @@ class FlattenAction(actions.TreeAction):
             self.level().insertContentsAuto(parent, index, children)
         stack.endMacro()
 
-FlattenAction.register('flatten', shortcut=translate('FlattenAction', 'Ctrl+F'))
+FlattenAction.register('flatten', shortcut=translate('QShortcut', 'Ctrl+F'))
 
 
 class ChangePositionAction(actions.TreeAction):
@@ -177,16 +177,13 @@ class ChangePositionAction(actions.TreeAction):
 
 ChangePositionAction.register('changePos*',
                               description=translate('ChangePositionAction', 'Change position'),
-                              shortcut=translate('ChangePositionAction', 'Ctrl+P'),
-                              mode='*')
+                              shortcut=translate('QShortcut', 'Ctrl+P'), mode='*')
 ChangePositionAction.register('changePos+',
                               description=translate('ChangePositionAction', 'Increase position by 1'),
-                              shortcut=translate('ChangePositionAction', '+'),
-                              mode='+',)
+                              shortcut=translate('QShortcut', '+'), mode='+',)
 ChangePositionAction.register('changePos-',
                               description=translate('ChangePositionAction', 'Decrease position by 1'),
-                              shortcut=translate('ChangePositionAction', '-'),
-                              mode='-',)
+                              shortcut=translate('QShortcut', '-'), mode='-',)
 
 
 class SetElementTypeAction(actions.TreeAction):
@@ -237,7 +234,7 @@ class ClearTreeAction(actions.TreeAction):
 
 ClearTreeAction.register('clearTree', context='misc',
                          description=translate('ClearTreeAction', 'Clear (empty) all contents'),
-                         shortcut=translate('ClearTreeAction', 'Shift+Del'))
+                         shortcut=translate('QShortcut', 'Shift+Del'))
 
 
 class CommitTreeAction(actions.TreeAction):
@@ -265,7 +262,7 @@ class CommitTreeAction(actions.TreeAction):
 
 CommitTreeAction.register('commit', context='misc',
                           description=translate('CommitTreeAction', 'Store all changes made in this view'),
-                          shortcut=translate('actions', 'Shift+Enter'))
+                          shortcut=translate('QShortcut', 'Shift+Enter'))
 
 
 class DeleteAction(actions.TreeAction):
@@ -318,7 +315,7 @@ class DeleteAction(actions.TreeAction):
             if dialog.exec_() == QtGui.QDialog.Accepted:
                 self.level().deleteElements(files, fromDisk=True)
 
-DeleteAction.register('delete', shortcut=translate('DeleteAction', 'Ctrl+Del'))
+DeleteAction.register('delete', shortcut=translate('QShortcut', 'Ctrl+Del'))
 
 
 class ChangeFileUrlsAction(actions.TreeAction):

@@ -21,6 +21,8 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
+from maestro import config, logging
+
 translate = QtCore.QCoreApplication.translate
 
 """This module contains the basic mechanism for action management. Every action that has a configurable
@@ -33,12 +35,13 @@ context menus (by means of separators). For context names to be shown in transla
 contextLabels dictionary.
 """
 
-contextLabels = OrderedDict(navigation=translate('ActionContext', 'Navigation'),
-                            elements=  translate('ActionContext', 'Elements'),
-                            browser=   translate('ActionContext', 'Browser'),
-                            playback=  translate('ActionContext', 'Playback'),
-                            misc=      translate('ActionContext', 'Misc'),
-                            plugins=   translate('ActionContext', 'Plugins'))
+contextLabels = OrderedDict([
+    ('misc',       translate('ActionContext', 'Misc')),
+    ('navigation', translate('ActionContext', 'Navigation')),
+    ('elements',   translate('ActionContext', 'Elements')),
+    ('browser',    translate('ActionContext', 'Browser')),
+    ('playback',   translate('ActionContext', 'Playback')),
+    ('plugins',    translate('ActionContext', 'Plugins'))])
 
 
 class ActionDefinition:
@@ -75,6 +78,9 @@ class ActionManager(QtCore.QObject):
         super().__init__()
         self.actions = {}
 
+    def contexts(self):
+        return set(action.shortcut for action in self.actions.values())
+
     def shortcut(self, identifier: str) -> QtGui.QKeySequence:
         """Return the shortcut associated to the action with given *identifier*. Might return *None* if no
         shortcut is set.
@@ -86,12 +92,20 @@ class ActionManager(QtCore.QObject):
     def setShortcut(self, identifier, shortcut: QtGui.QKeySequence):
         """Set a shortcut for the action named *identifier*."""
         self.actions[identifier].shortcut = shortcut
+        config.storage.gui.shortcuts[identifier] = shortcut.toString(QtGui.QKeySequence.PortableText)
         self.shortcutChanged.emit(identifier, shortcut)
 
     def registerAction(self, action: ActionDefinition):
         """Register a new action. Its identifier has to be unique."""
+        if action.context not in contextLabels:
+            raise ValueError('Action context "{}" not contained in context labels'.format(action.context))
         if action.identifier in self.actions:
             raise ValueError('Action identifier "{}" registered twice'.format(action.identifier))
+        if action.identifier in config.storage.gui.shortcuts:
+            action.shortcut = QtGui.QKeySequence(config.storage.gui.shortcuts[action.identifier],
+                                                 QtGui.QKeySequence.PortableText)
+            logging.debug(__name__, 'loaded user-definde shortcut {} for action {}'
+                          .format(action.shortcut.toString(), action.identifier))
         self.actions[action.identifier] = action
 
     def unregisterAction(self, identifier):

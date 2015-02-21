@@ -185,7 +185,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     if type == 'gui':
         splash.showMessage("Loading translations")
-    loadTranslators(app,logger)
+    loadTranslators(app, logger)
     translate = QtCore.QCoreApplication.translate
         
     # Initialize database
@@ -196,11 +196,11 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     from . import database
     try:
         if type == 'gui':
-            splash.showMessage(translate("Splash", "Connecting to database"))
+            splash.showMessage(translate('Splash', 'Connecting to database'))
         database.init()
     except database.DBException as e:
-        logger.error("I cannot connect to the database. Did you provide the correct information in the"
-                     " config file? SQL error: {}".format(e.message))
+        logger.error('I cannot connect to the database. Did you provide the correct information in the'
+                     ' config file? SQL error: {}'.format(e.message))
         if type == 'gui':
             runInstaller()
             
@@ -263,7 +263,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     # Load Plugins
     if type == 'gui':
-        splash.showMessage(translate("Splash", "Loading plugins"))
+        splash.showMessage(translate('Splash', 'Loading plugins'))
     from . import plugins
     plugins.init()
     plugins.enablePlugins()
@@ -275,22 +275,22 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     filesystem.init()
 
     # Create GUI
-    splash.showMessage(translate("Splash", "Loading GUI classes"))
-    from .gui import mainwindow
+    splash.showMessage(translate('Splash', 'Loading GUI classes'))
+    from maestro.gui import mainwindow
     # First import all modules that want to register WidgetClass-instances
     from .gui import filesystembrowser, editor, browser, tageditor, playback, playlist, \
                         coverbrowser, covertable, coverdesk, details
     
     global mainWindow
-    splash.showMessage(translate("Splash", "Creating main window"))
+    splash.showMessage(translate('Splash', 'Creating main window'))
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
     
     # Launch application
-    logger.debug("showing mainwindow")
+    logger.debug('showing mainwindow')
     mainWindow.show()
     splash.finish(mainWindow)
-    logger.debug("entering event loop")
+    logger.debug('entering event loop')
     returnValue = app.exec_()
     
     # Close operations
