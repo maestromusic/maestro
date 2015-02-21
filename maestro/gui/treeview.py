@@ -109,7 +109,7 @@ class TreeView(QtGui.QTreeView):
         return [action for action in self.actions() if action not in self.treeActions.values()]
 
     def contextMenuEvent(self, event):
-        menu = self.actionConf.createMenu(self, self.treeActions)
+        menu = self.actionConf.createMenu(self)
         for action in self.localActions():
             menu.addAction(action)
         if menu.isEmpty():

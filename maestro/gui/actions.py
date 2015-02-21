@@ -23,6 +23,15 @@ from PyQt4.QtCore import Qt
 
 translate = QtCore.QCoreApplication.translate
 
+"""This module contains the basic mechanism for action management. Every action that has a configurable
+shortcut should be registered by the ActionManager instance created below. For actions on TreeViews, a special
+mechanism is provided (see TreeActionConfiguration) that eases defining what actions should be available in a
+certain tree view class, like the Browser or Editor.
+
+Actions are grouped into *contexts*, which are used for grouping in the shortcut management GUI as well as in
+context menus (by means of separators). For context names to be shown in translated version, add them to the
+contextLabels dictionary.
+"""
 
 contextLabels = OrderedDict(navigation=translate('ActionContext', 'Navigation'),
                             elements=  translate('ActionContext', 'Elements'),
@@ -52,7 +61,12 @@ class ActionDefinition:
 
 
 class ActionManager(QtCore.QObject):
-    """Manager class for actions. Keeps track of Actions for which shortcuts are (or can be) defined.
+    """Manager class for actions. Keeps track of all Actions known to Maestro for which shortcuts are, or can
+    be, defined.
+
+    Each type of action has to be registered before it can be used (see registerAction), using a *unique*
+    string identifier and a context, preferably one of those defined above in contextLabels. Shortcuts can be
+    set and queried using shortcut() and setShortcut(); the latter emits the *shortcutChanged* signal.
     """
     shortcutChanged = QtCore.pyqtSignal(str, QtGui.QKeySequence)
     actionUnregistered = QtCore.pyqtSignal(str)
@@ -61,34 +75,41 @@ class ActionManager(QtCore.QObject):
         super().__init__()
         self.actions = {}
 
-    def shortcut(self, identifier) -> QtGui.QKeySequence:
+    def shortcut(self, identifier: str) -> QtGui.QKeySequence:
+        """Return the shortcut associated to the action with given *identifier*. Might return *None* if no
+        shortcut is set.
+        """
         if identifier in self.actions:
             return self.actions[identifier].shortcut
         return None
 
     def setShortcut(self, identifier, shortcut: QtGui.QKeySequence):
+        """Set a shortcut for the action named *identifier*."""
         self.actions[identifier].shortcut = shortcut
         self.shortcutChanged.emit(identifier, shortcut)
 
-    def registerAction(self, action):
+    def registerAction(self, action: ActionDefinition):
+        """Register a new action. Its identifier has to be unique."""
         if action.identifier in self.actions:
             raise ValueError('Action identifier "{}" registered twice'.format(action.identifier))
         self.actions[action.identifier] = action
 
     def unregisterAction(self, identifier):
+        """Unregister an action (e.g., when a plugin is disabled)."""
         del self.actions[identifier]
         self.actionUnregistered.emit(identifier)
 
 
 manager = ActionManager()
-setShortcut = manager.setShortcut
-shortcut = manager.shortcut
-registerAction = manager.registerAction
 
 
 class TreeActionDefinition(ActionDefinition):
-    """Subclass for actions on TreeView instances. Augments ActionDefinition by data how to instantiate the
-    action for a given treeview.
+    """Subclass for actions on TreeView instances. Augments ActionDefinition by information on how to
+    instantiate the action for a given treeview instance.
+
+    Args:
+      actionCls: subclass of TreeAction
+      **kwargs: additional keyword arguments passed to the action's constructor
     """
 
     def __init__(self, context, identifier, description, shortcut, actionCls, **kwargs):
@@ -97,11 +118,22 @@ class TreeActionDefinition(ActionDefinition):
         self.kwargs = kwargs
 
     def createAction(self, treeview):
+        """Instantiate an action parented by *treeview*. The identifier specified by this definition is always
+        passed to the action as keyword argument, in addition to self.kwargs.
+        """
         return self.actionCls(treeview, identifier=self.identifier, **self.kwargs)
 
 
 class TreeAction(QtGui.QAction):
     """Base class for actions on TreeView instances.
+
+    TreeAction defines some common task on tree views and simplifies integration with the ActionManager. A
+    TreeAction subclass can have a *label* class attribute, which is used as label (setText()) for the action.
+    Otherwise, subclasses have to call setText() by themselves.
+
+    Args:
+      identifier: Identifier of the action. If an identifier is supplied and known by the ActionManager, the
+        TreeAction will automatically set its shortcut and react to shortcutChanged events.
     """
     label = None
 
@@ -126,9 +158,13 @@ class TreeAction(QtGui.QAction):
             self.setShortcut(keySequence)
 
     def initialize(self, selection):
+        """Called whenever the selection in the parent TreeView has changed. The action should analyze the
+        selection in order to decide if it is enabled (valid for this selection) or not.
+        """
         pass
 
     def doAction(self):
+        """Performs the action This has to be implemented in all subclasses."""
         raise NotImplementedError()
 
     def level(self):
@@ -138,27 +174,74 @@ class TreeAction(QtGui.QAction):
 
     @classmethod
     def register(cls, identifier, context='elements', description=None, shortcut=None, **kwargs):
+        """Convenience method to register a new TreeActionDefinition to the ActionManager.
+
+        This method creates a new TreeActionDefinition object based on this class. The context defaults to
+        'elements' but can be changed to anything else. *description* may be left blank if the class has a
+        *label* class attribute, which is used for the action's description in that case.
+        """
         if description is None:
-            if 'label' in kwargs:
-                description = kwargs['label']
-            else:
-                description = cls.label
+            description = cls.label
         definition = TreeActionDefinition(context, identifier, description, shortcut, cls, **kwargs)
         manager.registerAction(definition)
 
 
-class ActionTree(OrderedDict):
+class TreeActionConfiguration(QtCore.QObject):
+    """Holds the configuration of actions associated to a certain TreeView subclass (Editor, Browser, ...).
 
+    A TreeActionConfiguration consists of a nested structure of ActionTrees, each containing, divided into
+    contexts, lists of actions (corresponding to one level of the context menu) and possibly child ActionTrees
+    for sub-menus.
+
+    Emits *actionDefinitionAdded* with the TreeActionDefinition as argument whenever such a definition was
+    added to the configuration, and *actionDefinitonRemoved* with the action's identifier when it was removed.
+
+    If an action is unregistered from the ActionManager, a TreeActionConfiguration will automatically remove
+    that action from its configuration and emit actionDefinitionRemoved signals accordingly.
+    """
+
+    actionDefinitionAdded = QtCore.pyqtSignal(object)
+    actionDefinitionRemoved = QtCore.pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.root = ActionTree(None, self)
+        manager.actionUnregistered.connect(self.root.removeActionDefinition)
+
+    def createMenu(self, parent):
+        """Create and return a context menu for the given TreeView instance."""
+        return self.root.createMenu(parent, parent.treeActions)
+
+    def createActions(self, parent):
+        """Instantiate all TreeActions defined by this configuration, with their parent set to *parent*. This
+        method also alls parent.addAction() for every action created.
+
+        Returns:
+          A dictionary mapping identifier to TreeAction instance.
+        """
+        actions = {}
+        for config in self.root.iterActions():
+            identifier = config.identifier
+            actions[identifier] = config.createAction(parent)
+            parent.addAction(actions[identifier])
+        return actions
+
+
+class ActionTree(OrderedDict):
+    """Defines one layer of the actions defined in a TreeActionConfiguration."""
     def __init__(self, name, parent):
         super().__init__()
         self.parent = parent
+        # store the associated TreeActionConfiguration as self.config
         while isinstance(parent, ActionTree):
             parent = parent.parent
         self.config = parent
-        self['misc'] = OrderedDict()
         self.name = name
 
     def addActionDefinition(self, action):
+        """Add a new action definition on this layer. For convenience, *action* might be a definition string
+        instead of a TreeActionDefinition; in that case, the definition is obtained from the ActionManager.
+        """
         if isinstance(action, str):
             action = manager.actions[action]
         if action.context not in self:
@@ -167,6 +250,7 @@ class ActionTree(OrderedDict):
         self.config.actionDefinitionAdded.emit(action)
 
     def addSubTree(self, name, context='misc'):
+        """Add and return a new subtree named *name*."""
         if context not in self:
             self[context] = OrderedDict()
         tree = ActionTree(name, self)
@@ -174,6 +258,9 @@ class ActionTree(OrderedDict):
         return tree
 
     def removeActionDefinition(self, identifier):
+        """Remove the action definition named *identifier* from this configuration. Recurses into sub-trees
+        if necessary.
+        """
         for section in self.values():
             if identifier in section:
                 del section[identifier]
@@ -221,25 +308,3 @@ class ActionTree(OrderedDict):
                 else:
                     yield from item.iterActions()
 
-
-class TreeActionConfiguration(QtCore.QObject):
-    """Objects of this class define an action configuration for a treeview."""
-
-    actionDefinitionAdded = QtCore.pyqtSignal(object)
-    actionDefinitionRemoved = QtCore.pyqtSignal(str)
-
-    def __init__(self):
-        super().__init__()
-        self.root = ActionTree(None, self)
-        manager.actionUnregistered.connect(self.root.removeActionDefinition)
-
-    def createMenu(self, parent, actionDict):
-        return self.root.createMenu(parent, actionDict)
-
-    def createActions(self, parent):
-        actions = {}
-        for config in self.root.iterActions():
-            identifier = config.identifier
-            actions[identifier] = config.createAction(parent)
-            parent.addAction(actions[identifier])
-        return actions
