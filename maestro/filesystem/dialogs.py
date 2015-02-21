@@ -22,12 +22,11 @@ import os.path
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 
-from .. import application, database as db, stack
-from ..core import levels, tags
-from maestro.core import urls
-from ..models.leveltreemodel import LevelTreeModel
-from ..gui import delegates, treeactions, treeview
-from ..gui.delegates import abstractdelegate, editor as editordelegate
+from maestro import application, database as db, stack
+from maestro.core import levels, tags, urls
+from maestro.models.leveltreemodel import LevelTreeModel
+from maestro.gui import actions, delegates, treeview
+from maestro.gui.delegates import abstractdelegate, editor as editordelegate
 
 translate = QtCore.QCoreApplication.translate
 
@@ -54,7 +53,7 @@ class LostFilesDelegate(delegates.StandardDelegate):
             self.addCenter(delegates.TextItem(element.url.path, style))
 
 
-class SetPathAction(treeactions.TreeAction):
+class SetPathAction(actions.TreeAction):
     """Action to change the URL of a file without any undo/redo.
     
     Used by the LostFilesDialog to correct URLs of files moved outside of Maestro.
@@ -90,7 +89,7 @@ class SetPathAction(treeactions.TreeAction):
             levels.real.emitEvent(dataIds=(elem.id,))
             
 
-class RemoveMissingFilesAction(treeactions.TreeAction):
+class RemoveMissingFilesAction(actions.TreeAction):
     """Action to remove elements from the database which are missing on the filesystem."""
     
     def __init__(self, parent):

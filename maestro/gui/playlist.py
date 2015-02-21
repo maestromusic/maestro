@@ -19,13 +19,12 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import treeview, mainwindow, treeactions, delegates
-from ..core import nodes
-from .delegates import playlist as playlistdelegate
-from .preferences import profiles as profilesgui
-from .treeactions import *
-from .. import player
-from ..models import rootedtreemodel
+from maestro import player, utils
+from maestro.core import levels, nodes
+from maestro.models import rootedtreemodel
+from maestro.gui import actions, dialogs, treeview, mainwindow, delegates, tageditor
+from maestro.gui.delegates import playlist as playlistdelegate
+from maestro.gui.preferences import profiles as profilesgui
 
 translate = QtCore.QCoreApplication.translate
 
@@ -56,17 +55,40 @@ def appendToDefaultPlaylist(wrappers, replace=False):
         model.backend.play()
 
 
+class RemoveFromPlaylistAction(actions.TreeAction):
+    """This action removes selected elements from a playlist."""
+
+    label = translate('RemoveFromPlaylistAction', 'Remove from playlist')
+
+    def initialize(self, selection):
+        self.setDisabled(selection.empty())
+
+    def doAction(self):
+        self.parent().removeSelected()
+
+
+class ClearPlaylistAction(actions.TreeAction):
+    """This action clears a playlist."""
+
+    label = translate('ClearPlaylistAction', 'Clear playlist')
+
+    def initialize(self, selection):
+        self.setEnabled(self.parent().model().root.hasContents() > 0)
+
+    def doAction(self):
+        self.parent().model().clear()
+
+
+RemoveFromPlaylistAction.register('removeFromPL', context='playback',
+                                  shortcut=translate('RemoveFromPlaylistAction', 'Del'))
+ClearPlaylistAction.register('clearPL', context='playback',
+                             shortcut=translate('ClearPLaylistAction', 'Shift+Del'))
+
+
 class PlaylistTreeView(treeview.DraggingTreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = None
-    
-    actionConfig = treeview.TreeActionConfiguration()
-    sect = translate("PlaylistTreeView", "Tags")
-    actionConfig.addActionDefinition(((sect, 'edittags'),), treeactions.EditTagsAction)
-    sect = translate("PlaylistTreeView", "Playlist")
-    actionConfig.addActionDefinition(((sect, 'removeFromPL'),), treeactions.RemoveFromPlaylistAction)
-    actionConfig.addActionDefinition(((sect, 'clearPL'),), treeactions.ClearPlaylistAction)
-    
+
     def __init__(self, delegateProfile):
         super().__init__(levels.real)
         self.backend = None
@@ -124,6 +146,9 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         self.model().removeMany(self.selectedRanges())
 
 
+for definition in 'editTags', 'removeFromPL', 'clearPL':
+    PlaylistTreeView.addActionDefinition(definition)
+
 
 class PlaylistWidget(mainwindow.Widget):
     def __init__(self, state=None, **args):
@@ -176,8 +201,7 @@ class PlaylistWidget(mainwindow.Widget):
 
         self.backend = backend
         self.treeview.setBackend(self.backend)
-    
-      
+
     def setActiveWidgetByState(self, state):
         current = self.mainLayout.itemAt(self.mainWidgetIndex).widget()
         self.mainLayout.removeWidget(current)

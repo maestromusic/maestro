@@ -16,10 +16,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import abc
 import os.path
 import re
-from PyQt4 import QtCore
+from PyQt4 import QtCore, QtGui
 from maestro import utils
 
 translate = QtCore.QCoreApplication.translate
@@ -184,3 +183,4 @@ def changeTags(changes):
             diff.revert(backendFile.tags, withoutPrivateTags=True)
             backendFile.saveTags()
         raise TagWriteError(problemUrl, problems)
+

@@ -22,21 +22,21 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, config, database as db, logging, utils, search
-from ..core import tags, flags, levels, domains
-from ..core.elements import Element, Container
-from . import mainwindow, treeactions, treeview, browserdialog, delegates, dockwidget, search as searchgui
-from .delegates import browser as browserdelegate
-from ..models import browser as browsermodel
+from maestro import application, database as db, logging, utils, search
+from maestro.core import flags, levels, domains
+from maestro.core.elements import Element
+from maestro.models import browser as browsermodel
+from maestro.gui import actions, treeactions, mainwindow, treeview, delegates, dockwidget, search as searchgui
+from maestro.gui import browserdialog, browseractions
+from maestro.gui.delegates import browser as browserdelegate
 
 
-class CompleteContainerAction(treeactions.TreeAction):
+class CompleteContainerAction(actions.TreeAction):
     """This action replaces the contents of a container wrapper by all contents of the corresponding element.
-    """ 
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setText(self.tr("Complete container"))
-    
+    """
+
+    label = translate('CompleteContainerAction', 'Complete container')
+
     def initialize(self, selection):
         self.setEnabled(any(w.isContainer()
                                 and (w.contents is None or len(w.contents) < len(w.element.contents))
@@ -54,6 +54,9 @@ class CompleteContainerAction(treeactions.TreeAction):
                 model.beginInsertRows(model.getIndex(wrapper), 0, len(wrapper.element.contents)-1)
                 wrapper.loadContents(recursive=True)
                 model.endInsertRows()
+
+CompleteContainerAction.register('completeContainer', context='browser',
+                                 description=translate('CompleteContainerAction', 'Load complete container'))
 
 
 class Browser(mainwindow.Widget):
@@ -377,22 +380,6 @@ class BrowserTreeView(treeview.TreeView):
     this browser, see BrowserModel. *delegateProfile* is the profile passed to the BrowserDelegate instance.
     """
     
-    actionConfig = treeview.TreeActionConfiguration()
-    sect = translate("BrowserTreeView", "Browser")
-    actionConfig.addActionDefinition(((sect, 'value'),), treeactions.TagValueAction)
-    sect = translate("BrowserTreeView", "Elements")
-    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
-    actionConfig.addActionDefinition(((sect, 'changeFileUrls'),), treeactions.ChangeFileUrlsAction)
-    actionConfig.addActionDefinition(((sect, 'delete'),), treeactions.DeleteAction,
-                                     text=translate("BrowserTreeView", "Delete from Maestro"))
-    actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
-    treeactions.SetElementTypeAction.addSubmenu(actionConfig, sect)
-    treeactions.ChangePositionAction.addSubmenu(actionConfig, sect)
-    viewSect = translate("BrowserTreeView", "View")
-    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'loadContainer'),), CompleteContainerAction)
-    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'collapseAll')), treeactions.ExpandOrCollapseAllAction, expand=False)
-    actionConfig.addActionDefinition(((sect, viewSect), (viewSect, 'expandAll')), treeactions.ExpandOrCollapseAllAction, expand=True)
-    
     def __init__(self, browser, domain, layers, filter, delegateProfile):
         super().__init__(levels.real)
         self.browser = browser
@@ -436,7 +423,14 @@ class BrowserTreeView(treeview.TreeView):
         else:
             from . import playlist
             playlist.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
-            
+
+
+for identifier in ('tagValue', 'editTags', 'changeURLs', 'delete', 'merge', 'completeContainer',
+                   'collapseAll', 'expandAll'):
+    BrowserTreeView.addActionDefinition(identifier)
+treeactions.SetElementTypeAction.addSubmenu(BrowserTreeView.actionConf.root)
+treeactions.ChangePositionAction.addSubmenu(BrowserTreeView.actionConf.root)
+
 
 class RestoreExpander:
     """Expander that will store the current list of expanded nodes in *view* and expand them again bit by bit,

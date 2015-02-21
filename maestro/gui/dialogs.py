@@ -421,3 +421,31 @@ class MergeDialog(QtGui.QDialog):
         else: config.storage.gui.merge_dialog_container_type = None
             
         self.accept()
+
+
+
+
+class DeleteDialog(QtGui.QDialog):
+    """Special dialog to display the files that have been deleted from database and may be deleted from disk.
+    It is used in DeleteAction."""
+    def __init__(self, files, parent):
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Delete files?"))
+        self.resize(400,300)
+        layout = QtGui.QVBoxLayout(self)
+        label = QtGui.QLabel(
+                             self.tr("You have deleted the following %n file(s) from Maestro. "
+                                     "Do you want them deleted completely?<br />\n"
+                                     "<b>This cannot be reversed!</b>",
+                                     '', len(files)))
+        label.setTextFormat(Qt.RichText)
+        label.setWordWrap(True)
+        layout.addWidget(label)
+        listWidget = QtGui.QListWidget()
+        listWidget.addItems([str(file.url) for file in files])
+        layout.addWidget(listWidget)
+        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Yes | QtGui.QDialogButtonBox.No)
+        buttonBox.button(QtGui.QDialogButtonBox.No).setDefault(True)
+        buttonBox.rejected.connect(self.reject)
+        buttonBox.accepted.connect(self.accept)
+        layout.addWidget(buttonBox)

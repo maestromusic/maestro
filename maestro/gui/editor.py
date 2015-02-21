@@ -20,30 +20,17 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import treeactions, treeview, mainwindow, tagwidgets, dialogs, delegates
-from .. import utils
-from ..core import levels, tags
-from ..models import albumguesser
-from ..models.editor import EditorModel
-from .delegates import editor as editordelegate
-from .preferences import profiles as profilesgui
+from maestro import utils
+from maestro.core import levels, tags
+from maestro.models import albumguesser
+from maestro.models.editor import EditorModel
+from maestro.gui import treeview, mainwindow, treeactions, tagwidgets, dialogs, delegates
+from maestro.gui.delegates import editor as editordelegate
+from maestro.gui.preferences import profiles as profilesgui
 
-        
+
 class EditorTreeView(treeview.DraggingTreeView):
     """This is the main widget of an editor: The tree view showing the current element tree."""
-
-    actionConfig = treeview.TreeActionConfiguration()
-    sect = translate("EditorTreeView", "elements")
-    actionConfig.addActionDefinition(((sect, 'editTags'),), treeactions.EditTagsAction)
-    actionConfig.addActionDefinition(((sect, 'remove'),), treeactions.RemoveFromParentAction)
-    actionConfig.addActionDefinition(((sect, 'merge'),), treeactions.MergeAction)
-    actionConfig.addActionDefinition(((sect, 'flatten'),), treeactions.FlattenAction)
-    treeactions.SetElementTypeAction.addSubmenu(actionConfig, sect)
-    treeactions.ChangePositionAction.addSubmenu(actionConfig, sect)
-    sect = translate("EditorTreeView", "editor")
-    
-    actionConfig.addActionDefinition(((sect, 'clearEditor'),), treeactions.ClearTreeAction)
-    actionConfig.addActionDefinition(((sect, 'commit'),), treeactions.CommitTreeAction)
 
     def __init__(self, delegateProfile):
         super().__init__(levels.editor)
@@ -66,7 +53,13 @@ class EditorTreeView(treeview.DraggingTreeView):
                                      QtGui.QItemSelectionModel.ClearAndSelect)   
         self.setFocus(Qt.MouseFocusReason)
 
-    
+
+for identifier in 'editTags', 'remove', 'merge', 'flatten', 'clearTree', 'commit':
+    EditorTreeView.addActionDefinition(identifier)
+treeactions.SetElementTypeAction.addSubmenu(EditorTreeView.actionConf.root)
+treeactions.ChangePositionAction.addSubmenu(EditorTreeView.actionConf.root)
+
+
 class EditorWidget(mainwindow.Widget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
@@ -107,7 +100,7 @@ class EditorWidget(mainwindow.Widget):
         
         # Fill buttonLayout
         self.toolbar = QtGui.QToolBar(self)
-        self.toolbar.addAction(self.editor.treeActions['clearEditor'])
+        self.toolbar.addAction(self.editor.treeActions['clearTree'])
         
         self.toolbar.addAction(self.editor.treeActions['commit'])
         buttonLayout.addWidget(self.toolbar)

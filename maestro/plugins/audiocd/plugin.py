@@ -39,8 +39,10 @@ def defaultConfig():
 def enable():
     urls.fileBackends.append(AudioCDTrack)
     from .gui import ImportAudioCDAction
-    editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'audiocd'),), ImportAudioCDAction)
-    from ...core.levels import real
+    ImportAudioCDAction.register('importAudioCD', context='plugins',
+                                 description=translate('ImportAudioCDAction', 'Open CD ripping dialog'))
+    editor.EditorTreeView.addActionDefinition('importAudioCD')
+    from maestro.core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.append(fileChangerHook)
 
@@ -55,8 +57,9 @@ def mainWindowInit():
 
 def disable():
     urls.fileBackends.remove(AudioCDTrack)
-    editor.EditorTreeView.actionConfig.removeActionDefinition( (("plugins", "audiocd"),) )
-    from ...core.levels import real
+    from maestro.gui import actions
+    actions.manager.unregisterAction('importAudioCD')
+    from maestro.core.levels import real
     from .ripper import fileChangerHook
     real.commitHooks.remove(fileChangerHook)
     application.mainWindow.menus['extras'].removeAction(_action)

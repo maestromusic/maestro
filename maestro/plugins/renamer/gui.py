@@ -19,8 +19,8 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from maestro import config, logging
-from maestro.gui import treeview, treeactions, delegates
+from maestro import logging
+from maestro.gui import actions, treeview, delegates
 from maestro.gui.delegates import abstractdelegate
 from maestro.gui.preferences import profiles
 from maestro.models import leveltreemodel
@@ -28,13 +28,10 @@ from maestro.core import levels
 from . import plugin
 
 
-class RenameFilesAction(treeactions.TreeAction):
+class RenameFilesAction(actions.TreeAction):
     """Action to rename files in a container according to the tags and the container structure."""
-    
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setText(self.tr("Rename files"))
-        self.setEnabled(True)
+
+    label = translate('RenameFilesAction', 'Rename files by pattern')
     
     def doAction(self):
         elements = self.parent().selection.elements()

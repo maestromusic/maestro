@@ -16,12 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from collections import OrderedDict
-
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import selection, treeactions
+from maestro.gui import selection, actions
 
 
 class TreeviewSelection(selection.Selection):
@@ -48,91 +46,6 @@ class TreeviewSelection(selection.Selection):
             return [n for n in self._nodes
                             if not any(self._model.isSelected(self._model.model().getIndex(parent))
                                             for parent in n.getParents())]
-        
-
-class TreeActionConfiguration(QtCore.QObject):
-    """Objects of this class define an action configuration for a treeview."""
-    #TODO: comment
-    
-    actionDefinitionAdded = QtCore.pyqtSignal(object)
-    actionDefinitionRemoved = QtCore.pyqtSignal(str)
-    
-    def __init__(self, toplevel=True):
-        super().__init__()
-        self.toplevel = toplevel
-        self.sections = OrderedDict()
-        
-    def addActionDefinition(self, path, callable, *args, **kwargs):
-        section, name = path[0]
-        if section not in self.sections:
-            self.sections[section] = OrderedDict()
-        if len(path) > 1:
-            if name not in self.sections[section]:
-                self.sections[section][name] = TreeActionConfiguration(False)
-            self.sections[section][name].addActionDefinition(path[1:], callable, *args, **kwargs)
-        else:
-            self.sections[section][name] = (callable, args, kwargs)
-        if self.toplevel:
-            self.actionDefinitionAdded.emit(path)
-    
-    
-    def removeActionDefinition(self, path):
-        section, name = path[0]
-        if len(path) > 1:
-            self.sections[section][name].removeActionDefinition(path[1:])
-            if len(self.sections[section][name]) == 0:
-                del self.sections[section][name]
-        else:
-            del self.sections[section][name]
-        if len(self.sections[section]) == 0:
-            del self.sections[section]
-        if self.toplevel:
-            self.actionDefinitionRemoved.emit(path[-1][1])
-    
-    def __len__(self):
-        return len(self.sections)
-    
-    def __iter__(self):
-        return self.actionIterator()
-    
-    def getDefinition(self, path):
-        section, name = path[0]
-        if len(path) == 1:
-            return self.sections[section][name]
-        section, name = path[0]
-        return self.sections[section][name].getDefinition(path[1:])
-
-    def actionIterator(self):
-        """Iterates over the actions and subactions in this configuration in the defined order."""
-        for _, actions in self.sections.items():
-            for name, definition in actions.items():
-                if isinstance(definition, TreeActionConfiguration):
-                    for a in definition:
-                        yield a
-                else:
-                    yield name, definition 
-            
-    def createMenu(self, parent, treeActions):
-        menu = QtGui.QMenu(parent)
-        anythingEnabled = False
-        for section, actions in self.sections.items():
-            sep = menu.addSeparator()
-            sep.setText(section)
-            
-            for name, definition in actions.items():
-                if isinstance(definition, TreeActionConfiguration):
-                    subMenu = definition.createMenu(menu, treeActions)
-                    subMenu.setTitle(name)
-                    if subMenu.isEnabled():
-                        anythingEnabled = True
-                    menu.addMenu(subMenu)
-                else:
-                    menu.addAction(treeActions[name])
-                    if treeActions[name].isEnabled():
-                        anythingEnabled = True
-        if not anythingEnabled:
-            menu.setEnabled(False)
-        return menu
 
 
 class TreeView(QtGui.QTreeView):
@@ -144,8 +57,6 @@ class TreeView(QtGui.QTreeView):
     *affectGlobalSelection* determines whether the treeview will change the global selection whenever nodes
     in it are selected. This should be set to False for treeviews in dialogs.
     """
-    
-    actionConfig = TreeActionConfiguration()
     
     def __init__(self, level, parent=None, affectGlobalSelection=True):
         super().__init__(parent)
@@ -160,37 +71,24 @@ class TreeView(QtGui.QTreeView):
         self.setDefaultDropAction(Qt.CopyAction)
         self.viewport().setMouseTracking(True)
         
-        self.treeActions = {}
-        for name, (callable, args, kwargs) in self.actionConfig:
-            if callable is not None:
-                self.treeActions[name] = action = callable(self, *args, **kwargs)
-                self.addAction(action)
-        self.actionConfig.actionDefinitionAdded.connect(self._addTreeAction)
-        self.actionConfig.actionDefinitionRemoved.connect(self._removeTreeAction)
-        self.localActions = []
-        
-    def _addTreeAction(self, path):
-        callable, args, kwargs = self.actionConfig.getDefinition(path)
-        if callable is not None:
-            action = self.treeActions[path[-1][1]] = callable(self, *args, **kwargs)
-            self.addAction(action)
-    
-    def _removeTreeAction(self, name):
+        self.treeActions = self.actionConf.createActions(self)
+        self.actionConf.actionDefinitionAdded.connect(self._handleActionDefAdded)
+        self.actionConf.actionDefinitionRemoved.connect(self._handleActionDefRemoved)
+
+    @classmethod
+    def addActionDefinition(cls, *args, **kwargs):
+        if 'actionConf' not in cls.__dict__:
+            cls.actionConf = actions.TreeActionConfiguration()
+        cls.actionConf.root.addActionDefinition(*args, **kwargs)
+
+    def _handleActionDefAdded(self, actionDef):
+        self.treeActions[actionDef.identifier] = actionDef.createAction(self)
+        self.addAction(self.treeActions[actionDef.identifier])
+
+    def _handleActionDefRemoved(self, name):
         action = self.treeActions[name]
         self.removeAction(action)
         del self.treeActions[name]
-    
-    def addLocalAction(self, action):
-        """Add an action to this treeview instance only, without the global actionConfig.
-        The action will be appended to the end of the context menu.
-        """
-        self.addAction(action)
-        self.localActions.append(action)
-        
-    def removeLocalAction(self, action):
-        """Remove an action previously added by *addLocalAction*."""
-        self.removeAction(action)
-        self.localActions.remove(action)
     
     def setModel(self, model):
         super().setModel(model)
@@ -204,23 +102,22 @@ class TreeView(QtGui.QTreeView):
         if selectionModel is not None: # happens if the view is empty
             self.selection = TreeviewSelection(self.level, selectionModel)
             for action in self.treeActions.values():
-                if isinstance(action, treeactions.TreeAction) or \
-                   isinstance(action, TreeActionConfiguration):
+                if isinstance(action, actions.TreeAction):
                     action.initialize(self.selection)
-        
+
+    def localActions(self):
+        return [action for action in self.actions() if action not in self.treeActions.values()]
+
     def contextMenuEvent(self, event):
-        if len(self.treeActions) == 0:
-            event.ignore()
-            return
-        menu = self.actionConfig.createMenu(self, self.treeActions)
-        for action in self.localActions:
+        menu = self.actionConf.createMenu(self, self.treeActions)
+        for action in self.localActions():
             menu.addAction(action)
-        if menu is not None:
+        if menu.isEmpty():
+            event.ignore()
+        else:
             menu.popup(event.globalPos())
             event.accept()
-        else:
-            event.ignore()
-               
+
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
         self.updateSelection()

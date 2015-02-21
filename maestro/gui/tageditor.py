@@ -20,17 +20,16 @@ import os.path, functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-from maestro.core import urls
 
+from maestro import utils, config, logging, stack
+from maestro.core import tags, levels, urls
+from maestro.models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
+from maestro.gui import singletageditor, tagwidgets, mainwindow, flageditor, dialogs
+from maestro.gui.misc import widgetlist
+        
 translate = QtCore.QCoreApplication.translate
 
-from .. import utils, config, logging, stack
-from ..core import tags, levels
-from ..models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from . import singletageditor, tagwidgets, mainwindow, flageditor, dialogs
-from .misc import widgetlist
-        
-        
+
 class TagEditorWidget(mainwindow.Widget):
     """A TagEditorWidget contains of a row of buttons, a TagEditorLayout forming the actual tageditor and
     a flageditor. The TagEditorLayout displays pairs of a TagTypeBox and a SingleTagEditor - one for each
@@ -839,4 +838,3 @@ class TagEditorLayout(QtGui.QLayout):
                 currentHeight =  height
             
         return columns
-        

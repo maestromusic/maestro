@@ -21,19 +21,19 @@ from PyQt4.QtGui import QDialogButtonBox
 from maestro import config
 from maestro.core import levels, tags, domains, urls
 from maestro.core.elements import ContainerType
-from maestro.gui import dialogs, delegates, mainwindow, treeactions, tagwidgets, treeview
+from maestro.gui import actions, dialogs, delegates, mainwindow, tagwidgets, treeview
 from maestro.gui.delegates.abstractdelegate import *
 from maestro.models import leveltreemodel
-from ...plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
+from maestro.plugins.musicbrainz import plugin as mbplugin, xmlapi, elements
 
 translate = QtCore.QCoreApplication.translate
 
 
-class ImportAudioCDAction(treeactions.TreeAction):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setText(self.tr('load audio CD'))
-        self.ripper = None
+class ImportAudioCDAction(actions.TreeAction):
+
+    label = translate('ImportAudioCDAction', 'Rip audio CD ...')
+
+    ripper = None
 
     @staticmethod
     def _getRelease(theDiscid):

@@ -23,11 +23,12 @@ from PyQt4.QtCore import Qt
 
 translate = QtCore.QCoreApplication.translate
 
-from ...core import covers
-from ...core.elements import Element
-from ...gui import treeactions
-from ...gui.misc import busyindicator
-from ... import application, stack
+from maestro import application, stack
+from maestro.core import covers
+from maestro.core.elements import Element
+from maestro.gui import actions
+from maestro.gui.misc import busyindicator
+
 
 # Various cover sizes used in the dialog
 BIG_COVER_SIZE = 400
@@ -36,22 +37,21 @@ SMALL_COVER_SIZE = 40
 
 
 def enable():
-    from ...gui import editor, browser
-    editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
-    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'covers'),), CoverAction)
-        
+    from maestro.gui import editor, browser
+    CoverAction.register('editCovers', context='plugins', description=translate('CoverAction', 'Edit covers'))
+    editor.EditorTreeView.addActionDefinition('editCovers')
+    browser.BrowserTreeView.addActionDefinition('editCovers')
+
+
 def disable():
-    from ...gui import editor, browser
-    editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
-    browser.BrowserTreeView.actionConfig.removeActionDefinition((("plugins", 'covers'),))
+    actions.manager.unregisterAction('editCovers')
     
     
-class CoverAction(treeactions.TreeAction):
+class CoverAction(actions.TreeAction):
     """Action to open the CoverDialog with the currently selected elements."""
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setText(self.tr("Edit covers..."))
-    
+
+    label = translate('CoverAction', 'Edit covers ...')
+
     def initialize(self, selection):
         self.setEnabled(selection.hasWrappers())
     

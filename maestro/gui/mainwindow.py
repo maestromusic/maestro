@@ -95,6 +95,7 @@ class WidgetClass:
         - icon: Optional. An icon which is displayed in tabs or docks for this widget.
 
     """
+    #TODO make an enum for DockAreas
     _areaFlags = {
             'top': Qt.TopDockWidgetArea,
             'bottom': Qt.BottomDockWidgetArea,

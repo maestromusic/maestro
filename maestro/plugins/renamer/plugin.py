@@ -51,15 +51,15 @@ def enable():
     
     from .gui import RenameFilesAction
     from ...gui import editor, browser
-    editor.EditorTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
-    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
+    RenameFilesAction.register('renamer', context='plugins',
+                               shortcut=translate('RenameFilesAction', 'Ctrl+R'))
+    editor.EditorTreeView.addActionDefinition('renamer')
+    browser.BrowserTreeView.addActionDefinition('renamer')
 
 
 def disable():
-    from ...gui import editor, browser
-    from .gui import RenameFilesAction
-    editor.EditorTreeView.actionConfig.removeActionDefinition((("plugins", 'renamer'),))
-    browser.BrowserTreeView.actionConfig.addActionDefinition((("plugins", 'renamer'),), RenameFilesAction)
+    from maestro.gui import actions
+    actions.manager.unregisterAction('renamer')
     global profileCategory
     profiles.manager.removeCategory(profileCategory)
     profileCategory = None
