@@ -21,9 +21,9 @@ import functools
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from . import mainwindow, dialogs
-from .. import utils
-        
+from maestro import utils
+from maestro.gui import mainwindow
+
 
 class DockWidget(QtGui.QDockWidget):
     """QDockWidget subclass that uses our custom DockWidgetTitleBar and respects the 'Hide title bars'

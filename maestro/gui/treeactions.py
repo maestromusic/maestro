@@ -222,8 +222,9 @@ for type in elements.ContainerType:
 class ClearTreeAction(actions.TreeAction):
     """This action clears a tree model."""
 
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, icon=images.icon('clear_playlist.png'), **kwargs)
+    def __init__(self, parent, identifier):
+        super().__init__(parent, identifier)
+        self.setIcon(QtGui.QIcon.fromTheme('edit-clear'))
         self.setText(self.tr('Clear'))
 
     def initialize(self, selection):
@@ -241,7 +242,8 @@ class CommitTreeAction(actions.TreeAction):
     """Commit the contents of a LevelTreeModel."""
 
     def __init__(self, parent, identifier):
-        super().__init__(parent, identifier=identifier, icon=images.standardIcon('save'))
+        super().__init__(parent, identifier)
+        self.setIcon(QtGui.QIcon.fromTheme('document-save'))
         self.setText(self.tr('Store'))
 
     def initialize(self, selection):

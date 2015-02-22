@@ -51,7 +51,7 @@ class LogoDock(mainwindow.Widget):
 
     def initialize(self, state):
         # initialize is called when the LogoDock has been added to its dockwidget
-        dock = self.getContainingWidget()
+        dock = self.containingWidget()
         # Do not show a title and icon in the title bar of this dock widget.
         dock.setWindowTitle('')
         dock.setWindowIcon(None)

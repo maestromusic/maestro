@@ -85,3 +85,18 @@ ExpandOrCollapseAllAction.register('expandAll', context='browser', expand=True,
 ExpandOrCollapseAllAction.register('collapseAll', context='browser', expand=False,
                                    description=translate('ExpandOrCollapseAllAction', 'Collapse all nodes'),
                                    shortcut=translate('QShortcut', 'Ctrl+-'))
+
+
+class GlobalSearchAction(actions.GlobalAction):
+    """Global action that jumps to the most current browser's search box."""
+    identifier = 'gSearch'
+    label = translate('GlobalSearchAction', 'Jump to browser search')
+
+    def doAction(self):
+        from maestro.gui import mainwindow
+        browser = mainwindow.mainWindow.currentWidgets.get('browser')
+        if browser:
+            browser.containingWidget().raise_()
+            browser.searchBox.setFocus()
+
+GlobalSearchAction.register('navigation', shortcut=QtGui.QKeySequence.Find)

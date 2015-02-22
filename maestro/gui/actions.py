@@ -37,6 +37,7 @@ contextLabels dictionary.
 
 contextLabels = OrderedDict([
     ('misc',       translate('ActionContext', 'Misc')),
+    ('view',       translate('ActionContext', 'View')),
     ('navigation', translate('ActionContext', 'Navigation')),
     ('elements',   translate('ActionContext', 'Elements')),
     ('browser',    translate('ActionContext', 'Browser')),
@@ -78,7 +79,7 @@ class ActionManager(QtCore.QObject):
     def __init__(self):
         super().__init__()
         self.actions = {}
-        """:type : dict of [str, ActionDefinition]"""
+        """:type : dict[str, ActionDefinition]"""
 
     def contexts(self):
         return set(action.shortcut for action in self.actions.values())
@@ -142,7 +143,57 @@ class TreeActionDefinition(ActionDefinition):
         return self.actionCls(treeview, identifier=self.identifier, **self.kwargs)
 
 
-class TreeAction(QtGui.QAction):
+class Action(QtGui.QAction):
+    """Base class for actions managed by Maestro.
+    """
+
+    label = None
+
+    def __init__(self, parent, identifier, label=None):
+        if label is None and self.label:
+            label = self.label
+        if label:
+            super().__init__(label, parent)
+        else:
+            super().__init__(parent)
+        if self.label:
+            self.setText(self.label)
+        self.identifier = identifier
+        shortcut = manager.shortcut(identifier)
+        if shortcut:
+            self.setShortcut(shortcut)
+        manager.shortcutChanged.connect(self._handleShortcutChange)
+
+    def _handleShortcutChange(self, identifier, keySequence):
+        if identifier == self.identifier:
+            self.setShortcut(keySequence)
+
+
+class GlobalAction(Action):
+
+    identifier = None
+
+    def __init__(self, parent, identifier=None, label=None):
+        if identifier is None:
+            identifier = type(self).identifier
+        super().__init__(parent, identifier, label)
+        self.triggered.connect(self.doAction)
+
+
+    def doAction(self):
+        raise NotImplementedError()
+
+    @classmethod
+    def register(cls, context='navigation', **kwargs):
+        """Convenience method to register a new ActionDefinition to the ActionManager.
+        """
+        description = kwargs.get('description', cls.label)
+        identifier = kwargs.get('identifier', cls.identifier)
+        definition = ActionDefinition(context, identifier, description, kwargs.get('shortcut'))
+        manager.registerAction(definition)
+
+
+class TreeAction(Action):
     """Base class for actions on TreeView instances.
 
     TreeAction defines some common task on tree views and simplifies integration with the ActionManager. A
@@ -153,27 +204,11 @@ class TreeAction(QtGui.QAction):
       identifier: Identifier of the action. If an identifier is supplied and known by the ActionManager, the
         TreeAction will automatically set its shortcut and react to shortcutChanged events.
     """
-    label = None
 
-    def __init__(self, parent, identifier=None, icon=None, tooltip=None):
-        super().__init__(parent)
-        self.identifier = identifier
-        shortcut = manager.shortcut(identifier)
-        if shortcut:
-            self.setShortcut(shortcut)
+    def __init__(self, parent, identifier):
+        super().__init__(parent, identifier)
         self.setShortcutContext(Qt.WidgetShortcut)
-        manager.shortcutChanged.connect(self._handleShortcutChange)
-        if self.label:
-            self.setText(self.label)
-        if icon:
-            self.setIcon(icon)
-        if tooltip:
-            self.setToolTip((tooltip))
         self.triggered.connect(self.doAction)
-
-    def _handleShortcutChange(self, identifier, keySequence):
-        if identifier == self.identifier:
-            self.setShortcut(keySequence)
 
     def initialize(self, selection):
         """Called whenever the selection in the parent TreeView has changed. The action should analyze the

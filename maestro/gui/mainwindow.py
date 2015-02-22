@@ -38,17 +38,17 @@ import functools
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
-QWIDGETSIZE_MAX = 16777215
 
-from .. import config, logging, utils, stack, VERSION
-from . import selection, dialogs
+from maestro import config, logging, utils, stack, VERSION
+from maestro.gui import actions, selection, dialogs
+
+
+translate = QtCore.QCoreApplication.translate
+QWIDGETSIZE_MAX = 16777215
 
 # This will contain the single instance of MainWindow once it is initialized
 mainWindow = None
-
-# Global selection
-_globalSelectionLevel = None
-_globalSelection = None
+""":type: MainWindow"""
 
 # "Name" of the default perspective (will never be displayed)
 DEFAULT_PERSPECTIVE = ''
@@ -76,6 +76,13 @@ def removeWidgetClass(id):
     else: _widgetClasses.remove(widgetClass)
     if mainWindow is not None:
         mainWindow._widgetClassRemoved(widgetClass)
+
+
+def getWidgetClass(id):
+    """Get the registered WidgetClass with the given id (or None)."""
+    for c in _widgetClasses:
+        if c.id == id:
+            return c
 
 
 class WidgetClass:
@@ -149,13 +156,6 @@ class WidgetClass:
         return "<WidgetClass({}, {}, {})>".format(self.id, self.name, self.theClass.__name__)
 
 
-def getWidgetClass(id):
-    """Get the registered WidgetClass with the given id (or None)."""
-    for c in _widgetClasses:
-        if c.id == id:
-            return c
-    else: return None
-
 
 class Widget(QtGui.QWidget):
     """This is the superclass of all widgets that can be used as central and/or docked widgets.
@@ -188,7 +188,7 @@ class Widget(QtGui.QWidget):
         in the constructor. Remember to call the base implementation!
         """
         if self.area != 'central':
-            self.getContainingWidget().dockLocationChanged.connect(self._handleDockLocationChanged)
+            self.containingWidget().dockLocationChanged.connect(self._handleDockLocationChanged)
     
     def canClose(self):
         """Return whether this widget may be closed. Subclasses should reimplement this function to ask
@@ -213,7 +213,7 @@ class Widget(QtGui.QWidget):
             self.area = area
             self.areaChanged.emit(area) 
             
-    def getContainingWidget(self):
+    def containingWidget(self):
         """Return the DockWidget or the central TabWidget containing this widget."""
         if self.area == 'central':
             return mainWindow.centralWidget()
@@ -260,18 +260,18 @@ class Widget(QtGui.QWidget):
         """Change the title of this widget, or rather of its containing widget (dock or central tabwidget).
         """
         if self.area == 'central':
-            tabWidget = self.getContainingWidget()
+            tabWidget = self.containingWidget()
             tabWidget.setTabText(tabWidget.indexOf(self), title)
         else:
-            self.getContainingWidget().setWindowTitle(title)
+            self.containingWidget().setWindowTitle(title)
         
     def setWindowIcon(self, icon):
         """Change the icon of this widget, or rather of its containing widget (dock or central tabwidget)."""
         if self.area == 'central':
-            tabWidget = self.getContainingWidget()
+            tabWidget = self.containingWidget()
             tabWidget.setTabIcon(tabWidget.indexOf(self), icon)
         else:
-            self.getContainingWidget().setWindowIcon(icon)
+            self.containingWidget().setWindowIcon(icon)
         
         
 class MainWindow(QtGui.QMainWindow):
@@ -292,9 +292,9 @@ class MainWindow(QtGui.QMainWindow):
 
         global mainWindow
         mainWindow = self
-    
-        # dicts that are indexed by WidgetClass-ids
-        self._currentWidgets = {}
+
+        self.currentWidgets = {}
+        """:type: dict[str, Widget]"""
 
         # Resize and move the widget to the size and position it had when the program was closed
         if config.binary.gui.mainwindow_maximized:
@@ -391,7 +391,7 @@ class MainWindow(QtGui.QMainWindow):
         except Exception as e:
             logging.exception(__name__, "Could not load central widget '{}'".format(widgetClass.id))
             return None
-        self._currentWidgets[widgetClass.id] = widget
+        self.currentWidgets[widgetClass.id] = widget
         if widgetClass.icon is not None:
             self.centralWidget().addTab(widget, widgetClass.icon, widgetClass.name)
         else: self.centralWidget().addTab(widget, widgetClass.name)
@@ -446,7 +446,7 @@ class MainWindow(QtGui.QMainWindow):
         except Exception as e:
             logging.exception(__name__, "Could not load docked widget '{}'".format(widgetClass.id))
             return None
-        self._currentWidgets[widgetClass.id] = widget
+        self.currentWidgets[widgetClass.id] = widget
         from . import dockwidget
         dock = dockwidget.DockWidget(widget, title=widgetClass.name, icon=widgetClass.icon)
         dock.setObjectName(objectName)
@@ -460,7 +460,7 @@ class MainWindow(QtGui.QMainWindow):
         """
         if ask and not widget.canClose():
             return
-        container = widget.getContainingWidget()
+        container = widget.containingWidget()
         if container is self.centralWidget():
             index = self.centralWidget().indexOf(widget)
             widget.close()
@@ -608,6 +608,10 @@ class MainWindow(QtGui.QMainWindow):
         # VIEW
         self.menus['view'] = self.menuBar().addMenu(self.tr("&View"))
 
+        from maestro.gui import browseractions
+        self.menus['view'].addAction(browseractions.GlobalSearchAction(self))
+        self.menus['view'].addSeparator()
+
         self.menus['centralwidgets'] = self.menus['view'].addMenu(self.tr("New central widget"))
         self.menus['dockwidgets'] = self.menus['view'].addMenu(self.tr("New dock widget"))
         self.menus['perspectives'] = self.menus['view'].addMenu(self.tr("Perspective"))
@@ -624,35 +628,20 @@ class MainWindow(QtGui.QMainWindow):
         self.freezeLayoutAction.toggled.connect(self.setLayoutFrozen)
         self.menus['view'].addAction(self.freezeLayoutAction)
 
-        self.fullscreenAction = QtGui.QAction(self.tr("&Fullscreen"), self)
-        self.fullscreenAction.setCheckable(True)
-        self.fullscreenAction.setChecked(False)
-        self.fullscreenAction.setShortcut(QtGui.QKeySequence(Qt.Key_F12))
-        self.fullscreenAction.toggled.connect(self._handleFullscreen)
-        self.menus['view'].addAction(self.fullscreenAction)
+        fullscreenAction = actions.Action(self, 'fullScreen', self.tr("Toggle &fullscreen"))
+        fullscreenAction.setCheckable(True)
+        fullscreenAction.toggled.connect(lambda state: self.showFullScreen() if state else self.showNormal())
+        self.menus['view'].addAction(fullscreenAction)
 
         # Playback
+        from maestro.gui import playback
         self.menus['playback'] = self.menuBar().addMenu(self.tr("Playback"))
-        self.playPauseAction = QtGui.QAction(self.tr("Play / Pause"), self)
-        self.playPauseAction.setShortcut(QtGui.QKeySequence(Qt.Key_Space))
-        self.playPauseAction.triggered.connect(self._handlePlayPause)
-        self.menus['playback'].addAction(self.playPauseAction)
-        self.stopAction = QtGui.QAction(self.tr("Stop"), self)
-        self.stopAction.triggered.connect(self._handleStop)
-        self.menus['playback'].addAction(self.stopAction)
-        
-        self.skipBackwardAction = QtGui.QAction(self.tr("Previous"), self)
-        self.skipBackwardAction.triggered.connect(self._handleSkipBackward)
-        self.menus['playback'].addAction(self.skipBackwardAction)
-        
-        self.skipForwardAction = QtGui.QAction(self.tr("Next"), self)
-        self.skipForwardAction.triggered.connect(self._handleSkipForward)
-        self.menus['playback'].addAction(self.skipForwardAction)
-        
-        self.addMarkAction = QtGui.QAction(self.tr("Add mark..."), self)
-        self.addMarkAction.triggered.connect(self._handleAddMark)
-        self.menus['playback'].addAction(self.addMarkAction)
-        
+        self.menus['playback'].addAction(playback.PlayPauseAction(self))
+        self.menus['playback'].addAction(playback.StopAction(self))
+        self.menus['playback'].addAction(playback.SkipAction(self, forward=True))
+        self.menus['playback'].addAction(playback.SkipAction(self, forward=False))
+        self.menus['playback'].addAction(playback.AddMarkAction(self))
+
         # EXTRAS
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))
 
@@ -711,49 +700,6 @@ class MainWindow(QtGui.QMainWindow):
             action = self.menus[menuId].findChild(QtGui.QAction, id)
             if action is not None:
                 action.setEnabled(enabled)
-
-    def _handleFullscreen(self, state):
-        """React to the 'Fullscreen' option in the view menu."""
-        if state:
-            self.showFullScreen()
-        else: self.showNormal()
-        
-    def _handlePlayPause(self):
-        from .. import player
-        backends = [b for b in player.profileCategory.profiles()
-                    if b.connectionState is player.ConnectionState.Connected]
-        if any(backend.state() == player.PlayState.Play for backend in backends):
-            # When a single backend is playing, stop all
-            for backend in backends:
-                backend.setState(player.PlayState.Pause)
-        else:
-            # otherwise start only the current one
-            if 'playback' in self._currentWidgets:
-                backend = self._currentWidgets['playback'].backend
-                if backend is not None:
-                    backend.setState(player.PlayState.Play)
-                    
-    def _handleStop(self):
-        from .. import player
-        for backend in player.profileCategory.profiles():
-            if backend.connectionState == player.ConnectionState.Connected:
-                backend.setState(player.PlayState.Stop)
-            
-    def _handleSkipBackward(self):
-        if 'playback' in self._currentWidgets:
-            backend = self._currentWidgets['playback'].backend
-            if backend is not None:
-                backend.skipBackward()
-            
-    def _handleSkipForward(self):
-        if 'playback' in self._currentWidgets:
-            backend = self._currentWidgets['playback'].backend
-            if backend is not None:
-                backend.skipForward()
-                
-    def _handleAddMark(self):
-        if 'playback' in self._currentWidgets:
-            self._currentWidgets['playback'].seekSlider.addMark()
         
     def showPreferences(self):
         """Open preferences dialog."""
@@ -795,7 +741,7 @@ class MainWindow(QtGui.QMainWindow):
         while new is not self and new is not None and not isinstance(new, Widget):
             new = new.parent()
         if isinstance(new, Widget):
-            self._currentWidgets[new.widgetClass.id] = new
+            self.currentWidgets[new.widgetClass.id] = new
 
 
 class CentralTabWidget(QtGui.QTabWidget):
@@ -849,3 +795,9 @@ class CentralTabBar(QtGui.QTabBar):
         if tabIndex != -1 and tabIndex != self.currentIndex():
             self.setCurrentIndex(tabIndex)
         return super().dragEnterEvent(event)
+
+
+fullscreenAction = actions.ActionDefinition('view', 'fullScreen',
+                                            translate('MainWindow', 'Toggle full-screen mode'),
+                                            shortcut=translate('QShortcut', 'F11'))
+actions.manager.registerAction(fullscreenAction)

@@ -20,15 +20,84 @@ import functools
 
 from PyQt4 import QtCore, QtGui, QtSvg
 from PyQt4.QtCore import Qt
+
+from maestro import player, utils
+from maestro.core import levels
+from maestro.gui import actions, mainwindow, dialogs
+from maestro.gui.preferences import profiles as profilesgui
+
 translate = QtCore.QCoreApplication.translate
-
-from . import mainwindow, dialogs, dockwidget
-from .preferences import profiles as profilesgui
-from .. import player, utils
-from ..core import levels, stickers
-
 renderer = QtSvg.QSvgRenderer(":maestro/playback.svg")
 ICON_SIZE = 16
+
+
+class PlayPauseAction(actions.GlobalAction):
+
+    label = translate('PlayPauseAction', 'Toggle Play / Pause')
+    identifer = 'playPause'
+
+    def doAction(self):
+        backends = [b for b in player.profileCategory.profiles()
+                    if b.connectionState is player.ConnectionState.Connected]
+        if any(backend.state() is player.PlayState.Play for backend in backends):
+            # When a single backend is playing, stop all
+            for backend in backends:
+                backend.setState(player.PlayState.Pause)
+        else:
+            # otherwise start only the current one
+            widget = mainwindow.mainWindow.currentWidgets.get('playback')
+            if widget is not None and widget.backend is not None:
+                widget.backend.setState(player.PlayState.Play)
+
+
+class StopAction(actions.GlobalAction):
+
+    label = translate('StopAction', 'Stop')
+    identifier = 'stop'
+
+    def doAction(self):
+        for backend in player.profileCategory.profiles():
+            if backend.connectionState == player.ConnectionState.Connected:
+                backend.setState(player.PlayState.Stop)
+
+
+class SkipAction(actions.GlobalAction):
+
+    def __init__(self, parent, forward=True):
+        if forward:
+            super().__init__(parent, identifier='skipForward')
+        else:
+            super().__init__(parent, identifier='skipBackward')
+        self.forward = forward
+        self.setText(self.tr('Skip to next track') if forward else self.tr('Jump to previous track'))
+
+    def doAction(self):
+        widget = mainwindow.mainWindow.currentWidgets.get('playback')
+        if widget is not None and widget.backend is not None:
+            if self.forward:
+                widget.backend.skipForward()
+            else:
+                widget.backend.skipBackward()
+
+
+class AddMarkAction(actions.GlobalAction):
+
+    label = translate('AddMarkAction', 'Add mark')
+    identifier = 'addMark'
+
+    def doAction(self):
+        if 'playback' in mainwindow.mainWindow.currentWidgets:
+            mainwindow.mainWindow.currentWidgets['playback'].seekSlider.addMark()
+
+
+PlayPauseAction.register(context='playback', shortcut=QtGui.QKeySequence(Qt.Key_Space))
+StopAction.register(context='playback')
+actions.manager.registerAction(actions.ActionDefinition('playback', 'skipForward',
+                translate('SkipAction', 'Skip to next track')))
+actions.manager.registerAction(actions.ActionDefinition('playback', 'skipBackward',
+                translate('SkipAction', 'Jump to previous track')))
+AddMarkAction.register('playback')
+
 
 
 class PlaybackWidget(mainwindow.Widget):
@@ -84,13 +153,14 @@ class PlaybackWidget(mainwindow.Widget):
         
         levels.real.connect(self.handleLevelChange)
         
-    def initialize(self, state):
+    def initialize(self, state=None):
         super().initialize(state)
-        if state is not None:
-            backend = player.profileCategory.get(state) # may be None
+        if state:
+            backend = player.profileCategory.get(state)  # may be None
         elif len(player.profileCategory.profiles()) > 0:
             backend = player.profileCategory.profiles()[0]
-        else: backend = None
+        else:
+            backend = None
         self.setBackend(backend)
         
     def _areaChanged(self, area):
