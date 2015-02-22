@@ -17,7 +17,10 @@
 #
 
 from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import Qt
+
 from maestro.core import tags
+from maestro.models import browser as browsermodel
 from maestro.gui import actions
 
 translate = QtCore.QCoreApplication.translate
@@ -85,6 +88,31 @@ ExpandOrCollapseAllAction.register('expandAll', context='browser', expand=True,
 ExpandOrCollapseAllAction.register('collapseAll', context='browser', expand=False,
                                    description=translate('ExpandOrCollapseAllAction', 'Collapse all nodes'),
                                    shortcut=translate('QShortcut', 'Ctrl+-'))
+
+
+class AddToPlaylistAction(actions.TreeAction):
+    """Action to play back elements selected in a browser."""
+
+    def __init__(self, parent, identifier, replace):
+        super().__init__(parent, identifier)
+        self.replace = replace
+        if replace:
+            self.setText(self.tr('Playback'))
+        else:
+            self.setText(self.tr('Append to playlist'))
+
+    def doAction(self):
+        mimeData = browsermodel.BrowserMimeData(self.parent().selection)
+        wrappers = [w.copy() for w in mimeData.wrappers()]
+        from maestro.gui import playlist
+        playlist.appendToDefaultPlaylist(wrappers, replace=self.replace)
+
+AddToPlaylistAction.register('appendToPL', context='playback',
+                             description=translate('AddToPlaylistAction', 'Append selection to playlist'),
+                             shortcut=QtGui.QKeySequence(Qt.Key_Enter | Qt.SHIFT), replace=False)
+AddToPlaylistAction.register('replacePL', context='playback',
+                             description=translate('AddToPlaylistAction', 'Playback selected elements'),
+                             shortcut=QtGui.QKeySequence(Qt.Key_P), replace=True)
 
 
 class GlobalSearchAction(actions.GlobalAction):

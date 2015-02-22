@@ -426,7 +426,7 @@ class BrowserTreeView(treeview.TreeView):
 
 
 for identifier in ('tagValue', 'editTags', 'changeURLs', 'delete', 'merge', 'completeContainer',
-                   'collapseAll', 'expandAll'):
+                   'collapseAll', 'expandAll', 'appendToPL', 'replacePL'):
     BrowserTreeView.addActionDefinition(identifier)
 treeactions.SetElementTypeAction.addSubmenu(BrowserTreeView.actionConf.root)
 treeactions.ChangePositionAction.addSubmenu(BrowserTreeView.actionConf.root)

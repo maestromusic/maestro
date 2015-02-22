@@ -636,11 +636,8 @@ class MainWindow(QtGui.QMainWindow):
         # Playback
         from maestro.gui import playback
         self.menus['playback'] = self.menuBar().addMenu(self.tr("Playback"))
-        self.menus['playback'].addAction(playback.PlayPauseAction(self))
-        self.menus['playback'].addAction(playback.StopAction(self))
-        self.menus['playback'].addAction(playback.SkipAction(self, forward=True))
-        self.menus['playback'].addAction(playback.SkipAction(self, forward=False))
-        self.menus['playback'].addAction(playback.AddMarkAction(self))
+        for command in playback.PlayCommand:
+            self.menus['playback'].addAction(playback.PlayControlAction(self, command))
 
         # EXTRAS
         self.menus['extras'] = self.menuBar().addMenu(self.tr("&Extras"))

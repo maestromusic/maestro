@@ -73,7 +73,7 @@ class ClearPlaylistAction(actions.TreeAction):
     label = translate('ClearPlaylistAction', 'Clear playlist')
 
     def initialize(self, selection):
-        self.setEnabled(self.parent().model().root.hasContents() > 0)
+        self.setEnabled(self.parent().model().root.hasContents())
 
     def doAction(self):
         self.parent().model().clear()
@@ -82,7 +82,7 @@ class ClearPlaylistAction(actions.TreeAction):
 RemoveFromPlaylistAction.register('removeFromPL', context='playback',
                                   shortcut=translate('RemoveFromPlaylistAction', 'Del'))
 ClearPlaylistAction.register('clearPL', context='playback',
-                             shortcut=translate('ClearPLaylistAction', 'Shift+Del'))
+                             shortcut=translate('ClearPlaylistAction', 'Shift+Del'))
 
 
 class PlaylistTreeView(treeview.DraggingTreeView):
