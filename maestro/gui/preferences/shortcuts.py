@@ -20,84 +20,94 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 from maestro.gui import actions
 
-class ShortcutSettings(QtGui.QWidget):
 
+class ShortcutSettings(QtGui.QWidget):
+    """Configuration widget for action shortcuts. Shows a tree of registered actions, grouped by context.
+    """
     def __init__(self, dialog, panel):
         super().__init__(panel)
-
         tree = QtGui.QTreeWidget()
         tree.setColumnCount(2)
-        tree.setHeaderLabels([self.tr('Action'), self.tr('Keys')])
-        contextItems = {}
+        tree.setHeaderLabels([self.tr('Action description'), self.tr('Shortcut')])
+        contextItems = {}  # the first-layer tree items according to shortcut contexts
         for context, label in actions.contextLabels.items():
             item = QtGui.QTreeWidgetItem(tree, [label])
             item.setData(0, Qt.UserRole, context)
             contextItems[context] = item
         for action in actions.manager.actions.values():
-            item = QtGui.QTreeWidgetItem(contextItems[action.context], [action.description,
-                                                                        action.shortcut.toString()])
-            item.setData(1, Qt.UserRole, action.shortcut)
-            item.setData(0, Qt.UserRole, action.identifier)
+            item = QtGui.QTreeWidgetItem(contextItems[action.context],
+                        [action.description, action.shortcut.toString(QtGui.QKeySequence.NativeText)])
+            item.setData(0, Qt.UserRole, action)
         tree.expandAll()
-        tree.itemDoubleClicked.connect(self.handleDoubleClick)
+        tree.itemActivated.connect(self.handleActivate)
         tree.header().setResizeMode(0, QtGui.QHeaderView.Stretch)
         layout = QtGui.QVBoxLayout()
         layout.addWidget(tree)
         self.setLayout(layout)
 
-    def handleDoubleClick(self, item, column):
+    def handleActivate(self, item, column):
         if item.parent() is None:
-            return  # category clicked
-        dialog = ChooseShortcutDialog(self)
-        seq = dialog.exec_()
-        if seq:
-            identifier = item.data(0, Qt.UserRole)
-            actions.manager.setShortcut(identifier, seq)
+            return  # clicked on a context item
+        action = item.data(0, Qt.UserRole)
+        dialog = ShortcutEditDialog(self, action)
+        if dialog.exec_():
+            sequence = dialog.chooser.keySequence()
+            actions.manager.setShortcut(action.identifier, sequence)
+            item.setText(1, sequence.toString(QtGui.QKeySequence.NativeText))
 
 
-class ShortcutCaptureWidget(QtGui.QLabel):
+class ShortcutEdit(QtGui.QLineEdit):
+    """A line edit that displays shortcuts when the user presses one."""
 
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setText(self.tr('Enter keyboard shortcut ...'))
-        self.keySequence = None
+    def __init__(self, current):
+        super().__init__()
+        if current:
+            self.setText(current.toString(QtGui.QKeySequence.NativeText))
 
     def keyPressEvent(self, event):
         key = event.key()
         if key in (Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_AltGr, Qt.Key_Meta):
             return
-        if key == Qt.Key_Escape:
-            self.parent().reject()
-        else:
-            modifiers = event.modifiers()
-            if modifiers & Qt.ShiftModifier:
-                key += Qt.SHIFT
-            if modifiers & Qt.ControlModifier:
-                key += Qt.CTRL
-            if modifiers & Qt.AltModifier:
-                key += Qt.ALT
-            if modifiers & Qt.MetaModifier:
-                key += Qt.META
-            self.keySequence = QtGui.QKeySequence(key)
-            self.parent().accept()
+        modifiers = event.modifiers()
+        if modifiers & Qt.ShiftModifier:
+            key += Qt.SHIFT
+        if modifiers & Qt.ControlModifier:
+            key += Qt.CTRL
+        if modifiers & Qt.AltModifier:
+            key += Qt.ALT
+        if modifiers & Qt.MetaModifier:
+            key += Qt.META
+        self.setText(QtGui.QKeySequence(key).toString(QtGui.QKeySequence.NativeText))
+
+    def keySequence(self):
+        return QtGui.QKeySequence(self.text())
 
 
-class ChooseShortcutDialog(QtGui.QDialog):
-
-    def __init__(self, parent):
+class ShortcutEditDialog(QtGui.QDialog):
+    """Dialog for setting a shortcut of a given action. Displays a short information text, a ShortcutEdit,
+    and a number of buttons.
+    """
+    def __init__(self, parent, action: actions.ActionDefinition):
         super().__init__(parent)
-        self.resize(130, 50)
-        self.keySequence = None
+        self.action = action
+        #self.resize(130, 50)
         layout = QtGui.QVBoxLayout()
-        self.chooser = ShortcutCaptureWidget(self)
+        self.setWindowTitle(self.tr('Enter shortcut'))
+        layout.addWidget(QtGui.QLabel(self.tr('Enter shortcut for "{}"').format(action.description)))
+        self.chooser = ShortcutEdit(action.shortcut)
         layout.addWidget(self.chooser)
-        bbx = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
+        bbx = QtGui.QDialogButtonBox()
+        bbx.addButton(bbx.Cancel)
+        bbx.addButton(bbx.Ok)
+        removeButton = bbx.addButton(self.tr('Clear'), bbx.ActionRole)
+        removeButton.clicked.connect(self.chooser.clear)
+        resetButton = bbx.addButton(bbx.Reset)
+        resetButton.clicked.connect(self.reset)
         layout.addWidget(bbx)
         bbx.rejected.connect(self.reject)
+        bbx.accepted.connect(self.accept)
         self.setLayout(layout)
         self.chooser.setFocus()
 
-    def exec_(self):
-        if super().exec_():
-            return self.chooser.keySequence
-
+    def reset(self):
+        self.chooser.setText(self.action.defaultShortcut.toString(QtGui.QKeySequence.NativeText))

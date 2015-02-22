@@ -376,7 +376,9 @@ addPanel('main/filesystem', translate('Preferences', 'File system'),
     ('gui.preferences.filesystem', 'FilesystemSettings'),
     iconPath = ':maestro/icons/folder.svg')
 addPanel('main/shortcuts', translate('Preferences', 'Keyboard shortcuts'),
-    ('gui.preferences.shortcuts', 'ShortcutSettings'))
+    ('gui.preferences.shortcuts', 'ShortcutSettings'),
+    description=translate('Preferences', 'Assign shortcuts to common actions in Maestro. Double click on an '
+                          'entry to set a keyboard shortcut.'))
 
 # Profile panels
 def _addProfileCategory(category):

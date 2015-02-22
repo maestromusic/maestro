@@ -21,7 +21,7 @@ from collections import OrderedDict
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import Qt
 
-from maestro import config, logging
+from maestro import config
 
 translate = QtCore.QCoreApplication.translate
 
@@ -61,6 +61,7 @@ class ActionDefinition:
         if not isinstance(shortcut, QtGui.QKeySequence):
             shortcut = QtGui.QKeySequence(shortcut)
         self.shortcut = shortcut
+        self.defaultShortcut = shortcut
 
 
 class ActionManager(QtCore.QObject):
@@ -77,6 +78,7 @@ class ActionManager(QtCore.QObject):
     def __init__(self):
         super().__init__()
         self.actions = {}
+        """:type : dict of [str, ActionDefinition]"""
 
     def contexts(self):
         return set(action.shortcut for action in self.actions.values())
@@ -91,8 +93,12 @@ class ActionManager(QtCore.QObject):
 
     def setShortcut(self, identifier, shortcut: QtGui.QKeySequence):
         """Set a shortcut for the action named *identifier*."""
-        self.actions[identifier].shortcut = shortcut
-        config.storage.gui.shortcuts[identifier] = shortcut.toString(QtGui.QKeySequence.PortableText)
+        action = self.actions[identifier]
+        action.shortcut = shortcut
+        if action.shortcut == action.defaultShortcut:
+            del config.storage.gui.shortcuts[identifier]
+        else:
+            config.storage.gui.shortcuts[identifier] = shortcut.toString()
         self.shortcutChanged.emit(identifier, shortcut)
 
     def registerAction(self, action: ActionDefinition):
@@ -104,8 +110,6 @@ class ActionManager(QtCore.QObject):
         if action.identifier in config.storage.gui.shortcuts:
             action.shortcut = QtGui.QKeySequence(config.storage.gui.shortcuts[action.identifier],
                                                  QtGui.QKeySequence.PortableText)
-            logging.debug(__name__, 'loaded user-definde shortcut {} for action {}'
-                          .format(action.shortcut.toString(), action.identifier))
         self.actions[action.identifier] = action
 
     def unregisterAction(self, identifier):
@@ -157,8 +161,8 @@ class TreeAction(QtGui.QAction):
         shortcut = manager.shortcut(identifier)
         if shortcut:
             self.setShortcut(shortcut)
-            self.setShortcutContext(Qt.WidgetShortcut)
-            manager.shortcutChanged.connect(self._handleShortcutChange)
+        self.setShortcutContext(Qt.WidgetShortcut)
+        manager.shortcutChanged.connect(self._handleShortcutChange)
         if self.label:
             self.setText(self.label)
         if icon:
