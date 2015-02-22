@@ -110,8 +110,8 @@ class PhononPlayerBackend(player.PlayerBackend):
             self.setState(player.PlayState.Stop)
             
     def setPlaylist(self, urls):
-        if self.playlist.current is None:
-            self.setState(player.PlayState.Stop)
+        self.playlist.current = None
+        self.setState(player.PlayState.Stop)
     
     phononToStateMap = { phonon.LoadingState: player.PlayState.Stop,
                          phonon.StoppedState: player.PlayState.Stop,
@@ -119,6 +119,7 @@ class PhononPlayerBackend(player.PlayerBackend):
                          phonon.BufferingState: player.PlayState.Play,
                          phonon.PausedState: player.PlayState.Pause,
                          phonon.ErrorState: player.PlayState.Stop }
+
     def state(self):
         """Return the current state"""
         return self.phononToStateMap[self.mediaObject.state()]

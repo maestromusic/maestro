@@ -603,7 +603,7 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
     """Subclass of ChangeCommand that additionally changes the backend."""
     def __init__(self, model, newContents, updateBackend):
         super().__init__(model, newContents)
-        if not updateBackend in ('always', 'never', 'onundoredo'):
+        if updateBackend not in ('always', 'never', 'onundoredo'):
             raise ValueError("Invalid value for 'updateBackend' argument: {}".format(updateBackend))
         self._updateBackend = updateBackend
         
@@ -618,6 +618,7 @@ class PlaylistChangeCommand(wrappertreemodel.ChangeCommand):
     def undo(self):
         super().undo()
         if self._updateBackend != 'never':
+            self.model.setCurrent(None)
             urls = list(f.element.url for f in self.model.root.getAllFiles())
             self.model.backend.setPlaylist(urls)
         

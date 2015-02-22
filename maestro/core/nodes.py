@@ -24,6 +24,8 @@ class Node:
     """(Abstract) base class for elements in a RootedTreeModel...that is almost everything in playlists,
     browser etc.. Node implements the methods required by RootedTreeModel as well as many tree-structure 
     methods."""
+
+    parent = None
     
     def hasContents(self):
         """Return whether this node has at least one child node."""
@@ -192,9 +194,10 @@ class Node:
             for child in self.parent.getContents():
                 if child == self:
                     return offset
-                else: offset += child.fileCount()
-            raise ValueError("Node.getOffset: Node {} is not contained in its parent {}."
-                                .format(self, self.parent))
+                else:
+                    offset += child.fileCount()
+            raise ValueError('Node.getOffset: Node {} is not contained in its parent {}.'
+                             .format(self, self.parent))
     
     def fileAtOffset(self, offset, allowFileCount=False):
         """Return the file at the given *offset*. Note that *offset* is relative to this node, so only the
@@ -332,7 +335,7 @@ class RootNode(Node):
         self.parent = None
     
     def __repr__(self):
-        return 'RootNode with {} contents'.format(len(self.contents))    
+        return 'RootNode[{} children]'.format(len(self.contents))
 
 
 class Wrapper(Node):
@@ -360,12 +363,12 @@ class Wrapper(Node):
         if element.isContainer():
             if contents is not None:
                 self.setContents(contents)
-            else: self.contents = []
+            else:
+                self.contents = []
         else:
             if contents is not None:
                 raise ValueError("contents must be None for a File-wrapper")
             self.contents = None
-        
         
     def copy(self, contents=None, level=None):
         """Return a copy of this wrapper. Because a flat copy of the contents is not possible (parent
