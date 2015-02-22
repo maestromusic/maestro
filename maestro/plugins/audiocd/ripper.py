@@ -219,6 +219,6 @@ def fileChangerHook(level,elements):
     for i in reversed(range(len(finishedTracks))):
         discid, tracknr, encodedFile = finishedTracks[i]
         for file in audioFiles:
-            if file.url.parsedUrl.netloc == "{}.{}".format(discid, tracknr):
+            if file.url.netloc == '{}.{}'.format(discid, tracknr):
                 level.stack.push(InsertRippedFileCommand(file, encodedFile))
                 del finishedTracks[i]

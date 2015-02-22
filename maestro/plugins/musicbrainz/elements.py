@@ -120,7 +120,8 @@ class MBTreeElement:
                 return False
             if not conf.mediumContainer:
                 return True
-            return 'title' not in mediumChild.tags
+            return 'title' not in medium.tags
+
         if conf.searchRelease and isinstance(self, Release) and tags.isInDb('musicbrainz_albumid'):
             albumid = self.mbid
             from ... import search
