@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt
+from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 
 from .. import utils, config
 from ..core import elements, levels, nodes, tags
@@ -31,16 +31,16 @@ def question(title, text, parent=None):
     main window.
     :param str title: Window title
     :param str text: Main message
-    :param QtGui.QWidget parent: (optional) parent window; defaults to Maestro's main window
+    :param QtWidgets.QWidget parent: (optional) parent window; defaults to Maestro's main window
     :returns: The user's answer
     :rtype: bool
     """
     if parent is None:
         from . import mainwindow
         parent = mainwindow.mainWindow
-    ans = QtGui.QMessageBox.question(parent,title,text,
-                                     buttons = QtGui.QMessageBox.No | QtGui.QMessageBox.Yes)
-    return ans == QtGui.QMessageBox.Yes
+    ans = QtWidgets.QMessageBox.question(parent,title,text,
+                                     buttons = QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Yes)
+    return ans == QtWidgets.QMessageBox.Yes
 
 
 def warning(title,text,parent=None):
@@ -49,27 +49,27 @@ def warning(title,text,parent=None):
     if parent is None:
         from . import mainwindow
         parent = mainwindow.mainWindow
-    QtGui.QMessageBox.warning(parent, title, text)
+    QtWidgets.QMessageBox.warning(parent, title, text)
 
 
 def getText(title, text, parent=None, default=''):
-    result, ok = QtGui.QInputDialog.getText(parent, title, text, QtGui.QLineEdit.Normal, default)
+    result, ok = QtWidgets.QInputDialog.getText(parent, title, text, QtWidgets.QLineEdit.Normal, default)
     if ok:
         return result
     else: return None
 
 
-class WaitingDialog(QtGui.QDialog):
+class WaitingDialog(QtWidgets.QDialog):
     def __init__(self, title, text, cancelButton=True):
         from . import mainwindow
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
         self.setWindowTitle(title)
-        layout = QtGui.QVBoxLayout()
-        self.label = QtGui.QLabel(text)
+        layout = QtWidgets.QVBoxLayout()
+        self.label = QtWidgets.QLabel(text)
         layout.addWidget(self.label)
         if cancelButton:
-            btnBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
+            btnBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
             btnBox.rejected.connect(self.reject)
             layout.addWidget(btnBox)
         self.setLayout(layout)
@@ -78,7 +78,7 @@ class WaitingDialog(QtGui.QDialog):
         self.label.setText(text)
 
 
-class FancyPopup(QtGui.QFrame):
+class FancyPopup(QtWidgets.QFrame):
     """Fancy popup that looks like a tooltip. It is shown beneath its parent component (usually the button
     that opens the popup).
     
@@ -98,7 +98,7 @@ class FancyPopup(QtGui.QFrame):
         
         # Fancy design code
         self.setAutoFillBackground(True)
-        self.setFrameStyle(QtGui.QFrame.Box | QtGui.QFrame.Plain);
+        self.setFrameStyle(QtWidgets.QFrame.Box | QtWidgets.QFrame.Plain);
         self.setLineWidth(1);
         p = self.palette()
         p.setColor(QtGui.QPalette.Window,p.window().color().lighter(105))
@@ -106,7 +106,7 @@ class FancyPopup(QtGui.QFrame):
         p.setColor(QtGui.QPalette.WindowText, Qt.darkGray)
         self.setPalette(p)
         
-        effect = QtGui.QGraphicsDropShadowEffect()
+        effect = QtWidgets.QGraphicsDropShadowEffect()
         effect.setOffset(0,0)
         effect.setBlurRadius(20)
         self.setGraphicsEffect(effect)
@@ -122,10 +122,10 @@ class FancyPopup(QtGui.QFrame):
         # Therefore we correct offscreen positions after the dialog is shown as well as before (to try to
         # avoid flickering).
         pos = self.pos()
-        if pos.x()+self.width() > QtGui.QApplication.desktop().width():
-            pos.setX(QtGui.QApplication.desktop().width() - self.width())
-        if pos.y()+self.height() > QtGui.QApplication.desktop().height():
-            pos.setY(QtGui.QApplication.desktop().height() - self.height())
+        if pos.x()+self.width() > QtWidgets.QApplication.desktop().width():
+            pos.setX(QtWidgets.QApplication.desktop().width() - self.width())
+        if pos.y()+self.height() > QtWidgets.QApplication.desktop().height():
+            pos.setY(QtWidgets.QApplication.desktop().height() - self.height())
         self.move(pos)
         
     def close(self):
@@ -154,7 +154,7 @@ class FancyPopup(QtGui.QFrame):
             # for mouseMoveEvent of windows, underMouse() doesn't work here. On the last received
             # mouseMoveEvent when leaving the window, we are still "underMouse" (otherwise we shouldn't
             # get the event...) but the following test return false and correctly closes the window.
-            widget = QtGui.QApplication.widgetAt(pos)
+            widget = QtWidgets.QApplication.widgetAt(pos)
             if widget is None:
                 underMouse = False
             else: underMouse = widget is self.parent() or self.isAncestorOf(widget)
@@ -177,15 +177,15 @@ class FancyTabbedPopup(FancyPopup):
     def __init__(self,parent,width=370,height=170):
         super().__init__(parent,width,height)
         # Create components
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
-        self.tabWidget = QtGui.QTabWidget(self)
+        self.tabWidget = QtWidgets.QTabWidget(self)
         self.tabWidget.setDocumentMode(True)
         self.layout().addWidget(self.tabWidget)
         
         from . import dockwidget
         closeButton = dockwidget.DockWidgetTitleButton(
-                                        QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TitleBarCloseButton))
+                                        QtWidgets.qApp.style().standardIcon(QtWidgets.QStyle.SP_TitleBarCloseButton))
         closeButton.clicked.connect(self.close)
         self.tabWidget.setCornerWidget(closeButton)
         
@@ -196,7 +196,7 @@ class FancyTabbedPopup(FancyPopup):
         self.tabWidget.setPalette(p)
         
 
-class MergeDialog(QtGui.QDialog):
+class MergeDialog(QtWidgets.QDialog):
     """A dialog for merging several children of the same parent into a new subcontainer.
     
     Merging is a convenient way to add structural information to otherwise flat containers, e.g.
@@ -247,30 +247,30 @@ class MergeDialog(QtGui.QDialog):
         elif len(self.elements) == 1:
             titleHint = ' - '.join(self.elements[0].tags[tags.TITLE])
         
-        layout = QtGui.QGridLayout()
+        layout = QtWidgets.QGridLayout()
         self.setLayout(layout)
         
         row = 0
-        titleLineLayout = QtGui.QHBoxLayout()
+        titleLineLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(titleLineLayout, row, 0, 1, 2)
-        titleLineLayout.addWidget(QtGui.QLabel(self.tr('Title of new container:')))
-        self.titleEdit = QtGui.QLineEdit(titleHint)
+        titleLineLayout.addWidget(QtWidgets.QLabel(self.tr('Title of new container:')))
+        self.titleEdit = QtWidgets.QLineEdit(titleHint)
         titleLineLayout.addWidget(self.titleEdit)
         
         row += 1
-        label = QtGui.QLabel(self.tr('Domain:'))
+        label = QtWidgets.QLabel(self.tr('Domain:'))
         layout.addWidget(label, row, 0)
         self.domainBox = widgets.DomainBox(domain)
         layout.addWidget(self.domainBox, row, 1)
         
         row += 1
-        label = QtGui.QLabel(self.tr('Container type:'))
+        label = QtWidgets.QLabel(self.tr('Container type:'))
         layout.addWidget(label, row, 0)
         self.parentTypeBox = widgets.ContainerTypeBox(containerType)
         layout.addWidget(self.parentTypeBox, row, 1)
         
         row += 1
-        label = QtGui.QLabel(self.tr("Options"))
+        label = QtWidgets.QLabel(self.tr("Options"))
         label.setStyleSheet("QLabel { font-weight: bold }")
         label.setContentsMargins(0, 10, 0, 0)
         layout.addWidget(label, row, 0, 1, 2)
@@ -301,7 +301,7 @@ class MergeDialog(QtGui.QDialog):
             self.removePrefixBox = QtGui.QCheckBox(self.tr("Remove common title prefix:"))
             self.removePrefixBox.setChecked(True)
             layout.addWidget(self.removePrefixBox, row, 0)
-            self.removeEdit = QtGui.QLineEdit(prefix)
+            self.removeEdit = QtWidgets.QLineEdit(prefix)
             layout.addWidget(self.removeEdit, row, 1)
             self.removePrefixBox.toggled.connect(self.removeEdit.setEnabled)
         
@@ -316,7 +316,7 @@ class MergeDialog(QtGui.QDialog):
         layout.setRowStretch(row, 1)
         
         row += 1
-        buttons = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         buttons.accepted.connect(self.performMerge)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons, row, 0, 1, 2)
@@ -425,15 +425,15 @@ class MergeDialog(QtGui.QDialog):
 
 
 
-class DeleteDialog(QtGui.QDialog):
+class DeleteDialog(QtWidgets.QDialog):
     """Special dialog to display the files that have been deleted from database and may be deleted from disk.
     It is used in DeleteAction."""
     def __init__(self, files, parent):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Delete files?"))
         self.resize(400,300)
-        layout = QtGui.QVBoxLayout(self)
-        label = QtGui.QLabel(
+        layout = QtWidgets.QVBoxLayout(self)
+        label = QtWidgets.QLabel(
                              self.tr("You have deleted the following %n file(s) from Maestro. "
                                      "Do you want them deleted completely?<br />\n"
                                      "<b>This cannot be reversed!</b>",
@@ -441,11 +441,11 @@ class DeleteDialog(QtGui.QDialog):
         label.setTextFormat(Qt.RichText)
         label.setWordWrap(True)
         layout.addWidget(label)
-        listWidget = QtGui.QListWidget()
+        listWidget = QtWidgets.QListWidget()
         listWidget.addItems([str(file.url) for file in files])
         layout.addWidget(listWidget)
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Yes | QtGui.QDialogButtonBox.No)
-        buttonBox.button(QtGui.QDialogButtonBox.No).setDefault(True)
+        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Yes | QtWidgets.QDialogButtonBox.No)
+        buttonBox.button(QtWidgets.QDialogButtonBox.No).setDefault(True)
         buttonBox.rejected.connect(self.reject)
         buttonBox.accepted.connect(self.accept)
         layout.addWidget(buttonBox)

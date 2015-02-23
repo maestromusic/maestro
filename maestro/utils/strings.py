@@ -20,7 +20,7 @@
 
 import re, unicodedata, string
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 

@@ -19,8 +19,8 @@
 """This simple plugin adds a dock widget which displays Maestro's logo. It played a major role during testing
 Maestro's widget system."""
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import utils
 from ...gui import mainwindow
@@ -29,7 +29,7 @@ from ...gui import mainwindow
 def enable():
     mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "logodock",
-        name = QtGui.QApplication.translate("LogoDock", "Logo"),
+        name = QtWidgets.QApplication.translate("LogoDock", "Logo"),
         icon = QtGui.QIcon(":/maestro/plugins/logodock/omg.png"),
         theClass = LogoDock,
         areas = 'dock',
@@ -43,8 +43,8 @@ def disable():
 class LogoDock(mainwindow.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        layout = QtGui.QHBoxLayout(self)
-        label = QtGui.QLabel()
+        layout = QtWidgets.QHBoxLayout(self)
+        label = QtWidgets.QLabel()
         label.setPixmap(QtGui.QPixmap(':/maestro/omg.png'))
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)

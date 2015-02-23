@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from . import dialogs
 from .. import utils, config
@@ -25,27 +25,27 @@ from ..core import flags
 from ..models import flageditor as flageditormodel, simplelistmodel
 
 
-class FlagEditor(QtGui.QWidget):
+class FlagEditor(QtWidgets.QWidget):
     """A FlagEditor contains a label, a button to add new flags and a FlagListWidget that displays the
     model's records using FlagWidgets. It is used as part of the tageditor."""
     def __init__(self, model, parent=None):
         super().__init__(parent)
-        self.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Fixed)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         
-        self.setLayout(QtGui.QHBoxLayout())
+        self.setLayout(QtWidgets.QHBoxLayout())
         self.layout().setSpacing(0)
         self.layout().setContentsMargins(0, 0, 0, 0)
         
-        label = QtGui.QLabel('<img src=":maestro/icons/flag_blue.png"> '+self.tr("Flags: "))
+        label = QtWidgets.QLabel('<img src=":maestro/icons/flag_blue.png"> '+self.tr("Flags: "))
         label.setToolTip(self.tr("Flags"))
         self.layout().addWidget(label)
         
-        self.addButton = QtGui.QPushButton()
+        self.addButton = QtWidgets.QPushButton()
         self.addButton.setIcon(utils.getIcon("add.png"))
         self.addButton.clicked.connect(self._handleAddButton)
         self.layout().addWidget(self.addButton)
         
-        self.flagScrollArea = QtGui.QScrollArea()
+        self.flagScrollArea = QtWidgets.QScrollArea()
         self.flagScrollArea.setWidgetResizable(True)
         self.flagScrollArea.setMaximumHeight(30)
         self.flagScrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -68,7 +68,7 @@ class FlagEditor(QtGui.QWidget):
         popup.show()
 
 
-class FlagListWidget(QtGui.QWidget):
+class FlagListWidget(QtWidgets.QWidget):
     """Displays a list of FlagWidgets representing the records in the FlagEditorModel *model*."""
     # The animation currently running (if any). This is used to stop the animation if the model changes.
     _animation = None
@@ -84,9 +84,9 @@ class FlagListWidget(QtGui.QWidget):
         self.model.recordRemoved.connect(self._handleRecordRemoved)
         self.model.recordChanged.connect(self._handleRecordChanged)
         
-        self.setLayout(QtGui.QBoxLayout(QtGui.QBoxLayout.LeftToRight))
+        self.setLayout(QtWidgets.QBoxLayout(QtWidgets.QBoxLayout.LeftToRight))
         self.layout().setAlignment(Qt.AlignLeft)
-        style = QtGui.QApplication.style()
+        style = QtWidgets.QApplication.style()
         # Use horizontal spacing instead of left margin so that the distance to the add button equals
         # the distance between two FlagWidgets.
         self.layout().setContentsMargins(style.pixelMetric(style.PM_LayoutHorizontalSpacing), 0,
@@ -128,7 +128,7 @@ class FlagListWidget(QtGui.QWidget):
                 if config.options.gui.flageditor.animation and pos < len(self._flagWidgets)\
                     and self.isVisible():
                     size = flagWidget.sizeHint()
-                    empty = QtGui.QWidget()
+                    empty = QtWidgets.QWidget()
                     empty.setMinimumWidth(size.width())
                     property = "minimumWidth"
                     self.layout().insertWidget(self._mapToLayout(pos), empty)
@@ -177,7 +177,7 @@ class FlagListWidget(QtGui.QWidget):
         else: return self.layout().count()
         
         
-class FlagWidget(QtGui.QWidget):
+class FlagWidget(QtWidgets.QWidget):
     """Small widget representing a Record. It will display the flag's name and icon and if the record is not
     common also the number of elements that have the flag. Furthermore it contains a button to remove the
     record and provides some actions in a contextmenu.
@@ -200,7 +200,7 @@ class FlagWidget(QtGui.QWidget):
     def __init__(self, model, record, parent=None):
         super().__init__(parent)
         self.setMouseTracking(True)
-        self.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.model = model
         self.record = record
         self.setRecord(record)
@@ -309,19 +309,19 @@ class FlagWidget(QtGui.QWidget):
         self.update()
 
     def contextMenuEvent(self, contextMenuEvent, record=None):
-        menu = QtGui.QMenu(self)
+        menu = QtWidgets.QMenu(self)
 
         menu.addAction(self.model.level.stack.createUndoAction())
         menu.addAction(self.model.level.stack.createRedoAction())
         menu.addSeparator()
 
         if not self.record.isCommon():
-            extendAction = QtGui.QAction(self.tr("Extend"), self)
+            extendAction = QtWidgets.QAction(self.tr("Extend"), self)
             extendAction.triggered.connect(self._handleExtend)
             menu.addAction(extendAction)
 
         if len(self.record.allElements) > 1:
-            elementsAction = QtGui.QAction(self.tr("Edit elements with flag..."), self)
+            elementsAction = QtWidgets.QAction(self.tr("Edit elements with flag..."), self)
             elementsAction.triggered.connect(self._handleEditElements)
             menu.addAction(elementsAction)
 
@@ -335,7 +335,7 @@ class FlagWidget(QtGui.QWidget):
     def _handleEditElements(self):
         """Open a dialog that allows to edit self.record.elementsWithFlag."""
         dialog = EditElementsDialog(self.record, self)
-        if dialog.exec_() == QtGui.QDialog.Accepted:
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
             selectedElements = dialog.getSelectedElements()
             if selectedElements != self.record.elementsWithFlag:
                 newRecord = flageditormodel.Record(self.record.flag, self.record.allElements,
@@ -350,8 +350,8 @@ class AddFlagPopup(dialogs.FancyPopup):
     def __init__(self, model, parent):
         super().__init__(parent)
         self.model = model
-        self.setLayout(QtGui.QVBoxLayout())
-        self.flagList = QtGui.QListWidget()
+        self.setLayout(QtWidgets.QVBoxLayout())
+        self.flagList = QtWidgets.QListWidget()
         self.flagList.itemClicked.connect(self._handleItemClicked)
         self.layout().addWidget(self.flagList)
 
@@ -359,18 +359,18 @@ class AddFlagPopup(dialogs.FancyPopup):
         for flag in _flagTypes:
             # Do not show flags which are already contained in all elements
             if self.model.getRecord(flag) is None or not self.model.getRecord(flag).isCommon():
-                item = QtGui.QListWidgetItem(flag.name)
+                item = QtWidgets.QListWidgetItem(flag.name)
                 item.setData(Qt.UserRole, flag)
                 if flag.icon is not None:
                     item.setIcon(flag.icon)
                 self.flagList.addItem(item)
 
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonLayout)
-        addFlagButton = QtGui.QPushButton(self.tr("New"))
+        addFlagButton = QtWidgets.QPushButton(self.tr("New"))
         addFlagButton.clicked.connect(self._handleAddButton)
         buttonLayout.addWidget(addFlagButton)
-        managerButton = QtGui.QPushButton(self.tr("FlagManager"))
+        managerButton = QtWidgets.QPushButton(self.tr("FlagManager"))
         managerButton.clicked.connect(self._handleManagerButton)
         buttonLayout.addWidget(managerButton)
 
@@ -395,7 +395,7 @@ class AddFlagPopup(dialogs.FancyPopup):
         self.close()
 
 
-class EditElementsDialog(QtGui.QDialog):
+class EditElementsDialog(QtWidgets.QDialog):
     """Small dialog that allows the user to choose which elements should have a specific flag. The flag and
     the elements that can be selected are contained in *record*."""
     def __init__(self, record, parent=None):
@@ -403,25 +403,25 @@ class EditElementsDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr("Edit elements with flag"))
         self.record = record
 
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
 
-        self.elementsBox = QtGui.QListView(self)
+        self.elementsBox = QtWidgets.QListView(self)
         self.layout().addWidget(self.elementsBox, 1)
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(self.record.allElements,
                                                                   lambda el: el.getTitle()))
-        self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
+        self.elementsBox.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
         for i, element in enumerate(self.record.allElements):
             if record is None or element in record.elementsWithFlag:
                 self.elementsBox.selectionModel().select(self.elementsBox.model().index(i, 0),
-                                                         QtGui.QItemSelectionModel.Select)
+                                                         QtCore.QItemSelectionModel.Select)
 
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         buttonLayout.addStretch(1)
         self.layout().addLayout(buttonLayout)
-        okButton = QtGui.QPushButton(self.tr("OK"))
+        okButton = QtWidgets.QPushButton(self.tr("OK"))
         okButton.clicked.connect(self._handleOkButton)
         buttonLayout.addWidget(okButton)
-        abortButton = QtGui.QPushButton(self.tr("Cancel"))
+        abortButton = QtWidgets.QPushButton(self.tr("Cancel"))
         abortButton.clicked.connect(self.reject)
         buttonLayout.addWidget(abortButton)
 
@@ -429,7 +429,7 @@ class EditElementsDialog(QtGui.QDialog):
         """Check whether at least one element is selected and if so, exit."""
         if self.elementsBox.selectionModel().hasSelection():
             self.accept()
-        else: QtGui.QMessageBox.warning(self, self.tr("No element selected"),
+        else: QtWidgets.QMessageBox.warning(self, self.tr("No element selected"),
                                         self.tr("You must select at lest one element."))
 
     def getSelectedElements(self):

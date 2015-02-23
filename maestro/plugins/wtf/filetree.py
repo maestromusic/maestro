@@ -18,8 +18,8 @@
 
 import os.path
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ...core import nodes
@@ -138,7 +138,7 @@ class FileTreeModel(rootedtreemodel.RootedTreeModel):
         self.root.sort()
 
 
-class FileTreeView(QtGui.QTreeView):
+class FileTreeView(QtWidgets.QTreeView):
     def __init__(self, model=None):
         super().__init__()
         self.setHeaderHidden(True)

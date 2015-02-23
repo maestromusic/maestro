@@ -18,8 +18,8 @@
 
 from collections import OrderedDict
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import config
 
@@ -143,7 +143,7 @@ class TreeActionDefinition(ActionDefinition):
         return self.actionCls(treeview, identifier=self.identifier, **self.kwargs)
 
 
-class Action(QtGui.QAction):
+class Action(QtWidgets.QAction):
     """Base class for actions managed by Maestro.
     """
 
@@ -338,7 +338,7 @@ class ActionTree(OrderedDict):
             self.parent.removeEmpty()
 
     def createMenu(self, parent, actionDict):
-        menu = QtGui.QMenu(parent)
+        menu = QtWidgets.QMenu(parent)
         for context, section in self.items():
             if context != 'misc':
                 sep = menu.addSeparator()

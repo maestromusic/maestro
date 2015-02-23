@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import player, utils
 from maestro.core import levels, nodes
@@ -129,7 +129,7 @@ class PlaylistTreeView(treeview.DraggingTreeView):
             model = backend.playlist
             self.setRootIsDecorated(True)
             for action in backend.treeActions():
-                self.addLocalAction(action)
+                self.addAction(action)
         else:
             model = self.emptyModel
             self.setRootIsDecorated(False)
@@ -168,12 +168,12 @@ class PlaylistWidget(mainwindow.Widget):
         
         self.treeview = PlaylistTreeView(delegateProfile)
          
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
         layout.addWidget(self.treeview)
-        self.errorLabel = QtGui.QLabel()
+        self.errorLabel = QtWidgets.QLabel()
         self.errorLabel.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
         self.errorLabel.linkActivated.connect(lambda: self.backend.connectBackend())
         self.mainLayout = layout
@@ -229,7 +229,7 @@ class OptionDialog(dialogs.FancyPopup):
     """Dialog for the option button in the playlist's (dock widget) title bar.""" 
     def __init__(self, parent, playlist):
         super().__init__(parent)
-        layout = QtGui.QFormLayout(self)
+        layout = QtWidgets.QFormLayout(self)
         backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playlist.backend)
         backendChooser.profileChosen.connect(playlist.setBackend)
         layout.addRow(self.tr("Backend:"), backendChooser)

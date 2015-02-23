@@ -18,8 +18,8 @@
 
 import logging
 
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt 
+from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import logging as maestrologging
 from ...gui import mainwindow
@@ -32,7 +32,7 @@ def enable():
     _signaller = StreamSignaller()
     mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "loggerdock",
-        name = QtGui.QApplication.translate("LoggerDock","Logger"),
+        name = QtWidgets.QApplication.translate("LoggerDock","Logger"),
         icon = QtGui.QIcon(":/maestro/plugins/loggerdock/loggerdock.png"),
         theClass = LoggerDock,
         preferredDockArea = 'bottom'))
@@ -46,7 +46,7 @@ class StreamSignaller(QtCore.QObject):
     def __init__(self):
         super().__init__()
         self.doSignalling = True
-        QtGui.qApp.aboutToQuit.connect(self.stopSignalling)
+        QtWidgets.qApp.aboutToQuit.connect(self.stopSignalling)
     textReceived = QtCore.pyqtSignal(str)
 
     def stopSignalling(self):
@@ -63,10 +63,10 @@ class StreamSignaller(QtCore.QObject):
 class LoggerDock(mainwindow.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         
         self.textBrowser = QtGui.QTextBrowser(self)
-        dropdown = QtGui.QComboBox()
+        dropdown = QtWidgets.QComboBox()
         dropdown.addItems(["Debug", "Info", "Warning", "Error", "Critical"])
         self.handler = logging.StreamHandler(_signaller)
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")

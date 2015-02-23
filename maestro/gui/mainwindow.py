@@ -36,8 +36,8 @@ To work with this system central widgets or docked widgets must follow some rule
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import config, logging, utils, stack, VERSION
 from maestro.gui import actions, selection, dialogs
@@ -157,7 +157,7 @@ class WidgetClass:
 
 
 
-class Widget(QtGui.QWidget):
+class Widget(QtWidgets.QWidget):
     """This is the superclass of all widgets that can be used as central and/or docked widgets.
     The constructor of subclasses must take one argument *state* which is either None or what was returned
     by saveState on the last shutdown. It may have additional arguments and must pass all remaining
@@ -203,8 +203,8 @@ class Widget(QtGui.QWidget):
         # latter.
         return True
         # Debug code
-        #return QtGui.QMessageBox.question(self, "Close?", "Close {}".format(self.widgetClass.id),
-        #                                QtGui.QMessageBox.Yes|QtGui.QMessageBox.No) == QtGui.QMessageBox.Yes
+        #return QtWidgets.QMessageBox.question(self, "Close?", "Close {}".format(self.widgetClass.id),
+        #                                QtWidgets.QMessageBox.Yes|QtWidgets.QMessageBox.No) == QtWidgets.QMessageBox.Yes
         
     def _handleDockLocationChanged(self, location):
         area = {Qt.LeftDockWidgetArea: 'left', Qt.RightDockWidgetArea: 'right',
@@ -274,7 +274,7 @@ class Widget(QtGui.QWidget):
             self.containingWidget().setWindowIcon(icon)
         
         
-class MainWindow(QtGui.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
     """The main window of Maestro. It contains a CentralTabWidget as actual central widget (in Qt sense)
     so that several widgets (in tabs) can be displayed as central widgets (in Maestro's sense)."""
     # Do not use this! Use gui.selection.changed instead. We just need a QObject to put the signal in.
@@ -325,7 +325,7 @@ class MainWindow(QtGui.QMainWindow):
         
         self.updateWidgetMenus()  # view menu can only be initialized after all widgets have been created
         
-        QtGui.QApplication.instance().focusChanged.connect(self._handleFocusChanged)
+        QtWidgets.QApplication.instance().focusChanged.connect(self._handleFocusChanged)
         self.show()
 
     def closeEvent(self, event):
@@ -492,7 +492,7 @@ class MainWindow(QtGui.QMainWindow):
     #========================================================================================================
     def _handleSavePerspective(self):
         """Ask the user for a name and store the current widget layout and state under this name."""
-        name, ok = QtGui.QInputDialog.getText(self, self.tr("Save perspective"),
+        name, ok = QtWidgets.QInputDialog.getText(self, self.tr("Save perspective"),
                             self.tr("Save the layout and state of the current widgets as a perspective."
                                     "Please specify a name for the new perspective:"))
         if ok and len(name) > 0 and name != DEFAULT_PERSPECTIVE:
@@ -598,7 +598,7 @@ class MainWindow(QtGui.QMainWindow):
         self.menus['edit'].addAction(stack.createUndoAction())
         self.menus['edit'].addAction(stack.createRedoAction())
 
-        action = QtGui.QAction(utils.getIcon('preferences/preferences_small.png'),
+        action = QtWidgets.QAction(utils.getIcon('preferences/preferences_small.png'),
                                self.tr("Preferences..."),
                                self)
         
@@ -618,11 +618,11 @@ class MainWindow(QtGui.QMainWindow):
         self.updatePerspectiveMenu()
         self.menus['view'].addSeparator()
 
-        self.hideTitleBarsAction = QtGui.QAction(self.tr("Hide title bars"), self)
+        self.hideTitleBarsAction = QtWidgets.QAction(self.tr("Hide title bars"), self)
         self.hideTitleBarsAction.setCheckable(True)
         self.menus['view'].addAction(self.hideTitleBarsAction)
 
-        self.freezeLayoutAction = QtGui.QAction(self.tr("Freeze layout"), self)
+        self.freezeLayoutAction = QtWidgets.QAction(self.tr("Freeze layout"), self)
         self.freezeLayoutAction.setCheckable(True)
         self.freezeLayoutAction.setChecked(self.isLayoutFrozen())
         self.freezeLayoutAction.toggled.connect(self.setLayoutFrozen)
@@ -645,7 +645,7 @@ class MainWindow(QtGui.QMainWindow):
         # HELP
         self.menus['help'] = self.menuBar().addMenu(self.tr("&Help"))
 
-        action = QtGui.QAction(self.tr("&About"), self)
+        action = QtWidgets.QAction(self.tr("&About"), self)
         action.triggered.connect(self.showAboutDialog)
         self.menus['help'].addAction(action) 
 
@@ -654,9 +654,8 @@ class MainWindow(QtGui.QMainWindow):
         def _updateMenu(widgetClasses, menu, method):
             menu.clear()
             for wClass in widgetClasses:
-                action = QtGui.QAction(wClass.name, menu)
-                # Choose the signal without "checked" argument because *method* may accept optional arguments.
-                action.triggered[tuple()].connect(functools.partial(method, wClass))
+                action = QtWidgets.QAction(wClass.name, menu)
+                action.triggered.connect(lambda: method(wClass))
                 if wClass.icon is not None:
                     action.setIcon(wClass.icon)
                 if wClass.unique:
@@ -680,12 +679,12 @@ class MainWindow(QtGui.QMainWindow):
         for name, perspective in config.storage.gui.perspectives.items():
             if name == DEFAULT_PERSPECTIVE:
                 continue
-            action = QtGui.QAction(name, self)
+            action = QtWidgets.QAction(name, self)
             action.triggered.connect(functools.partial(self.restorePerspective, name))
             menu.addAction(action)
         if len(menu.actions()) > 0:
             menu.addSeparator()
-        action = QtGui.QAction(self.tr("Save perspective..."), self)
+        action = QtWidgets.QAction(self.tr("Save perspective..."), self)
         action.triggered.connect(self._handleSavePerspective)
         menu.addAction(action)
 
@@ -694,7 +693,7 @@ class MainWindow(QtGui.QMainWindow):
         WidgetClass-instance having the 'unique'-flag.
         """
         for menuId in 'centralwidgets', 'dockwidgets':
-            action = self.menus[menuId].findChild(QtGui.QAction, id)
+            action = self.menus[menuId].findChild(QtWidgets.QAction, id)
             if action is not None:
                 action.setEnabled(enabled)
         
@@ -705,12 +704,12 @@ class MainWindow(QtGui.QMainWindow):
 
     def showAboutDialog(self):
         """Display the About dialog."""
-        box = QtGui.QMessageBox(QtGui.QMessageBox.NoIcon, self.tr("About Maestro"),
+        box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.NoIcon, self.tr("About Maestro"),
                 '<div align="center"><img src=":maestro/omg.png" /><br />'
                 + self.tr("This is Maestro version {} by Martin Altmayer and Michael Helmling.")
                              .format(VERSION)
                 + '</div>',
-                QtGui.QMessageBox.Ok)
+                QtWidgets.QMessageBox.Ok)
         box.exec_()
 
     # Misc
@@ -741,7 +740,7 @@ class MainWindow(QtGui.QMainWindow):
             self.currentWidgets[new.widgetClass.id] = new
 
 
-class CentralTabWidget(QtGui.QTabWidget):
+class CentralTabWidget(QtWidgets.QTabWidget):
     """This tab widget is used as the main window's central widget. Via the 'View'-menu the user can choose
     which widgets should be inside the tabs."""
     def __init__(self):
@@ -753,8 +752,8 @@ class CentralTabWidget(QtGui.QTabWidget):
 
         # Create corner widget
         from . import dockwidget
-        cornerWidget = QtGui.QWidget()
-        cornerLayout = QtGui.QHBoxLayout(cornerWidget)
+        cornerWidget = QtWidgets.QWidget()
+        cornerLayout = QtWidgets.QHBoxLayout(cornerWidget)
         cornerLayout.setContentsMargins(2,0,0,0)
         cornerLayout.setSpacing(0)
         self.optionButton = dockwidget.DockWidgetTitleButton('options')
@@ -781,7 +780,7 @@ class CentralTabWidget(QtGui.QTabWidget):
         self.currentWidget().toggleOptionDialog(self.optionButton)
 
 
-class CentralTabBar(QtGui.QTabBar):
+class CentralTabBar(QtWidgets.QTabBar):
     """This tabbar makes a tab active when a drag enters its tabbutton."""
     def __init__(self, parent=None):
         super().__init__(parent)

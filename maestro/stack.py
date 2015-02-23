@@ -18,7 +18,7 @@
 
 """Improved QUndoStack."""
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from . import logging, utils
 
 # The main application stack.
@@ -556,7 +556,7 @@ def _filterSubstackCommands(substack, commands, index=0):
     return index
         
                
-class UndoRedoAction(QtGui.QAction):
+class UndoRedoAction(QtWidgets.QAction):
     """QAction that is returned by the methods createUndoAction and createRedoAction."""
     def __init__(self, stack, redo):
         super().__init__(stack)

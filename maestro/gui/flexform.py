@@ -18,8 +18,8 @@
 
 import functools, os
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 
@@ -62,17 +62,17 @@ class FlexFormConfig:
         return self.fields.__iter__()
     
         
-class AbstractFlexForm(QtGui.QWidget):
+class AbstractFlexForm(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         layout.setSpacing(0)
-        self.toolBar = QtGui.QToolBar()
+        self.toolBar = QtWidgets.QToolBar()
         layout.addWidget(self.toolBar)
         self.toolBar.hide()
         self._createView()
-        self.buttonLayout = QtGui.QHBoxLayout()
+        self.buttonLayout = QtWidgets.QHBoxLayout()
         self.buttonLayout.addStretch()
         layout.addLayout(self.buttonLayout)
         
@@ -88,7 +88,7 @@ class AbstractFlexForm(QtGui.QWidget):
     
     def addToolButton(self, name, icon, method, text=None, toolTip=None, enabled=False):
         assert name not in self.buttons
-        button = QtGui.QToolButton()
+        button = QtWidgets.QToolButton()
         if icon is not None:
             button.setIcon(icon)
         if text is not None:
@@ -108,7 +108,7 @@ class AbstractFlexForm(QtGui.QWidget):
         
     def addPushButton(self, name, title, method):
         assert name not in self.buttons
-        button = QtGui.QPushButton(title)
+        button = QtWidgets.QPushButton(title)
         button.clicked.connect(method)
         self.buttons[name] = button
         self.buttonLayout.addWidget(button)
@@ -127,7 +127,7 @@ class FlexForm(AbstractFlexForm):
             self.addFields(config)
             
     def _createView(self):
-        self.formLayout = QtGui.QFormLayout()
+        self.formLayout = QtWidgets.QFormLayout()
         self.layout().addLayout(self.formLayout)
         
     def addFields(self, config):
@@ -141,9 +141,9 @@ class FlexForm(AbstractFlexForm):
                 editor.installEventFilter(FieldEventFilter(field, editor))
             if field.hint is not None and len(field.hint) > 0 \
                         and field.type != 'check': # checkboxes contain their own hint
-                layout = QtGui.QHBoxLayout()
+                layout = QtWidgets.QHBoxLayout()
                 layout.addWidget(editor)
-                hintLabel = QtGui.QLabel(field.hint)
+                hintLabel = QtWidgets.QLabel(field.hint)
                 palette = hintLabel.palette()
                 palette.setColor(QtGui.QPalette.WindowText, Qt.darkGray)
                 hintLabel.setPalette(palette)
@@ -314,12 +314,12 @@ class FlexTable(AbstractFlexForm):
     def _createView(self):
         self.view = QtGui.QTableView()
         self.view.verticalHeader().hide()
-        self.view.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.view.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.view.doubleClicked.connect(self._clicked)       
         self.view.setContextMenuPolicy(Qt.CustomContextMenu) 
         self.view.customContextMenuRequested.connect(self._customContextMenuRequested)
-        self.view.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self.view.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.layout().addWidget(self.view)
         
     def _clicked(self, index):
@@ -348,12 +348,12 @@ class FlexTable(AbstractFlexForm):
             if item in self.model.items:
                 row = self.model.items.index(item)
                 if i > 0:
-                    command = QtGui.QItemSelectionModel.Select
-                else: command = QtGui.QItemSelectionModel.SelectCurrent 
+                    command = QtCore.QItemSelectionModel.Select
+                else: command = QtCore.QItemSelectionModel.SelectCurrent
                 sModel.select(self.model.index(row, 0), command)
             
 
-class FlexTableDelegate(QtGui.QStyledItemDelegate):
+class FlexTableDelegate(QtWidgets.QStyledItemDelegate):
     def __init__(self, fields):
         super().__init__()
         self.fields = fields
@@ -371,9 +371,9 @@ class FlexTableDelegate(QtGui.QStyledItemDelegate):
             return None
         editor = field.createEditor(parent)
         editor.setAutoFillBackground(True)
-        if isinstance(editor, QtGui.QFrame):
-            editor.setFrameStyle(QtGui.QFrame.NoFrame)
-        elif isinstance(editor, QtGui.QLineEdit):
+        if isinstance(editor, QtWidgets.QFrame):
+            editor.setFrameStyle(QtWidgets.QFrame.NoFrame)
+        elif isinstance(editor, QtWidgets.QLineEdit):
             p = editor.palette()
             p.setColor(QtGui.QPalette.Base, Qt.white)
             editor.setPalette(p)
@@ -469,7 +469,7 @@ class StringField(Field):
         self.maxLength = options.get('maxLength')
         
     def createEditor(self, parent=None):    
-        editor = QtGui.QLineEdit(parent)
+        editor = QtWidgets.QLineEdit(parent)
         if self.maxLength is not None:
             editor.setMaxLength(self.maxLength)
         return editor
@@ -499,11 +499,11 @@ class IntField(Field):
             editor.setRange(self.min, self.max)
             editor.setSingleStep(self.step)
         elif self.widget == 'lineedit':
-            editor = QtGui.QLineEdit(parent)
+            editor = QtWidgets.QLineEdit(parent)
             editor.setValidator(QtGui.QIntValidator(self.min, self.max))
             editor.sizeHint = editor.minimumSizeHint
         elif self.widget == 'slider':
-            editor = QtGui.QSlider(Qt.Horizontal, parent)
+            editor = QtWidgets.QSlider(Qt.Horizontal, parent)
             editor.setRange(self.min, self.max)
             editor.setSingleStep(self.step)
         else: assert False
@@ -539,7 +539,7 @@ class SelectionField(Field):
        
     def createEditor(self, parent=None):
         if self.widget == 'combobox':
-            editor = QtGui.QComboBox(parent)
+            editor = QtWidgets.QComboBox(parent)
             for data, title in self.values:
                 editor.addItem(title, data)
         elif self.widget == 'radiobuttons':
@@ -572,12 +572,12 @@ class SelectionField(Field):
         signal.connect(method)
             
        
-class RadioButtonGroup(QtGui.QWidget):
+class RadioButtonGroup(QtWidgets.QWidget):
     valueChanged = QtCore.pyqtSignal(str)
     
     def __init__(self, values, parent=None):
         super().__init__(parent)
-        layout = QtGui.QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         self.buttons = [] # list of (data, button) tuples
         for data, title in values:
             button = QtGui.QRadioButton(title)
@@ -622,10 +622,10 @@ class ImageField(Field):
     
     def createContextMenu(self, item, view):
         value = view.model.getItemData(item, self)
-        menu = QtGui.QMenu(view)
+        menu = QtWidgets.QMenu(view)
         if value is None:
-            changeAction = QtGui.QAction(translate("ImageField", "Add image..."), menu)
-        else: changeAction = QtGui.QAction(translate("ImageField", "Change image..."), menu)
+            changeAction = QtWidgets.QAction(translate("ImageField", "Add image..."), menu)
+        else: changeAction = QtWidgets.QAction(translate("ImageField", "Change image..."), menu)
         def changeImage():
             imagePath = ImageChooser.getImage(self.folders, value, view)
             if imagePath is not None:
@@ -633,14 +633,14 @@ class ImageField(Field):
         changeAction.triggered.connect(changeImage)
         menu.addAction(changeAction)
         
-        removeAction = QtGui.QAction(translate("ImageField", "Remove image"), menu)
+        removeAction = QtWidgets.QAction(translate("ImageField", "Remove image"), menu)
         removeAction.setEnabled(value is not None)
         removeAction.triggered.connect(lambda: view.model.setItemData(item, self, None))
         menu.addAction(removeAction)
         return menu
 
 
-class ImageLabel(QtGui.QLabel):
+class ImageLabel(QtWidgets.QLabel):
     valueChanged = QtCore.pyqtSignal()
     
     def __init__(self, parent=None):
@@ -666,7 +666,7 @@ class ImageLabel(QtGui.QLabel):
         self.valueChanged.emit()
         
 
-class ImageChooser(QtGui.QDialog):
+class ImageChooser(QtWidgets.QDialog):
     """Lets the user choose an image from a list or an abitrary image using a file dialog. *folders*
     is a list of directory paths. The dialog will display all files in these directories. If *default*
     is the path of a displayed icon, it will be selected.
@@ -675,7 +675,7 @@ class ImageChooser(QtGui.QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Choose an image"))
         
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         pixmaps = []
         for path in folders:
             for file in QtCore.QDir(path).entryInfoList(filters=QtCore.QDir.Files):
@@ -684,15 +684,15 @@ class ImageChooser(QtGui.QDialog):
                     pixmaps.append((pixmap, file))
                 except Exception as e:
                     pass
-        self.view = QtGui.QListWidget(self)
-        self.view.setViewMode(QtGui.QListView.IconMode)
+        self.view = QtWidgets.QListWidget(self)
+        self.view.setViewMode(QtWidgets.QListView.IconMode)
         self.view.doubleClicked.connect(self.accept)
        
         if default is not None:
             defaultFile = QtCore.QFileInfo(default)
         else: defaultFile = None
         for pixmap, file in pixmaps:
-            item = QtGui.QListWidgetItem(QtGui.QIcon(pixmap), '')
+            item = QtWidgets.QListWidgetItem(QtGui.QIcon(pixmap), '')
             item.setData(Qt.UserRole, file.canonicalFilePath())
             item.setToolTip(file.baseName())
             self.view.addItem(item)
@@ -701,15 +701,15 @@ class ImageChooser(QtGui.QDialog):
                 self.view.setCurrentItem(item)
                 
         layout.addWidget(self.view)
-        buttonBox = QtGui.QDialogButtonBox()
+        buttonBox = QtWidgets.QDialogButtonBox()
         layout.addWidget(buttonBox)
         
-        addButton = QtGui.QPushButton(self.tr("Add..."))
+        addButton = QtWidgets.QPushButton(self.tr("Add..."))
         addButton.clicked.connect(self._handleAdd)
-        buttonBox.addButton(addButton, QtGui.QDialogButtonBox.ActionRole)
-        cancelButton = buttonBox.addButton(QtGui.QDialogButtonBox.Cancel)
+        buttonBox.addButton(addButton, QtWidgets.QDialogButtonBox.ActionRole)
+        cancelButton = buttonBox.addButton(QtWidgets.QDialogButtonBox.Cancel)
         cancelButton.clicked.connect(self.reject)
-        okButton = buttonBox.addButton(QtGui.QDialogButtonBox.Ok)
+        okButton = buttonBox.addButton(QtWidgets.QDialogButtonBox.Ok)
         okButton.clicked.connect(self.accept)
         
         self.resize(320, 350)
@@ -720,7 +720,7 @@ class ImageChooser(QtGui.QDialog):
         its path. Otherwise return None.
         """
         chooser = ImageChooser(folders, default, parent)
-        if chooser.exec_() == QtGui.QDialog.Accepted:
+        if chooser.exec_() == QtWidgets.QDialog.Accepted:
             item = chooser.view.currentItem()
             return item.data(Qt.UserRole)
         else: return None
@@ -731,7 +731,7 @@ class ImageChooser(QtGui.QDialog):
                                                      filter = self.tr("Images (*.png *.xpm *.jpg)"))
         if fileName:
             pixmap = QtGui.QPixmap(fileName)
-            item = QtGui.QListWidgetItem(QtGui.QIcon(pixmap), '')
+            item = QtWidgets.QListWidgetItem(QtGui.QIcon(pixmap), '')
             item.setData(Qt.UserRole, fileName)
             item.setToolTip(fileName)
             self.view.addItem(item)
@@ -745,7 +745,7 @@ class CustomField(Field):
         super().__init__(name, title, **options)
         if 'widget' in options:
             self.widget = options['widget']
-        else: self.widget = QtGui.QWidget()
+        else: self.widget = QtWidgets.QWidget()
         
     def createEditor(self, parent=None):
         return self.widget
@@ -756,7 +756,7 @@ class FixedField(Field):
     editable = False
     
     def createEditor(self, parent=None):
-        return QtGui.QLabel()
+        return QtWidgets.QLabel()
     
     def getValue(self, editor):
         if hasattr(editor, 'value'):
@@ -823,20 +823,20 @@ class PasswordField(Field):
         return PasswordEditor(parent)
     
     
-class PasswordEditor(QtGui.QWidget):
+class PasswordEditor(QtWidgets.QWidget):
     textChanged = QtCore.pyqtSignal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QtGui.QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        self.lineEdit = QtGui.QLineEdit()
-        self.lineEdit.setEchoMode(QtGui.QLineEdit.Password)
+        self.lineEdit = QtWidgets.QLineEdit()
+        self.lineEdit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.lineEdit.textChanged.connect(self.textChanged)
         layout.addWidget(self.lineEdit)
         echoModeBox = QtGui.QCheckBox('Show password')
         echoModeBox.clicked.connect(lambda checked: self.lineEdit.setEchoMode(
-                                    QtGui.QLineEdit.Normal if checked else QtGui.QLineEdit.Password))
+                                    QtWidgets.QLineEdit.Normal if checked else QtWidgets.QLineEdit.Password))
         layout.addWidget(echoModeBox)
 
     def text(self):

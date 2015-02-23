@@ -19,8 +19,8 @@
 """This plugin adds a central widget that allows the user to search and will display the search result
 table without any fancy grouping as the browser does (it will add titles, though)."""
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ...core import tags, domains
 from ... import search, config, application, database as db, utils
@@ -32,7 +32,7 @@ from . import resources
 def enable():
     mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "searchanalyzer",
-        name = QtGui.QApplication.translate("SearchAnalyzer", "Search Analyzer"),
+        name = QtWidgets.QApplication.translate("SearchAnalyzer", "Search Analyzer"),
         icon = QtGui.QIcon(":/maestro/plugins/searchanalyzer/searchanalyzer.png"),
         theClass = SearchAnalyzer))
 
@@ -56,8 +56,8 @@ class SearchAnalyzer(mainwindow.Widget):
         self.flagFilter = []
 
         # Initialize GUI
-        layout = QtGui.QVBoxLayout(self)
-        topLayout = QtGui.QHBoxLayout()
+        layout = QtWidgets.QVBoxLayout(self)
+        topLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(topLayout)
 
         self.searchBox = searchgui.SearchBox()
@@ -75,7 +75,7 @@ class SearchAnalyzer(mainwindow.Widget):
         
         topLayout.addStretch(1)
 
-        self.table = QtGui.QTableWidget()
+        self.table = QtWidgets.QTableWidget()
         layout.addWidget(self.table)
         
     def closeEvent(self, event):
@@ -111,7 +111,7 @@ class SearchAnalyzer(mainwindow.Widget):
             if i == 0:
                 self.table.setColumnCount(len(row))
             for j, data in enumerate(row):
-                item = QtGui.QTableWidgetItem(str(data))
+                item = QtWidgets.QTableWidgetItem(str(data))
                 item.setFlags(Qt.ItemIsEnabled)
                 self.table.setItem(i, j, item)
         self.table.resizeColumnsToContents()

@@ -18,16 +18,15 @@
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
-from . import profiles as profilesgui
 from .. import dialogs, delegates
 from ... import application, utils
 from ...core import tags
 
         
-class DelegateOptionsPanel(QtGui.QWidget):
+class DelegateOptionsPanel(QtWidgets.QWidget):
     """This panel allows the user to edit a single delegate configuration. It consists of three parts:
     Two DataPiecesEditors to edit the datapieces displayed in the left and those displayed in the right
     column and a list of widgets (checkboxes, comboboxes etc.) to edit the configuration's options.
@@ -36,26 +35,26 @@ class DelegateOptionsPanel(QtGui.QWidget):
         super().__init__(parent)
         self.profile = profile
         
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         
-        layout.addWidget(QtGui.QLabel("Decide which tags should be displayed on the left and right side:"))
-        dataLayout = QtGui.QHBoxLayout()
+        layout.addWidget(QtWidgets.QLabel("Decide which tags should be displayed on the left and right side:"))
+        dataLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(dataLayout)
         dataLayout.addWidget(DataPiecesEditor(self,True,))
         dataLayout.addWidget(DataPiecesEditor(self,False))
         
         layout.addSpacing(20)
         
-        optionsBox = QtGui.QGroupBox(self.tr("Options"))
+        optionsBox = QtWidgets.QGroupBox(self.tr("Options"))
         layout.addWidget(optionsBox)
-        grid = QtGui.QGridLayout(optionsBox)
+        grid = QtWidgets.QGridLayout(optionsBox)
         grid.setContentsMargins(0,0,0,0)
         
         # Create an editor for each option
         row = 0
         self._editors = {}
         for option in profile.type.options.values():
-            grid.addWidget(QtGui.QLabel(option.title),row,1)
+            grid.addWidget(QtWidgets.QLabel(option.title),row,1)
             editor = createEditor(option.type,profile.options[option.name],option.typeOptions)
             editor.valueChanged.connect(functools.partial(self._handleValueChanged,option,editor))
             self._editors[option.name] = editor
@@ -158,26 +157,26 @@ class MimeData(QtCore.QMimeData):
         return ["application/x-maestro-datapieces"]
         
         
-class DataPiecesEditor(QtGui.QWidget):
+class DataPiecesEditor(QtWidgets.QWidget):
     """A widget to edit one column of datapieces (tags, filetype, length etc.)."""
     def __init__(self,panel,left):
         super().__init__()
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         self.panel = panel
         self.left = left
         
         mainColumn = 0 if left else 1
         
-        topLayout = QtGui.QHBoxLayout()
+        topLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(topLayout)
         
-        self.addDataBox = QtGui.QComboBox()
+        self.addDataBox = QtWidgets.QComboBox()
         self._fillAddDataBox()
         self.addDataBox.currentIndexChanged.connect(self._handleAddData)
         topLayout.addWidget(self.addDataBox)
         
-        removeDataButton = QtGui.QPushButton()
+        removeDataButton = QtWidgets.QPushButton()
         removeDataButton.setIcon(utils.getIcon('remove.png'))
         removeDataButton.clicked.connect(self._handleRemoveData)
         topLayout.addWidget(removeDataButton)
@@ -185,7 +184,7 @@ class DataPiecesEditor(QtGui.QWidget):
         topLayout.addStretch()
         
         self.model = DataPiecesModel(panel.profile,left)
-        self.listView = QtGui.QListView()
+        self.listView = QtWidgets.QListView()
         self.listView.setModel(self.model)
         self.listView.setDragEnabled(True)
         self.listView.viewport().setAcceptDrops(True)
@@ -231,7 +230,7 @@ class DataPiecesEditor(QtGui.QWidget):
         self.panel.profile.setDataPieces(self.left,remainingData)
         
         
-class ListWidget(QtGui.QListWidget):
+class ListWidget(QtWidgets.QListWidget):
     """Special list widget with the drag&drop handling necessary for DataPiecesEditor."""
     def __init__(self):
         super().__init__()
@@ -261,13 +260,13 @@ def createEditor(type,value,options=None):
 # The next classes are used as editors for the different option types. They all must provide a property 
 # value and a signal valueChanged.
 
-class StringEditor(QtGui.QLineEdit):
+class StringEditor(QtWidgets.QLineEdit):
     """Editor for options of type 'string'."""
     def __init__(self,value,options):
         super().__init__(value)
         
-    value = property(QtGui.QLineEdit.text,QtGui.QLineEdit.setText)
-    valueChanged = QtGui.QLineEdit.editingFinished
+    value = property(QtWidgets.QLineEdit.text,QtWidgets.QLineEdit.setText)
+    valueChanged = QtWidgets.QLineEdit.editingFinished
     
     
 class BoolEditor(QtGui.QCheckBox):
@@ -302,7 +301,7 @@ class IntEditor(QtGui.QSpinBox):
     # valueChanged is already contained in QSpinBox
 
 
-class TagEditor(QtGui.QComboBox):
+class TagEditor(QtWidgets.QComboBox):
     """Editor for options of type 'tag'."""
     valueChanged = QtCore.pyqtSignal()
     
@@ -343,7 +342,7 @@ class TagEditor(QtGui.QComboBox):
             self._updateBox(self.getValue())
             
 
-class DataPieceEditor(QtGui.QComboBox):
+class DataPieceEditor(QtWidgets.QComboBox):
     """Editor for options of type 'datapiece'."""
     valueChanged = QtCore.pyqtSignal()
     
@@ -386,51 +385,51 @@ class DataPieceEditor(QtGui.QComboBox):
         if isinstance(event,tags.TagTypeChangeEvent):
             self._updateBox(self.getValue())
             
-            
-class ManageConfigurationsDialog(QtGui.QDialog):
+
+class ManageConfigurationsDialog(QtWidgets.QDialog):
     """Dialog to add, rename and delete delegate configurations."""
     def __init__(self,parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Manage configurations"))
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         
-        layout.addWidget(QtGui.QLabel(
+        layout.addWidget(QtWidgets.QLabel(
                             self.tr("<i>Italic configurations</i> are built in and cannot be deleted.")))
-        layout.addWidget(QtGui.QLabel(self.tr("Click on a name to change it.")))
+        layout.addWidget(QtWidgets.QLabel(self.tr("Click on a name to change it.")))
         
-        mainLayout = QtGui.QHBoxLayout()
+        mainLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(mainLayout)
-        self.table = QtGui.QTableWidget()
+        self.table = QtWidgets.QTableWidget()
         self.table.verticalHeader().hide()
-        self.table.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self._updateTable()
         self.table.itemSelectionChanged.connect(self._handleSelectionChanged)
         self.table.itemChanged.connect(self._handleItemChanged)
         mainLayout.addWidget(self.table)
         
-        buttonLayout = QtGui.QVBoxLayout()
+        buttonLayout = QtWidgets.QVBoxLayout()
         mainLayout.addLayout(buttonLayout)
         
-        self.addBox = QtGui.QComboBox()
+        self.addBox = QtWidgets.QComboBox()
         self.addBox.addItem(self.tr("Add configuration"))
         for type in configuration.getTypes():
             self.addBox.addItem(type.title,type)
         self.addBox.currentIndexChanged.connect(self._handleAddBox)
         buttonLayout.addWidget(self.addBox)
             
-        self.resetButton = QtGui.QPushButton(self.tr("Reset to defaults"))
+        self.resetButton = QtWidgets.QPushButton(self.tr("Reset to defaults"))
         self.resetButton.setEnabled(False)
         self.resetButton.clicked.connect(self._handleResetButton)
         buttonLayout.addWidget(self.resetButton)
         
-        self.deleteButton = QtGui.QPushButton(self.tr("Delete"))
+        self.deleteButton = QtWidgets.QPushButton(self.tr("Delete"))
         self.deleteButton.setEnabled(False)
         self.deleteButton.clicked.connect(self._handleDeleteButton)
         buttonLayout.addWidget(self.deleteButton)
         
         buttonLayout.addStretch(1)
         
-        closeButton = QtGui.QPushButton(self.tr("Close"))
+        closeButton = QtWidgets.QPushButton(self.tr("Close"))
         closeButton.clicked.connect(self.close)
         buttonLayout.addWidget(closeButton)
         closeButton.setFocus(Qt.PopupFocusReason)
@@ -445,7 +444,7 @@ class ManageConfigurationsDialog(QtGui.QDialog):
         self.table.setRowCount(len(configs))
         
         for row,config in enumerate(configs):
-            item = QtGui.QTableWidgetItem(config.title)
+            item = QtWidgets.QTableWidgetItem(config.title)
             if config.builtin:
                 font = item.font()
                 font.setItalic(True)
@@ -454,7 +453,7 @@ class ManageConfigurationsDialog(QtGui.QDialog):
             else: item.setFlags(Qt.ItemIsEditable | Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             self.table.setItem(row,0,item)
             
-            item = QtGui.QTableWidgetItem(config.type.title)
+            item = QtWidgets.QTableWidgetItem(config.type.title)
             item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             self.table.setItem(row,1,item)
             

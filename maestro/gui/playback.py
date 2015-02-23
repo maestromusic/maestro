@@ -19,8 +19,8 @@
 import enum
 import functools
 
-from PyQt4 import QtCore, QtGui, QtSvg
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
+from PyQt5.QtCore import Qt
 
 from maestro import player, utils
 from maestro.core import levels
@@ -102,28 +102,28 @@ class PlaybackWidget(mainwindow.Widget):
         self.backend = None
         self.areaChanged.connect(self._areaChanged)
         
-        self.topLayout = QtGui.QBoxLayout(QtGui.QBoxLayout.TopToBottom)
+        self.topLayout = QtWidgets.QBoxLayout(QtWidgets.QBoxLayout.TopToBottom)
         self._areaChanged(self.area) # the direction of topLayout depends on the area 
         self.topLayout.setContentsMargins(0,0,0,0)
-        self.titleLabel = QtGui.QLabel()
+        self.titleLabel = QtWidgets.QLabel()
         self.titleLabel.setTextFormat(Qt.AutoText)
         self.titleLabel.linkActivated.connect(lambda: self.backend.connectBackend())
         self.topLayout.addWidget(self.titleLabel, 1)  
         
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         buttonLayout.setContentsMargins(0,0,0,0)
         # Do not inhertit spacing from self.topLayout, see self._areaChanged
-        buttonLayout.setSpacing(self.style().pixelMetric(QtGui.QStyle.PM_LayoutHorizontalSpacing))
+        buttonLayout.setSpacing(self.style().pixelMetric(QtWidgets.QStyle.PM_LayoutHorizontalSpacing))
         self.topLayout.addLayout(buttonLayout)
         
-        self.skipBackwardButton = QtGui.QToolButton()
+        self.skipBackwardButton = QtWidgets.QToolButton()
         self.skipBackwardButton.setIcon(QtGui.QIcon(utils.images.renderSvg(renderer, "media_skip_backward",
                                                                            ICON_SIZE, 10)))
         self.ppButton = PlayPauseButton(self)
-        self.stopButton = QtGui.QToolButton()
+        self.stopButton = QtWidgets.QToolButton()
         self.stopButton.setIcon(QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_stop",
                                                                    ICON_SIZE, ICON_SIZE)))
-        self.skipForwardButton = QtGui.QToolButton()
+        self.skipForwardButton = QtWidgets.QToolButton()
         self.skipForwardButton.setIcon(QtGui.QIcon(utils.images.renderSvg(renderer, "media_skip_forward",
                                                                           ICON_SIZE, 10)))
         self.volumeButton = VolumeButton()
@@ -134,12 +134,12 @@ class PlaybackWidget(mainwindow.Widget):
             buttonLayout.addWidget(button)
         buttonLayout.addStretch()
             
-        bottomLayout = QtGui.QHBoxLayout()
-        self.seekLabel = QtGui.QLabel("", self)
+        bottomLayout = QtWidgets.QHBoxLayout()
+        self.seekLabel = QtWidgets.QLabel("", self)
         self.seekSlider = SeekSlider(self)
         bottomLayout.addWidget(self.seekSlider)
         bottomLayout.addWidget(self.seekLabel)
-        mainLayout = QtGui.QVBoxLayout(self)
+        mainLayout = QtWidgets.QVBoxLayout(self)
         mainLayout.addLayout(self.topLayout)
         mainLayout.addLayout(bottomLayout)
         self.seekSlider.sliderMoved.connect(self.updateSeekLabel)
@@ -159,11 +159,11 @@ class PlaybackWidget(mainwindow.Widget):
     def _areaChanged(self, area):
         """Handle changes in the dock's position."""
         if self.area in ['left', 'right']:
-            self.topLayout.setDirection(QtGui.QBoxLayout.TopToBottom)
-            self.topLayout.setSpacing(self.style().pixelMetric(QtGui.QStyle.PM_LayoutVerticalSpacing))
+            self.topLayout.setDirection(QtWidgets.QBoxLayout.TopToBottom)
+            self.topLayout.setSpacing(self.style().pixelMetric(QtWidgets.QStyle.PM_LayoutVerticalSpacing))
         else:
-            self.topLayout.setDirection(QtGui.QBoxLayout.RightToLeft)
-            self.topLayout.setSpacing(30 + self.style().pixelMetric(QtGui.QStyle.PM_LayoutHorizontalSpacing))
+            self.topLayout.setDirection(QtWidgets.QBoxLayout.RightToLeft)
+            self.topLayout.setSpacing(30 + self.style().pixelMetric(QtWidgets.QStyle.PM_LayoutHorizontalSpacing))
     
     def createOptionDialog(self, button=None):
         return OptionDialog(button, self)
@@ -313,10 +313,10 @@ class OptionDialog(dialogs.FancyPopup):
     """Dialog for the option button in the playlist's (dock widget) title bar.""" 
     def __init__(self, parent, playback):
         super().__init__(parent)
-        layout = QtGui.QVBoxLayout(self)
-        hLayout = QtGui.QHBoxLayout()
+        layout = QtWidgets.QVBoxLayout(self)
+        hLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(hLayout)
-        hLayout.addWidget(QtGui.QLabel(self.tr("Backend:")))
+        hLayout.addWidget(QtWidgets.QLabel(self.tr("Backend:")))
         backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playback.backend)
         backendChooser.profileChosen.connect(playback.setBackend)
         hLayout.addWidget(backendChooser)
@@ -324,7 +324,7 @@ class OptionDialog(dialogs.FancyPopup):
         layout.addStretch()
     
 
-class PlayPauseButton(QtGui.QToolButton):
+class PlayPauseButton(QtWidgets.QToolButton):
     """Special button with two states. Depending on the state different signals (play and pause)
     are emitted when the button is clicked and the button shows different icons."""
     
@@ -348,7 +348,7 @@ class PlayPauseButton(QtGui.QToolButton):
             self.setIcon(self.pauseIcon if playing else self.playIcon)
         
     
-class VolumeButton(QtGui.QToolButton):
+class VolumeButton(QtWidgets.QToolButton):
     """Button displaying an icon that visualizes the current volume. When clicked it opens a popup menu
     that allows to change the volume. Alternatively the volume can be changed using the mouse-wheel.
     The middle mouse button can be used to mute/unmute.
@@ -366,11 +366,11 @@ class VolumeButton(QtGui.QToolButton):
         self.setIconSize(QtCore.QSize(24, 24))
         self.setContentsMargins(0,0,0,0)
         
-        self.popup = QtGui.QWidget()
-        layout = QtGui.QVBoxLayout(self.popup)
+        self.popup = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(self.popup)
         layout.setContentsMargins(1,1,1,1)
         layout.setSpacing(0)
-        self.volumeLabel = QtGui.QLabel()
+        self.volumeLabel = QtWidgets.QLabel()
         # Make sure the menu is wide enough to hold all possible values
         self.volumeLabel.setText(self.tr("{}%").format(100))
         self.volumeLabel.setMinimumWidth(self.volumeLabel.sizeHint().width())
@@ -382,14 +382,14 @@ class VolumeButton(QtGui.QToolButton):
         self.volumeSlider.valueChanged.connect(self.setVolume)
         layout.addWidget(self.volumeSlider, 0, Qt.AlignHCenter)
         
-        muteButton = QtGui.QToolButton()
+        muteButton = QtWidgets.QToolButton()
         muteButton.setIcon(self.mutedIcon)
         muteButton.setIconSize(QtCore.QSize(20, 20))
         muteButton.clicked.connect(self.toggleMute)
         layout.addWidget(muteButton, 0, Qt.AlignHCenter)
         
-        self.menu = QtGui.QMenu()
-        action = QtGui.QWidgetAction(self)
+        self.menu = QtWidgets.QMenu()
+        action = QtWidgets.QWidgetAction(self)
         action.setDefaultWidget(self.popup)
         self.menu.addAction(action)
         
@@ -465,14 +465,14 @@ class VolumeButton(QtGui.QToolButton):
         else: self.setVolume(0)
         
 
-class VolumeSlider(QtGui.QSlider):
+class VolumeSlider(QtWidgets.QSlider):
     """Special slider used in the menu of VolumeButton."""
     def __init__(self, parent=None):
         super().__init__(Qt.Vertical, parent)
         self.setRange(0, 100)
         
     def contextMenuEvent(self, event):
-        menu = QtGui.QMenu()
+        menu = QtWidgets.QMenu()
         for v in [100, 80, 60, 40, 20, 0]:
             menu.addAction(self.tr("{}%").format(v)).setData(v)
         action = menu.exec_(self.mapToGlobal(event.pos()))
@@ -480,7 +480,7 @@ class VolumeSlider(QtGui.QSlider):
             self.setValue(action.data())
 
 
-class SeekSlider(QtGui.QSlider):
+class SeekSlider(QtWidgets.QSlider):
     """Fancy seek slider. This is a Python port of the TimeSlider from Amarok 2.7.1."""
     sliderHeight = 14
     knobSize = 14
@@ -591,11 +591,11 @@ class SeekSlider(QtGui.QSlider):
                     
     def contextMenuEvent(self, event):
         if self.currentElement() is not None:
-            menu = QtGui.QMenu(self)
-            markAction = QtGui.QAction(self.tr("Add mark..."), menu)
+            menu = QtWidgets.QMenu(self)
+            markAction = QtWidgets.QAction(self.tr("Add mark..."), menu)
             markAction.triggered.connect(functools.partial(self.addMark, self._posToSeconds(event.x())))
             menu.addAction(markAction)
-            removeAllAction = QtGui.QAction(self.tr("Remove all marks"), menu)
+            removeAllAction = QtWidgets.QAction(self.tr("Remove all marks"), menu)
             removeAllAction.triggered.connect(self.removeAllMarks)
             removeAllAction.setEnabled(len(self.marks) > 0)
             menu.addAction(removeAllAction)
@@ -671,7 +671,7 @@ class SliderMark:
         return SliderMark(int(args), text)
 
 
-class SliderMarkWidget(QtGui.QWidget):
+class SliderMarkWidget(QtWidgets.QWidget):
     """This widget is used to display SliderMarks on the SeekSlider."""
     SIZE = QtCore.QSize(8, 8)
     
@@ -692,7 +692,7 @@ class SliderMarkWidget(QtGui.QWidget):
         return self.SIZE
     
     def sizePolicy(self):
-        return QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        return QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
     
     def mouseDoubleClickEvent(self, event):
         if self.parent().backend is not None:
@@ -702,11 +702,11 @@ class SliderMarkWidget(QtGui.QWidget):
     def contextMenuEvent(self, event):
         backend = self.parent().backend
         if backend is not None and backend.current() is not None:
-            menu = QtGui.QMenu(self)
-            changeAction = QtGui.QAction(self.tr("Change text"), menu)
+            menu = QtWidgets.QMenu(self)
+            changeAction = QtWidgets.QAction(self.tr("Change text"), menu)
             changeAction.triggered.connect(functools.partial(self.parent().changeMark, self.mark.seconds))
             menu.addAction(changeAction)
-            removeAction = QtGui.QAction(self.tr("Remove mark"), menu)
+            removeAction = QtWidgets.QAction(self.tr("Remove mark"), menu)
             removeAction.triggered.connect(functools.partial(self.parent().removeMark, self.mark.seconds))
             menu.addAction(removeAction)
             menu.exec_(event.globalPos())

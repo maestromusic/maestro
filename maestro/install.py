@@ -34,8 +34,8 @@ Currently the order of pages is:
 """
 import collections, os
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 # This script tries to include as few modules as possible
 from maestro import config, logging, database as db
@@ -47,7 +47,7 @@ from maestro.gui import flexform
 logger = logging.getLogger("Install tool")
 
 
-class InstallToolWindow(QtGui.QWidget):
+class InstallToolWindow(QtWidgets.QWidget):
     """The InstallToolWindow contains several pages/states/SettingsWidgets which allow the user to define
     basic config variables and set up the database.
     
@@ -70,24 +70,24 @@ class InstallToolWindow(QtGui.QWidget):
         loadTranslators(app, logger)
         self.setWindowTitle(self.tr("Maestro Install Tool"))
         self.resize(630, 550)
-        self.move(QtGui.QApplication.desktop().screen().rect().center() - self.rect().center())
+        self.move(QtWidgets.QApplication.desktop().screen().rect().center() - self.rect().center())
         
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         
-        self.stackedLayout = QtGui.QStackedLayout()
+        self.stackedLayout = QtWidgets.QStackedLayout()
         layout.addLayout(self.stackedLayout)
         
-        buttonLayout = QtGui.QHBoxLayout()
-        style = QtGui.QApplication.style()
+        buttonLayout = QtWidgets.QHBoxLayout()
+        style = QtWidgets.QApplication.style()
         layout.addLayout(buttonLayout)
-        self.prevButton = QtGui.QPushButton(self.tr("Previous"))
-        self.prevButton.setIcon(style.standardIcon(QtGui.QStyle.SP_ArrowLeft))
+        self.prevButton = QtWidgets.QPushButton(self.tr("Previous"))
+        self.prevButton.setIcon(style.standardIcon(QtWidgets.QStyle.SP_ArrowLeft))
         self.prevButton.clicked.connect(self._handlePrevButton)
         self.prevButton.setEnabled(False)
         buttonLayout.addWidget(self.prevButton)
         buttonLayout.addStretch()
-        self.nextButton = QtGui.QPushButton(self.tr("Next"))
-        self.nextButton.setIcon(style.standardIcon(QtGui.QStyle.SP_ArrowRight))
+        self.nextButton = QtWidgets.QPushButton(self.tr("Next"))
+        self.nextButton.setIcon(style.standardIcon(QtWidgets.QStyle.SP_ArrowRight))
         self.nextButton.clicked.connect(self._handleNextButton)
         self.nextButton.setDefault(True)
         buttonLayout.addWidget(self.nextButton)
@@ -161,22 +161,22 @@ class InstallToolWindow(QtGui.QWidget):
         else: return False
         
 
-class SettingsWidget(QtGui.QWidget):
+class SettingsWidget(QtWidgets.QWidget):
     """This is the abstract base class for all pages/steps/slides of the InstallTool. It simply contains
     a title label and a QVBoxLayout. *installTool* is a reference to the InstallToolWindow, *titleNumber*
     is the step number displayed in the title (the actual title is set by the subclasses using setTitle).
     """
     def __init__(self, installTool, titleNumber):
         super().__init__()
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         self.installTool = installTool
         self.titleNumber = titleNumber
         
-        self.titleLabel = QtGui.QLabel()
+        self.titleLabel = QtWidgets.QLabel()
         self.titleLabel.setStyleSheet('QLabel {font-size: 16px; font-weight: bold}')
         layout.addWidget(self.titleLabel)
         
-        self.textLabel = QtGui.QLabel()
+        self.textLabel = QtWidgets.QLabel()
         self.textLabel.setWordWrap(True)
         layout.addWidget(self.textLabel)
         
@@ -200,11 +200,11 @@ class LanguageWidget(SettingsWidget):
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
         self.setTitle(self.tr("Language"))
-        formLayout = QtGui.QFormLayout()
+        formLayout = QtWidgets.QFormLayout()
         self.layout().addLayout(formLayout)
         self.layout().addStretch()
         
-        self.languageBox = QtGui.QComboBox()
+        self.languageBox = QtWidgets.QComboBox()
         self.languageBox.addItem("English", "en")
         self.languageBox.addItem("Deutsch", "de")
         locale = QtCore.QLocale.system().name()
@@ -229,8 +229,8 @@ class DatabaseWidget(SettingsWidget):
         super().__init__(installTool, titleNumber)
         self.setTitle(self.tr("Database settings"))
         self.setText(self.tr("Choose a database type and enter the necessary connection parameters."))
-        groupBox = QtGui.QGroupBox(self.tr("Database type"))
-        layout = QtGui.QVBoxLayout(groupBox)
+        groupBox = QtWidgets.QGroupBox(self.tr("Database type"))
+        layout = QtWidgets.QVBoxLayout(groupBox)
         self.sqliteButton = QtGui.QRadioButton(self.tr("SQLite"))
         self.sqliteButton.setChecked(True)
         self.sqliteButton.toggled.connect(self._handleTypeButton)
@@ -240,8 +240,8 @@ class DatabaseWidget(SettingsWidget):
         layout.addWidget(self.mysqlButton)
         self.layout().addWidget(groupBox)
         
-        groupBox = QtGui.QGroupBox(self.tr("Connection settings"))
-        self.stackedLayout = QtGui.QStackedLayout(groupBox)
+        groupBox = QtWidgets.QGroupBox(self.tr("Connection settings"))
+        self.stackedLayout = QtWidgets.QStackedLayout(groupBox)
         self.layout().addWidget(groupBox)
         
         flexConfig = flexform.FlexFormConfig()
@@ -297,7 +297,7 @@ class DatabaseWidget(SettingsWidget):
             db.init()
         except db.DBException as e:
             logger.error("I cannot connect to the database. SQL error: {}".format(e.message))
-            QtGui.QMessageBox.warning(self, self.tr("Database connection failed"),
+            QtWidgets.QMessageBox.warning(self, self.tr("Database connection failed"),
                                       self.tr("I cannot connect to the database."))
             return False 
         
@@ -306,21 +306,21 @@ class DatabaseWidget(SettingsWidget):
             return True
         
         if len(db.listTables()) > 0: # otherwise we assume a new installation and create all tables
-            buttons = QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Abort
+            buttons = QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Abort
             if not any(table.exists() for table in tables.tables): 
-                if QtGui.QMessageBox.question(self, self.tr("Database tables missing"),
+                if QtWidgets.QMessageBox.question(self, self.tr("Database tables missing"),
                         self.tr("Although the database is not empty, I cannot find any of my tables. If you "
                                 "use a table prefix, please check whether it is correct. Shall I continue "
                                 "and create the missing tables?"),
-                          buttons, QtGui.QMessageBox.Yes) != QtGui.QMessageBox.Yes:
+                          buttons, QtWidgets.QMessageBox.Yes) != QtWidgets.QMessageBox.Yes:
                     db.close()
                     return False
             else:
                 missingTables = [table.name for table in tables.tables if not table.exists()]
-                if QtGui.QMessageBox.question(self, self.tr("Database table(s) missing"),
+                if QtWidgets.QMessageBox.question(self, self.tr("Database table(s) missing"),
                           self.tr("Some tables are missing: {}. Shall I continue and create them?")
                                     .format(', '.join(missingTables)),
-                          buttons, QtGui.QMessageBox.Yes) != QtGui.QMessageBox.Yes:
+                          buttons, QtWidgets.QMessageBox.Yes) != QtWidgets.QMessageBox.Yes:
                     db.close()
                     return False
         
@@ -328,7 +328,7 @@ class DatabaseWidget(SettingsWidget):
             database.createTables()
         except db.DBException as e:
             logger.error("I cannot create database tables. SQL error: {}".format(e.message))
-            QtGui.QMessageBox.warning(self, self.tr("Cannot create tables"),
+            QtWidgets.QMessageBox.warning(self, self.tr("Cannot create tables"),
                                       self.tr("I cannot create the database tables. Please make sure that "
                                               "the specified user has the necessary permissions."))
             db.close()
@@ -354,10 +354,10 @@ class DomainWidget(SettingsWidget):
                        dialogTitle = self.tr("Choose source directory"),
                        pathType = 'existingDirectory')
         self.domainManager.setModel(model)
-        newDomainAction = QtGui.QAction(getIcon('add.png'), self.tr("Add domain"), self)
+        newDomainAction = QtWidgets.QAction(getIcon('add.png'), self.tr("Add domain"), self)
         newDomainAction.triggered.connect(self._addDomain)
         self.domainManager.addAction(newDomainAction)
-        removeDomainAction = QtGui.QAction(getIcon('delete.png'), self.tr("Remove domain"), self)
+        removeDomainAction = QtWidgets.QAction(getIcon('delete.png'), self.tr("Remove domain"), self)
         removeDomainAction.triggered.connect(self._removeDomain)
         self.domainManager.addAction(removeDomainAction)
         
@@ -383,11 +383,11 @@ class DomainWidget(SettingsWidget):
     def finish(self):
         items = [item for item in self.domainManager.model.items if item[0]] # enabled items
         if len(items) == 0:
-            QtGui.QMessageBox.warning(self, self.tr("No domain"),
+            QtWidgets.QMessageBox.warning(self, self.tr("No domain"),
                                       self.tr("Please create and activate at least one domain."))
             return False
         if any(len(set(item[i] for item in items)) < len(items) for i in (1,2)):
-            QtGui.QMessageBox.warning(self, self.tr("Names not unique"),
+            QtWidgets.QMessageBox.warning(self, self.tr("Names not unique"),
                                       self.tr("Please give each domain a unique name and path."))
             return False
         
@@ -422,16 +422,16 @@ class TagWidget(SettingsWidget):
                 ("private", self.tr("Private?")),
                 ]
         
-        self.tableWidget = QtGui.QTableWidget()
+        self.tableWidget = QtWidgets.QTableWidget()
         self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
         self.tableWidget.verticalHeader().hide()
-        self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.tableWidget.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.layout().addWidget(self.tableWidget)
         
-        buttonBarLayout = QtGui.QHBoxLayout()
+        buttonBarLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout)
-        addButton = QtGui.QPushButton(self.tr("Add tag"))
+        addButton = QtWidgets.QPushButton(self.tr("Add tag"))
         addButton.setIcon(getIcon('add.png'))
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
@@ -458,7 +458,7 @@ class TagWidget(SettingsWidget):
         self.tableWidget.setRowHeight(row, 36) # Enough space for icons
         
         column = self._getColumnIndex('name')
-        item = QtGui.QTableWidgetItem(name)
+        item = QtWidgets.QTableWidgetItem(name)
         if row <= 1:
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable)
         else: item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable | Qt.ItemIsUserCheckable)
@@ -467,18 +467,18 @@ class TagWidget(SettingsWidget):
         
         column = self._getColumnIndex('type')
         if row <= 1:
-            item = QtGui.QTableWidgetItem('varchar')
+            item = QtWidgets.QTableWidgetItem('varchar')
             item.setFlags(Qt.ItemIsEnabled)
             self.tableWidget.setItem(row, column, item)
         else:
-            box = QtGui.QComboBox()
+            box = QtWidgets.QComboBox()
             types = ['varchar', 'text', 'date']
             box.addItems(types)
             box.setCurrentIndex(types.index(valueType))
             self.tableWidget.setIndexWidget(self.tableWidget.model().index(row, column), box)
         
         column = self._getColumnIndex('title')
-        item = QtGui.QTableWidgetItem(title)
+        item = QtWidgets.QTableWidgetItem(title)
         item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsEditable)
         self.tableWidget.setItem(row, column, item)
         
@@ -487,7 +487,7 @@ class TagWidget(SettingsWidget):
         self.tableWidget.setIndexWidget(self.tableWidget.model().index(row, column), label)
         
         column = self._getColumnIndex('private')
-        item = QtGui.QTableWidgetItem()
+        item = QtWidgets.QTableWidgetItem()
         if row <= 1:
             item.setFlags(Qt.ItemIsEnabled) # Insert an empty item that is not editable
         else:
@@ -508,13 +508,13 @@ class TagWidget(SettingsWidget):
             
             # Check invalid tag names
             if not isValidTagName(name):
-                QtGui.QMessageBox.warning(self, self.tr("Invalid tagname"),
+                QtWidgets.QMessageBox.warning(self, self.tr("Invalid tagname"),
                                           self.tr("'{}' is not a valid tagname.").format(name))
                 return False
             
             # Check duplicate tag names
             if name in tags:
-                QtGui.QMessageBox.warning(self, self.tr("Some tags have the same name"),
+                QtWidgets.QMessageBox.warning(self, self.tr("Some tags have the same name"),
                                           self.tr("There is more than one tag with name '{}'.").format(name))
                 return False
                 
@@ -599,7 +599,7 @@ class AudioWidget(SettingsWidget):
             noBackendBox = QtGui.QRadioButton(self.tr("No backend"))
             noBackendBox.setChecked(True)
             self.layout().addWidget(noBackendBox)
-            label = QtGui.QLabel(self.tr(
+            label = QtWidgets.QLabel(self.tr(
                 "You will not be able to play music. Please install one of the missing packages. "
                 "If you continue, you will also need to enable the corresponding plugin in the preferences."
                 ))
@@ -622,7 +622,7 @@ def getIcon(name):
     return QtGui.QIcon(":maestro/icons/" + name)
 
 
-class IconLabel(QtGui.QLabel):
+class IconLabel(QtWidgets.QLabel):
     """Label for the icon column in TagWidget. It displays the icon and provides a contextmenu to change
     or remove it.
     """
@@ -640,14 +640,14 @@ class IconLabel(QtGui.QLabel):
         self.setPixmap(pixmap)
                 
     def contextMenuEvent(self, event):
-        menu = QtGui.QMenu(self)
+        menu = QtWidgets.QMenu(self)
         if self.path is None:
-            changeAction = QtGui.QAction(self.tr("Add icon..."), menu)
-        else:changeAction = QtGui.QAction(self.tr("Change icon..."), menu)
+            changeAction = QtWidgets.QAction(self.tr("Add icon..."), menu)
+        else:changeAction = QtWidgets.QAction(self.tr("Change icon..."), menu)
         changeAction.triggered.connect(lambda: self.mouseDoubleClickEvent(None))
         menu.addAction(changeAction)
         
-        removeAction = QtGui.QAction(self.tr("Remove icon"), menu)
+        removeAction = QtWidgets.QAction(self.tr("Remove icon"), menu)
         removeAction.setEnabled(self.path is not None)
         removeAction.triggered.connect(lambda: self.setPath(None))
         menu.addAction(removeAction)
@@ -662,7 +662,7 @@ class IconLabel(QtGui.QLabel):
 def run():
     """Run the install tool."""
     global app
-    app = QtGui.QApplication([])
+    app = QtWidgets.QApplication([])
     from maestro import resources
     widget = InstallToolWindow()
     widget.show()

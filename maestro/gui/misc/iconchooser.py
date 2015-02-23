@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 
-class IconChooser(QtGui.QDialog):
+class IconChooser(QtWidgets.QDialog):
     """Lets the user choose an icon from a list or using a file dialog to choose an arbitrary icon. *folders*
     is a list of directory paths. The dialog will display all files in these directories. If *defaultPath*
     is the path of a displayed icon, it will be selected.
@@ -29,14 +29,14 @@ class IconChooser(QtGui.QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Choose an icon"))
         
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         icons = []
         for path in folders:
             for file in QtCore.QDir(path).entryInfoList(filters=QtCore.QDir.Files):
                 icon = QtGui.QIcon(file.canonicalFilePath())
                 icons.append( (icon, file) )
-        self.view = QtGui.QListWidget(self)
-        self.view.setViewMode(QtGui.QListView.IconMode)
+        self.view = QtWidgets.QListWidget(self)
+        self.view.setViewMode(QtWidgets.QListView.IconMode)
         self.view.doubleClicked.connect(self.accept)
        
         self.row = self.col = 0
@@ -44,7 +44,7 @@ class IconChooser(QtGui.QDialog):
             defaultFile = QtCore.QFileInfo(defaultPath)
         else: defaultFile = None
         for icon, file in icons:
-            item = QtGui.QListWidgetItem(icon,'')
+            item = QtWidgets.QListWidgetItem(icon,'')
             item.setData(Qt.UserRole, file.canonicalFilePath())
             item.setToolTip(file.baseName())
             self.view.addItem(item)
@@ -53,15 +53,15 @@ class IconChooser(QtGui.QDialog):
                 self.view.setCurrentItem(item)
                 
         layout.addWidget(self.view)
-        buttonBox = QtGui.QDialogButtonBox()
+        buttonBox = QtWidgets.QDialogButtonBox()
         layout.addWidget(buttonBox)
         
-        addButton = QtGui.QPushButton(self.tr("Add..."))
+        addButton = QtWidgets.QPushButton(self.tr("Add..."))
         addButton.clicked.connect(self._handleAdd)
-        buttonBox.addButton(addButton,QtGui.QDialogButtonBox.ActionRole)
-        cancelButton = buttonBox.addButton(QtGui.QDialogButtonBox.Cancel)
+        buttonBox.addButton(addButton,QtWidgets.QDialogButtonBox.ActionRole)
+        cancelButton = buttonBox.addButton(QtWidgets.QDialogButtonBox.Cancel)
         cancelButton.clicked.connect(self.reject)
-        okButton = buttonBox.addButton(QtGui.QDialogButtonBox.Ok)
+        okButton = buttonBox.addButton(QtWidgets.QDialogButtonBox.Ok)
         okButton.clicked.connect(self.accept)
         
         self.resize(320, 350)
@@ -71,7 +71,7 @@ class IconChooser(QtGui.QDialog):
         """Let the user choose an icon using an IconChooser dialog. Return the icon and its path if the user
         selected an icon. Return None otherwise."""
         chooser = IconChooser(folders,defaultPath,parent)
-        if chooser.exec_() == QtGui.QDialog.Accepted:
+        if chooser.exec_() == QtWidgets.QDialog.Accepted:
             item = chooser.view.currentItem()
             return (item.data(Qt.DecorationRole), item.data(Qt.UserRole))
         else: return None
@@ -82,7 +82,7 @@ class IconChooser(QtGui.QDialog):
                                                      filter = self.tr("Images (*.png *.xpm *.jpg)"))
         if fileName:
             icon = QtGui.QIcon(fileName)
-            item = QtGui.QListWidgetItem(icon,'')
+            item = QtWidgets.QListWidgetItem(icon,'')
             item.setData(Qt.UserRole, fileName)
             item.setToolTip(fileName)
             self.view.addItem(item)

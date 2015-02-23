@@ -18,8 +18,8 @@
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import application, database as db, utils, stack
 from ...core import tags
@@ -28,41 +28,41 @@ from .. import tagwidgets, dialogs, misc
 CUSTOM_MIME = 'application/x-maestrotagtype'
 
     
-class TagManager(QtGui.QWidget):
+class TagManager(QtWidgets.QWidget):
     """The TagManager allows to add, edit and remove tagtypes (like artist, composer,...). To make things
     easy it only allows changing tagtypes which do not appear in any internal element."""
     def __init__(self, dialog, panel):
         super().__init__(panel)
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
         self.layout().setSpacing(0)
         
-        buttonBar = QtGui.QToolBar()
+        buttonBar = QtWidgets.QToolBar()
         self.layout().addWidget(buttonBar)
                 
-        addButton = QtGui.QToolButton()
+        addButton = QtWidgets.QToolButton()
         addButton.setIcon(utils.getIcon("add.png"))
         addButton.setToolTip(self.tr("Add tag..."))
         addButton.clicked.connect(self._handleAddButton)
         buttonBar.addWidget(addButton)
         
-        self.undoButton = QtGui.QToolButton()
+        self.undoButton = QtWidgets.QToolButton()
         self.undoButton.setIcon(utils.getIcon("undo.png"))
         self.undoButton.setToolTip(self.tr("Undo"))
         self.undoButton.clicked.connect(stack.undo)
         buttonBar.addWidget(self.undoButton)
-        self.redoButton = QtGui.QToolButton()
+        self.redoButton = QtWidgets.QToolButton()
         self.redoButton.setIcon(utils.getIcon("redo.png"))
         self.redoButton.setToolTip(self.tr("Redo"))
         self.redoButton.clicked.connect(stack.redo)
         buttonBar.addWidget(self.redoButton)
-        self.showInBrowserButton = QtGui.QToolButton()
+        self.showInBrowserButton = QtWidgets.QToolButton()
         self.showInBrowserButton.setIcon(utils.getIcon("preferences/goto.png"))
         self.showInBrowserButton.setToolTip(self.tr("Show in browser"))
         self.showInBrowserButton.setEnabled(False)
         self.showInBrowserButton.clicked.connect(self._handleShowInBrowserButton)
         buttonBar.addWidget(self.showInBrowserButton)
-        self.deleteButton = QtGui.QToolButton()
+        self.deleteButton = QtWidgets.QToolButton()
         self.deleteButton.setIcon(utils.getIcon("delete.png"))
         self.deleteButton.setToolTip(self.tr("Delete tag"))
         self.deleteButton.setEnabled(False)
@@ -114,7 +114,7 @@ class TagManager(QtGui.QWidget):
             tags.removeTagType(tag)
             
 
-class TagManagerTableWidget(QtGui.QTableWidget):
+class TagManagerTableWidget(QtWidgets.QTableWidget):
     """The TableWidget used by the TagManager. We need our own class because of Drag&Drop."""
     def __init__(self):
         super().__init__()
@@ -132,14 +132,14 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         
         self.verticalHeader().hide()
         self.setSortingEnabled(True)
-        self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.horizontalHeader().setStretchLastSection(True)
         self.setDragEnabled(True)
         # I first tried to use InternalMove but Qt doesn't call dropMimeData then and there doesn't seem
         # to be another way to intercept drops (ok probably it is possible using some weird event filters).
-        self.setDragDropMode(QtGui.QAbstractItemView.DragDrop)
-        self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.setDragDropMode(QtWidgets.QAbstractItemView.DragDrop)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.horizontalHeader().setSortIndicator(0, Qt.AscendingOrder)
         
@@ -182,7 +182,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
             self.setItem(row, column, item)
             
             column = self._getColumnIndex("icon")
-            label = QtGui.QLabel()       
+            label = QtWidgets.QLabel()
             label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
             self.setCellWidget(row, column, label)
             if tag.iconPath is not None:
@@ -190,7 +190,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                 label.setToolTip(tag.iconPath)     
             
             column = self._getColumnIndex("name")
-            item = QtGui.QTableWidgetItem(tag.name)
+            item = QtWidgets.QTableWidgetItem(tag.name)
             item.setData(Qt.ToolTipRole, tag.name)
             if elementCount == 0:
                 item.setFlags(stdFlags | Qt.ItemIsEditable)
@@ -204,12 +204,12 @@ class TagManagerTableWidget(QtGui.QTableWidget):
                 combo.typeChanged.connect(functools.partial(self._handleValueTypeChanged, tag))
                 self.setCellWidget(row, column, combo)
             else:
-                item = QtGui.QTableWidgetItem(tag.type.name)
+                item = QtWidgets.QTableWidgetItem(tag.type.name)
                 item.setFlags(stdFlags)
                 self.setItem(row, column, item)
             
             column = self._getColumnIndex("title")
-            item = QtGui.QTableWidgetItem(tag.rawTitle if tag.rawTitle is not None else '')
+            item = QtWidgets.QTableWidgetItem(tag.rawTitle if tag.rawTitle is not None else '')
             item.setFlags(stdFlags | Qt.ItemIsEditable)
             self.setItem(row, column, item)
             
@@ -332,13 +332,13 @@ class TagManagerTableWidget(QtGui.QTableWidget):
         column = self.columnAt(pos.x())
         if column == self._getColumnIndex("icon") and row != -1:
             tag = self.getTag(row)
-            menu = QtGui.QMenu(self)
+            menu = QtWidgets.QMenu(self)
             if tag.iconPath is None:
-                changeAction = QtGui.QAction(self.tr("Add icon..."), menu)
-            else: changeAction = QtGui.QAction(self.tr("Change icon..."), menu)
+                changeAction = QtWidgets.QAction(self.tr("Add icon..."), menu)
+            else: changeAction = QtWidgets.QAction(self.tr("Change icon..."), menu)
             changeAction.triggered.connect(lambda: self._openIconDialog(row, tag))
             menu.addAction(changeAction)
-            removeAction = QtGui.QAction(self.tr("Remove icon"), menu)
+            removeAction = QtWidgets.QAction(self.tr("Remove icon"), menu)
             removeAction.setEnabled(tag.iconPath is not None)
             removeAction.triggered.connect(lambda: self._setIcon(row, tag, None))
             menu.addAction(removeAction)
@@ -376,7 +376,7 @@ class TagManagerTableWidget(QtGui.QTableWidget):
     def dropMimeData(self, row, column, mimeData, action):
         if isinstance(mimeData, TagTypeMimeData) and mimeData.tagType in tags.tagList:
             if (self.horizontalHeader().sortIndicatorSection() != self._getColumnIndex('sort')):
-                QtGui.QMessageBox.warning(self, self.tr("Move not possible"),
+                QtWidgets.QMessageBox.warning(self, self.tr("Move not possible"),
                      self.tr("Changing the order of tagtypes is only possible, if the tagtypes are sorted "
                              " in the sort order (i.e. by the first column)."))
                 return False

@@ -18,7 +18,7 @@
 
 import collections, importlib
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 from .. import logging, config, compareVersion

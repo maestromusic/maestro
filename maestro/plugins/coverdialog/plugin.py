@@ -18,8 +18,8 @@
 
 import os.path, functools
 
-from PyQt4 import QtCore, QtGui, QtNetwork
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets, QtNetwork
+from PyQt5.QtCore import Qt
 
 translate = QtCore.QCoreApplication.translate
 
@@ -267,7 +267,7 @@ class CoverDialogModel(QtCore.QObject):
         self.level.setCovers(covers)
         
         
-class CoverDialog(QtGui.QDialog):
+class CoverDialog(QtWidgets.QDialog):
     """A dialog that allows to change covers of some elements on the given level. The dialog will allow the
     user to load covers from files, urls or cover providers from the covers-module.
     """
@@ -283,46 +283,46 @@ class CoverDialog(QtGui.QDialog):
         self.model.coverChanged.connect(self._handleCoverChanged)
         # busyChanged is connected below
                 
-        style = QtGui.QApplication.style()
+        style = QtWidgets.QApplication.style()
         
-        self.setLayout(QtGui.QVBoxLayout())
-        splitter = QtGui.QSplitter(Qt.Vertical)
+        self.setLayout(QtWidgets.QVBoxLayout())
+        splitter = QtWidgets.QSplitter(Qt.Vertical)
         self.layout().addWidget(splitter)
         
-        topWidget = QtGui.QWidget()
+        topWidget = QtWidgets.QWidget()
         splitter.addWidget(topWidget)
-        layout = QtGui.QHBoxLayout(topWidget)
+        layout = QtWidgets.QHBoxLayout(topWidget)
         
-        self.elementList = QtGui.QListWidget()
+        self.elementList = QtWidgets.QListWidget()
         self.elementList.setIconSize(QtCore.QSize(SMALL_COVER_SIZE,SMALL_COVER_SIZE))
         self.elementList.currentItemChanged.connect(self._handleElementSelected)
         layout.addWidget(self.elementList)
         
-        rightLayout = QtGui.QVBoxLayout()
+        rightLayout = QtWidgets.QVBoxLayout()
         layout.addLayout(rightLayout)
         
-        rightTopLayout = QtGui.QHBoxLayout()
+        rightTopLayout = QtWidgets.QHBoxLayout()
         rightLayout.addLayout(rightTopLayout)
-        self.label = QtGui.QLabel()
+        self.label = QtWidgets.QLabel()
         self.label.setMinimumSize(BIG_COVER_SIZE,BIG_COVER_SIZE)
         self.label.setAlignment(Qt.AlignCenter)
         rightTopLayout.addWidget(self.label,1)
         
-        coverButtonLayout = QtGui.QVBoxLayout()
+        coverButtonLayout = QtWidgets.QVBoxLayout()
         rightTopLayout.addLayout(coverButtonLayout)
         
-        openFromFileButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogOpenButton),
+        openFromFileButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogOpenButton),
                                                self.tr("Open from file..."))
         openFromFileButton.clicked.connect(self._handleOpenFromFile)
         coverButtonLayout.addWidget(openFromFileButton)
         
-        openFromURLButton = QtGui.QPushButton(self.tr("Open from URL..."))
+        openFromURLButton = QtWidgets.QPushButton(self.tr("Open from URL..."))
         openFromURLButton.clicked.connect(self._handleOpenFromUrl)
         coverButtonLayout.addWidget(openFromURLButton)
         
         self.providerButtons = {}
         for coverProvider in self.model.coverProviders:
-            button = QtGui.QPushButton(self.tr("Fetch from {}").format(coverProvider.name()))
+            button = QtWidgets.QPushButton(self.tr("Fetch from {}").format(coverProvider.name()))
             if coverProvider.icon() is not None:
                 button.setIcon(coverProvider.icon())
             button.clicked.connect(functools.partial(self.model.fetchCovers,coverProvider))
@@ -337,12 +337,12 @@ class CoverDialog(QtGui.QDialog):
         
         coverButtonLayout.addStretch()
         
-        self.removeCoverButton = QtGui.QPushButton(self.tr("Remove cover"))
+        self.removeCoverButton = QtWidgets.QPushButton(self.tr("Remove cover"))
         self.removeCoverButton.clicked.connect(self.model.removeCover)
         coverButtonLayout.addWidget(self.removeCoverButton)
             
-        self.coverList = QtGui.QListWidget()
-        self.coverList.setFlow(QtGui.QListView.LeftToRight)
+        self.coverList = QtWidgets.QListWidget()
+        self.coverList.setFlow(QtWidgets.QListView.LeftToRight)
         self.coverList.setIconSize(QtCore.QSize(AVAILABLE_COVER_SIZE,AVAILABLE_COVER_SIZE))
         self.coverList.itemSelectionChanged.connect(self._handleCoverSelected)
         rightLayout.addWidget(self.coverList)
@@ -356,15 +356,15 @@ class CoverDialog(QtGui.QDialog):
         self.model.error.connect(self.errorPanel.add)
         
         # Buttons
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonLayout)
         
-        undoButton = QtGui.QPushButton(self.tr("Undo"))
+        undoButton = QtWidgets.QPushButton(self.tr("Undo"))
         undoButton.clicked.connect(self.model.stack.undo)
         self.model.stack.canUndoChanged.connect(undoButton.setEnabled)
         undoButton.setEnabled(False)
         buttonLayout.addWidget(undoButton)
-        redoButton = QtGui.QPushButton(self.tr("Redo"))
+        redoButton = QtWidgets.QPushButton(self.tr("Redo"))
         redoButton.clicked.connect(self.model.stack.redo)
         self.model.stack.canRedoChanged.connect(redoButton.setEnabled)
         redoButton.setEnabled(False)
@@ -372,13 +372,13 @@ class CoverDialog(QtGui.QDialog):
         
         buttonLayout.addStretch()
         
-        resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
+        resetButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogResetButton),
                                              self.tr("Reset"))
         resetButton.clicked.connect(self.model.reset)
-        cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
+        cancelButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogCancelButton),
                                              self.tr("Cancel"))
         cancelButton.clicked.connect(self.reject)
-        commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
+        commitButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogSaveButton),
                                          self.tr("OK"))
         commitButton.clicked.connect(self._handleOkButton)
         
@@ -388,7 +388,7 @@ class CoverDialog(QtGui.QDialog):
         
         # Fill element list
         for element in self.model.elements:
-            item = QtGui.QListWidgetItem(element.getTitle())
+            item = QtWidgets.QListWidgetItem(element.getTitle())
             item.setData(Qt.UserRole,element)
             cover = self.model.getCover(element)
             if cover is not None:
@@ -405,7 +405,7 @@ class CoverDialog(QtGui.QDialog):
         self.coverList.clear()
         for cover in self.model.availableCovers[self.model.currentElement]:
             pixmap = cover.pixmap
-            item = QtGui.QListWidgetItem()
+            item = QtWidgets.QListWidgetItem()
             text = "{}x{}".format(pixmap.width(),pixmap.height())
             if cover.text is not None:
                 text = text + '\n' + cover.text
@@ -495,7 +495,7 @@ class CoverDialog(QtGui.QDialog):
         
         pixmap = QtGui.QPixmap(fileName)
         if pixmap.isNull():
-            QtGui.QMessageBox.warning(self,self.tr("Failed to open the file"),
+            QtWidgets.QMessageBox.warning(self,self.tr("Failed to open the file"),
                                       self.tr("The file could not be opened."))
         else:
             cover = Cover(pixmap=pixmap)
@@ -504,22 +504,22 @@ class CoverDialog(QtGui.QDialog):
         
     def _handleOpenFromUrl(self):
         """Handle the "Open from URL..." button."""
-        clipTexts = [QtGui.qApp.clipboard().text(mode)
+        clipTexts = [QtWidgets.qApp.clipboard().text(mode)
                      for mode in (QtGui.QClipboard.Selection, QtGui.QClipboard.Clipboard) ]
         dialogText = ""
         for text in clipTexts:
             if text.startswith("http") or text.startswith("www"):
                 dialogText = text 
-        url, ok = QtGui.QInputDialog.getText(self,self.tr("Open cover URL"),
+        url, ok = QtWidgets.QInputDialog.getText(self,self.tr("Open cover URL"),
                                             self.tr("Please enter the URL of the cover:"),
-                                            QtGui.QLineEdit.Normal,
+                                            QtWidgets.QLineEdit.Normal,
                                             dialogText)
         if not ok: # user canceled the dialog
             return
         
         url = QtCore.QUrl.fromUserInput(url)
         if not url.isValid():
-            QtGui.QMessageBox.warning(self,self.tr("Invalid URL"),
+            QtWidgets.QMessageBox.warning(self,self.tr("Invalid URL"),
                                       self.tr("The specified URL is invalid."))
             return
         
@@ -536,7 +536,7 @@ class CoverDialog(QtGui.QDialog):
         pixmap = QtGui.QPixmap()
         if not pixmap.loadFromData(reply.readAll()):
             url = reply.request().url().toString()
-            QtGui.QMessageBox.warning(self,self.tr("Invalid image"),
+            QtWidgets.QMessageBox.warning(self,self.tr("Invalid image"),
                                       self.tr("Could not load cover image from '{}'.").format(url))
         else:
             cover = Cover(pixmap=pixmap)
@@ -553,7 +553,7 @@ class CoverDialog(QtGui.QDialog):
         self.accept()
 
 
-class ErrorPanel(QtGui.QTextEdit):
+class ErrorPanel(QtWidgets.QTextEdit):
     """QTextEdit that is used to display error messages from cover providers."""
     def __init__(self):
         super().__init__()

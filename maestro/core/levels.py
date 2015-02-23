@@ -19,7 +19,7 @@
 import collections.abc
 import weakref
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 from maestro.core.urls import URL

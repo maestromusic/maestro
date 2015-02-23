@@ -18,8 +18,8 @@
 
 import math,itertools
 
-from PyQt4 import QtCore,QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore,QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import utils
 from . import profiles
@@ -39,7 +39,7 @@ class DelegateStyle:
     the delegate option ''fontSize''.
     """
     def __init__(self, relFontSize=1, bold=False, italic=False,
-                 color=QtGui.qApp.palette().color(QtGui.QPalette.WindowText)):
+                 color=QtWidgets.qApp.palette().color(QtGui.QPalette.WindowText)):
         self.bold = bold
         self.italic = italic
         self.relFontSize = relFontSize
@@ -52,7 +52,7 @@ ITALIC_STYLE = DelegateStyle(1,False,True)
 BOLD_STYLE = DelegateStyle(1,True,False)
             
             
-class AbstractDelegate(QtGui.QStyledItemDelegate):
+class AbstractDelegate(QtWidgets.QStyledItemDelegate):
     """Abstract base class for delegates. This class implements sizeHint and paint by calling ''layout'',
     which must be implemented in subclasses. In that method subclasses must use ''addLeft'', ''addCenter''
     and ''addRight'' to fill the three areas with DelegateItems. This class will then layout the items and
@@ -146,7 +146,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         raise NotImplementedError()
 
     def sizeHint(self,option,index):
-        """Implementation of QtGui.QStyleItemDelegate.sizHint. This method is called by Qt. It will call
+        """Implementation of QtWidgets.QStyleItemDelegate.sizHint. This method is called by Qt. It will call
         self.layout (implemented in subclasses) to fill the lists ''left'', ''center'' and ''right'' and
         then compute the sizeHint based on the DelegateItems in those lists.
         """
@@ -199,7 +199,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         return None
         
     def paint(self,painter,option,index):
-        """Implementation of QtGui.QStyleItemDelegate.paint. This method is called by Qt. It will call
+        """Implementation of QtWidgets.QStyleItemDelegate.paint. This method is called by Qt. It will call
         self.layout (implemented in subclasses) to fill the lists ''left'', ''center'' and ''right'' and
         then paint the DelegateItems in those lists.
         """
@@ -214,7 +214,7 @@ class AbstractDelegate(QtGui.QStyledItemDelegate):
         if background is not None:
             option.backgroundBrush = background
         # Draw the background depending on selection etc.
-        QtGui.QApplication.style().drawControl(QtGui.QStyle.CE_ItemViewItem,option,painter)
+        QtWidgets.QApplication.style().drawControl(QtWidgets.QStyle.CE_ItemViewItem,option,painter)
         painter.save()
         painter.translate(option.rect.x(),option.rect.y())
         self.option = option

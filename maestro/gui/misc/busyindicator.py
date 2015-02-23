@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 
-class BusyIndicator(QtGui.QWidget):
+class BusyIndicator(QtWidgets.QWidget):
     """Displays an animation to indicate that some work is done. Based on the file process-working.png
     from the Tange icon gallery: http://tango.freedesktop.org/Tango_Icon_Library
     """
@@ -79,18 +79,18 @@ class BusyIndicator(QtGui.QWidget):
             painter.drawPixmap(0,0,self._pixmap,x,y,32,32)
         
         
-class BusyLabel(QtGui.QWidget):
+class BusyLabel(QtWidgets.QWidget):
     """This widget combines a BusyIndicator with a text. Like the BusyIndicator, it will only be visible
     when running."""
     def __init__(self,text):
         super().__init__()
-        layout = QtGui.QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         self.busyIndicator = BusyIndicator()
         layout.addWidget(self.busyIndicator)
-        self.stackLayout = QtGui.QStackedLayout()
+        self.stackLayout = QtWidgets.QStackedLayout()
         layout.addLayout(self.stackLayout)
-        self.stackLayout.addWidget(QtGui.QWidget())
-        self.label = QtGui.QLabel(text)
+        self.stackLayout.addWidget(QtWidgets.QWidget())
+        self.label = QtWidgets.QLabel(text)
         self.stackLayout.addWidget(self.label)
         
     def setInterval(self,interval):

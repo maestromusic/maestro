@@ -21,7 +21,7 @@ import os.path
 import time
 import threading, queue
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 
 from maestro import logging, stack, utils, config
 from maestro import database as db

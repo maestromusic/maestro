@@ -18,8 +18,8 @@
 
 import itertools, collections, functools, locale
 
-from PyQt4 import QtCore
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import rootedtreemodel
@@ -486,9 +486,9 @@ class TagLayer(Layer):
     @staticmethod
     def openDialog(parent, model, layer=None):
         """Open a dialog to configure a new or existing TagLayer."""
-        from PyQt4 import QtGui
+        from PyQt5 import QtGui
         tagList = layer.tagList if layer is not None else TagLayer.defaultTagList()
-        text, ok = QtGui.QInputDialog.getText(parent, translate("TagLayer", "Configure tag layer"),
+        text, ok = QtWidgets.QInputDialog.getText(parent, translate("TagLayer", "Configure tag layer"),
                         translate("TagLayer", "Enter the names/titles of the tags that should "
                                   "be used to group elements."),
                         text=', '.join(tag.title for tag in tagList))

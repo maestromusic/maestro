@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from ..core import domains, elements
 from .. import application
@@ -24,7 +24,7 @@ from maestro.filesystem import sources
 from maestro import filesystem
 
 
-class ContainerTypeBox(QtGui.QComboBox):
+class ContainerTypeBox(QtWidgets.QComboBox):
     """ComboBox to select a container type."""
     
     def __init__(self, currentType=None):
@@ -54,7 +54,7 @@ class ContainerTypeBox(QtGui.QComboBox):
         return self.itemData(self.currentIndex())
 
 
-class DomainBox(QtGui.QComboBox):
+class DomainBox(QtWidgets.QComboBox):
     """ComboBox to select a domain."""
     domainChanged = QtCore.pyqtSignal(domains.Domain)
     
@@ -99,7 +99,7 @@ class DomainBox(QtGui.QComboBox):
                 self.domainChanged.emit(self.currentDomain())
                 
 
-class SourceBox(QtGui.QComboBox):
+class SourceBox(QtWidgets.QComboBox):
     """ComboBox to select a filesystem source."""
     sourceChanged = QtCore.pyqtSignal(sources.Source)
     

@@ -21,8 +21,8 @@ import functools, itertools, collections
 import urllib.parse
 import xml.dom.minidom
 
-from PyQt4 import QtCore,QtGui,QtNetwork
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore,QtGui,QtNetwork
+from PyQt5.QtCore import Qt
 
 from ...core import tags, covers
 from ...core.elements import Element

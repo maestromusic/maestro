@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore,QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore,QtGui
+from PyQt5.QtCore import Qt
 
 
-class DynamicGridLayout(QtGui.QGridLayout):
+class DynamicGridLayout(QtWidgets.QGridLayout):
     """This subclass of QGridLayout adds two methods to remove whole rows and to insert widgets between 
     existing rows. If you simply remove all widgets from a QGridLayout the rows will still exist, but be
     empty. And usually it is not possible to insert items between two (full) rows without moving all further
@@ -30,7 +30,7 @@ class DynamicGridLayout(QtGui.QGridLayout):
     """
     def __init__(self,parent=None):
         """Create a new DynamicGridLayout with the given parent."""
-        QtGui.QGridLayout.__init__(self,parent)
+        QtWidgets.QGridLayout.__init__(self,parent)
 
     def removeRow(self,row):
         """Remove the given row (first row is 0) from the layout and move all further widgets a row up.

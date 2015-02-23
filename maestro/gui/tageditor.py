@@ -18,8 +18,8 @@
 
 import os.path, functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import utils, config, logging, stack
 from maestro.core import tags, levels, urls
@@ -66,30 +66,30 @@ class TagEditorWidget(mainwindow.Widget):
         self.selectionManager.isSelectable = \
             lambda wList, widget: not isinstance(widget, singletageditor.ExpandLine)
         
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setSpacing(1)
         self.layout().setContentsMargins(0,0,0,0)
-        self.topLayout = QtGui.QHBoxLayout()
+        self.topLayout = QtWidgets.QHBoxLayout()
         # Spacings and margins are inherited. Reset the horizontal values for topLayout
-        style = QtGui.QApplication.style()
+        style = QtWidgets.QApplication.style()
         self.topLayout.setSpacing(style.pixelMetric(style.PM_LayoutHorizontalSpacing))
         self.topLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin), 0,
                                           style.pixelMetric(style.PM_LayoutRightMargin), 0)
         self.layout().addLayout(self.topLayout)
 
-        self.levelLabel = QtGui.QLabel()
+        self.levelLabel = QtWidgets.QLabel()
         self.topLayout.addWidget(self.levelLabel)
         
         # Texts will be set in _changeLayout because they are only displayed in horizontal mode
         self.addButton = tagwidgets.TagTypeButton()
         self.addButton.tagChosen.connect(self._handleAddRecord)
         self.topLayout.addWidget(self.addButton)
-        self.removeButton = QtGui.QPushButton()
+        self.removeButton = QtWidgets.QPushButton()
         self.removeButton.setIcon(QtGui.QIcon.fromTheme('list-remove'))
         self.removeButton.clicked.connect(self._handleRemoveSelected)
         self.topLayout.addWidget(self.removeButton)
         
-        self.includeContentsButton = QtGui.QPushButton()
+        self.includeContentsButton = QtWidgets.QPushButton()
         self.includeContentsButton.setCheckable(True)
         self.includeContentsButton.setChecked(state is not None and state.get('includeContents', False))
         self.includeContentsButton.setToolTip(self.tr("Include all contents"))
@@ -98,16 +98,16 @@ class TagEditorWidget(mainwindow.Widget):
         self.topLayout.addWidget(self.includeContentsButton)
         self.topLayout.addStretch(1)
         
-        scrollArea = QtGui.QScrollArea()
+        scrollArea = QtWidgets.QScrollArea()
         scrollArea.setWidgetResizable(True)
         self.layout().addWidget(scrollArea, 1)
             
-        self.viewport = QtGui.QWidget()
+        self.viewport = QtWidgets.QWidget()
         self.tagEditorLayout = TagEditorLayout(self.viewport)
         scrollArea.setWidget(self.viewport)
 
-        self.flagWidget = QtGui.QWidget()
-        self.flagWidget.setLayout(QtGui.QHBoxLayout())
+        self.flagWidget = QtWidgets.QWidget()
+        self.flagWidget.setLayout(QtWidgets.QHBoxLayout())
         self.flagWidget.layout().setContentsMargins(0,0,0,0)
         self.layout().addWidget(self.flagWidget)
         
@@ -244,7 +244,7 @@ class TagEditorWidget(mainwindow.Widget):
         """Handle the add record button and context menu entry: Open a RecordDialog. If *tag* is given it
         will be selected by default in this dialog."""
         dialog = RecordDialog(self, self.model.getElements(), defaultTag=tag)
-        if dialog.exec_() == QtGui.QDialog.Accepted:
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
             try:
                 self.model.addRecord(dialog.getRecord())
             except urls.TagWriteError as e:
@@ -325,28 +325,28 @@ class TagEditorWidget(mainwindow.Widget):
         else:
             # This means that changeTag failed because some values could not be converted to the new tag.
             # Reset the box
-            QtGui.QMessageBox.warning(self, self.tr("Invalid value"),
+            QtWidgets.QMessageBox.warning(self, self.tr("Invalid value"),
                                       self.tr("At least one value is invalid for the new type."))
         self._ignoreHandleTagChangedByUser = False
                 
     def contextMenuEvent(self, contextMenuEvent, record=None):
-        menu = QtGui.QMenu(self)
+        menu = QtWidgets.QMenu(self)
 
         menu.addAction(self.model.stack.createUndoAction())
         menu.addAction(self.model.stack.createRedoAction())
         menu.addSeparator()
         
-        addRecordAction = QtGui.QAction(self.tr("Add record..."), self)
+        addRecordAction = QtWidgets.QAction(self.tr("Add record..."), self)
         tag = record.tag if record is not None else None
         addRecordAction.triggered.connect(lambda: self._handleAddRecord(tag))
         menu.addAction(addRecordAction)
         
-        removeSelectedAction = QtGui.QAction(self.tr("Remove selected"), self)
+        removeSelectedAction = QtWidgets.QAction(self.tr("Remove selected"), self)
         removeSelectedAction.triggered.connect(self._handleRemoveSelected)
         menu.addAction(removeSelectedAction)
 
         if record is not None:
-            editRecordAction = QtGui.QAction(self.tr("Edit record..."), self)
+            editRecordAction = QtWidgets.QAction(self.tr("Edit record..."), self)
             editRecordAction.triggered.connect(lambda: self._handleEditRecord(record))
             menu.addAction(editRecordAction)
             
@@ -434,7 +434,7 @@ class TagEditorWidget(mainwindow.Widget):
         """Handle 'edit common start' action from context menu."""
         selectedRecords = [editor.getRecord() for editor in self.selectionManager.getSelectedWidgets()]
         commonStart = utils.strings.commonPrefix(str(record.value) for record in selectedRecords)
-        text, ok = QtGui.QInputDialog.getText(self, self.tr("Edit common start"),
+        text, ok = QtWidgets.QInputDialog.getText(self, self.tr("Edit common start"),
                          self.tr("Insert a new text which will replace the common start "
                                  "of all selected records:"),
                          text=commonStart)
@@ -447,7 +447,7 @@ class TagEditorWidget(mainwindow.Widget):
     def _handleEditRecord(self, record):
         """Handle 'edit record' action from context menu."""
         dialog = RecordDialog(self, self.model.getElements(), record=record)
-        if dialog.exec_() == QtGui.QDialog.Accepted:
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
             try:
                 self.model.changeRecord(record, dialog.getRecord())
             except urls.TagWriteError as e:
@@ -479,7 +479,7 @@ widgetClass = mainwindow.WidgetClass(
 mainwindow.addWidgetClass(widgetClass)
 
 
-class RecordDialog(QtGui.QDialog):
+class RecordDialog(QtWidgets.QDialog):
     """Dialog to edit a single record. Parameters are:
     
         - *parent*: The parent widget
@@ -490,7 +490,7 @@ class RecordDialog(QtGui.QDialog):
     
     \ """
     def __init__(self, parent, elements, record=None, defaultTag=None):
-        QtGui.QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
         self.setWindowTitle(self.tr("Add tag value"))
         assert len(elements) > 0
         
@@ -503,30 +503,30 @@ class RecordDialog(QtGui.QDialog):
         if record is not None:
             self.valueEditor.setValue(record.value)
             
-        self.elementsBox = QtGui.QListView(self)
+        self.elementsBox = QtWidgets.QListView(self)
         self.elementsBox.setModel(simplelistmodel.SimpleListModel(elements, lambda el: el.getTitle()))
-        self.elementsBox.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
+        self.elementsBox.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
         for i, element in enumerate(elements):
             if record is None or element in record.elementsWithValue:
                 self.elementsBox.selectionModel().select(self.elementsBox.model().index(i, 0),
-                                                         QtGui.QItemSelectionModel.Select)
+                                                         QtCore.QItemSelectionModel.Select)
                 
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         buttonBox.rejected.connect(self.reject)
         buttonBox.accepted.connect(self._handleOkButton)
         
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
-        firstLineLayout = QtGui.QHBoxLayout()
-        secondLineLayout = QtGui.QHBoxLayout()
+        firstLineLayout = QtWidgets.QHBoxLayout()
+        secondLineLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(firstLineLayout)
         layout.addLayout(secondLineLayout)
-        firstLineLayout.addWidget(QtGui.QLabel(self.tr("Type: "), self))
+        firstLineLayout.addWidget(QtWidgets.QLabel(self.tr("Type: "), self))
         firstLineLayout.addWidget(self.typeEditor)
         firstLineLayout.addStretch(1)
-        secondLineLayout.addWidget(QtGui.QLabel(self.tr("Value: "), self))
+        secondLineLayout.addWidget(QtWidgets.QLabel(self.tr("Value: "), self))
         secondLineLayout.addWidget(self.valueEditor)
-        layout.addWidget(QtGui.QLabel(self.tr("Elements: "), self))
+        layout.addWidget(QtWidgets.QLabel(self.tr("Elements: "), self))
         layout.addWidget(self.elementsBox)
 
         layout.addWidget(buttonBox)
@@ -538,7 +538,7 @@ class RecordDialog(QtGui.QDialog):
     def _handleOkButton(self):
         """Check whether at least one element is selected and the current value is valid and if so, exit."""
         if not self.elementsBox.selectionModel().hasSelection():
-            QtGui.QMessageBox.warning(self, self.tr("No element selected"),
+            QtWidgets.QMessageBox.warning(self, self.tr("No element selected"),
                                       self.tr("You must select at lest one element."))
             return
         
@@ -556,7 +556,7 @@ class RecordDialog(QtGui.QDialog):
                 tagType = newTag
             
         if self.valueEditor.getValue() is None: # valueEditor.getValue returns None if the value is invalid
-            QtGui.QMessageBox.warning(self, self.tr("Invalid value"), self.tr("The given value is invalid."))
+            QtWidgets.QMessageBox.warning(self, self.tr("Invalid value"), self.tr("The given value is invalid."))
             return
         
         self.accept()
@@ -578,10 +578,10 @@ class RecordDialog(QtGui.QDialog):
         self.valueEditor.setTag(tag)
         
     
-class TagEditorDialog(QtGui.QDialog):
+class TagEditorDialog(QtWidgets.QDialog):
     """The tageditor as dialog. It uses its own level and commits the level when the dialog is accepted."""
     def __init__(self, includeContents=None, parent=None):
-        QtGui.QDialog.__init__(self, parent)
+        QtWidgets.QDialog.__init__(self, parent)
         self.setWindowTitle(self.tr("Edit tags"))
         self.resize(600, 450) #TODO: make this cleverer
         self.stack = stack.createSubstack(modalDialog=True)
@@ -589,36 +589,36 @@ class TagEditorDialog(QtGui.QDialog):
         if includeContents is None:
             includeContents = config.storage.gui.tag_editor_include_contents
             
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.tagedit = TagEditorWidget(state={'includeContents': includeContents},
                                        stack=self.stack,
                                        useGlobalSelection=False,
                                        widgetClass=widgetClass)
         self.layout().addWidget(self.tagedit)
         
-        style = QtGui.QApplication.style()
+        style = QtWidgets.QApplication.style()
         
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonLayout)
         
-        undoButton = QtGui.QPushButton(self.tr("Undo"))
+        undoButton = QtWidgets.QPushButton(self.tr("Undo"))
         undoButton.clicked.connect(self.stack.undo)
         self.stack.canUndoChanged.connect(undoButton.setEnabled)
         undoButton.setEnabled(False)
         buttonLayout.addWidget(undoButton)
-        redoButton = QtGui.QPushButton(self.tr("Redo"))
+        redoButton = QtWidgets.QPushButton(self.tr("Redo"))
         redoButton.clicked.connect(self.stack.redo)
         self.stack.canRedoChanged.connect(redoButton.setEnabled)
         redoButton.setEnabled(False)
         buttonLayout.addWidget(redoButton)
         
-        resetButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogResetButton),
+        resetButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogResetButton),
                                              self.tr("Reset"))
         resetButton.clicked.connect(self._handleReset)
-        cancelButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCancelButton),
+        cancelButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogCancelButton),
                                              self.tr("Cancel"))
         cancelButton.clicked.connect(self.reject)
-        commitButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogSaveButton),
+        commitButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogSaveButton),
                                          self.tr("OK"))
         commitButton.clicked.connect(self.accept)
         buttonLayout.addWidget(resetButton)
@@ -692,7 +692,7 @@ class SmallTagTypeBox(tagwidgets.TagTypeBox):
         self.label.setIconOnly(iconOnly)
               
 
-class TagEditorLayout(QtGui.QLayout):
+class TagEditorLayout(QtWidgets.QLayout):
     """Layout for the TagEditor. It may contain several columns each of which contain several pairs
     consisting of a TagTypeBox (left) and a SingleTagEditor (right).
     
@@ -726,7 +726,7 @@ class TagEditorLayout(QtGui.QLayout):
         self.addChildWidget(tagBox)
         self.addChildWidget(singleTagEditor)
         self._pairs.insert(row, (tagBox, singleTagEditor))
-        self._items.insert(row, (QtGui.QWidgetItem(tagBox), QtGui.QWidgetItem(singleTagEditor)))
+        self._items.insert(row, (QtWidgets.QWidgetItem(tagBox), QtWidgets.QWidgetItem(singleTagEditor)))
         self.invalidate() # this is also called by for example QBoxLayout::addItem
         
     def removePair(self, tag):

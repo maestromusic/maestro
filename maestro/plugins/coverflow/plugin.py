@@ -18,7 +18,7 @@
 
 import os.path
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
 from ...core import covers, levels, nodes

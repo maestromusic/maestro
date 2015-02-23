@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtGui
+from PyQt5 import QtGui
 
 from ...gui.delegates.abstractdelegate import *
 from ...gui.delegates import StandardDelegate
@@ -34,7 +34,7 @@ class MusicBrainzDelegate(StandardDelegate):
         profile.options['appendRemainingTags'] = True
         super().__init__(view, profile)
         
-        ignoreColor = QtGui.qApp.palette().color(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText)
+        ignoreColor = QtWidgets.qApp.palette().color(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText)
         self.ignoreBold = DelegateStyle(1, True, False, ignoreColor)
         self.ignoreItalic = DelegateStyle(1, False, True, ignoreColor)
         self.ignoreNormal = DelegateStyle(1, False, False, ignoreColor)

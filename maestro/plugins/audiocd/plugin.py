@@ -20,7 +20,7 @@ try:
     import discid
 except ImportError:
     raise ImportError('discid module not installed')
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from maestro import application, database as db
 from maestro.gui import editor
 from maestro.core import urls, tags
@@ -49,7 +49,7 @@ def enable():
 
 def mainWindowInit():
     global _action
-    _action = QtGui.QAction(application.mainWindow)
+    _action = QtWidgets.QAction(application.mainWindow)
     _action.setText(translate("AudioCD Plugin", "rip missing tracks..."))
     _action.triggered.connect(showRipMissingDialog)
     application.mainWindow.menus['extras'].addAction(_action)

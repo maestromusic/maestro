@@ -18,14 +18,14 @@
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import utils
 from maestro.gui import mainwindow
 
 
-class DockWidget(QtGui.QDockWidget):
+class DockWidget(QtWidgets.QDockWidget):
     """QDockWidget subclass that uses our custom DockWidgetTitleBar and respects the 'Hide title bars'
     option. DockWidgets are created automatically by MainWindow when a mainwindow.Widget is added to a
     dock area.
@@ -35,7 +35,7 @@ class DockWidget(QtGui.QDockWidget):
     """    
     def __init__(self, widget, title='', icon=None):
         super().__init__()
-        self.setFeatures(QtGui.QDockWidget.DockWidgetClosable | QtGui.QDockWidget.DockWidgetMovable)
+        self.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.tbWidget = DockWidgetTitleBar(self)
         self.setWindowTitle(title)
@@ -69,7 +69,7 @@ class DockWidget(QtGui.QDockWidget):
     def _handleHideTitleBarAction(self, checked):
         """Set whether the title bar is visible."""
         if checked:
-            self.setTitleBarWidget(QtGui.QWidget())
+            self.setTitleBarWidget(QtWidgets.QWidget())
             self.tbWidget.hide()
         else:
             self.setTitleBarWidget(self.tbWidget)
@@ -79,27 +79,27 @@ class DockWidget(QtGui.QDockWidget):
         """Freeze/unfreeze dockwidget. Frozen dockwidgets cannot be resized, moved or closed."""
         if frozen:
             self.setFixedSize(self.size())
-            self.setFeatures(QtGui.QDockWidget.NoDockWidgetFeatures)
+            self.setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)
         else:
             self.setFixedSize(mainwindow.QWIDGETSIZE_MAX, mainwindow.QWIDGETSIZE_MAX)
-            self.setFeatures(QtGui.QDockWidget.DockWidgetClosable | QtGui.QDockWidget.DockWidgetMovable)
+            self.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable)
         self.tbWidget.closeButton.setVisible(not frozen)
 
 
-class DockWidgetTitleBar(QtGui.QFrame):
+class DockWidgetTitleBar(QtWidgets.QFrame):
     """Custom class for title bars of DockWidgets. Compared with Qt's standard title bar, the 'float' button
     has been removed, but an 'options' button may be added."""
     def __init__(self, parent):
         super().__init__(parent)
         
-        layout = QtGui.QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(2, 0, 0, 0)
         layout.setSpacing(0)
         
-        self.iconLabel = QtGui.QLabel()
+        self.iconLabel = QtWidgets.QLabel()
         layout.addWidget(self.iconLabel)
         layout.addSpacing(3)
-        self.titleLabel = QtGui.QLabel()
+        self.titleLabel = QtWidgets.QLabel()
         self.titleLabel.setStyleSheet('QLabel { font-weight: bold }')
         layout.addWidget(self.titleLabel)
         layout.addStretch()
@@ -123,7 +123,7 @@ class DockWidgetTitleBar(QtGui.QFrame):
             self.optionButton.setEnabled(True)
 
 
-class DockWidgetTitleButton(QtGui.QAbstractButton):
+class DockWidgetTitleButton(QtWidgets.QAbstractButton):
     """Python implementation of QDockWidgetTitleButton from the Qt source (gui/widgets/qdockwidget.cpp).
     Unfortunately that class is not part of the public API and hence this Python port is necessary to create
     custom buttons. Constructor and paintEvent have been slightly modified, the rest is the same.
@@ -138,7 +138,7 @@ class DockWidgetTitleButton(QtGui.QAbstractButton):
         self.setFocusPolicy(Qt.NoFocus)
         if isinstance(icon, str):
             if icon == 'close':
-                icon = QtGui.qApp.style().standardIcon(QtGui.QStyle.SP_TitleBarCloseButton)
+                icon = QtWidgets.qApp.style().standardIcon(QtWidgets.QStyle.SP_TitleBarCloseButton)
             elif icon == 'options':
                 if self.style().objectName() == 'oxygen':
                     icon = utils.getIcon('dockwidgetarrow_oxygen.png')
@@ -154,9 +154,9 @@ class DockWidgetTitleButton(QtGui.QAbstractButton):
 
     def sizeHint(self):
         self.ensurePolished()
-        size = 2*self.style().pixelMetric(QtGui.QStyle.PM_DockWidgetTitleBarButtonMargin, None, self)
+        size = 2*self.style().pixelMetric(QtWidgets.QStyle.PM_DockWidgetTitleBarButtonMargin, None, self)
         if not self.icon().isNull():
-            iconSize = self.style().pixelMetric(QtGui.QStyle.PM_SmallIconSize, None, self)
+            iconSize = self.style().pixelMetric(QtWidgets.QStyle.PM_SmallIconSize, None, self)
             sz = self.icon().actualSize(QtCore.QSize(iconSize, iconSize))
             size += max(sz.width(), sz.height())
         return QtCore.QSize(size, size)
@@ -173,32 +173,32 @@ class DockWidgetTitleButton(QtGui.QAbstractButton):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        opt = QtGui.QStyleOptionToolButton()
+        opt = QtWidgets.QStyleOptionToolButton()
         opt.initFrom(self)
-        opt.state |= QtGui.QStyle.State_AutoRaise;
+        opt.state |= QtWidgets.QStyle.State_AutoRaise;
         
-        if self.style().styleHint(QtGui.QStyle.SH_DockWidget_ButtonsHaveFrame, None, self):
+        if self.style().styleHint(QtWidgets.QStyle.SH_DockWidget_ButtonsHaveFrame, None, self):
             if self.isEnabled() and self.underMouse() and not self.isChecked() and not self.isDown():
-                opt.state |= QtGui.QStyle.State_Raised
+                opt.state |= QtWidgets.QStyle.State_Raised
             if self.isChecked():
-                opt.state |= QtGui.QStyle.State_On
+                opt.state |= QtWidgets.QStyle.State_On
             if self.isDown():
-                opt.state |= QtGui.QStyle.State_Sunken
+                opt.state |= QtWidgets.QStyle.State_Sunken
             
             # QGtkStyle disables the frame (unless hovering). It does so by checking whether this widget
             # inherits QDockWidgetTitleButton, which is not part of the API.
             # Thus we have to anticipate this check here.
-            if not self.style().inherits("QGtkStyle") or opt.state & QtGui.QStyle.State_MouseOver:
+            if not self.style().inherits("QGtkStyle") or opt.state & QtWidgets.QStyle.State_MouseOver:
                 if self.style().inherits("QGtkStyle"):
                     # This should be done in drawPrimitive, but for some reason it does not work.
                     opt.rect.adjust(2,2,-2,-2)
-                self.style().drawPrimitive(QtGui.QStyle.PE_PanelButtonTool, opt, painter, self)
+                self.style().drawPrimitive(QtWidgets.QStyle.PE_PanelButtonTool, opt, painter, self)
         
         opt.icon = self.icon()
-        opt.subControls = QtGui.QStyle.SC_None
-        opt.activeSubControls = QtGui.QStyle.SC_None
-        opt.features = getattr(QtGui.QStyleOptionToolButton, 'None') # QStyleOptionToolButton::None
+        opt.subControls = QtWidgets.QStyle.SC_None
+        opt.activeSubControls = QtWidgets.QStyle.SC_None
+        opt.features = getattr(QtWidgets.QStyleOptionToolButton, 'None') # QStyleOptionToolButton::None
         opt.arrowType = Qt.NoArrow
-        size = self.style().pixelMetric(QtGui.QStyle.PM_SmallIconSize, None, self)
+        size = self.style().pixelMetric(QtWidgets.QStyle.PM_SmallIconSize, None, self)
         opt.iconSize = QtCore.QSize(size, size)
-        self.style().drawComplexControl(QtGui.QStyle.CC_ToolButton, opt, painter, self)
+        self.style().drawComplexControl(QtWidgets.QStyle.CC_ToolButton, opt, painter, self)

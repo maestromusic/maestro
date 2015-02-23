@@ -18,8 +18,8 @@
 
 import collections, datetime
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ... import database as db
@@ -38,7 +38,7 @@ except ImportError as e:
 def enable():
     mainwindow.addWidgetClass(mainwindow.WidgetClass(
         id = "statistics",
-        name = QtGui.QApplication.translate("Statistics", "Statistics"),
+        name = QtWidgets.QApplication.translate("Statistics", "Statistics"),
         theClass = StatisticsWidget,
         icon = QtGui.QIcon(":/maestro/plugins/statistics/statistics.png")
         ))
@@ -52,22 +52,22 @@ class StatisticsWidget(mainwindow.Widget):
     """Widget that displays some statistics (or an error message if matplotlib cannot be loaded)."""
     def __init__(self, state=None, **kwargs):
         super().__init__(**kwargs)
-        layout = QtGui.QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         if pyplot is None:
-            errorLabel = QtGui.QLabel(pyplotError)
+            errorLabel = QtWidgets.QLabel(pyplotError)
             errorLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
             layout.addWidget(errorLabel)
             return
         
-        self.scrollArea = QtGui.QScrollArea()
+        self.scrollArea = QtWidgets.QScrollArea()
         self.updateCharts()
         layout.addWidget(self.scrollArea)
         levels.real.connect(self.updateCharts)
         
     def updateCharts(self):
         """Create or update the charts."""
-        innerWidget = QtGui.QWidget()
-        self.innerLayout = QtGui.QGridLayout(innerWidget)
+        innerWidget = QtWidgets.QWidget()
+        self.innerLayout = QtWidgets.QGridLayout(innerWidget)
         if tags.get("genre").isInDb() and tags.get("genre").type == tags.TYPE_VARCHAR:
             sizes, labels = self._filter(self.getGenres())
             self._addPie(self.tr("Genres"), 0, 0, sizes, labels, 4, 3)
@@ -91,7 +91,7 @@ class StatisticsWidget(mainwindow.Widget):
         ax.pie(sizes, shadow=True, colors=colors, labels=labels,
                autopct=lambda p: "{} %".format(round(p)) if p >= 8 else '')
         canvas = FigureCanvasQTAgg(figure)
-        self.innerLayout.addWidget(QtGui.QLabel(title), 2*row, column)
+        self.innerLayout.addWidget(QtWidgets.QLabel(title), 2*row, column)
         self.innerLayout.addWidget(canvas, 2*row+1, column)
         
     def _addBars(self, title, row, column, heights, labels, width, height):
@@ -104,7 +104,7 @@ class StatisticsWidget(mainwindow.Widget):
         ax.set_xticks(range(len(heights)))
         ax.set_xticklabels(labels, rotation=70)
         canvas = FigureCanvasQTAgg(figure)
-        self.innerLayout.addWidget(QtGui.QLabel(title), 2*row, column)
+        self.innerLayout.addWidget(QtWidgets.QLabel(title), 2*row, column)
         self.innerLayout.addWidget(canvas, 2*row+1, column)
         
     def _filter(self, tuples, number=6, p1=0.01, p2=0.05):

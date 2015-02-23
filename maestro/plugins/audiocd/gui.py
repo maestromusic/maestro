@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4.QtGui import QDialogButtonBox
+from PyQt5.QtWidgets import QDialogButtonBox
 
 from maestro import config
 from maestro.core import levels, tags, domains, urls
@@ -54,11 +54,11 @@ class ImportAudioCDAction(actions.TreeAction):
         """
         import discid
 
-        device, ok = QtGui.QInputDialog.getText(
+        device, ok = QtWidgets.QInputDialog.getText(
             mainwindow.mainWindow,
             translate('AudioCD Plugin', 'Select device'),
             translate('AudioCD Plugin', 'CDROM device:'),
-            QtGui.QLineEdit.Normal,
+            QtWidgets.QLineEdit.Normal,
             discid.get_default_device())
         if not ok:
             return None
@@ -90,13 +90,13 @@ class ImportAudioCDAction(actions.TreeAction):
 
             def callback(url):
                 progress.setText(self.tr("Fetching data from:\n{}").format(url))
-                QtGui.qApp.processEvents()
+                QtWidgets.qApp.processEvents()
 
             xmlapi.queryCallback = callback
             xmlapi.fillReleaseForDisc(release, theDiscid)
             progress.close()
             xmlapi.queryCallback = None
-            QtGui.qApp.processEvents()
+            QtWidgets.qApp.processEvents()
             stack = self.level().stack.createSubstack(modalDialog=True)
             level = levels.Level("audiocd", self.level(), stack=stack)
             dialog = ImportAudioCDDialog(level, release)
@@ -121,13 +121,13 @@ class ImportAudioCDAction(actions.TreeAction):
                 progress.close()
 
 
-class ReleaseSelectionDialog(QtGui.QDialog):
+class ReleaseSelectionDialog(QtWidgets.QDialog):
 
     def __init__(self, releases, discid):
         super().__init__(mainwindow.mainWindow)
         self.setModal(True)
-        lay = QtGui.QVBoxLayout()
-        lay.addWidget(QtGui.QLabel(self.tr('Select release:')))
+        lay = QtWidgets.QVBoxLayout()
+        lay.addWidget(QtWidgets.QLabel(self.tr('Select release:')))
         for release in releases:
             text = ""
             if len(release.children) > 1:
@@ -140,12 +140,12 @@ class ReleaseSelectionDialog(QtGui.QDialog):
                     text += " ({})".format(release.tags["country"][0])
                 if "barcode" in release.tags:
                     text += ", barcode={}".format(release.tags["barcode"][0])
-            but = QtGui.QPushButton(text)
+            but = QtWidgets.QPushButton(text)
             but.release = release
             but.setStyleSheet("text-align: left")
             but.clicked.connect(self._handleClick)
             lay.addWidget(but)
-        btbx = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
+        btbx = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
         btbx.rejected.connect(self.reject)
         lay.addWidget(btbx)
         self.setLayout(lay)
@@ -173,7 +173,7 @@ class CDROMDelegate(delegates.StandardDelegate):
         return super().getUrlWarningItem(wrapper)
 
 
-class AliasComboDelegate(QtGui.QStyledItemDelegate):
+class AliasComboDelegate(QtWidgets.QStyledItemDelegate):
     def __init__(self, box, parent=None):
         super().__init__(parent)
         self.box = box
@@ -186,7 +186,7 @@ class AliasComboDelegate(QtGui.QStyledItemDelegate):
         option.font.setBold(False)
 
 
-class AliasComboBox(QtGui.QComboBox):
+class AliasComboBox(QtWidgets.QComboBox):
     aliasChanged = QtCore.pyqtSignal(object)
 
     def __init__(self, entity, sortNameItem):
@@ -210,7 +210,7 @@ class AliasComboBox(QtGui.QComboBox):
                                      ("primary " if alias.primary else "") + \
                                      "alias for locale {}".format(alias.locale),
                                      Qt.ToolTipRole)
-            QtGui.qApp.processEvents()
+            QtWidgets.qApp.processEvents()
         return super().showPopup()
 
     def _handleActivate(self, index):
@@ -226,7 +226,7 @@ class AliasComboBox(QtGui.QComboBox):
         self.aliasChanged.emit(self.entity)
 
 
-class AliasWidget(QtGui.QTableWidget):
+class AliasWidget(QtWidgets.QTableWidget):
     """
     TODO: use sort names!
     """
@@ -242,21 +242,21 @@ class AliasWidget(QtGui.QTableWidget):
         self.setColumnCount(len(self.columns))
         self.verticalHeader().hide()
         self.setHorizontalHeaderLabels(self.columns)
-        self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.horizontalHeader().setStretchLastSection(True)
         self.setRowCount(len(self.entities))
         self.cellChanged.connect(self._handleCellChanged)
         for row, ent in enumerate(self.entities):
-            label = QtGui.QTableWidgetItem(", ".join(ent.asTag))
+            label = QtWidgets.QTableWidgetItem(", ".join(ent.asTag))
             label.setFlags(Qt.ItemIsEnabled)
             self.setItem(row, 0, label)
 
-            label = QtGui.QLabel('<a href="{}">{}</a>'.format(ent.url(), self.tr("lookup")))
+            label = QtWidgets.QLabel('<a href="{}">{}</a>'.format(ent.url(), self.tr("lookup")))
             label.setToolTip(ent.url())
             label.setOpenExternalLinks(True)
             self.setCellWidget(row, 1, label)
 
-            sortNameItem = QtGui.QTableWidgetItem(ent.sortName)
+            sortNameItem = QtWidgets.QTableWidgetItem(ent.sortName)
             combo = AliasComboBox(ent, sortNameItem)
             combo.aliasChanged.connect(self.aliasChanged)
             self.setCellWidget(row, 2, combo)
@@ -290,7 +290,7 @@ class AliasWidget(QtGui.QTableWidget):
         self.entities[row].sortName = self.item(row, col).text()
 
 
-class TagMapWidget(QtGui.QTableWidget):
+class TagMapWidget(QtWidgets.QTableWidget):
     tagConfigChanged = QtCore.pyqtSignal(dict)
 
     def __init__(self, newtags):
@@ -299,7 +299,7 @@ class TagMapWidget(QtGui.QTableWidget):
         self.setColumnCount(len(self.columns))
         self.verticalHeader().hide()
         self.setHorizontalHeaderLabels(self.columns)
-        self.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.setRowCount(len(newtags))
         self.tagMapping = mbplugin.tagMap.copy()
         from ...gui.tagwidgets import TagTypeBox
@@ -309,10 +309,10 @@ class TagMapWidget(QtGui.QTableWidget):
                 tag = self.tagMapping[tagname]
             else:
                 tag = tags.get(tagname)
-            checkbox = QtGui.QTableWidgetItem()
+            checkbox = QtWidgets.QTableWidgetItem()
             ttBox = TagTypeBox(tag, editable=True)
             ttBox.tagChanged.connect(self._handleTagTypeChanged)
-            mbname = QtGui.QTableWidgetItem(tagname)
+            mbname = QtWidgets.QTableWidgetItem(tagname)
             self.setCellWidget(row, 2, ttBox)
             if tag is None:
                 checkbox.setCheckState(Qt.Unchecked)
@@ -349,7 +349,7 @@ class TagMapWidget(QtGui.QTableWidget):
         self.tagConfigChanged.emit(self.tagMapping)
 
 
-class ImportAudioCDDialog(QtGui.QDialog):
+class ImportAudioCDDialog(QtWidgets.QDialog):
     """The main dialog of this plugin, which is used for adding audioCDs to the editor.
     
     Shows the container structure obtained from musicbrainz and allows to configure alias handling
@@ -378,7 +378,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.newTagWidget = TagMapWidget(release.collectExternalTags())
         self.newTagWidget.tagConfigChanged.connect(self.aliasWidget.updateDisabledTags)
         self.newTagWidget.tagConfigChanged.connect(self.makeElements)
-        configLayout = QtGui.QVBoxLayout()
+        configLayout = QtWidgets.QVBoxLayout()
         self.searchReleaseBox = QtGui.QCheckBox(self.tr('search for existing release'))
         self.searchReleaseBox.setChecked(True)
         self.searchReleaseBox.stateChanged.connect(self.makeElements)
@@ -393,14 +393,14 @@ class ImportAudioCDDialog(QtGui.QDialog):
         btbx.accepted.connect(self.finalize)
         btbx.rejected.connect(self.reject)
 
-        lay = QtGui.QVBoxLayout()
-        topLayout = QtGui.QHBoxLayout()
+        lay = QtWidgets.QVBoxLayout()
+        topLayout = QtWidgets.QHBoxLayout()
         topLayout.addLayout(configLayout)
         topLayout.addWidget(self.maestroView)
         lay.addLayout(topLayout, stretch=5)
-        lay.addWidget(QtGui.QLabel(self.tr("Alias handling:")))
+        lay.addWidget(QtWidgets.QLabel(self.tr("Alias handling:")))
         lay.addWidget(self.aliasWidget, stretch=2)
-        lay.addWidget(QtGui.QLabel(self.tr("New tagtypes:")))
+        lay.addWidget(QtWidgets.QLabel(self.tr("New tagtypes:")))
         lay.addWidget(self.newTagWidget, stretch=1)
         lay.addWidget(btbx, stretch=1)
         self.setLayout(lay)
@@ -425,7 +425,7 @@ class ImportAudioCDDialog(QtGui.QDialog):
         self.accept()
 
 
-class SimpleRipDialog(QtGui.QDialog):
+class SimpleRipDialog(QtWidgets.QDialog):
     """Dialog for ripping CDs that are not found in the MusicBrainz database. Allows to enter album
     title, artist, date, and a title for each track,
     """
@@ -434,33 +434,33 @@ class SimpleRipDialog(QtGui.QDialog):
         self.setModal(True)
         self.level = level
         self.discid = discId
-        topLayout = QtGui.QHBoxLayout()
-        topLayout.addWidget(QtGui.QLabel(self.tr('Album title:')))
+        topLayout = QtWidgets.QHBoxLayout()
+        topLayout.addWidget(QtWidgets.QLabel(self.tr('Album title:')))
         self.titleEdit = tagwidgets.TagValueEditor(tags.TITLE)
         self.titleEdit.setValue('unknown album')
         topLayout.addWidget(self.titleEdit)
-        midLayout = QtGui.QHBoxLayout()
-        midLayout.addWidget(QtGui.QLabel(self.tr('Artist:')))
+        midLayout = QtWidgets.QHBoxLayout()
+        midLayout.addWidget(QtWidgets.QLabel(self.tr('Artist:')))
         self.artistEdit = tagwidgets.TagValueEditor(tags.get('artist'))
         self.artistEdit.setValue('unknown artist')
         midLayout.addWidget(self.artistEdit)
         midLayout.addStretch()
-        midLayout.addWidget(QtGui.QLabel(self.tr('Date:')))
+        midLayout.addWidget(QtWidgets.QLabel(self.tr('Date:')))
         self.dateEdit = tagwidgets.TagValueEditor(tags.get('date'))
         self.dateEdit.setValue(utils.FlexiDate(1900))
         midLayout.addWidget(self.dateEdit)
-        layout = QtGui.QVBoxLayout()
-        description = QtGui.QLabel(self.tr('The MusicBrainz database does not contain a release '
+        layout = QtWidgets.QVBoxLayout()
+        description = QtWidgets.QLabel(self.tr('The MusicBrainz database does not contain a release '
             'for this disc. Please fill the tags manually.'))
         description.setWordWrap(True)
         layout.addWidget(description)
         layout.addLayout(topLayout)
         layout.addLayout(midLayout)
 
-        tableLayout = QtGui.QGridLayout()
+        tableLayout = QtWidgets.QGridLayout()
         edits = []
         for i in range(1, trackCount+1):
-            tableLayout.addWidget(QtGui.QLabel(self.tr('Track {:2d}:').format(i)), i-1, 0)
+            tableLayout.addWidget(QtWidgets.QLabel(self.tr('Track {:2d}:').format(i)), i-1, 0)
             edits.append(tagwidgets.TagValueEditor(tags.TITLE))
             edits[-1].setValue('unknown title')
             tableLayout.addWidget(edits[-1], i-1, 1)

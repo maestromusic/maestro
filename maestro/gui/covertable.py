@@ -18,8 +18,8 @@
 
 import collections
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import coverbrowser, selection
@@ -31,11 +31,11 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
     table layout."""
     def __init__(self, state, coverBrowser):
         super().__init__(coverBrowser)
-        layout = QtGui.QHBoxLayout(self)
-        self.view = QtGui.QGraphicsView(CoverTableScene(self, coverBrowser.worker,
+        layout = QtWidgets.QHBoxLayout(self)
+        self.view = QtWidgets.QGraphicsView(CoverTableScene(self, coverBrowser.worker,
                                                         state.get('size') if state is not None else 80))
         self.view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.view.setDragMode(QtGui.QGraphicsView.ScrollHandDrag)
+        self.view.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.view.scene().selectionChanged.connect(self.selectionChanged)
         layout.addWidget(self.view)
 
@@ -62,17 +62,17 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
         return self.view.scene().selection()
     
     def createConfigWidget(self, parent):
-        widget = QtGui.QWidget(parent)
-        layout = QtGui.QFormLayout(widget)
+        widget = QtWidgets.QWidget(parent)
+        layout = QtWidgets.QFormLayout(widget)
         
-        sizeSliderLayout = QtGui.QHBoxLayout()
-        sizeSlider = QtGui.QSlider(Qt.Horizontal) 
+        sizeSliderLayout = QtWidgets.QHBoxLayout()
+        sizeSlider = QtWidgets.QSlider(Qt.Horizontal)
         sizeSlider.setMinimum(20)
         sizeSlider.setMaximum(200)
         sizeSlider.setValue(self.getCoverSize())
         sizeSlider.valueChanged.connect(self.setCoverSize)
         sizeSliderLayout.addWidget(sizeSlider)
-        sizeLabel = QtGui.QLabel(str(self.getCoverSize()))
+        sizeLabel = QtWidgets.QLabel(str(self.getCoverSize()))
         sizeSlider.valueChanged.connect(lambda x: sizeLabel.setText(str(x)))
         sizeSliderLayout.addWidget(sizeLabel)
         layout.addRow(self.tr("Cover size: "), sizeSliderLayout)
@@ -84,7 +84,7 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
 coverbrowser.addDisplayClass('table', CoverTable)
 
     
-class CoverTableScene(QtGui.QGraphicsScene):
+class CoverTableScene(QtWidgets.QGraphicsScene):
     """QGraphicsScene that contains one CoverItem for each cover and arranges them in a grid."""
     innerSpaceFactor = 3./8. # fraction of coverSize that is used as inner space
     shadowFactor = 1./15. # fraction of coverSize that is used for shadows
@@ -234,7 +234,7 @@ class CoverTableScene(QtGui.QGraphicsScene):
             return '<div>{}</div>'.format(lines)
 
 
-class CoverItem(QtGui.QGraphicsItem):
+class CoverItem(QtWidgets.QGraphicsItem):
     """A GraphicsItem which draws either a cover and a dropshadow or a loading animation."""
     def __init__(self, scene, elid, path):
         super().__init__()
@@ -258,7 +258,7 @@ class CoverItem(QtGui.QGraphicsItem):
         if not self.cover.loaded:
             self.scene.loadingTimer.timeout.connect(self._handleTimer)
         else: self._addShadow()
-        self.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable)
     
     def reload(self):
         """Reload the cover from source."""
@@ -280,7 +280,7 @@ class CoverItem(QtGui.QGraphicsItem):
         """Add a shadow to the item. The shadow should be added when the image is loaded, so that the
         loading animation is drawn without a shadow."""
         if self.graphicsEffect() is None:
-            effect = QtGui.QGraphicsDropShadowEffect()
+            effect = QtWidgets.QGraphicsDropShadowEffect()
             effect.setOffset(5)
             self.setGraphicsEffect(effect)
         
@@ -326,7 +326,7 @@ class CoverItem(QtGui.QGraphicsItem):
                                srcX, srcY, 32, 32)
             borderRect = QtCore.QRect(0, 0, size+1, size+1)
         pen = painter.pen()
-        if option.state & QtGui.QStyle.State_Selected:
+        if option.state & QtWidgets.QStyle.State_Selected:
             pen.setColor(QtGui.QColor(0,0,255))
         else: pen.setColor(QtGui.QColor(0,0,0))
         painter.setPen(pen)
@@ -334,7 +334,7 @@ class CoverItem(QtGui.QGraphicsItem):
 
     def mouseMoveEvent(self, event):
         if QtCore.QLineF(QtCore.QLine(event.screenPos(), event.buttonDownScreenPos(Qt.LeftButton))).length() \
-                > QtGui.QApplication.startDragDistance():
+                > QtWidgets.QApplication.startDragDistance():
             drag = QtGui.QDrag(event.widget())
             sel = self.scene.selection()
             drag.setMimeData(selection.MimeData(sel))

@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt 
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from . import profiles, StandardDelegate
 from ...core import tags
@@ -46,7 +46,7 @@ class EditorDelegate(StandardDelegate):
         else: return None
 
 
-class LineEdit(QtGui.QLineEdit):
+class LineEdit(QtWidgets.QLineEdit):
     def __init__(self, element, parent):
         title = element.tags[tags.TITLE][0] if tags.TITLE in element.tags else ''
         super().__init__(title, parent)

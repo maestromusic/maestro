@@ -21,7 +21,7 @@ categories (e.g. delegates, playback). Profiles of one category may have differe
 playback, Phonon playback). Profiles and types are managed by their category. Categories are
 managed by the ProfileManager.""" 
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 
 from . import config
 

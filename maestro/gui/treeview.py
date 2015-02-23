@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro.gui import selection, actions
 
@@ -48,7 +48,7 @@ class TreeviewSelection(selection.Selection):
                                             for parent in n.getParents())]
 
 
-class TreeView(QtGui.QTreeView):
+class TreeView(QtWidgets.QTreeView):
     """Base class for tree views that contain mostly wrappers. This class handles mainly the
     ContextMenuProvider system, that allows plugins to insert entries into the context menus of playlist and
     browser.
@@ -68,7 +68,7 @@ class TreeView(QtGui.QTreeView):
         self.setHeaderHidden(True)
         self.setExpandsOnDoubleClick(False)
         self.setAlternatingRowColors(True)
-        self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.setDragEnabled(True)
         self.setDefaultDropAction(Qt.CopyAction)
         self.viewport().setMouseTracking(True)

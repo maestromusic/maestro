@@ -18,9 +18,9 @@
 
 import os.path
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 try:
-    from PyQt4.phonon import Phonon as phonon
+    from PyQt5.phonon import Phonon as phonon
 except ImportError as e:
     raise ImportError("PyQt4-phonon is not installed.")
 

@@ -20,7 +20,7 @@ import os.path
 import bisect
 import enum
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 from . import tags as tagsModule, urls

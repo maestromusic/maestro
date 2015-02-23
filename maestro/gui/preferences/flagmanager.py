@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ... import application, database as db, utils, stack
@@ -96,7 +96,7 @@ class FlagManager(flexform.FlexTable):
         self.addAction(ShowInBrowserAction(self))
 
 
-class NewFlagAction(QtGui.QAction):
+class NewFlagAction(QtWidgets.QAction):
     """Ask the user for a name and add a new flag to the database."""
     def __init__(self, parent):
         super().__init__(utils.getIcon('add.png'), translate("NewFlagAction", "Create new flag..."), parent)
@@ -108,7 +108,7 @@ class NewFlagAction(QtGui.QAction):
             self.parent().selectItems([newFlag])
 
 
-class DeleteFlagAction(QtGui.QAction):
+class DeleteFlagAction(QtWidgets.QAction):
     """Confirm and delete a flag from the database."""
     def __init__(self, parent):
         super().__init__(utils.getIcon('delete.png'), translate("DeleteFlagAction", "Delete flag"), parent)
@@ -130,7 +130,7 @@ class DeleteFlagAction(QtGui.QAction):
             flags.deleteFlagType(flag)
 
 
-class ShowInBrowserAction(QtGui.QAction):
+class ShowInBrowserAction(QtWidgets.QAction):
     """Load all elements containing the selected flag into the default browser."""
     def __init__(self, parent):
         super().__init__(utils.getIcon('preferences/goto.png'),

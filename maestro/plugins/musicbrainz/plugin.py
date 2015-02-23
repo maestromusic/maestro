@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 translate = QtCore.QCoreApplication.translate
 
 from ... import database as db

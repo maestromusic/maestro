@@ -18,14 +18,14 @@
 
 import os.path
 
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt
+from PyQt5 import QtGui, QtCore
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from maestro import application, filesystem, config, stack, utils
 
 
-class FilesystemSettings(QtGui.QWidget):
+class FilesystemSettings(QtWidgets.QWidget):
     columns = [
         ('name',   translate('FilesystemSettings', 'Name')),
         ('path',   translate('FilesystemSettings', 'Path')),
@@ -36,56 +36,56 @@ class FilesystemSettings(QtGui.QWidget):
 
     def __init__(self, dialog, panel):
         super().__init__(panel)
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         
-        buttonBar = QtGui.QToolBar()
+        buttonBar = QtWidgets.QToolBar()
         self.layout().addWidget(buttonBar)
-        addButton = QtGui.QToolButton()
+        addButton = QtWidgets.QToolButton()
         addButton.setIcon(utils.getIcon('add.png'))
         addButton.setToolTip('Add source')
         addButton.clicked.connect(self._handleAddButton)
         buttonBar.addWidget(addButton)
-        self.undoButton = QtGui.QToolButton()
+        self.undoButton = QtWidgets.QToolButton()
         self.undoButton.setIcon(utils.getIcon("undo.png"))
         self.undoButton.clicked.connect(stack.undo)
         buttonBar.addWidget(self.undoButton)
-        self.redoButton = QtGui.QToolButton()
+        self.redoButton = QtWidgets.QToolButton()
         self.redoButton.setIcon(utils.getIcon("redo.png"))
         self.redoButton.clicked.connect(stack.redo)
         buttonBar.addWidget(self.redoButton)
-        self.deleteButton = QtGui.QToolButton()
+        self.deleteButton = QtWidgets.QToolButton()
         self.deleteButton.setIcon(utils.getIcon("delete.png"))
         self.deleteButton.setToolTip(self.tr("Delete source"))
         self.deleteButton.setEnabled(False)
         self.deleteButton.clicked.connect(self._handleDeleteButton)
         buttonBar.addWidget(self.deleteButton)
         
-        self.tableWidget = QtGui.QTableWidget()
+        self.tableWidget = QtWidgets.QTableWidget()
         self.tableWidget.setItemDelegateForColumn(self._getColumnIndex("domain"), DomainItemDelegate())
         self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.verticalHeader().hide()
         self.tableWidget.setSortingEnabled(True)
-        self.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.tableWidget.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
-        self.tableWidget.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
-        self.tableWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.tableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tableWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
         self.layout().addWidget(self.tableWidget)
 
         #TODO: reimplement force recheck and scan interval configuration (should now be per-source)
-        # self.recheckButton = QtGui.QPushButton(self.tr("Force recheck of all files"))
-        # self.recheckButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        # self.recheckButton = QtWidgets.QPushButton(self.tr("Force recheck of all files"))
+        # self.recheckButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         # self.recheckButton.clicked.connect(self._handleRecheckButton)
         # self.scanIntervalBox = QtGui.QSpinBox()
         # self.scanIntervalBox.setMinimum(0)
         # self.scanIntervalBox.setMaximum(24*3600)
-        # self.scanIntervalLabel = QtGui.QLabel()
+        # self.scanIntervalLabel = QtWidgets.QLabel()
         # self.scanIntervalText = self.tr("Rescan filesystem every {} seconds (set to 0 to disable scans).")
         # self.scanDisabledText = self.tr("No periodic rescans.")
         # self.scanIntervalBox.valueChanged[int].connect(self._handleIntervalChanged)
         #
-        # intervalLayout = QtGui.QHBoxLayout()
+        # intervalLayout = QtWidgets.QHBoxLayout()
         # intervalLayout.addWidget(self.scanIntervalBox)
         # intervalLayout.addWidget(self.scanIntervalLabel)
         #
@@ -110,27 +110,27 @@ class FilesystemSettings(QtGui.QWidget):
         
         for row, source in enumerate(self._sources):
             column = self._getColumnIndex("name")
-            item = QtGui.QTableWidgetItem(source.name)
+            item = QtWidgets.QTableWidgetItem(source.name)
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
             
             column = self._getColumnIndex("path")
-            item = QtGui.QTableWidgetItem(source.path)
+            item = QtWidgets.QTableWidgetItem(source.path)
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
             
             column = self._getColumnIndex("domain")
-            item = QtGui.QTableWidgetItem(source.domain.name if source.domain is not None else '')
+            item = QtWidgets.QTableWidgetItem(source.domain.name if source.domain is not None else '')
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
 
             column = self._getColumnIndex('extensions')
-            item = QtGui.QTableWidgetItem(', '.join(source.extensions))
+            item = QtWidgets.QTableWidgetItem(', '.join(source.extensions))
             item.setFlags(Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.tableWidget.setItem(row, column, item)
 
             column = self._getColumnIndex("enable")
-            item = QtGui.QTableWidgetItem(source.enabled)
+            item = QtWidgets.QTableWidgetItem(source.enabled)
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             item.setCheckState(Qt.Checked if source.enabled else Qt.Unchecked)
             self.tableWidget.setItem(row, column, item)
@@ -201,7 +201,7 @@ class FilesystemSettings(QtGui.QWidget):
         raise ValueError("Invalid key {}".format(columnKey))
 
 
-class DomainItemDelegate(QtGui.QStyledItemDelegate):
+class DomainItemDelegate(QtWidgets.QStyledItemDelegate):
     def createEditor(self, parent, option, index): 
         from .. import widgets
         return widgets.DomainBox(parent=parent)
@@ -216,27 +216,27 @@ class DomainItemDelegate(QtGui.QStyledItemDelegate):
         filesystem.changeSource(source, domain=domain)
 
 
-class SourceDialog(QtGui.QDialog):
+class SourceDialog(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Add source"))
-        layout = QtGui.QVBoxLayout(self)
-        formLayout = QtGui.QFormLayout()
+        layout = QtWidgets.QVBoxLayout(self)
+        formLayout = QtWidgets.QFormLayout()
         layout.addLayout(formLayout, 1)
-        self.nameLineEdit = QtGui.QLineEdit()
+        self.nameLineEdit = QtWidgets.QLineEdit()
         formLayout.addRow(self.tr("Name:"), self.nameLineEdit)
-        self.pathLineEdit = QtGui.QLineEdit()
+        self.pathLineEdit = QtWidgets.QLineEdit()
         formLayout.addRow(self.tr("Path:"), self.pathLineEdit)
         from .. import widgets
         self.domainChooser =  widgets.DomainBox()
         formLayout.addRow(self.tr("Domain:"), self.domainChooser)
-        self.extensionsEdit = QtGui.QLineEdit()
+        self.extensionsEdit = QtWidgets.QLineEdit()
         self.extensionsEdit.setText(', '.join(config.options.main.audio_extensions))
         formLayout.addRow(self.tr("Extensions:"), self.extensionsEdit)
         self.enableBox = QtGui.QCheckBox()
         formLayout.addRow(self.tr("Enabled:"), self.enableBox)
         
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addWidget(buttonBox)
@@ -258,13 +258,13 @@ class SourceDialog(QtGui.QDialog):
 def checkSourceName(parent, name, source=None):
     """Check whether the given source name is valid."""
     if not filesystem.isValidSourceName(name):
-        QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
+        QtWidgets.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                     translate("Filesystem", "'{}' is not a valid source name.").format(name))
         return False
     
     for s in filesystem._sources:
         if s != source and s.name == name:
-            QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
+            QtWidgets.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                    translate("Filesystem", "A source named '{}' already exists.").format(name))
             return False
     return True
@@ -273,11 +273,11 @@ def checkSourceName(parent, name, source=None):
 def checkSourcePath(parent, path, source=None):
     """Check whether the given source path is valid."""
     if not os.path.exists(path):
-        QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
+        QtWidgets.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                     translate("Filesystem", "The path '{}' does not exist.").format(path))
         return False
     if any(s.contains(path) for s in filesystem._sources if s != source):
-        QtGui.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
+        QtWidgets.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                 translate("Filesystem", "The path '{}' is contained in an existing source.").format(path))
         return False
     return True

@@ -48,12 +48,12 @@ the following ways to get tags:
 from collections import Sequence
 from functools import reduce
 
-from PyQt4 import QtGui
+from PyQt5 import QtGui, QtWidgets
 
 from .. import application, config, logging, utils, stack
 from ..application import ChangeEvent, ChangeType
 
-translate = QtGui.QApplication.translate
+translate = QtWidgets.QApplication.translate
 
 
 # Module variables - Will be initialized with the first call of init.

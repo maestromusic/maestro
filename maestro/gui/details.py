@@ -17,9 +17,9 @@
 #
 
 import os
-
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from xml.sax import saxutils
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, selection
@@ -39,27 +39,27 @@ class DetailsView(mainwindow.Widget):
         self.history = []
         self.historyPosition = 0
         
-        #widget = QtGui.QWidget()
-        #layout = QtGui.QVBoxLayout(widget)
+        #widget = QtWidgets.QWidget()
+        #layout = QtWidgets.QVBoxLayout(widget)
         #self.setWidget(widget)
         
-        #buttonBar = QtGui.QHBoxLayout()
+        #buttonBar = QtWidgets.QHBoxLayout()
         #buttonBar.addStretch()
-        #self.backButton = QtGui.QPushButton()
+        #self.backButton = QtWidgets.QPushButton()
         #self.backButton.setFlat(True)
         #self.backButton.setIcon(utils.images.standardIcon("back"))
         #buttonBar.addWidget(self.backButton)
-        #self.forwardButton = QtGui.QPushButton()
+        #self.forwardButton = QtWidgets.QPushButton()
         #self.forwardButton.setIcon(utils.images.standardIcon("forward"))
         #buttonBar.addWidget(self.forwardButton)
         #layout.addLayout(buttonBar)
         
-        scrollArea = QtGui.QScrollArea()
-        layout = QtGui.QHBoxLayout(self)
+        scrollArea = QtWidgets.QScrollArea()
+        layout = QtWidgets.QHBoxLayout(self)
         layout.addWidget(scrollArea)
         scrollArea.setWidgetResizable(True)
         #layout.addWidget(scrollArea, 1)
-        self.label = QtGui.QLabel()
+        self.label = QtWidgets.QLabel()
         self.label.setTextFormat(Qt.RichText)
         self.label.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.label.linkActivated.connect(self._handleLink)
@@ -139,20 +139,20 @@ class DetailsView(mainwindow.Widget):
             if cover is not None:
                 text.append(link("cover", utils.images.html(cover)))
         text.append('</td><td>')    
-        text.append('<h2>{}</h2>'.format(Qt.escape(el.getTitle())))
+        text.append('<h2>{}</h2>'.format(saxutils.escape(el.getTitle())))
         text.append('</td></tr>')
         
         # Type
         text.append('<tr><td>'+self.tr("Type: ")+'</td><td>')
         if el.isContainer():
             text.append(el.type.title())
-        else: text.append(Qt.escape(el.url.extension))
+        else: text.append(saxutils.escape(el.url.extension))
         text.append('</td></tr>')
         
         # Domain
         text.append('<tr><td>'+self.tr("Domain: ")+'</td><td>')
         if el.domain is not None:
-            text.append(Qt.escape(el.domain.name))
+            text.append(saxutils.escape(el.domain.name))
         else: text.append(self.tr("None"))
         text.append('</td></tr>')
         
@@ -179,7 +179,7 @@ class DetailsView(mainwindow.Widget):
         if len(el.parents) > 0:
             text.append('<tr><td>'+self.tr("Parents: ")+'</td><td>')
             parents = el.level.fetch(el.parents)
-            text.append('<br />'.join(link(p.id, Qt.escape(p.getTitle())) for p in parents))
+            text.append('<br />'.join(link(p.id, saxutils.escape(p.getTitle())) for p in parents))
             text.append('</td></tr>')
             
         # Tags
@@ -195,10 +195,10 @@ class DetailsView(mainwindow.Widget):
                             value = value[:20]
                         elif tag.type == tags.TYPE_DATE:
                             value = str(value)
-                        value = Qt.escape(value)
-                        href = '{tag='+Qt.escape(tag.name)+'='+value+'}'
+                        value = saxutils.escape(value)
+                        href = '{tag='+saxutils.escape(tag.name)+'='+value+'}'
                         links.append(link(href, value))
-                    tagLines.append("{}: {}".format(Qt.escape(tag.title), ', '.join(links)))
+                    tagLines.append("{}: {}".format(saxutils.escape(tag.title), ', '.join(links)))
                 for tag in tags.tagList:
                     if tag in el.tags: # First display the internal tags in their order
                         addTag(tag, el.tags[tag])
@@ -215,11 +215,11 @@ class DetailsView(mainwindow.Widget):
             text.append('<tr><td>'+self.tr("Flags: ")+'</td><td>')
             links = []
             for flag in el.flags:
-                href = '{flag='+Qt.escape(flag.name)+'}'
+                href = '{flag='+saxutils.escape(flag.name)+'}'
                 if flag.icon is not None:
-                    icon = '<img src="{}" /> '.format(Qt.escape(flag.iconPath))
+                    icon = '<img src="{}" /> '.format(saxutils.escape(flag.iconPath))
                 else: icon = ''
-                links.append(link(href, icon+Qt.escape(flag.name)))
+                links.append(link(href, icon+saxutils.escape(flag.name)))
             text.append(', '.join(links))
             text.append('</td></tr>')
             
@@ -229,7 +229,7 @@ class DetailsView(mainwindow.Widget):
             text.append('<tr><td>' + ln + self.tr("Contents: ") + '</td><td>')
             if self.contentsVisible:
                 contents = el.level.fetch(el.contents)
-                contents = ["{} - {}".format(pos, link(id, Qt.escape(c.getTitle())))
+                contents = ["{} - {}".format(pos, link(id, saxutils.escape(c.getTitle())))
                             for (pos, id), c in zip(el.contents.items(), contents)]
                 text.append('<br />'.join(contents))
             else: text.append(str(len(el.contents)))
@@ -241,8 +241,8 @@ class DetailsView(mainwindow.Widget):
             if self.stickersVisible:
                 stickerLines = []
                 for stickerType, values in el.stickers.items():
-                    values = ', '.join(Qt.escape(v) for v in values)
-                    stickerLines.append('{}: {}'.format(Qt.escape(stickerType), values))
+                    values = ', '.join(saxutils.escape(v) for v in values)
+                    stickerLines.append('{}: {}'.format(saxutils.escape(stickerType), values))
                 text.append('<br />'.join(stickerLines))
             else: text.append(str(sum(len(stickerList) for stickerList in el.stickers.values())))
             text.append('</td></tr>')
@@ -259,7 +259,7 @@ mainwindow.addWidgetClass(mainwindow.WidgetClass(
         preferredDockArea = 'right'))
 
 
-class CoverDialog(QtGui.QDialog):
+class CoverDialog(QtWidgets.QDialog):
     """Dialog that displays the cover of the given element."""
     def __init__(self, element, parent=None):
         super().__init__(parent)
@@ -268,12 +268,12 @@ class CoverDialog(QtGui.QDialog):
         width = min(pixmap.width(), 800)
         height = min(pixmap.height(), 800)
         self.resize(width+2, height+2) # +2 suffices so that the scrollbar is not shown
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        label = QtGui.QLabel()
+        label = QtWidgets.QLabel()
         label.setPixmap(pixmap)
         label.installEventFilter(self)
-        scrollArea = QtGui.QScrollArea()
+        scrollArea = QtWidgets.QScrollArea()
         scrollArea.setWidget(label)
         layout.addWidget(scrollArea)
     

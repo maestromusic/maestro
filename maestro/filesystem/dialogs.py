@@ -19,8 +19,8 @@
 import itertools
 import os.path
 
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt
+from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import application, database as db, stack
 from maestro.core import levels, tags, urls
@@ -115,7 +115,7 @@ class RemoveMissingFilesAction(actions.TreeAction):
         levels.real.deleteElements(elements)
 
 
-class MissingFilesDialog(QtGui.QDialog):
+class MissingFilesDialog(QtWidgets.QDialog):
     """A dialog that notifies the user about missing files.
     
     When Maestro detects that files were deleted from outside Maestro, this
@@ -130,8 +130,8 @@ class MissingFilesDialog(QtGui.QDialog):
         super().__init__(application.mainWindow)
         self.setModal(True)
         self.setWindowTitle(self.tr('Missing Files Detected'))
-        layout = QtGui.QVBoxLayout()
-        label = QtGui.QLabel(self.tr(
+        layout = QtWidgets.QVBoxLayout()
+        label = QtWidgets.QLabel(self.tr(
             "Some files from Maestro's database could not be found anymore in your "
             "filesystem. They are shown in red below. For each file, you can either "
             "provide a new path manually or delete it from the database."))
@@ -156,17 +156,17 @@ class MissingFilesDialog(QtGui.QDialog):
         
         self.setPathAction = SetPathAction(self.view, self)
         self.deleteAction = RemoveMissingFilesAction(self.view)
-        self.view.addLocalAction(self.setPathAction)
-        self.view.addLocalAction(self.deleteAction)
+        self.view.addAction(self.setPathAction)
+        self.view.addAction(self.deleteAction)
         layout.addWidget(self.view)
         
-        toolbar = QtGui.QToolBar()
+        toolbar = QtWidgets.QToolBar()
         toolbar.addAction(self.setPathAction)
         toolbar.addAction(self.deleteAction)
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         buttonLayout.addStretch()
         buttonLayout.addWidget(toolbar)
-        self.closeButton = QtGui.QPushButton()
+        self.closeButton = QtWidgets.QPushButton()
         buttonLayout.addWidget(self.closeButton)
         self.closeButton.clicked.connect(self.accept)
         layout.addLayout(buttonLayout)
@@ -182,7 +182,7 @@ class MissingFilesDialog(QtGui.QDialog):
         self.closeButton.setText(self.tr("Close (%n files still missing)", None, numProblem))
 
 
-class ModifiedTagsDialog(QtGui.QDialog):
+class ModifiedTagsDialog(QtWidgets.QDialog):
     """A dialog displayed when modification of tags has been detected on the filesystem.
 
     Allows user to choose between tags from Maestro's database and the tags in the file.
@@ -194,9 +194,9 @@ class ModifiedTagsDialog(QtGui.QDialog):
         self.fsTags = fsTags
         self.setModal(True)
         self.setWindowTitle(self.tr('Modified Tags Detected'))
-        layout = QtGui.QGridLayout()
-        layout.addWidget(QtGui.QLabel(self.tr("<b>In Database:</b>")), 0, 0)
-        layout.addWidget(QtGui.QLabel(self.tr("<b>On Disk:</b>")), 0, 1)
+        layout = QtWidgets.QGridLayout()
+        layout.addWidget(QtWidgets.QLabel(self.tr("<b>In Database:</b>")), 0, 0)
+        layout.addWidget(QtWidgets.QLabel(self.tr("<b>On Disk:</b>")), 0, 1)
         
         delegateProfile = delegates.profiles.category.getFromStorage(
                                 None, editordelegate.EditorDelegate.profileType)
@@ -224,8 +224,8 @@ class ModifiedTagsDialog(QtGui.QDialog):
         layout.addWidget(dbTree, 1, 0)
         layout.addWidget(fsTree, 1, 1)
         
-        dbButton = QtGui.QPushButton(self.tr("use DB tags"))
-        fsButton = QtGui.QPushButton(self.tr("use disk tags"))
+        dbButton = QtWidgets.QPushButton(self.tr("use DB tags"))
+        fsButton = QtWidgets.QPushButton(self.tr("use disk tags"))
         layout.addWidget(dbButton, 2, 0)
         layout.addWidget(fsButton, 2, 1)
         

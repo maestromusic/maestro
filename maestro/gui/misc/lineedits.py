@@ -16,13 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import utils
 
 
-class IconLineEdit(QtGui.QLineEdit):
+class IconLineEdit(QtWidgets.QLineEdit):
     """This is simply a line edit that displays an icon inside the lineedit at the right end. In fact the
     icon is a QToolButton that may be accessed via the attribute ''button''. The following will make the
     button clear the text::
@@ -33,8 +33,8 @@ class IconLineEdit(QtGui.QLineEdit):
     lineedit is not empty.
     """ 
     def __init__(self, icon, parent = None):
-        QtGui.QLineEdit.__init__(self, parent)
-        self.button = QtGui.QToolButton(self)
+        QtWidgets.QLineEdit.__init__(self, parent)
+        self.button = QtWidgets.QToolButton(self)
         self.button.setIcon(QtGui.QIcon(icon))
         self.button.setCursor(Qt.ArrowCursor)
 
@@ -76,7 +76,7 @@ class IconLineEdit(QtGui.QLineEdit):
         self.button.move(self.rect().right() - sizeHint.width(), self.rect().bottom() - sizeHint.height())
 
 
-class LineEditWithHint(QtGui.QLineEdit):
+class LineEditWithHint(QtWidgets.QLineEdit):
     """A lineedit with the additional feature that it draws a gray text in its right corner. The text is
     only visible if there is enough space."""
     def __init__(self,text='',parent=None):
@@ -103,10 +103,10 @@ class LineEditWithHint(QtGui.QLineEdit):
         spaceLeft = 10
         
         # Compute available rect
-        option = QtGui.QStyleOptionFrameV2()
+        option = QtWidgets.QStyleOptionFrame()
         self.initStyleOption(option)
-        style = QtGui.QApplication.style()
-        r = style.subElementRect(QtGui.QStyle.SE_LineEditContents,option,self)
+        style = QtWidgets.QApplication.style()
+        r = style.subElementRect(QtWidgets.QStyle.SE_LineEditContents,option,self)
         
         margins = self.getTextMargins()
         r.setX(r.x() + margins[0])
@@ -126,7 +126,7 @@ class LineEditWithHint(QtGui.QLineEdit):
             painter.setPen(oldPen)
             
             
-class PathLineEdit(QtGui.QWidget):
+class PathLineEdit(QtWidgets.QWidget):
     """A line edit together with a small button that opens a file dialog. The user can select an existing
     directory which will then be inserted into the line edit.
     
@@ -143,14 +143,14 @@ class PathLineEdit(QtGui.QWidget):
         super().__init__(parent)
         self.dialogTitle = dialogTitle
         self.pathType = pathType
-        layout = QtGui.QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        self.lineEdit = QtGui.QLineEdit()
+        self.lineEdit = QtWidgets.QLineEdit()
         if path is not None:
             self.lineEdit.setText(path)
         self.lineEdit.textChanged.connect(self.textChanged)
         layout.addWidget(self.lineEdit, 1)
-        button = QtGui.QPushButton()
+        button = QtWidgets.QPushButton()
         button.setIcon(utils.images.standardIcon('directory'))
         button.setIconSize(QtCore.QSize(16, 16))
         button.clicked.connect(self._handleButton)

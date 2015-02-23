@@ -18,8 +18,8 @@
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from .. import application, utils, database as db, stack
 from ..core import tags
@@ -28,7 +28,7 @@ from .misc import lineedits
 translate = QtCore.QCoreApplication.translate
 
 
-class TagLabel(QtGui.QLabel):
+class TagLabel(QtWidgets.QLabel):
     """Specialized label which can contain arbitrary text, but displays the corresponding icon next to the
     name when showing a tagname. If *iconOnly* is True the label will display only the icon if there is one
     (if the current tag does not have an icon or the label does not display a tagname, it will still show the
@@ -40,7 +40,7 @@ class TagLabel(QtGui.QLabel):
         """Initialize a new TagLabel. You may specify a tag which is displayed at the beginning and a
         parent.
         """
-        QtGui.QLabel.__init__(self, parent)
+        QtWidgets.QLabel.__init__(self, parent)
         self.iconOnly = iconOnly
         self.setTag(tag)
         application.dispatcher.connect(self._handleDispatcher)
@@ -93,7 +93,7 @@ class TagLabel(QtGui.QLabel):
                 font = self.font()
                 font.setPointSize(8)
                 self.setFont(font)
-            else: self.setFont(QtGui.QApplication.font())
+            else: self.setFont(QtWidgets.QApplication.font())
             self.setTag(self.tag)
             
     def _handleDispatcher(self, event):
@@ -102,7 +102,7 @@ class TagLabel(QtGui.QLabel):
             self.setTag(self.tag)
 
 
-class ValueTypeBox(QtGui.QComboBox):
+class ValueTypeBox(QtWidgets.QComboBox):
     """Combobox to choose a ValueType for tags. Additionally it has a property 'disableMouseWheel'. If this
     property is set to True the Combobox will not react to WheelEvents. Use this if the combobox is inside
     a ScrollArea and you expect the user to change the value of the box rarely but scroll often.
@@ -111,7 +111,7 @@ class ValueTypeBox(QtGui.QComboBox):
     typeChanged = QtCore.pyqtSignal(tags.ValueType)
     
     def __init__(self, valueType=None, parent=None):
-        QtGui.QComboBox.__init__(self, parent)
+        QtWidgets.QComboBox.__init__(self, parent)
         for type in tags.TYPES:
             self.addItem(type.name, type)
         if valueType is not None:
@@ -135,13 +135,13 @@ class ValueTypeBox(QtGui.QComboBox):
         if self.disableMouseWheel:
             # Let the parent widget handle it. If that parent is a scrollarea, it will scroll
             wheelEvent.ignore() 
-        else: QtGui.QComboBox.wheelEvent(self, wheelEvent)
+        else: QtWidgets.QComboBox.wheelEvent(self, wheelEvent)
     
     def _handleCurrentIndexChanged(self, index):
         self.typeChanged.emit(self.getType())
         
         
-class TagTypeBox(QtGui.QStackedWidget):
+class TagTypeBox(QtWidgets.QStackedWidget):
     """A combobox to select a tagtype from those in the tagids table. By default the box will be editable.
     and in this case the box will handle tag titles and if the entered tagname is unknown it will add
     a new tag to the table (querying the user for a type). If the entered text is invalid it will reset the
@@ -164,7 +164,7 @@ class TagTypeBox(QtGui.QStackedWidget):
     
     def __init__(self, defaultTag=None, parent=None, editable=True, useCoverLabel=False):
         super().__init__(parent)
-        self.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Fixed))
+        self.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed))
         
         if defaultTag is None:
             self._tag = tags.tagList[0]
@@ -181,8 +181,8 @@ class TagTypeBox(QtGui.QStackedWidget):
         
         if editable:
             self.box = EnhancedComboBox()
-        else: self.box = QtGui.QComboBox()
-        self.box.setInsertPolicy(QtGui.QComboBox.NoInsert)
+        else: self.box = QtWidgets.QComboBox()
+        self.box.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
 
         self._createItems()
 
@@ -272,7 +272,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         if self.currentWidget() == self.label:
             self.showBox()
             self.box.setFocus(focusEvent.reason())
-        QtGui.QStackedWidget.focusInEvent(self, focusEvent)
+        QtWidgets.QStackedWidget.focusInEvent(self, focusEvent)
         
     def _handleCurrentIndexChanged(self, index):
         if self._ignoreChanges:
@@ -310,7 +310,7 @@ class TagTypeBox(QtGui.QStackedWidget):
                 # Note: when we open a dialog, self.box will loose focus 
                 # and emit the editingFinished-signal again.
                 self._ignoreChanges = True
-                QtGui.QMessageBox.warning(self, translate("AddTagTypeDialog", "Invalid tagname"),
+                QtWidgets.QMessageBox.warning(self, translate("AddTagTypeDialog", "Invalid tagname"),
                                           translate("AddTagTypeDialog", "'{}' is not a valid tagname")
                                                 .format(self.box.currentText()))
                 self._ignoreChanges = False
@@ -322,7 +322,7 @@ class TagTypeBox(QtGui.QStackedWidget):
         if keyEvent.key() == Qt.Key_Escape:
             self.box.setEditText(self._tag.title) # Reset
             self.showLabel()
-        else: QtGui.QStackedWidget.keyPressEvent(self, keyEvent)
+        else: QtWidgets.QStackedWidget.keyPressEvent(self, keyEvent)
     
     def _handleDispatcher(self, event):
         """React upon TagTypeChangeEvents and TagTypeOrderChangeEvents from the dispatcher."""
@@ -330,7 +330,7 @@ class TagTypeBox(QtGui.QStackedWidget):
             self._createItems()
 
 
-class TagTypeButton(QtGui.QPushButton):
+class TagTypeButton(QtWidgets.QPushButton):
     """Button with a menu to choose a tagtype from. When a tagtype has been chosen the signal tagChosen is
     emitted with that tagtype."""
     tagChosen = QtCore.pyqtSignal(tags.Tag)
@@ -342,7 +342,7 @@ class TagTypeButton(QtGui.QPushButton):
         self.setIcon(QtGui.QIcon.fromTheme('list-add'))
         # Unfortunately there is a large margin on the left
         #https://bugreports.qt-project.org/browse/QTBUG-3624
-        self.setMenu(QtGui.QMenu())
+        self.setMenu(QtWidgets.QMenu())
         self._fillMenu()
         application.dispatcher.connect(self._handleDispatcher)
         
@@ -380,7 +380,7 @@ class TagTypeButton(QtGui.QPushButton):
             self._fillMenu()
         
 
-class TagValueEditor(QtGui.QWidget):
+class TagValueEditor(QtWidgets.QWidget):
     """A flexible editor to edit tag values. Depending on the tag type which may change during runtime a
     TagValueEditor will use different widgets as actual editor (QLineEdit, QTextEdit etc.). A TagValueEditor
     can use a HiddenEditor to hide the actual editor behind a label as long as it doesn't have the focus. Set 
@@ -395,9 +395,9 @@ class TagValueEditor(QtGui.QWidget):
     valueChanged = QtCore.pyqtSignal()
     
     def __init__(self, tag, parent=None, hideEditor=False):
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         assert tag is not None
-        self.setLayout(QtGui.QStackedLayout()) # doesn't matter...we just need a layout for one child widget
+        self.setLayout(QtWidgets.QStackedLayout()) # doesn't matter...we just need a layout for one child widget
         self.hideEditor = hideEditor
         self.editor = None
         self.tag = None # Create the variable
@@ -459,7 +459,7 @@ class TagValueEditor(QtGui.QWidget):
             self.setValue(text)
             self._emitValueChanged = True
 
-        if self._editorClass() == QtGui.QLineEdit:
+        if self._editorClass() == QtWidgets.QLineEdit:
             # Update the completer
             if tag in self.insertedValues:
                 completionStrings = self.insertedValues[tag][:] # copy the list
@@ -470,7 +470,7 @@ class TagValueEditor(QtGui.QWidget):
                 completionStrings.extend(ext)
 
             if len(completionStrings) > 0:
-                self._getActualEditor().setCompleter(QtGui.QCompleter(completionStrings))
+                self._getActualEditor().setCompleter(QtWidgets.QCompleter(completionStrings))
             else: self._getActualEditor().setCompleter(None)
         
         self.tagChanged.emit(tag)
@@ -493,7 +493,7 @@ class TagValueEditor(QtGui.QWidget):
         if tag is None:
             tag = self.tag
         if not tag.isInDb() or tag.type == tags.TYPE_VARCHAR:
-            return QtGui.QLineEdit
+            return QtWidgets.QLineEdit
         elif tag.type == tags.TYPE_TEXT:
             return EnhancedTextEdit
         else: return DateLineEdit
@@ -502,7 +502,7 @@ class TagValueEditor(QtGui.QWidget):
         """Return the current text of this editor. This might be invalid for the current tag type."""
         if self.hideEditor:
             return self.editor.getValue()
-        elif isinstance(self.editor, QtGui.QLineEdit):
+        elif isinstance(self.editor, QtWidgets.QLineEdit):
             return self.editor.text()
         else: return self.editor.toPlainText()
 
@@ -524,7 +524,7 @@ class TagValueEditor(QtGui.QWidget):
         if text != self.getText():
             if self.hideEditor:
                 self.editor.setValue(text)
-            elif isinstance(self.editor, QtGui.QLineEdit):
+            elif isinstance(self.editor, QtWidgets.QLineEdit):
                 self.editor.setText(text)
             else: self.editor.setPlainText(text)
 
@@ -541,7 +541,7 @@ class TagValueEditor(QtGui.QWidget):
                 if self.hideEditor:
                     self.editor.setFixed(False)
                 
-            if isinstance(self._getActualEditor(), QtGui.QLineEdit):
+            if isinstance(self._getActualEditor(), QtWidgets.QLineEdit):
                 # Add value to insertedValues (which will be shown in the completer)
                 if self.tag not in self.insertedValues:
                     self.insertedValues[self.tag] = []
@@ -562,7 +562,7 @@ class TagValueEditor(QtGui.QWidget):
                 self.editor.setFixed(True)
 
 
-class AddTagTypeDialog(QtGui.QDialog):
+class AddTagTypeDialog(QtWidgets.QDialog):
     """This dialog allows the user to add a tagtype to the database. To do this, the user has to specify
     name and type and may specify a title and set the private flag. The dialog can be initialized with an
     external tag *tagType*, otherwise the name field will be empty at first. If given, *text* will be
@@ -575,44 +575,44 @@ class AddTagTypeDialog(QtGui.QDialog):
     added to the database and is stored in the attribute 'tagType' may differ from the argument *tagType*.
     """
     def __init__(self, tagType=None, text=None):
-        QtGui.QDialog.__init__(self)
+        QtWidgets.QDialog.__init__(self)
         self.setWindowTitle(self.tr("Add tag type"))
         
         if tagType is not None and tagType.isInDb():
             raise ValueError("Cannot open AddTagTypeDialog for an internal tagtype.")
         self.tagType = None # only set this, if the type has been added to the database
                 
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         
         if text is not None:
-            label = QtGui.QLabel(text)
+            label = QtWidgets.QLabel(text)
             label.setWordWrap(True)
             self.layout().addWidget(label)
         
-        formLayout = QtGui.QFormLayout()
+        formLayout = QtWidgets.QFormLayout()
         self.layout().addLayout(formLayout)
             
-        self.lineEdit = QtGui.QLineEdit(tagType.name if tagType is not None else '')
+        self.lineEdit = QtWidgets.QLineEdit(tagType.name if tagType is not None else '')
         formLayout.addRow(self.tr("Name:"), self.lineEdit)
             
         self.combo = ValueTypeBox()
         formLayout.addRow(self.tr("Type:"), self.combo)
         
-        self.titleLineEdit = QtGui.QLineEdit(tagType.name.capitalize() if tagType is not None else '')
+        self.titleLineEdit = QtWidgets.QLineEdit(tagType.name.capitalize() if tagType is not None else '')
         formLayout.addRow(self.tr("Title:"), self.titleLineEdit)
         
         self.privateBox = QtGui.QCheckBox()
         formLayout.addRow(self.tr("Private:"), self.privateBox)
                 
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonLayout)
         buttonLayout.addStretch()
         
-        self.cancelButton = QtGui.QPushButton(self.tr("Cancel"))
+        self.cancelButton = QtWidgets.QPushButton(self.tr("Cancel"))
         self.cancelButton.clicked.connect(self.reject)
         buttonLayout.addWidget(self.cancelButton)
         
-        self.okButton = QtGui.QPushButton(self.tr("OK"))
+        self.okButton = QtWidgets.QPushButton(self.tr("OK"))
         self.okButton.clicked.connect(self._handleOk)
         self.okButton.setDefault(True)
         buttonLayout.addWidget(self.okButton)
@@ -621,16 +621,16 @@ class AddTagTypeDialog(QtGui.QDialog):
         """Handle OK button: Check if everything is fine and add the type to the database."""
         tagName = self.lineEdit.text()
         if tags.isInDb(tagName):
-            QtGui.QMessageBox.warning(self, self.tr("Tag exists already"),
+            QtWidgets.QMessageBox.warning(self, self.tr("Tag exists already"),
                                       self.tr("There is already a tag named '{}'.").format(tagName))
             return
         if not tags.isValidTagName(tagName):
-            QtGui.QMessageBox.warning(self, self.tr("Invalid tagname"),
+            QtWidgets.QMessageBox.warning(self, self.tr("Invalid tagname"),
                                       self.tr("'{}' is not a valid tagname.").format(tagName))
             return
         title = self.titleLineEdit.text()
         if not tags.titleAllowed(title):
-            QtGui.QMessageBox.warning(self, self.tr("Title exists already"),
+            QtWidgets.QMessageBox.warning(self, self.tr("Title exists already"),
                                       self.tr("There is already a tag with title '{}'.").format(title))
             return
         if len(title) == 0 or title == tagName:
@@ -663,11 +663,11 @@ class AddTagTypeDialog(QtGui.QDialog):
         return dialog.tagType
         
         
-class EnhancedTextEdit(QtGui.QTextEdit):
-    """Enhanced version of QtGui.QTextEdit which has an editingFinished-signal like QLineEdit."""
+class EnhancedTextEdit(QtWidgets.QTextEdit):
+    """Enhanced version of QtWidgets.QTextEdit which has an editingFinished-signal like QLineEdit."""
     editingFinished = QtCore.pyqtSignal()
     def __init__(self, parent=None):
-        QtGui.QTextEdit.__init__(self, parent)
+        QtWidgets.QTextEdit.__init__(self, parent)
         self.changed = False
         self.setAcceptRichText(False)
         self.textChanged.connect(self._handleTextChanged)
@@ -679,16 +679,16 @@ class EnhancedTextEdit(QtGui.QTextEdit):
         if self.changed:
             self.changed = False
             self.editingFinished.emit()
-        QtGui.QTextEdit.focusOutEvent(self, event)
+        QtWidgets.QTextEdit.focusOutEvent(self, event)
         
 
-class EnhancedComboBox(QtGui.QComboBox):
-    """Enhanced version of QtGui.QComboBox which has an editingFinished-signal like QLineEdit."""
+class EnhancedComboBox(QtWidgets.QComboBox):
+    """Enhanced version of QtWidgets.QComboBox which has an editingFinished-signal like QLineEdit."""
     editingFinished = QtCore.pyqtSignal()
     _popup = None # The lineedit's contextmenu while it is shown
     
     def __init__(self, parent=None):
-        QtGui.QComboBox.__init__(self, parent)
+        QtWidgets.QComboBox.__init__(self, parent)
         self.setEditable(True)
         self.lineEdit().installEventFilter(self)
         
@@ -698,12 +698,12 @@ class EnhancedComboBox(QtGui.QComboBox):
         
     def focusOutEvent(self, focusEvent):
         self._emit()
-        QtGui.QComboBox.focusOutEvent(self, focusEvent)
+        QtWidgets.QComboBox.focusOutEvent(self, focusEvent)
     
     def keyPressEvent(self, keyEvent):
         if keyEvent.key() == Qt.Key_Return or keyEvent.key() == Qt.Key_Enter:
             self._emit()
-        QtGui.QComboBox.keyPressEvent(self, keyEvent)
+        QtWidgets.QComboBox.keyPressEvent(self, keyEvent)
         
     def eventFilter(self, object, event):
         if event.type() == QtCore.QEvent.ContextMenu and object == self.lineEdit():
@@ -722,7 +722,7 @@ class DateLineEdit(lineedits.LineEditWithHint):
         self.setRightText(utils.FlexiDate.getHumanReadableFormat())
         
 
-class TagValuePropertiesWidget(QtGui.QWidget):
+class TagValuePropertiesWidget(QtWidgets.QWidget):
     """A widget that displays properties of tag values and allows to change them.
     
     The user can choose to:
@@ -733,8 +733,8 @@ class TagValuePropertiesWidget(QtGui.QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QtGui.QGridLayout()
-        self.label = QtGui.QLabel("")
+        layout = QtWidgets.QGridLayout()
+        self.label = QtWidgets.QLabel("")
         self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label, 0, 0, 1, 2)
         self.changeValueCheckbox = QtGui.QCheckBox(self.tr('rename all occurences:'))
@@ -746,7 +746,7 @@ class TagValuePropertiesWidget(QtGui.QWidget):
         self.sortValueCheckbox = QtGui.QCheckBox(self.tr('distinguished sort value:'))
 
         layout.addWidget(self.sortValueCheckbox, 2, 0)
-        self.sortEdit = QtGui.QLineEdit()
+        self.sortEdit = QtWidgets.QLineEdit()
         self.sortValueCheckbox.toggled.connect(self.sortEdit.setEnabled)
         self.sortValueCheckbox.toggled.connect(self._handleSortCheckboxToggled)
         layout.addWidget(self.sortEdit, 2, 1)
@@ -820,19 +820,19 @@ class TagValuePropertiesWidget(QtGui.QWidget):
     
     @staticmethod
     def showDialog(tag, valueId):
-        dialog = QtGui.QDialog()
-        dialog.setLayout(QtGui.QVBoxLayout())
+        dialog = QtWidgets.QDialog()
+        dialog.setLayout(QtWidgets.QVBoxLayout())
         
         tvp = TagValuePropertiesWidget()
         dialog.layout().addWidget(tvp)
         
-        buttonLine = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)        
+        buttonLine = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         dialog.layout().addWidget(buttonLine)
         tvp.setValue(tag, valueId)
         
         buttonLine.accepted.connect(lambda : dialog.accept() if tvp.inputAcceptable() else None)
         buttonLine.rejected.connect(dialog.reject)
         dialog.exec_()
-        if dialog.result() == QtGui.QDialog.Accepted:
+        if dialog.result() == QtWidgets.QDialog.Accepted:
             tvp.commit()
             

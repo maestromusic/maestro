@@ -18,8 +18,8 @@
 
 import os
 
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt
+from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 from maestro.core import urls
 
 translate = QtCore.QCoreApplication.translate
@@ -36,7 +36,7 @@ Folders which contain music files that are not yet present in the database are m
 special icon."""
 
 
-class FileSystemBrowserModel(QtGui.QFileSystemModel):
+class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
     """Model class for the file system browser.
     
     In contrast to QFileSystemModel, this returns folder and file icons depending on the state
@@ -64,7 +64,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         FilesystemState.unknown  : translate("FileSystemBrowserModel", "unknown status")}
     
     def __init__(self, parent=None):
-        QtGui.QFileSystemModel.__init__(self, parent)
+        QtWidgets.QFileSystemModel.__init__(self, parent)
         self.setFilter(QtCore.QDir.AllEntries | QtCore.QDir.NoDotAndDotDot)
         self.source = None
         self.setRootPath(None)
@@ -108,7 +108,7 @@ class FileSystemBrowserModel(QtGui.QFileSystemModel):
         return super().data(index, role) 
 
 
-class FileSystemBrowserTreeView(QtGui.QTreeView):
+class FileSystemBrowserTreeView(QtWidgets.QTreeView):
     
     rescanRequested = QtCore.pyqtSignal(str)
     
@@ -120,12 +120,12 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
         self.setEnabled(False)        
         
         self.setSelectionMode(self.ExtendedSelection)
-        self.setDragDropMode(QtGui.QAbstractItemView.DragOnly)
+        self.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         
-        self.rescanDirectoryAction = QtGui.QAction(self.tr("rescan"), self)
+        self.rescanDirectoryAction = QtWidgets.QAction(self.tr("rescan"), self)
         self.addAction(self.rescanDirectoryAction)
         self.rescanDirectoryAction.triggered.connect(self._handleRescan)
-        self.deleteFileAction = QtGui.QAction(self.tr('delete'), self)
+        self.deleteFileAction = QtWidgets.QAction(self.tr('delete'), self)
         self.addAction(self.deleteFileAction)
         self.deleteFileAction.triggered.connect(self._handleDelete)
         application.dispatcher.connect(self._handleDispatcher)
@@ -155,7 +155,7 @@ class FileSystemBrowserTreeView(QtGui.QTreeView):
     
     def contextMenuEvent(self, event):
         index = self.indexAt(event.pos())
-        menu = QtGui.QMenu(self)
+        menu = QtWidgets.QMenu(self)
         if self.model().isDir(index):
             menu.addAction(self.rescanDirectoryAction)
         else:
@@ -188,7 +188,7 @@ class FileSystemBrowser(mainwindow.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         self.hasOptionDialog = True
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         application.dispatcher.connect(self._handleDispatcher)

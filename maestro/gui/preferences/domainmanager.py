@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ... import application, database as db, utils, stack
@@ -95,7 +95,7 @@ class DomainManager(flexform.FlexTable):
         self.addAction(DeleteDomainAction(self))
         
         
-class NewDomainAction(QtGui.QAction):
+class NewDomainAction(QtWidgets.QAction):
     """Ask the user for a name and create a new domain."""
     def __init__(self, parent):
         super().__init__(utils.getIcon('add.png'), translate("NewDomainAction", "Create new domain..."),
@@ -108,7 +108,7 @@ class NewDomainAction(QtGui.QAction):
             self.parent().selectItems([newDomain])
 
 
-class DeleteDomainAction(QtGui.QAction):
+class DeleteDomainAction(QtWidgets.QAction):
     """Delete an empty domain."""
     def __init__(self, parent):
         super().__init__(utils.getIcon('delete.png'), translate("DeleteDomainAction", "Delete domain"),
@@ -139,7 +139,7 @@ class DeleteDomainAction(QtGui.QAction):
 def createNewDomain(parent=None):
     """Ask the user to supply a name and then create a new domain with this name. Return the new domain or
     None if no domain was created (e.g. if the user aborted the dialog or the supplied name was invalid)."""
-    name, ok = QtGui.QInputDialog.getText(parent, translate("DomainManager", "New domain"),
+    name, ok = QtWidgets.QInputDialog.getText(parent, translate("DomainManager", "New domain"),
                                     translate("DomainManager", "Please enter the name of the new domain:"))
     if not ok:
         return None

@@ -19,8 +19,8 @@
 """This module provides a dialog to display all plugins with the info from the PLUGININFO file and allow
 the user to enable or disable them."""
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import plugins
 
@@ -40,14 +40,14 @@ COLUMN_HEADERS = [translate("PluginDialog", "Enabled"),
                   ]
 
 
-class PluginPanel(QtGui.QWidget):
+class PluginPanel(QtWidgets.QWidget):
     """Preferences panel to display all plugins with the info from the PLUGININFO file and allow the user to
     enable or disable them."""
     def __init__(self, dialog, panel):
         super().__init__(panel)
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
             
-        self.table = QtGui.QTableWidget()
+        self.table = QtWidgets.QTableWidget()
         self.layout().addWidget(self.table, 1)
         self.table.setRowCount(len(plugins.plugins))
         self.table.setColumnCount(len(PLUGININFO_OPTIONS)+1)
@@ -55,7 +55,7 @@ class PluginPanel(QtGui.QWidget):
         self.table.verticalHeader().hide()
         
         for i, plugin in enumerate(plugins.plugins.values()):
-            item = QtGui.QTableWidgetItem()
+            item = QtWidgets.QTableWidgetItem()
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable if plugin.versionOk else Qt.NoItemFlags)
             item.setCheckState(Qt.Checked if plugin.enabled else Qt.Unchecked)
             self.table.setItem(i, 0, item)
@@ -63,7 +63,7 @@ class PluginPanel(QtGui.QWidget):
                 if hasattr(plugin.package, key):
                     text = getattr(plugin.package, key)
                 else: text = ''
-                item = QtGui.QTableWidgetItem(text)
+                item = QtWidgets.QTableWidgetItem(text)
                 item.setFlags(Qt.ItemIsEnabled if plugin.versionOk else Qt.NoItemFlags)
                 self.table.setItem(i, j+1, item)
         self.table.resizeColumnsToContents()

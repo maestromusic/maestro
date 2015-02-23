@@ -54,14 +54,14 @@ if exists(join(dirname(__file__), '.git')):
                     subprocess.check_call(["lrelease", proFile])
                 except Exception as e:
                     try:
-                        subprocess.check_call(["lrelease-qt4", proFile])
+                        subprocess.check_call(["lrelease-qt5", proFile])
                     except Exception as e:
                         print(e)
                         print("Warning: Could not update translations")
                         return
 
     def updateResources():
-        """Update resource files with pyrcc4 if necessary."""
+        """Update resource files with pyrcc5 if necessary."""
         resources = [ (["images/images.qrc"], "maestro/resources.py"),
                       (["i18n/translations.qrc"] + glob.glob("i18n/*.qm"), "maestro/translations.py") ]
         pluginBaseDir = os.path.join("maestro", "plugins")
@@ -74,7 +74,7 @@ if exists(join(dirname(__file__), '.git')):
             for source in sources:
                 if not os.path.exists(py) or getmtime(source) > getmtime(py):
                     print("Updating resource file: {}".format(py))
-                    subprocess.check_call(["pyrcc4", "-py3", "-o", py, sources[0]])
+                    subprocess.check_call(["pyrcc5", "-o", py, sources[0]])
                     break
     
     # Now we monkey-patch the relevant commands to update i18n & resources on demand

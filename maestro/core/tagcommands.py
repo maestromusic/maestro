@@ -16,13 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt
 
 from . import tags, levels
 from .. import application, database as db, stack
 
-translate = QtGui.QApplication.translate
+translate = QtWidgets.QApplication.translate
 
 
 class SortValueChangeEvent(application.ChangeEvent):

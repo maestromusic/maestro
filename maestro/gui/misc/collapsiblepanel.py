@@ -16,32 +16,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 
-class CollapsiblePanel(QtGui.QWidget):
+class CollapsiblePanel(QtWidgets.QWidget):
     """This panel takes a widget or layout and displays it below a title bar which contains the given title
     and a button that can be used to expand/collapse the widget or layout."""
     def __init__(self, title, widgetOrLayout, expanded=True, parent=None):
         super().__init__(parent)
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
-        topLayout = QtGui.QHBoxLayout()
+        topLayout = QtWidgets.QHBoxLayout()
         self.toggleButton = ToggleButton(self)
         topLayout.addWidget(self.toggleButton)
-        self.titleLabel = QtGui.QLabel(title)
+        self.titleLabel = QtWidgets.QLabel(title)
         self.titleLabel.setStyleSheet("QLabel { font-weight: bold }")
         topLayout.addWidget(self.titleLabel)
         topLayout.addStretch()
         layout.addLayout(topLayout)
         
-        self.widget = QtGui.QWidget()
+        self.widget = QtWidgets.QWidget()
         self.widget.setContentsMargins(self.toggleButton.sizeHint().width(), 0, 0, 0)
         
-        if isinstance(widgetOrLayout, QtGui.QWidget):
-            self.widget.setLayout(QtGui.QHBoxLayout())
+        if isinstance(widgetOrLayout, QtWidgets.QWidget):
+            self.widget.setLayout(QtWidgets.QHBoxLayout())
             self.widget.layout().addWidget(widgetOrLayout)
         else:
             widgetOrLayout.setContentsMargins(1,1,1,1)
@@ -76,7 +76,7 @@ class CollapsiblePanel(QtGui.QWidget):
         self.updateGeometry()
         
 
-class ToggleButton(QtGui.QWidget):
+class ToggleButton(QtWidgets.QWidget):
     """Button used by CollapsiblePanel: Depending on the state it draws an arrow to the right or down."""
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -86,13 +86,13 @@ class ToggleButton(QtGui.QWidget):
         return QtCore.QSize(16, 16)
     
     def sizePolicy(self):
-        return QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        return QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
     
     def paintEvent(self, paintEvent):
         super().paintEvent(paintEvent)
         painter = QtGui.QPainter(self)
-        style = QtGui.QApplication.style()
-        option = QtGui.QStyleOption()
+        style = QtWidgets.QApplication.style()
+        option = QtWidgets.QStyleOption()
         option.rect = self.rect()
-        arrow = QtGui.QStyle.PE_IndicatorArrowDown if self.down else QtGui.QStyle.PE_IndicatorArrowRight
+        arrow = QtWidgets.QStyle.PE_IndicatorArrowDown if self.down else QtWidgets.QStyle.PE_IndicatorArrowRight
         style.drawPrimitive(arrow, option, painter)

@@ -18,8 +18,8 @@
 
 import threading, functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 # Internal states that are used to manage the worker thread
 STATE_INIT, STATE_RUNNING, STATE_QUIT = 1,2,3

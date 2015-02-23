@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ... import utils, logging, config
@@ -84,13 +84,13 @@ class Panel:
                 self._callable = None
 
         if self._callable is None:
-            return QtGui.QWidget()
+            return QtWidgets.QWidget()
         elif not isinstance(self._callable, tuple):
             return self._callable(dialog, panel)
         else: return self._callable[0](dialog, panel, *self._callable[1:])
 
 
-class PreferencesDialog(QtGui.QDialog):
+class PreferencesDialog(QtWidgets.QDialog):
     """The preferences dialog contains a list of panels on the left and the current panel's title together
     with the actual panel on the right. Except for the "main" panel which is shown at the beginning, it will
     only construct a panel (and in fact import the corresponding module) when the user selects it in the
@@ -117,22 +117,22 @@ class PreferencesDialog(QtGui.QDialog):
         self.panelWidgets = {}
         self.currentPath = None
 
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
 
-        splitter = QtGui.QSplitter(Qt.Horizontal)
+        splitter = QtWidgets.QSplitter(Qt.Horizontal)
         splitter.setContentsMargins(0,0,0,0)
         self.layout().addWidget(splitter, 1)
 
-        self.treeWidget = QtGui.QTreeWidget()
+        self.treeWidget = QtWidgets.QTreeWidget()
         self.treeWidget.header().hide()
-        self.treeWidget.header().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.treeWidget.header().setStretchLastSection(False)
-        self.treeWidget.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.treeWidget.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.treeWidget.itemSelectionChanged.connect(self._handleSelectionChanged)
         splitter.addWidget(self.treeWidget)
 
-        self.stackedWidget = QtGui.QStackedWidget()
+        self.stackedWidget = QtWidgets.QStackedWidget()
         splitter.addWidget(self.stackedWidget)
 
         splitter.setSizes([180, 620])
@@ -145,7 +145,7 @@ class PreferencesDialog(QtGui.QDialog):
         """Fill the treeview with a tree of all panels."""
         self.treeWidget.clear()
         for path, panel in panels.items():
-            item = QtGui.QTreeWidgetItem([panel.title])
+            item = QtWidgets.QTreeWidgetItem([panel.title])
             item.setData(0, Qt.UserRole, path)
             if panel.iconPath is not None:
                 item.setIcon(0, QtGui.QIcon(panel.iconPath))
@@ -157,7 +157,7 @@ class PreferencesDialog(QtGui.QDialog):
         """Add the subpanels of *panel* to the treeview. *item* is the QTreeWidgetItem for *panel*."""
         for p, subPanel in panel.subPanels.items():
             newPath = '{}/{}'.format(panel.path, p)
-            newItem = QtGui.QTreeWidgetItem([subPanel.title])
+            newItem = QtWidgets.QTreeWidgetItem([subPanel.title])
             newItem.setData(0, Qt.UserRole, newPath)
             if subPanel.iconPath is not None:
                 newItem.setIcon(0, QtGui.QIcon(subPanel.iconPath))
@@ -233,7 +233,7 @@ class PreferencesDialog(QtGui.QDialog):
         config.binary.gui.preferences_geometry = bytearray(self.saveGeometry())
 
 
-class PanelWidget(QtGui.QWidget):
+class PanelWidget(QtWidgets.QWidget):
     """PanelWidgets are used for the right part of the preferences dialog. They contain a title section,
     a configuration widget and a button bar. The configuration widget is created using the createWidget
     method of *panel*.
@@ -242,44 +242,44 @@ class PanelWidget(QtGui.QWidget):
         super().__init__(dialog)
         self.dialog = dialog
 
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
 
         # Create title widget
-        titleWidget = QtGui.QFrame()
-        titleWidget.setFrameStyle(QtGui.QFrame.StyledPanel | QtGui.QFrame.Raised)
+        titleWidget = QtWidgets.QFrame()
+        titleWidget.setFrameStyle(QtWidgets.QFrame.StyledPanel | QtWidgets.QFrame.Raised)
         titleWidget.setStyleSheet("QFrame { background-color: white; }")
         self.layout().addWidget(titleWidget)
 
-        titleLayout = QtGui.QHBoxLayout(titleWidget)
+        titleLayout = QtWidgets.QHBoxLayout(titleWidget)
         titleLayout.setSpacing(20)
-        self.titleLabel = QtGui.QLabel()
+        self.titleLabel = QtWidgets.QLabel()
         self.titleLabel.setText("<b>{}</b><br/>{}".format(panel.title, panel.description))
         self.titleLabel.setWordWrap(True)
         self.titleLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         titleLayout.addWidget(self.titleLabel, 1)
-        self.pixmapLabel = QtGui.QLabel()
+        self.pixmapLabel = QtWidgets.QLabel()
         self.pixmapLabel.setPixmap(QtGui.QPixmap(panel.pixmapPath))
         self.pixmapLabel.setContentsMargins(20, 0, 20, 0)
         titleLayout.addWidget(self.pixmapLabel)
 
-        self.buttonBar = QtGui.QHBoxLayout()
+        self.buttonBar = QtWidgets.QHBoxLayout()
 
         # Create configuration widget
         self.configurationWidget = panel.createWidget(dialog, self)
-        scrollArea = QtGui.QScrollArea()
+        scrollArea = QtWidgets.QScrollArea()
         scrollArea.setWidgetResizable(True)
         scrollArea.setWidget(self.configurationWidget)
         self.layout().addWidget(scrollArea, 1)
 
         # Add button bar
-        style = QtGui.QApplication.style()
+        style = QtWidgets.QApplication.style()
         self.layout().addLayout(self.buttonBar)
-        self.buttonBar.setContentsMargins(0, 0, style.pixelMetric(QtGui.QStyle.PM_LayoutRightMargin),
-                                          style.pixelMetric(QtGui.QStyle.PM_LayoutBottomMargin))
+        self.buttonBar.setContentsMargins(0, 0, style.pixelMetric(QtWidgets.QStyle.PM_LayoutRightMargin),
+                                          style.pixelMetric(QtWidgets.QStyle.PM_LayoutBottomMargin))
         if all(self.buttonBar.stretch(i) == 0 for i in range(self.buttonBar.count())):
             self.buttonBar.addStretch(1)
-        closeButton = QtGui.QPushButton(style.standardIcon(QtGui.QStyle.SP_DialogCloseButton),
+        closeButton = QtWidgets.QPushButton(style.standardIcon(QtWidgets.QStyle.SP_DialogCloseButton),
                                         self.tr("Close"))
         closeButton.clicked.connect(self._handleCloseButton)
         self.buttonBar.addWidget(closeButton)

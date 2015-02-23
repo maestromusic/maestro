@@ -16,17 +16,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore,QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 
 
-class ListView(QtGui.QListView):
+class ListView(QtWidgets.QListView):
     """Listview which pays attention to its contents when calculating sizeHints and does not use scrollbars.
     The sizeHint-method of QListView is inherited all the way down from QAbstractScrollArea...and it returns
     the hard-coded value (256,192). Confer QTBUG-2273, QTBUG-6118 and QTBUG-2338.
     """
     def __init__(self,parent=None):
-        QtGui.QListView.__init__(self,parent)
+        QtWidgets.QListView.__init__(self,parent)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     
@@ -35,11 +35,11 @@ class ListView(QtGui.QListView):
         
         # The following code is from qabstractscrollarea.cpp,
         # but it leads to a scrollarea that is slightly too large.
-        opt = QtGui.QStyleOption()
+        opt = QtWidgets.QStyleOption()
         opt.initFrom(self)
-        if (self.frameStyle() != QtGui.QFrame.NoFrame
-              and self.style().styleHint(QtGui.QStyle.SH_ScrollView_FrameOnlyAroundContents,opt,self)):
-            extra = extra + self.style().pixelMetric(QtGui.QStyle.PM_ScrollView_ScrollBarSpacing,opt,self)
+        if (self.frameStyle() != QtWidgets.QFrame.NoFrame
+              and self.style().styleHint(QtWidgets.QStyle.SH_ScrollView_FrameOnlyAroundContents,opt,self)):
+            extra = extra + self.style().pixelMetric(QtWidgets.QStyle.PM_ScrollView_ScrollBarSpacing,opt,self)
     
         return QtCore.QSize(self.sizeHintForColumn(0)+extra,
                             sum(self.sizeHintForRow(i) for i in range(self.model().rowCount()))+extra)

@@ -23,8 +23,8 @@ Maestro's framework without starting a GUI.
 
 import sys, os, fcntl, getopt, enum
 
-from PyQt4 import QtCore, QtGui, QtNetwork
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets, QtNetwork
+from PyQt5.QtCore import Qt
 
 from . import config, logging, VERSION
 
@@ -103,7 +103,7 @@ class ChangeEventDispatcher(QtCore.QObject):
 dispatcher = None
  
 
-class Splash(QtGui.QSplashScreen):
+class Splash(QtWidgets.QSplashScreen):
     """Splash screen showing a logo and the loading progress."""
     def __init__(self, message):
         super().__init__(QtGui.QPixmap(":/maestro/omg_splash.png"))
@@ -111,7 +111,7 @@ class Splash(QtGui.QSplashScreen):
         
     def showMessage(self, message):
         self.message = message + '…'
-        QtGui.QApplication.instance().processEvents()
+        QtWidgets.QApplication.instance().processEvents()
         
     def drawContents(self, painter):
         super().drawContents(painter)
@@ -148,7 +148,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     handleCommandLineOptions(cmdConfig)
     
     # Some Qt-classes need a running QApplication before they can be created
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Maestro")
     app.setApplicationVersion(VERSION)
 

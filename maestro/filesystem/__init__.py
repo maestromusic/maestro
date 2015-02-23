@@ -17,7 +17,7 @@
 #
 
 import os, shutil, collections
-from PyQt4 import QtCore
+from PyQt5 import QtCore
 import taglib
 from maestro.core import levels, urls, tags
 from maestro import application, logging, config, stack, database as db

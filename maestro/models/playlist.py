@@ -18,8 +18,8 @@
 
 import itertools, urllib
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from . import wrappertreemodel, treebuilder
 from .. import config, logging, player, utils
@@ -188,7 +188,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         else: position = row
         
         # Handle internal moves separately
-        if action == Qt.MoveAction and isinstance(self.dndSource, QtGui.QTreeView) \
+        if action == Qt.MoveAction and isinstance(self.dndSource, QtWidgets.QTreeView) \
                 and isinstance(self.dndSource.model(), PlaylistModel) \
                 and self.dndSource.model().backend == self.backend:
             return self.move(list(mimeData.wrappers()), parent, position)
@@ -289,9 +289,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.stack.push(command)
         if hasattr(command, 'error'):
             from ..gui import dialogs
-            QtGui.qApp.setOverrideCursor(Qt.ArrowCursor)
+            QtWidgets.qApp.setOverrideCursor(Qt.ArrowCursor)
             dialogs.warning(self.tr('Playlist error'), str(command.error))
-            QtGui.qApp.restoreOverrideCursor()
+            QtWidgets.qApp.restoreOverrideCursor()
             wrappers = command.wrappers
             if len(wrappers) == 0:
                 self.stack.abortMacro()

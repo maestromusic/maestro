@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro.core import tags
 from maestro.models import browser as browsermodel
@@ -48,7 +48,7 @@ class TagValueAction(actions.TreeAction):
         from ..gui.tagwidgets import TagValuePropertiesWidget
         if len(self.tagIds) > 1:
             tagNames = [tags.get(tagId).name for tagId, valueId in self.tagIds]
-            answer, ok = QtGui.QInputDialog.getItem(self.parent(), self.tr("Choose tag mode"),
+            answer, ok = QtWidgets.QInputDialog.getItem(self.parent(), self.tr("Choose tag mode"),
                                                     self.tr('Tag:'), tagNames)
             if not ok:
                 return

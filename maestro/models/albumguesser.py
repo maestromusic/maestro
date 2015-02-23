@@ -19,8 +19,8 @@
 import os, re, itertools
 from collections import OrderedDict
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import config, profiles, utils
 from maestro.core import flags, tags
@@ -223,47 +223,47 @@ if len(profileCategory.profiles()) == 0:
                                profileCategory.getType('standard'))
 
 
-class GuessProfileConfigWidget(QtGui.QWidget):
+class GuessProfileConfigWidget(QtWidgets.QWidget):
     """A widget to configure the profiles used for guessing album structures."""
     
     def __init__(self, profile, parent):
         super().__init__(parent)
-        mainLayout = QtGui.QVBoxLayout(self)
-        descriptionLabel = QtGui.QLabel(self.tr('Album guessing is done by means of a list of tags; all files '
+        mainLayout = QtWidgets.QVBoxLayout(self)
+        descriptionLabel = QtWidgets.QLabel(self.tr('Album guessing is done by means of a list of tags; all files '
                                         'whose tags coincide for this list will then be considered an album.'))
         descriptionLabel.setWordWrap(True)
         mainLayout.addWidget(descriptionLabel)
-        toolBar = QtGui.QToolBar()
+        toolBar = QtWidgets.QToolBar()
 
         addTagButton = TagTypeButton()
         addTagButton.setToolTip(self.tr('Add a tag to the grouping conditions'))
         addTagButton.tagChosen.connect(self.addTag)
         toolBar.addWidget(addTagButton)
 
-        removeTagButton = QtGui.QToolButton()
+        removeTagButton = QtWidgets.QToolButton()
         removeTagButton.setIcon(utils.getIcon('delete.png'))
         removeTagButton.setToolTip(self.tr('Remove tag from grouping conditions'))
         removeTagButton.clicked.connect(self.removeTag)
         toolBar.addWidget(removeTagButton)
-        self.dirModeButton = QtGui.QPushButton()
+        self.dirModeButton = QtWidgets.QPushButton()
         self.dirModeButton.setIcon(utils.getIcon('folder.svg'))
         self.dirModeButton.setCheckable(True)
         self.dirModeButton.setToolTip(self.tr('Only files inside a common directory'))
         self.dirModeButton.clicked.connect(self.updateProfile)
         toolBar.addWidget(self.dirModeButton)
-        mainButton = QtGui.QToolButton()
+        mainButton = QtWidgets.QToolButton()
         mainButton.setIcon(utils.getIcon('cd.png'))
         mainButton.setToolTip(self.tr("Album tag: use this tag's value as container title"))
         mainButton.clicked.connect(self.setMain)
         toolBar.addWidget(mainButton)
         mainLayout.addWidget(toolBar)
-        regexLayout = QtGui.QHBoxLayout()
+        regexLayout = QtWidgets.QHBoxLayout()
         self.regexCheck = QtGui.QCheckBox(self.tr('Detect meta-containers:'))
-        self.regexEdit = QtGui.QLineEdit()
+        self.regexEdit = QtWidgets.QLineEdit()
         self.regexEdit.textChanged.connect(self.updateProfile)
         self.regexCheck.toggled.connect(self.regexEdit.setEnabled)
         self.regexCheck.clicked.connect(self.updateProfile)
-        resetRegexButton = QtGui.QToolButton()
+        resetRegexButton = QtWidgets.QToolButton()
         resetRegexButton.setIcon(utils.getIcon('undo.png'))
         resetRegexButton.setToolTip(self.tr('Reset to default regular expression'))
         self.regexCheck.toggled.connect(resetRegexButton.setEnabled)
@@ -272,7 +272,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
         regexLayout.addWidget(self.regexEdit)
         regexLayout.addWidget(resetRegexButton)
         mainLayout.addLayout(regexLayout)
-        self.tagListView = QtGui.QListWidget()
+        self.tagListView = QtWidgets.QListWidget()
         mainLayout.addWidget(self.tagListView)
         self.profile = profile
         self.setProfile(profile)
@@ -286,7 +286,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
         self.tagListView.clear()
         self.dirModeButton.setChecked(profile.directoryMode)
         for tag in profile.groupTags:
-            item = QtGui.QListWidgetItem(tag.title)
+            item = QtWidgets.QListWidgetItem(tag.title)
             item.setData(Qt.UserRole, tag)
             self.tagListView.addItem(item)
         if self.tagListView.count() > 0:
@@ -318,7 +318,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
     def addTag(self, tag: tags.Tag):
         if tag in self.profile.groupTags:
             return
-        newItem = QtGui.QListWidgetItem(tag.title)
+        newItem = QtWidgets.QListWidgetItem(tag.title)
         newItem.setData(Qt.UserRole, tag)
         self.tagListView.addItem(newItem)
         if self.tagListView.count() == 1:

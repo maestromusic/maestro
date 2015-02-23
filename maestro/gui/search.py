@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from .. import utils, logging
 from ..core import flags
@@ -69,7 +69,7 @@ class SearchBox(IconLineEdit):
             self.criterionChanged.emit()
                 
     def keyPressEvent(self, event):
-        QtGui.QLineEdit.keyPressEvent(self, event)
+        QtWidgets.QLineEdit.keyPressEvent(self, event)
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             try:
                 criterion = criteria.parse(self.text())
@@ -158,14 +158,14 @@ class CriterionLineEdit(IconLineEdit):
                 else: self.criterionCleared.emit()
 
 
-class FlagView(QtGui.QTableWidget):
+class FlagView(QtWidgets.QTableWidget):
     """A QTableWidget containing entries for all flags. Whenever the selection changes, selectionChanged is
     emitted. Flags given in *selectedFlagTypes* are selected at the beginnning.
     """
     selectionChanged = QtCore.pyqtSignal(list)
     
     def __init__(self, selectedFlagTypes, parent=None):
-        QtGui.QTableWidget.__init__(self, parent)
+        QtWidgets.QTableWidget.__init__(self, parent)
         self.verticalHeader().hide()
         self.horizontalHeader().hide()
         self.verticalHeader().setDefaultSectionSize(self.verticalHeader().fontMetrics().height() + 2)
@@ -193,7 +193,7 @@ class FlagView(QtGui.QTableWidget):
         for row, flagType in enumerate(flagList):
             column = 1 if row >= rowCount else 0
             
-            item = QtGui.QTableWidgetItem()
+            item = QtWidgets.QTableWidgetItem()
             item.setText(flagType.name)
             item.setData(Qt.UserRole, flagType)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)

@@ -22,7 +22,7 @@
 import os, shutil, re, tempfile
 from os.path import dirname, exists,join
 import subprocess
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from maestro import database as db, logging, config, filesystem
 from maestro.core import urls, levels
@@ -41,7 +41,7 @@ statusRe = re.compile(r'^##:\s-?[0-9]+\s\[(\w+)\]\s@\s([0-9]+)', re.M)
 currentRe = re.compile(r'outputting\sto\strack([0-9]+)\.')
 
 
-class RipperStatusWidget(QtGui.QWidget):
+class RipperStatusWidget(QtWidgets.QWidget):
 
     cancelled = QtCore.pyqtSignal()
 
@@ -51,10 +51,10 @@ class RipperStatusWidget(QtGui.QWidget):
         self.progress.setRange(0, 0)
         self.progress.setValue(0)
         self.progress.setFormat(self.tr('starting ripper...'))
-        closeButton = QtGui.QToolButton()
-        closeButton.setIcon(self.style().standardIcon(QtGui.QStyle.SP_BrowserStop))
+        closeButton = QtWidgets.QToolButton()
+        closeButton.setIcon(self.style().standardIcon(QtWidgets.QStyle.SP_BrowserStop))
         closeButton.clicked.connect(self.cancelled)
-        layout = QtGui.QHBoxLayout()
+        layout = QtWidgets.QHBoxLayout()
         layout.addWidget(self.progress, 0)
         layout.addWidget(closeButton)
         self.setLayout(layout)
@@ -82,7 +82,7 @@ class Ripper(QtCore.QObject):
         self.discid = discid
         self.tmpdir = tempfile.mkdtemp(prefix='maestro_rip')
         self.encodingProcess = self.ripProcess = None
-        QtGui.qApp.aboutToQuit.connect(self.cleanup)
+        QtWidgets.qApp.aboutToQuit.connect(self.cleanup)
         global activeRipper
         self.fromTrack, self.toTrack = fromTrack, toTrack
         self.currentTrack = None

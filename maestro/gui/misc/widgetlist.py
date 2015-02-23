@@ -16,11 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 
-class WidgetList(QtGui.QWidget):
+class WidgetList(QtWidgets.QWidget):
     """A WidgetList is sort of a list-view for widgets: It is a widget containing a list of child-widgets,
     which are either laid out horizontically or vertically. Using a SelectionManager a WidgetList can have
     a selection and will highlight selected children.
@@ -28,25 +28,25 @@ class WidgetList(QtGui.QWidget):
     
     # This signal is emitted when a widget is inserted into this WidgetList and contains the WidgetList and
     # the position of the inserted widget as parameters.
-    widgetInserted = QtCore.pyqtSignal(QtGui.QWidget,int) # Actually the first parameter is a WidgetList
+    widgetInserted = QtCore.pyqtSignal(QtWidgets.QWidget,int) # Actually the first parameter is a WidgetList
     
     # This signal is emitted when a widget is removed from this WidgetList and contains the WidgetList, the
     # position of the removed widget and that widget itself as parameters.
-    widgetRemoved = QtCore.pyqtSignal(QtGui.QWidget,int,QtGui.QWidget)
+    widgetRemoved = QtCore.pyqtSignal(QtWidgets.QWidget,int,QtWidgets.QWidget)
 
     # This signal is emitted when a widget is moved in the WidgetList. The parameters are the WidgetList and
     # the old and new position of the moved widget.
-    widgetMoved = QtCore.pyqtSignal(QtGui.QWidget,int,int)
+    widgetMoved = QtCore.pyqtSignal(QtWidgets.QWidget,int,int)
     
     def __init__(self,direction,parent=None):
         """Create a new WidgetList laying out children in the specified direction (confer the
         QBoxLayout::Direction-enum) and using the given parent."""
-        QtGui.QWidget.__init__(self,parent)
-        self.setLayout(QtGui.QBoxLayout(direction))
+        QtWidgets.QWidget.__init__(self,parent)
+        self.setLayout(QtWidgets.QBoxLayout(direction))
         self.children = []
         self.selectionManager = None
         self.layout().setSpacing(0)
-        self.layout().setMargin(0)
+        self.layout().setContentsMargins(0, 0, 0, 0)
     
     def getDirection(self):
         """Set the direction in which the children of this WidgetList are laid out (confer the
@@ -76,7 +76,7 @@ class WidgetList(QtGui.QWidget):
         raise NotImplementedError() # Use insertWidget or addWidget
         
     def __delitem__(self,key):
-        raise NotImpelementedError() # Use removeWidget
+        raise NotImplementedError() # Use removeWidget
     
     def insertWidget(self,index,widget):
         """Insert *widget* into this WidgetList's children at position *index*."""
@@ -134,7 +134,7 @@ class WidgetList(QtGui.QWidget):
                     if selectionStatus[i]:
                         c = self.children[i]
                         painter.fillRect(c.x(),c.y(),c.width(),c.height(),QtGui.QColor.fromRgb(89,166,230))
-        QtGui.QWidget.paintEvent(self,event)
+        QtWidgets.QWidget.paintEvent(self,event)
 
     def selectionChanged(self,index):
         """Update the widget at *index* because its selection status has changed. This method is called by

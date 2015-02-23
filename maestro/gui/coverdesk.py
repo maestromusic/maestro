@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from maestro import config, utils
@@ -29,7 +29,7 @@ class CoverDesk(mainwindow.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         self.hasOptionDialog = True
-        layout = QtGui.QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout(self)
         scene = CoverDeskScene(self)
         
         if state is not None:
@@ -38,10 +38,10 @@ class CoverDesk(mainwindow.Widget):
                 for elid, pos in state['elements']:
                     scene.addElements([levels.real[elid]], QtCore.QPointF(*pos))
                 
-        self.view = QtGui.QGraphicsView(scene)
+        self.view = QtWidgets.QGraphicsView(scene)
         self.view.setAcceptDrops(True)
         self.view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.view.setDragMode(QtGui.QGraphicsView.ScrollHandDrag)
+        self.view.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         #self.view.scene().selectionChanged.connect(self.selectionChanged)
         layout.addWidget(self.view)
         self.view.ensureVisible(0, 0, 1, 1, 0, 0)
@@ -61,7 +61,7 @@ mainwindow.addWidgetClass(mainwindow.WidgetClass(
         preferredDockArea = 'right'))
 
     
-class CoverDeskScene(QtGui.QGraphicsScene):
+class CoverDeskScene(QtWidgets.QGraphicsScene):
     coverSize = 100
     
     def __init__(self, parent):
@@ -164,7 +164,7 @@ class CoverDeskScene(QtGui.QGraphicsScene):
         event.acceptProposedAction()
         
 
-class CoverItem(QtGui.QGraphicsItem):
+class CoverItem(QtWidgets.QGraphicsItem):
     """A GraphicsItem which draws either a cover and a dropshadow or a loading animation."""
     def __init__(self, scene, elid, path):
         super().__init__()
@@ -174,7 +174,7 @@ class CoverItem(QtGui.QGraphicsItem):
         self.cover = None
         self._oldCover = None
         self.setCoverPath(path)
-        self.setFlags(QtGui.QGraphicsItem.ItemIsMovable)
+        self.setFlags(QtWidgets.QGraphicsItem.ItemIsMovable)
             #QGraphicsItem::ItemIsSelectable |
             #QGraphicsItem::ItemIgnoresTransformations );
 
@@ -190,7 +190,7 @@ class CoverItem(QtGui.QGraphicsItem):
         self.scene.worker.submit(self.cover)
         if not self.cover.loaded:
             self.scene.loadingTimer.timeout.connect(self._handleTimer)
-        self.setFlag(QtGui.QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable)
     
     def reload(self):
         """Reload the cover from source."""
@@ -249,7 +249,7 @@ class CoverItem(QtGui.QGraphicsItem):
                                srcX, srcY, 32, 32)
             borderRect = QtCore.QRect(0, 0, size+1, size+1)
         pen = painter.pen()
-        if option.state & QtGui.QStyle.State_Selected:
+        if option.state & QtWidgets.QStyle.State_Selected:
             pen.setColor(QtGui.QColor(0,0,255))
         else: pen.setColor(QtGui.QColor(0,0,0))
         painter.setPen(pen)

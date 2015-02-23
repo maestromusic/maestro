@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui, QtSvg
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
+from PyQt5.QtCore import Qt
 
 _staticImages = {}
 
@@ -32,27 +32,27 @@ def pixmap(name):
 
 
 def standardIcon(name):
-    style = QtGui.QApplication.style()
+    style = QtWidgets.QApplication.style()
     qtIcons = {
-        "file": QtGui.QStyle.SP_FileIcon,
-        "directory": QtGui.QStyle.SP_DirIcon,
-        "ok": QtGui.QStyle.SP_DialogOkButton,
-        "cancel": QtGui.QStyle.SP_DialogCancelButton,
-        "help": QtGui.QStyle.SP_DialogHelpButton,
-        "open": QtGui.QStyle.SP_DialogOpenButton,
-        "save": QtGui.QStyle.SP_DialogSaveButton,
-        "close": QtGui.QStyle.SP_DialogCloseButton,
-        "apply": QtGui.QStyle.SP_DialogApplyButton,
-        "reset": QtGui.QStyle.SP_DialogResetButton,
-        "discard": QtGui.QStyle.SP_DialogDiscardButton,
-        "yes": QtGui.QStyle.SP_DialogYesButton,
-        "no": QtGui.QStyle.SP_DialogNoButton, 
-        "up": QtGui.QStyle.SP_ArrowUp,
-        "down": QtGui.QStyle.SP_ArrowDown,
-        "left": QtGui.QStyle.SP_ArrowLeft,
-        "right": QtGui.QStyle.SP_ArrowRight, 
-        "back": QtGui.QStyle.SP_ArrowBack,
-        "forward": QtGui.QStyle.SP_ArrowForward,
+        "file": QtWidgets.QStyle.SP_FileIcon,
+        "directory": QtWidgets.QStyle.SP_DirIcon,
+        "ok": QtWidgets.QStyle.SP_DialogOkButton,
+        "cancel": QtWidgets.QStyle.SP_DialogCancelButton,
+        "help": QtWidgets.QStyle.SP_DialogHelpButton,
+        "open": QtWidgets.QStyle.SP_DialogOpenButton,
+        "save": QtWidgets.QStyle.SP_DialogSaveButton,
+        "close": QtWidgets.QStyle.SP_DialogCloseButton,
+        "apply": QtWidgets.QStyle.SP_DialogApplyButton,
+        "reset": QtWidgets.QStyle.SP_DialogResetButton,
+        "discard": QtWidgets.QStyle.SP_DialogDiscardButton,
+        "yes": QtWidgets.QStyle.SP_DialogYesButton,
+        "no": QtWidgets.QStyle.SP_DialogNoButton,
+        "up": QtWidgets.QStyle.SP_ArrowUp,
+        "down": QtWidgets.QStyle.SP_ArrowDown,
+        "left": QtWidgets.QStyle.SP_ArrowLeft,
+        "right": QtWidgets.QStyle.SP_ArrowRight,
+        "back": QtWidgets.QStyle.SP_ArrowBack,
+        "forward": QtWidgets.QStyle.SP_ArrowForward,
     }
     if name in qtIcons:
         return style.standardIcon(qtIcons[name])
@@ -61,21 +61,21 @@ def standardIcon(name):
 
 
 def standardPixmap(name):
-    style = QtGui.QApplication.style()
+    style = QtWidgets.QApplication.style()
     if name in ["expander", "collapser"]:
         if name in _staticImages:
             return _staticImages[name]
         else:
             pixmap = QtGui.QPixmap(16, 12)
             pixmap.fill(Qt.transparent)
-            option = QtGui.QStyleOption()
-            option.type = QtGui.QStyleOption.SO_ViewItem
+            option = QtWidgets.QStyleOption()
+            option.type = QtWidgets.QStyleOption.SO_ViewItem
             option.rect = QtCore.QRect(QtCore.QPoint(0, 0), QtCore.QPoint(10, 10))
-            option.state = QtGui.QStyle.State_Children
+            option.state = QtWidgets.QStyle.State_Children
             if name == "collapser":
-                option.state |=  QtGui.QStyle.State_Open
+                option.state |=  QtWidgets.QStyle.State_Open
             painter = QtGui.QPainter(pixmap)
-            style.drawPrimitive(QtGui.QStyle.PE_IndicatorBranch, option, painter)
+            style.drawPrimitive(QtWidgets.QStyle.PE_IndicatorBranch, option, painter)
             painter.end()
             _staticImages[name] = pixmap
             return pixmap

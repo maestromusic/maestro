@@ -17,8 +17,8 @@
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro.gui import dialogs, mainwindow
 from maestro.gui.preferences import PreferencesDialog
@@ -36,7 +36,7 @@ def showPreferences(category, profile=None):
     dialog.exec_()
 
 
-class CreateProfileDialog(QtGui.QDialog):
+class CreateProfileDialog(QtWidgets.QDialog):
     """Small dialog that is used to create a new profile of a TypedProfileCategory. It asks the user for 
     the type and name of the new profile. NewProfileDialog works only with typed categories. For normal
     categories, simply use suggestProfileName and create an instance of the profile-class.
@@ -50,22 +50,22 @@ class CreateProfileDialog(QtGui.QDialog):
         self.category = category
         self.profile = None  # stores new profile, when created
 
-        layout = QtGui.QVBoxLayout(self)
-        label = QtGui.QLabel(self.tr("Choose a name and type for the new profile:"))
+        layout = QtWidgets.QVBoxLayout(self)
+        label = QtWidgets.QLabel(self.tr("Choose a name and type for the new profile:"))
         layout.addWidget(label)
 
-        formLayout = QtGui.QFormLayout()
-        formLayout.setSizeConstraint(QtGui.QLayout.SetFixedSize)
+        formLayout = QtWidgets.QFormLayout()
+        formLayout.setSizeConstraint(QtWidgets.QLayout.SetFixedSize)
         layout.addLayout(formLayout)
-        self.typeBox = QtGui.QComboBox()
+        self.typeBox = QtWidgets.QComboBox()
         self.typeBox.addItems([type.title for type in self.category.types])
         self.typeBox.currentIndexChanged.connect(self._handleTypeChanged)
         formLayout.addRow(self.tr("Type:"), self.typeBox)
-        self.nameLineEdit = QtGui.QLineEdit()
+        self.nameLineEdit = QtWidgets.QLineEdit()
         self._handleTypeChanged(0)  # fill line edit with a suitable name
         formLayout.addRow(self.tr("Name:"), self.nameLineEdit)
 
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel)
+        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addWidget(buttonBox)
@@ -96,13 +96,13 @@ class CreateProfileDialog(QtGui.QDialog):
         return dialog.profile
 
 
-class ProfileConfigurationPanel(QtGui.QWidget):
+class ProfileConfigurationPanel(QtWidgets.QWidget):
     """Panel to configure profiles of a given category. It consists of a tree of profiles and (for typed
     categories) types on the left and the category-specific configuration widget on the right."""
 
     def __init__(self, dialog, panel, category, profile=None):
         super().__init__(panel)
-        style = QtGui.QApplication.style()
+        style = QtWidgets.QApplication.style()
 
         self.category = category
         self.profile = profile
@@ -110,29 +110,29 @@ class ProfileConfigurationPanel(QtGui.QWidget):
         self.category.profileRenamed.connect(self._handleProfileRenamed)
         self.category.profileRemoved.connect(self._handleProfileRemoved)
 
-        self.setLayout(QtGui.QHBoxLayout())
+        self.setLayout(QtWidgets.QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(0)
 
         # Left column
-        leftLayout = QtGui.QVBoxLayout()
+        leftLayout = QtWidgets.QVBoxLayout()
         self.layout().addLayout(leftLayout)
 
-        toolBar = QtGui.QToolBar()
+        toolBar = QtWidgets.QToolBar()
         toolBar.setIconSize(QtCore.QSize(16, 16))
         leftLayout.addWidget(toolBar)
 
-        self.createButton = QtGui.QToolButton()
+        self.createButton = QtWidgets.QToolButton()
         self.createButton.setIcon(utils.getIcon('add.png'))
         self.createButton.setToolTip(self.tr("Create profile"))
         self.createButton.clicked.connect(self._handleCreateButton)
         toolBar.addWidget(self.createButton)
-        self.renameButton = QtGui.QToolButton()
+        self.renameButton = QtWidgets.QToolButton()
         self.renameButton.setIcon(utils.getIcon('pencil.png'))
         self.renameButton.setToolTip(self.tr("Rename profile"))
         self.renameButton.clicked.connect(self._handleRenameButton)
         toolBar.addWidget(self.renameButton)
-        self.deleteButton = QtGui.QToolButton()
+        self.deleteButton = QtWidgets.QToolButton()
         self.deleteButton.setIcon(utils.getIcon('delete.png'))
         self.deleteButton.setToolTip(self.tr("Delete profile"))
         self.deleteButton.clicked.connect(self._handleDeleteButton)
@@ -140,12 +140,12 @@ class ProfileConfigurationPanel(QtGui.QWidget):
 
         self.profileTree = ProfileTree(self.category)
         self.profileTree.itemSelectionChanged.connect(self._handleSelectionChanged)
-        self.profileTree.setFrameStyle(QtGui.QFrame.NoFrame)
+        self.profileTree.setFrameStyle(QtWidgets.QFrame.NoFrame)
         leftLayout.addWidget(self.profileTree, 1)
 
         # Line between left and right layout
-        frame = QtGui.QFrame()
-        frame.setFrameStyle(QtGui.QFrame.VLine)
+        frame = QtWidgets.QFrame()
+        frame.setFrameStyle(QtWidgets.QFrame.VLine)
         palette = frame.palette()
         # Draw frame in the color that is used for the Sunken | 
         palette.setColor(QtGui.QPalette.WindowText, self.palette().color(QtGui.QPalette.Dark))
@@ -153,19 +153,19 @@ class ProfileConfigurationPanel(QtGui.QWidget):
         self.layout().addWidget(frame)
 
         # Right column
-        right = QtGui.QScrollArea()
+        right = QtWidgets.QScrollArea()
         right.setWidgetResizable(True)
-        right.setFrameStyle(QtGui.QFrame.NoFrame)
-        innerRight = QtGui.QWidget()
+        right.setFrameStyle(QtWidgets.QFrame.NoFrame)
+        innerRight = QtWidgets.QWidget()
         right.setWidget(innerRight)
-        rightLayout = QtGui.QVBoxLayout(innerRight)
+        rightLayout = QtWidgets.QVBoxLayout(innerRight)
         self.layout().addWidget(right, 1)
 
-        self.titleLabel = QtGui.QLabel()
+        self.titleLabel = QtWidgets.QLabel()
         self.titleLabel.setStyleSheet('QLabel {font-weight: bold}')
         rightLayout.addWidget(self.titleLabel)
 
-        self.stackedLayout = QtGui.QStackedLayout()
+        self.stackedLayout = QtWidgets.QStackedLayout()
         self.stackedLayout.setContentsMargins(0, 0, 0, 0)
         rightLayout.addLayout(self.stackedLayout, 1)
         noProfileWidget = NoProfileYetWidget(self)
@@ -190,7 +190,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
             if profile not in self.profileWidgets:
                 widget = profile.configurationWidget(profile, self)
                 if widget is None:
-                    widget = QtGui.QLabel(self.tr("There are no options for this profile."))
+                    widget = QtWidgets.QLabel(self.tr("There are no options for this profile."))
                     widget.setAlignment(Qt.AlignLeft | Qt.AlignTop)
                 else:
                     widget.layout().setContentsMargins(0, 0, 0, 0)
@@ -243,7 +243,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
         """Ask the user for a new name of the current profile and change names."""
         if self.profile is None:
             return
-        text, ok = QtGui.QInputDialog.getText(self,
+        text, ok = QtWidgets.QInputDialog.getText(self,
                                               self.tr("Profile name"),
                                               self.tr("Choose a new name:"),
                                               text=self.profile.name)
@@ -271,7 +271,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
                or self.stackedLayout.currentWidget().okToClose()
 
 
-class ProfileTree(QtGui.QTreeWidget):
+class ProfileTree(QtWidgets.QTreeWidget):
     """TreeWidget that displays all profiles of a given category. For non-typed categories, profiles will
     be displayed as list. In typed categories a tree with types on first level and profiles on second
     level is used.
@@ -279,11 +279,11 @@ class ProfileTree(QtGui.QTreeWidget):
 
     def __init__(self, category):
         super().__init__()
-        self.setSelectionMode(QtGui.QAbstractItemView.SingleSelection)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.setItemsExpandable(False)
         self.setRootIsDecorated(False)
         self.header().hide()
-        self.header().setResizeMode(QtGui.QHeaderView.ResizeToContents)
+        self.header().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.header().setStretchLastSection(False)
 
         self.category = category
@@ -345,7 +345,7 @@ class ProfileTree(QtGui.QTreeWidget):
         text = self.tr("{}:").format(type.title)
         if type != self.category.types[0]:
             text = '\n' + text  # create space between subtrees
-        typeItem = QtGui.QTreeWidgetItem([text])
+        typeItem = QtWidgets.QTreeWidgetItem([text])
         font = typeItem.font(0)
         font.setItalic(True)
         typeItem.setFont(0, font)
@@ -370,14 +370,14 @@ class ProfileTree(QtGui.QTreeWidget):
     def _handleProfileAdded(self, profile):
         """Handle the profileAdded-signal of the profile category."""
         if not isinstance(self.category, profiles.TypedProfileCategory):
-            item = QtGui.QTreeWidgetItem([profile.name])
+            item = QtWidgets.QTreeWidgetItem([profile.name])
             item.setData(0, Qt.UserRole, profile)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             self.addTopLevelItem(item)
         else:
             typeItem, i = self._findToplevelItem(profile.type)
             if typeItem is not None:
-                item = QtGui.QTreeWidgetItem([profile.name])
+                item = QtWidgets.QTreeWidgetItem([profile.name])
                 item.setData(0, Qt.UserRole, profile)
                 item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 typeItem.addChild(item)
@@ -400,15 +400,15 @@ class ProfileTree(QtGui.QTreeWidget):
             item.setText(0, profile.name)
 
 
-class NoProfileYetWidget(QtGui.QWidget):
+class NoProfileYetWidget(QtWidgets.QWidget):
     """This widget is displayed in a ProfileConfigurationPanel if the underlying profile category does
     not have a profile yet."""
 
     def __init__(self, parent):
         super().__init__(parent)
         self.category = parent.category
-        layout = QtGui.QVBoxLayout(self)
-        label = QtGui.QLabel()
+        layout = QtWidgets.QVBoxLayout(self)
+        label = QtWidgets.QLabel()
         label.setWordWrap(True)
         layout.addWidget(label)
 
@@ -419,13 +419,13 @@ class NoProfileYetWidget(QtGui.QWidget):
 
         label.setText(self.tr("There is no profile yet."))
 
-        self.createButton = QtGui.QPushButton(utils.getIcon('add.png'), self.tr("Create profile"))
-        self.createButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        self.createButton = QtWidgets.QPushButton(utils.getIcon('add.png'), self.tr("Create profile"))
+        self.createButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         layout.addWidget(self.createButton)
         layout.addStretch()
 
 
-class CategoryMenu(QtGui.QLabel):
+class CategoryMenu(QtWidgets.QLabel):
     """Simple menu of available profile categories. A click on a category will open the corresponding
     preferences panel."""
 
@@ -449,7 +449,7 @@ class CategoryMenu(QtGui.QLabel):
         self.setText(''.join(parts))
 
 
-class ProfileComboBox(QtGui.QComboBox):
+class ProfileComboBox(QtWidgets.QComboBox):
     """This class provides a combo box that lets the user choose a profile. Parameters are
     
         - *category*: The category where the profiles are taken from,
@@ -580,7 +580,7 @@ class ProfileComboBox(QtGui.QComboBox):
             return super().mousePressEvent(event)
         
 
-class ProfileConfigurationWidget(QtGui.QWidget):
+class ProfileConfigurationWidget(QtWidgets.QWidget):
     """Base class for widgets that configure profiles."""
     def __init__(self, profile, parent=None):
         super().__init__(parent)
@@ -590,7 +590,7 @@ class ProfileConfigurationWidget(QtGui.QWidget):
         raise NotImplementedError()
 
 
-class ProfileActionWidget(QtGui.QWidget):
+class ProfileActionWidget(QtWidgets.QWidget):
     """A ProfileActionWidget is used for profile categories which configure an action (e.g. export, renamer).
     The widget allows the user to make temporary changes before performing the action. To this end it
     contains a configuration widget for the specified category. This widget will however not modify
@@ -607,19 +607,19 @@ class ProfileActionWidget(QtGui.QWidget):
         self.baseProfile = None
         self.profile = None
 
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        topLayout = QtGui.QHBoxLayout()
-        style = QtGui.QApplication.style()
+        topLayout = QtWidgets.QHBoxLayout()
+        style = QtWidgets.QApplication.style()
         topLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin),
                                      style.pixelMetric(style.PM_LayoutTopMargin),
                                      style.pixelMetric(style.PM_LayoutRightMargin),
                                      1)
 
-        self.profileNameLabel = QtGui.QLabel()
+        self.profileNameLabel = QtWidgets.QLabel()
         topLayout.addWidget(self.profileNameLabel)
         topLayout.addStretch(1)
-        self.profileButton = QtGui.QPushButton(self.tr("Profiles..."))
+        self.profileButton = QtWidgets.QPushButton(self.tr("Profiles..."))
         topLayout.addWidget(self.profileButton)
         self._makeMenu()
         layout.addLayout(topLayout)
@@ -634,7 +634,7 @@ class ProfileActionWidget(QtGui.QWidget):
     def _makeMenu(self):
         """Fill the menu (only in temporary mode). This is necessary if the name of the current profile
         changes."""
-        menu = QtGui.QMenu()
+        menu = QtWidgets.QMenu()
         for profile in self.category.profiles():
             action = menu.addAction(self.tr("Load '{}'").format(profile.name))
             action.triggered.connect(functools.partial(self.setProfile, profile))
@@ -669,7 +669,7 @@ class ProfileActionWidget(QtGui.QWidget):
         showPreferences(self.category)
 
 
-class SaveProfileDialog(QtGui.QDialog):
+class SaveProfileDialog(QtWidgets.QDialog):
     """This dialog is used to save the temporary configuration in a ProfileActionWidget as normal
     (persistent) profile."""
     def __init__(self, category, profile, parent=None):
@@ -677,17 +677,17 @@ class SaveProfileDialog(QtGui.QDialog):
         self.setWindowTitle(self.tr("Save configuration as profile"))
         self.category = category
         self.profile = profile
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
 
-        nameLayout = QtGui.QHBoxLayout()
-        nameLayout.addWidget(QtGui.QLabel(self.tr("Choose a profile name: ")))
-        self.nameEdit = QtGui.QLineEdit(profile.name if profile is not None else '')
+        nameLayout = QtWidgets.QHBoxLayout()
+        nameLayout.addWidget(QtWidgets.QLabel(self.tr("Choose a profile name: ")))
+        self.nameEdit = QtWidgets.QLineEdit(profile.name if profile is not None else '')
         nameLayout.addWidget(self.nameEdit)
         layout.addLayout(nameLayout)
 
-        profileListLabel = QtGui.QLabel(self.tr("Or overwrite an existing profile:"))
+        profileListLabel = QtWidgets.QLabel(self.tr("Or overwrite an existing profile:"))
         layout.addWidget(profileListLabel)
-        self.profileList = QtGui.QListWidget()
+        self.profileList = QtWidgets.QListWidget()
         self.profileList.addItems([profile.name for profile in category.profiles()])
         self.profileList.itemClicked.connect(lambda item: self.nameEdit.setText(item.text()))
         if len(category.profiles()) == 0:
@@ -695,8 +695,8 @@ class SaveProfileDialog(QtGui.QDialog):
             self.profileList.setEnabled(False)
         layout.addWidget(self.profileList)
 
-        buttonBox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel)
-        okButton = buttonBox.addButton(QtGui.QDialogButtonBox.Ok)
+        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
+        okButton = buttonBox.addButton(QtWidgets.QDialogButtonBox.Ok)
         okButton.setEnabled(len(self._getProfileName()) > 0)
         self.nameEdit.textChanged.connect(lambda: okButton.setEnabled(len(self._getProfileName()) > 0))
         buttonBox.accepted.connect(self.accept)

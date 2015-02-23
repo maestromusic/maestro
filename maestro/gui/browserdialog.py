@@ -18,8 +18,8 @@
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from . import dialogs, delegates, search as searchgui, widgets
 from .. import config, utils, database as db
@@ -57,26 +57,26 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         self.browser = browser
         self.viewConfigurations = []
                 
-        filterTab = QtGui.QWidget()
-        filterTab.setLayout(QtGui.QVBoxLayout())
+        filterTab = QtWidgets.QWidget()
+        filterTab.setLayout(QtWidgets.QVBoxLayout())
         self.tabWidget.addTab(filterTab, self.tr("Filter"))
         
-        domainLayout = QtGui.QHBoxLayout()
-        domainLayout.addWidget(QtGui.QLabel(self.tr("Domain:")))
+        domainLayout = QtWidgets.QHBoxLayout()
+        domainLayout.addWidget(QtWidgets.QLabel(self.tr("Domain:")))
         self.domainBox = widgets.DomainBox(self.browser.getDomain())
         self.domainBox.domainChanged.connect(self.browser.setDomain)
         domainLayout.addWidget(self.domainBox)
         filterTab.layout().addLayout(domainLayout)
         
-        filterTab.layout().addWidget(QtGui.QLabel(self.tr("Flags:")))
+        filterTab.layout().addWidget(QtWidgets.QLabel(self.tr("Flags:")))
         flagList = self.browser.flagCriterion.flags if self.browser.flagCriterion is not None else []
         
         self.flagView = searchgui.FlagView(flagList)
         self.flagView.selectionChanged.connect(browser.setFlagFilter)
         filterTab.layout().addWidget(self.flagView)
         
-        filterCriterionLayout = QtGui.QHBoxLayout()
-        filterCriterionLayout.addWidget(QtGui.QLabel(self.tr("General:")))
+        filterCriterionLayout = QtWidgets.QHBoxLayout()
+        filterCriterionLayout.addWidget(QtWidgets.QLabel(self.tr("General:")))
         filterCriterionLine = searchgui.CriterionLineEdit(self.browser.filterCriterion)
         filterCriterionLine.criterionChanged.connect(self.browser.setFilterCriterion)
         filterCriterionLine.criterionCleared.connect(functools.partial(self.browser.setFilterCriterion,None))
@@ -84,8 +84,8 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         filterCriterionLayout.addWidget(filterCriterionLine)
         filterTab.layout().addLayout(filterCriterionLayout)
         
-        self.optionTab = QtGui.QWidget()
-        self.optionTab.setLayout(QtGui.QVBoxLayout())
+        self.optionTab = QtWidgets.QWidget()
+        self.optionTab.setLayout(QtWidgets.QVBoxLayout())
         self.tabWidget.addTab(self.optionTab,self.tr("Options"))
 
         # Option tab is filled in subclasses
@@ -96,9 +96,9 @@ class BrowserDialog(AbstractBrowserDialog):
     def __init__(self, parent, browser):
         super().__init__(parent, browser)
         optionLayout = self.optionTab.layout()
-        lineLayout = QtGui.QHBoxLayout()
+        lineLayout = QtWidgets.QHBoxLayout()
         optionLayout.addLayout(lineLayout)
-        lineLayout.addWidget(QtGui.QLabel(self.tr("Item Display:")))
+        lineLayout.addWidget(QtWidgets.QLabel(self.tr("Item Display:")))
         profileType = browserdelegate.BrowserDelegate.profileType
         profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
                                                      restrictToType=profileType,
@@ -116,9 +116,9 @@ class BrowserDialog(AbstractBrowserDialog):
         hideInBrowserBox.clicked.connect(self.browser.setShowHiddenValues)
         optionLayout.addWidget(hideInBrowserBox)
         
-        viewConfigButton = QtGui.QPushButton(self.tr("Configure Views..."))
+        viewConfigButton = QtWidgets.QPushButton(self.tr("Configure Views..."))
         viewConfigButton.clicked.connect(self._handleViewConfigButton)
-        viewConfigButton.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed))
+        viewConfigButton.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed))
         optionLayout.addWidget(viewConfigButton)
         
         optionLayout.addStretch(1)          
@@ -132,22 +132,22 @@ class BrowserDialog(AbstractBrowserDialog):
         ViewConfigurationDialog(self.browser).exec_()
             
         
-class ViewConfigurationDialog(QtGui.QDialog):
+class ViewConfigurationDialog(QtWidgets.QDialog):
     """The BrowserDialog allows you to configure the views of a browser and their layers."""
     def __init__(self, browser):
         """Initialize with the given parent, which must be the browser to configure."""
-        QtGui.QDialog.__init__(self)
+        QtWidgets.QDialog.__init__(self)
         self.setWindowTitle(self.tr("Browser configuration"))
         self.resize(450, 300)
         self.browser = browser
         
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         
-        self.addButton = QtGui.QPushButton(utils.getIcon('add.png'), '')
+        self.addButton = QtWidgets.QPushButton(utils.getIcon('add.png'), '')
         self.addButton.setEnabled(len(self.browser.views) < MAX_SUB_BROWSERS)
         self.addButton.clicked.connect(self._handleAddButton)
                
-        self.tabWidget = QtGui.QTabWidget()
+        self.tabWidget = QtWidgets.QTabWidget()
         self.tabWidget.setCornerWidget(self.addButton)
         self.tabWidget.setMovable(True)
         self.tabWidget.setTabsClosable(True)
@@ -182,13 +182,13 @@ class ViewConfigurationDialog(QtGui.QDialog):
             self.tabWidget.setTabText(index, self.tr("Browser {}").format(index+1))
     
     
-class SingleViewConfiguration(QtGui.QWidget):
+class SingleViewConfiguration(QtWidgets.QWidget):
     def __init__(self, view):
         super().__init__()
         self.model = view.model()
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         
-        self.table = QtGui.QTableWidget()
+        self.table = QtWidgets.QTableWidget()
         self.table.horizontalHeader().setVisible(False)
         self.table.verticalHeader().setMovable(True)
         self.table.verticalHeader().sectionMoved.connect(self._handleSectionMoved)
@@ -196,18 +196,18 @@ class SingleViewConfiguration(QtGui.QWidget):
         self.table.itemDoubleClicked.connect(lambda item: self._handleEditButton(item.row()))
         layout.addWidget(self.table)
         
-        bottomLine = QtGui.QHBoxLayout()
-        bottomLine.addWidget(QtGui.QLabel(self.tr("Add layer:")))
-        self.layerTypeBox = QtGui.QComboBox()
+        bottomLine = QtWidgets.QHBoxLayout()
+        bottomLine.addWidget(QtWidgets.QLabel(self.tr("Add layer:")))
+        self.layerTypeBox = QtWidgets.QComboBox()
         for name, (title, theClass) in browsermodel.layerClasses.items():
             self.layerTypeBox.addItem(title, name)
         bottomLine.addWidget(self.layerTypeBox)
-        self.addLayerButton = QtGui.QPushButton(utils.getIcon('add.png'), '')
+        self.addLayerButton = QtWidgets.QPushButton(utils.getIcon('add.png'), '')
         self.addLayerButton.clicked.connect(self._handleAddLayerButton)
         bottomLine.addWidget(self.addLayerButton)
         
         bottomLine.addStretch()
-        closeButton = QtGui.QPushButton(self.tr("Close"))
+        closeButton = QtWidgets.QPushButton(self.tr("Close"))
         closeButton.clicked.connect(self._close)
         bottomLine.addWidget(closeButton)
         layout.addLayout(bottomLine)
@@ -218,16 +218,16 @@ class SingleViewConfiguration(QtGui.QWidget):
         self.table.setRowCount(len(self.model.layers))
         self.table.setColumnCount(2)
         for i, layer in enumerate(self.model.layers):
-            item = QtGui.QTableWidgetItem(layer.text())
+            item = QtWidgets.QTableWidgetItem(layer.text())
             item.setFlags(Qt.ItemIsEnabled)
             self.table.setItem(i, 0, item)
-            buttonWidget = QtGui.QWidget()
-            buttonLayout = QtGui.QHBoxLayout(buttonWidget)
+            buttonWidget = QtWidgets.QWidget()
+            buttonLayout = QtWidgets.QHBoxLayout(buttonWidget)
             buttonLayout.setContentsMargins(0, 0, 0, 0)
-            editButton = QtGui.QPushButton(utils.getIcon('pencil.png'), '')
+            editButton = QtWidgets.QPushButton(utils.getIcon('pencil.png'), '')
             editButton.clicked.connect(functools.partial(self._handleEditButton, i))
             buttonLayout.addWidget(editButton)
-            removeButton = QtGui.QPushButton(utils.getIcon('remove.png'), '')
+            removeButton = QtWidgets.QPushButton(utils.getIcon('remove.png'), '')
             removeButton.clicked.connect(functools.partial(self._handleRemoveButton, i))
             buttonLayout.addWidget(removeButton)
             self.table.setIndexWidget(self.table.model().index(i, 1), buttonWidget)

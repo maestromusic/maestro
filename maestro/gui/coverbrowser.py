@@ -18,7 +18,7 @@
 
 import functools, weakref
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
 from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui, browser
@@ -92,9 +92,9 @@ class CoverBrowser(mainwindow.Widget):
         self.worker.done.connect(self._loaded)
         self.worker.start()
         
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         
-        controlLineLayout = QtGui.QHBoxLayout()
+        controlLineLayout = QtWidgets.QHBoxLayout()
         self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox, 1)
@@ -108,7 +108,7 @@ class CoverBrowser(mainwindow.Widget):
         self._displayWidgets = {}
         self._displayConfig = state['config'] if state is not None and 'config' in state else {}
 
-        self.displayChooser = QtGui.QComboBox()
+        self.displayChooser = QtWidgets.QComboBox()
         controlLineLayout.addWidget(self.displayChooser)
         self.displayChooser.currentIndexChanged.connect(self._handleDisplayChooser)
         self.updateDisplayChooser()
@@ -121,7 +121,7 @@ class CoverBrowser(mainwindow.Widget):
         self.optionButton.setVisible(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
         layout.addLayout(controlLineLayout)
         
-        self.stackedLayout = QtGui.QStackedLayout()
+        self.stackedLayout = QtWidgets.QStackedLayout()
         layout.addLayout(self.stackedLayout, 1)
         if state is not None and 'display' in state and state['display'] in _displayClasses:
             self.setDisplayKey(state['display'])
@@ -323,7 +323,7 @@ mainwindow.addWidgetClass(mainwindow.WidgetClass(
         theClass = CoverBrowser))
 
 
-class AbstractCoverWidget(QtGui.QWidget):
+class AbstractCoverWidget(QtWidgets.QWidget):
     """Base class for classes which can be used as display class for CoverBrowser. Plugins can subclass
     this class and register their cover widgets with addDisplayClass."""
     selectionChanged = QtCore.pyqtSignal()

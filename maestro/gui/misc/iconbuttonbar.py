@@ -16,22 +16,22 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore,QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore,QtGui
+from PyQt5.QtCore import Qt
 
  
-class IconButtonBar(QtGui.QWidget):
+class IconButtonBar(QtWidgets.QWidget):
     def __init__(self,parent = None):
-        QtGui.QWidget.__init__(self,parent)
+        QtWidgets.QWidget.__init__(self,parent)
         self.setSizePolicy(
-                QtGui.QSizePolicy(QtGui.QSizePolicy.MinimumExpanding,QtGui.QSizePolicy.MinimumExpanding))
-        self.setLayout(QtGui.QHBoxLayout())
+                QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,QtWidgets.QSizePolicy.MinimumExpanding))
+        self.setLayout(QtWidgets.QHBoxLayout())
         self.layout().setContentsMargins(0,0,0,0)
         self.layout().setSpacing(0)
         self.layout().addStretch(1)
         
     def addIcon(self,icon,slot = None,toolTip = None):
-        button = QtGui.QToolButton()
+        button = QtWidgets.QToolButton()
         button.setContentsMargins(0,0,0,0)
         button.setIcon(icon)
         if slot is not None:

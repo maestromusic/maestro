@@ -16,12 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 
 def createSortingTableWidgetClass(name,keyFunc):
-    """Return a subclass of QtGui.QTableWidgetItem that uses *keyFunc* to compute keys during sorting.
+    """Return a subclass of QtWidgets.QTableWidgetItem that uses *keyFunc* to compute keys during sorting.
     *keyFunc* must be a function mapping an instance of the new class to the key. Alternatively *keyFunc*
     may be one of the strings ``leadingInt`` or ``checked``. In that case one of the predefined functions of
     this module will be used.
@@ -30,11 +30,11 @@ def createSortingTableWidgetClass(name,keyFunc):
         keyFunc = {'leadingInt': leadingInt,'checked': checked}[keyFunc]
     lt = lambda self,other: keyFunc(self) < keyFunc(other)
     ge = lambda self,other: keyFunc(self) >= keyFunc(other)
-    return type(name,(QtGui.QTableWidgetItem,),{'__lt__': lt, '__ge__': ge})
+    return type(name,(QtWidgets.QTableWidgetItem,),{'__lt__': lt, '__ge__': ge})
 
 
 def leadingInt(item):
-    """If the text of the QtGui.QTableWidgetItem *item* starts with an integer, return it.
+    """If the text of the QtWidgets.QTableWidgetItem *item* starts with an integer, return it.
     Otherwise return -1.""" 
     text = item.text()
     i = 0
@@ -46,6 +46,6 @@ def leadingInt(item):
 
 
 def checked(item):
-    """Return whether the QtGui.QTableWidgetItem *item* is checked."""
+    """Return whether the QtWidgets.QTableWidgetItem *item* is checked."""
     return item.checkState() == Qt.Checked
     

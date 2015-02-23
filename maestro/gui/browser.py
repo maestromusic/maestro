@@ -18,8 +18,8 @@
 
 import functools
 
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import Qt
+from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from maestro import application, database as db, logging, utils, search
@@ -93,8 +93,8 @@ class Browser(mainwindow.Widget):
     searchRequest = None
     
     # Called when the selection changes in any of the views
-    selectionChanged = QtCore.pyqtSignal(QtGui.QItemSelectionModel,
-                                         QtGui.QItemSelection, QtGui.QItemSelection)
+    selectionChanged = QtCore.pyqtSignal(QtCore.QItemSelectionModel,
+                                         QtCore.QItemSelection, QtCore.QItemSelection)
     
     def __init__(self, state=None, **args):
         """Initialize a new Browser with the given parent."""
@@ -111,11 +111,11 @@ class Browser(mainwindow.Widget):
         self.searchCriterion = None  # Used by the search box
 
         # Layout
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
-        controlLineLayout = QtGui.QHBoxLayout()
+        controlLineLayout = QtWidgets.QHBoxLayout()
         self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox)
@@ -133,7 +133,7 @@ class Browser(mainwindow.Widget):
         
         layout.addLayout(controlLineLayout)
                
-        self.splitter = QtGui.QSplitter(Qt.Vertical, self)
+        self.splitter = QtWidgets.QSplitter(Qt.Vertical, self)
         layout.addWidget(self.splitter)
         
         # Restore state
@@ -384,7 +384,7 @@ class BrowserTreeView(treeview.TreeView):
         super().__init__(levels.real)
         self.browser = browser
         self.setModel(browsermodel.BrowserModel(domain, layers, filter))
-        self.header().sectionResized.connect(self.model().layoutChanged)
+        self.header().sectionResized.connect(lambda x, y, z: self.model().layoutChanged)
         
         # If there are no contents, the browser model contains a help message (e.g. "no search results"),
         # which should not be decorated.
@@ -582,7 +582,7 @@ class VisibleLevelsExpander:
                     self.expandToDepth(depth-1, parent=node)
 
 
-class FilterButton(QtGui.QPushButton):
+class FilterButton(QtWidgets.QPushButton):
     """Small button next to the browser's search bar that indicates whether a filter is set or not and
     allows to deactivate filters.
     """

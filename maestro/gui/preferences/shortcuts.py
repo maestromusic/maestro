@@ -16,32 +16,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 from maestro.gui import actions
 
 
-class ShortcutSettings(QtGui.QWidget):
+class ShortcutSettings(QtWidgets.QWidget):
     """Configuration widget for action shortcuts. Shows a tree of registered actions, grouped by context.
     """
     def __init__(self, dialog, panel):
         super().__init__(panel)
-        tree = QtGui.QTreeWidget()
+        tree = QtWidgets.QTreeWidget()
         tree.setColumnCount(2)
         tree.setHeaderLabels([self.tr('Action description'), self.tr('Shortcut')])
         contextItems = {}  # the first-layer tree items according to shortcut contexts
         for context, label in actions.contextLabels.items():
-            item = QtGui.QTreeWidgetItem(tree, [label])
+            item = QtWidgets.QTreeWidgetItem(tree, [label])
             item.setData(0, Qt.UserRole, context)
             contextItems[context] = item
         for action in actions.manager.actions.values():
-            item = QtGui.QTreeWidgetItem(contextItems[action.context],
+            item = QtWidgets.QTreeWidgetItem(contextItems[action.context],
                         [action.description, action.shortcut.toString(QtGui.QKeySequence.NativeText)])
             item.setData(0, Qt.UserRole, action)
         tree.expandAll()
         tree.itemActivated.connect(self.handleActivate)
-        tree.header().setResizeMode(0, QtGui.QHeaderView.Stretch)
-        layout = QtGui.QVBoxLayout()
+        tree.header().setResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        layout = QtWidgets.QVBoxLayout()
         layout.addWidget(tree)
         self.setLayout(layout)
 
@@ -56,7 +56,7 @@ class ShortcutSettings(QtGui.QWidget):
             item.setText(1, sequence.toString(QtGui.QKeySequence.NativeText))
 
 
-class ShortcutEdit(QtGui.QLineEdit):
+class ShortcutEdit(QtWidgets.QLineEdit):
     """A line edit that displays shortcuts when the user presses one."""
 
     def __init__(self, current):
@@ -83,7 +83,7 @@ class ShortcutEdit(QtGui.QLineEdit):
         return QtGui.QKeySequence(self.text())
 
 
-class ShortcutEditDialog(QtGui.QDialog):
+class ShortcutEditDialog(QtWidgets.QDialog):
     """Dialog for setting a shortcut of a given action. Displays a short information text, a ShortcutEdit,
     and a number of buttons.
     """
@@ -91,12 +91,12 @@ class ShortcutEditDialog(QtGui.QDialog):
         super().__init__(parent)
         self.action = action
         #self.resize(130, 50)
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle(self.tr('Enter shortcut'))
-        layout.addWidget(QtGui.QLabel(self.tr('Enter shortcut for "{}"').format(action.description)))
+        layout.addWidget(QtWidgets.QLabel(self.tr('Enter shortcut for "{}"').format(action.description)))
         self.chooser = ShortcutEdit(action.shortcut)
         layout.addWidget(self.chooser)
-        bbx = QtGui.QDialogButtonBox()
+        bbx = QtWidgets.QDialogButtonBox()
         bbx.addButton(bbx.Cancel)
         bbx.addButton(bbx.Ok)
         removeButton = bbx.addButton(self.tr('Clear'), bbx.ActionRole)

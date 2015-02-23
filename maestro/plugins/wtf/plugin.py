@@ -20,8 +20,8 @@
 
 import functools, os, os.path, shutil, copy, itertools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ... import utils, profiles, config, application, database as db, search, logging, filesystem
@@ -54,11 +54,11 @@ def enable():
                             )
     profiles.manager.addCategory(profileCategory)
     
-    _action = QtGui.QAction(application.mainWindow)
-    _action.setText(QtGui.QApplication.translate("wtf", "Export..."))
-    _action.triggered[tuple()].connect(Dialog.execute)
+    _action = QtWidgets.QAction(application.mainWindow)
+    _action.setText(QtWidgets.QApplication.translate("wtf", "Export..."))
+    _action.triggered.connect(Dialog.execute)
     global _sqlAction
-    _sqlAction = QtGui.QAction(application.mainWindow)
+    _sqlAction = QtWidgets.QAction(application.mainWindow)
     _sqlAction.setText("Export SQLite...")
     _sqlAction.triggered.connect(exportSQLite)
     
@@ -131,38 +131,38 @@ class Profile(profiles.Profile):
                 self.options.remove(option)
 
     
-class Dialog(QtGui.QDialog):
+class Dialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Export"))
-        layout = QtGui.QVBoxLayout(self)
-        self.stackedLayout = QtGui.QStackedLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
+        self.stackedLayout = QtWidgets.QStackedLayout(self)
         layout.addLayout(self.stackedLayout, 1)
         self.profileActionWidget = profilesgui.ProfileActionWidget(profileCategory)
         self.configWidget = self.profileActionWidget.configWidget
         self.stackedLayout.addWidget(self.profileActionWidget)
         self.stackedLayout.setContentsMargins(0,0,0,0)
-        fileTreePage = QtGui.QWidget()
-        fileTreeLayout = QtGui.QVBoxLayout(fileTreePage)
-        self.statLabel = QtGui.QLabel()
+        fileTreePage = QtWidgets.QWidget()
+        fileTreeLayout = QtWidgets.QVBoxLayout(fileTreePage)
+        self.statLabel = QtWidgets.QLabel()
         fileTreeLayout.addWidget(self.statLabel)
         self.fileTree = filetree.FileTreeView()
         fileTreeLayout.addWidget(self.fileTree)
         self.stackedLayout.addWidget(fileTreePage)
         
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(buttonLayout)
-        cancelButton = QtGui.QPushButton(self.tr("Cancel"))
+        cancelButton = QtWidgets.QPushButton(self.tr("Cancel"))
         cancelButton.clicked.connect(self.reject)
         buttonLayout.addWidget(cancelButton)
         buttonLayout.addStretch()
         
-        self.previousButton = QtGui.QPushButton(self.tr("Previous"))
+        self.previousButton = QtWidgets.QPushButton(self.tr("Previous"))
         self.previousButton.clicked.connect(self.previous)
         self.previousButton.setEnabled(False)
         buttonLayout.addWidget(self.previousButton)
         
-        self.nextButton = QtGui.QPushButton(self.tr("Next"))
+        self.nextButton = QtWidgets.QPushButton(self.tr("Next"))
         self.nextButton.clicked.connect(self.next)
         buttonLayout.addWidget(self.nextButton)
         
@@ -276,22 +276,22 @@ class ConfigWidget(profilesgui.ProfileConfigurationWidget):
 
     def __init__(self, profile, parent=None):
         super().__init__(profile, parent)
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setContentsMargins(1,1,1,1)
         
-        layout = QtGui.QFormLayout()
+        layout = QtWidgets.QFormLayout()
         self.domainBox = widgets.DomainBox(profile.domain)
         self.domainBox.domainChanged.connect(self._handleDomainChanged)
         if profile.domain is None:
             profile.domain = self.domainBox.currentDomain()
         layout.addRow(self.tr("Domain:"), self.domainBox)
-        lineLayout = QtGui.QHBoxLayout()
+        lineLayout = QtWidgets.QHBoxLayout()
         self.criterionLineEdit = searchgui.CriterionLineEdit(profile.criterion)
         self.criterionLineEdit.criterionChanged.connect(self._handleCriterionLineEdit)
         self.criterionLineEdit.criterionCleared.connect(self._handleCriterionLineEdit)
         lineLayout.addWidget(self.criterionLineEdit, 1)
         layout.addRow(self.tr("Filter:"), lineLayout)
-        self.flagButton = QtGui.QPushButton()
+        self.flagButton = QtWidgets.QPushButton()
         self.flagButton.setIcon(utils.getIcon("flag_blue.png"))
         self.flagButton.setIconSize(QtCore.QSize(16, 16))
         self.flagButton.clicked.connect(self._handleFlagButton)
@@ -300,13 +300,13 @@ class ConfigWidget(profilesgui.ProfileConfigurationWidget):
         #self.layout().addWidget(
         #                    collapsiblepanel.CollapsiblePanel(self.tr("Choose elements to export"), layout))
         
-        layout = QtGui.QFormLayout()
+        layout = QtWidgets.QFormLayout()
         self.pathLineEdit = lineedits.PathLineEdit(self.tr("Choose an export directory"),
                                                    pathType="existingDirectory",
                                                    path=profile.path)
         self.pathLineEdit.textChanged.connect(self._handlePathEditingFinished)
         layout.addRow(self.tr("Path:"), self.pathLineEdit)
-        self.structureBox = QtGui.QComboBox()
+        self.structureBox = QtWidgets.QComboBox()
         self.structureBox.addItem(self.tr("Keep directory structure"), STRUCTURE_KEEP)
         self.structureBox.addItem(self.tr("Put all files into target directory"), STRUCTURE_FLAT)
         self.structureBox.setCurrentIndex(profile.structure)
@@ -318,7 +318,7 @@ class ConfigWidget(profilesgui.ProfileConfigurationWidget):
         self.layout().addLayout(layout)
         #self.layout().addWidget(collapsiblepanel.CollapsiblePanel(self.tr("Export location"), layout))
         
-        layout = QtGui.QFormLayout()
+        layout = QtWidgets.QFormLayout()
         self.includeWorkTitlesBox = QtGui.QCheckBox(
                                             self.tr("Include titles of works into the works' contents."))
         self.includeWorkTitlesBox.toggled.connect(
@@ -365,7 +365,7 @@ class FlagDialog(dialogs.FancyPopup):
     def __init__(self, parent, criterionLine):
         super().__init__(parent)
         self.criterionLine = criterionLine
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         self.flagView = searchgui.FlagView(self._getSelectedFlags())
         self.flagView.selectionChanged.connect(self._setSelectedFlags)
         layout.addWidget(self.flagView)

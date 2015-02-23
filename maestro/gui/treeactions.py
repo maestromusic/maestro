@@ -18,8 +18,8 @@
 
 import os.path
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from maestro import stack
 from maestro.utils import images
@@ -314,7 +314,7 @@ class DeleteAction(actions.TreeAction):
         if self.allowDisk and len(files) > 0:
             from maestro.gui.dialogs import DeleteDialog
             dialog = DeleteDialog(files,self.parent())
-            if dialog.exec_() == QtGui.QDialog.Accepted:
+            if dialog.exec_() == QtWidgets.QDialog.Accepted:
                 self.level().deleteElements(files, fromDisk=True)
 
 DeleteAction.register('delete', shortcut=translate('QShortcut', 'Ctrl+Del'))
@@ -371,16 +371,16 @@ class ChangeFileUrlsAction(actions.TreeAction):
         if path in [None, '', oldPath]:
             return False
         if not shouldExist and os.path.exists(path):
-            QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
+            QtWidgets.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("The given path exists already."))
             return False
         elif shouldExist and not os.path.exists(path):
-            QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
+            QtWidgets.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("The given path does not exists."))
             return False
         source = domains.getSource(oldPath)
         if not path.startswith(source.path):
-            QtGui.QMessageBox.warning(None, self.tr("Invalid path"),
+            QtWidgets.QMessageBox.warning(None, self.tr("Invalid path"),
                                       self.tr("Path must be inside collection directory"))
             return False
         return True
@@ -397,15 +397,15 @@ class ChangeFileUrlsAction(actions.TreeAction):
     def changeOtherUrl(self, element):
         """Ask the user for a new URL for *element* and change the URL. For filesystem-files use
         changeFileUrl instead."""
-        path, ok = QtGui.QInputDialog.getText(None, self.tr("Change file URL"),
+        path, ok = QtWidgets.QInputDialog.getText(None, self.tr("Change file URL"),
                                               self.tr("Select new file URL:"),
-                                              QtGui.QLineEdit.Normal, str(element.url))
+                                              QtWidgets.QLineEdit.Normal, str(element.url))
         if not ok or path is None or path == '':
             return
         try:
             newUrl = urls.URL(path)
         except ValueError:
-            QtGui.QMessageBox.warning(None, self.tr("Invalid URL"), self.tr("Please enter a valid URL."))
+            QtWidgets.QMessageBox.warning(None, self.tr("Invalid URL"), self.tr("Please enter a valid URL."))
             return
 
         self.level().renameFiles({element: (element.url, newUrl)})
@@ -422,7 +422,7 @@ class ChangeFileUrlsAction(actions.TreeAction):
                        for element in elements}
             for oldUrl, newUrl in changes.values():
                 if os.path.exists(newUrl.path):
-                    QtGui.QMessageBox.warning(None, self.tr("Path collision"),
+                    QtWidgets.QMessageBox.warning(None, self.tr("Path collision"),
                                 self.tr("Cannot move '{}' to '{}' because the latter path exists already."
                                         .format(str(oldUrl), str(newUrl))))
                     return

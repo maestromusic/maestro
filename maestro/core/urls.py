@@ -18,7 +18,7 @@
 
 import os.path
 import re
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from maestro import utils
 
 translate = QtCore.QCoreApplication.translate

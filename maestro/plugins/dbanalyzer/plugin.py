@@ -20,8 +20,8 @@
 them. It is provided as central widget, dialog (in the extras menu) and standalone application
 (bin/dbanalyzer)."""
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import database as db, application, config, utils, VERSION
 from ...gui import mainwindow
@@ -34,8 +34,8 @@ _widget = None # the dialog widget must be stored in a variable or it will vanis
 
 def enable():
     global _action
-    _action = QtGui.QAction(application.mainWindow)
-    _action.setText(QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"))
+    _action = QtWidgets.QAction(application.mainWindow)
+    _action.setText(QtWidgets.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"))
     _action.triggered.connect(_openDialog)
     mainwindow.addWidgetClass(_getWidgetClass())
 
@@ -59,7 +59,7 @@ def defaultStorage():
 def _getWidgetClass():
     return mainwindow.WidgetClass(
         id = "dbanalyzer",
-        name = QtGui.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
+        name = QtWidgets.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
         theClass = DBAnalyzer,
         areas = 'central',
         icon = QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
@@ -72,74 +72,74 @@ class DBAnalyzer(mainwindow.Widget):
     
     def __init__(self, state=None, dialog=False, **args):
         super().__init__(**args)
-        layout = QtGui.QHBoxLayout(self)
-        splitter = QtGui.QSplitter()
+        layout = QtWidgets.QHBoxLayout(self)
+        splitter = QtWidgets.QSplitter()
         layout.addWidget(splitter)
-        leftWidget = QtGui.QWidget()
-        leftLayout = QtGui.QVBoxLayout()
+        leftWidget = QtWidgets.QWidget()
+        leftLayout = QtWidgets.QVBoxLayout()
         leftLayout.setContentsMargins(0,0,0,0)
         leftWidget.setLayout(leftLayout)
         splitter.addWidget(leftWidget)
-        rightWidget = QtGui.QWidget()
-        rightLayout = QtGui.QVBoxLayout()
+        rightWidget = QtWidgets.QWidget()
+        rightLayout = QtWidgets.QVBoxLayout()
         rightLayout.setContentsMargins(0,0,0,0)
         rightWidget.setLayout(rightLayout)
         splitter.addWidget(rightWidget)
 
         # Statistics
-        statisticsBox = QtGui.QGroupBox(self.tr("Statistics"))
-        statisticsLayout = QtGui.QVBoxLayout()
+        statisticsBox = QtWidgets.QGroupBox(self.tr("Statistics"))
+        statisticsLayout = QtWidgets.QVBoxLayout()
         statisticsBox.setLayout(statisticsLayout)
         leftLayout.addWidget(statisticsBox,0)
 
-        self.statisticsTable = QtGui.QTableWidget(1,2)
+        self.statisticsTable = QtWidgets.QTableWidget(1,2)
         self.statisticsTable.horizontalHeader().hide()
         self.statisticsTable.verticalHeader().hide()
         statisticsLayout.addWidget(self.statisticsTable)
 
         # Tags
-        tagBox = QtGui.QGroupBox(self.tr("Tags"))
-        tagLayout = QtGui.QVBoxLayout()
+        tagBox = QtWidgets.QGroupBox(self.tr("Tags"))
+        tagLayout = QtWidgets.QVBoxLayout()
         tagBox.setLayout(tagLayout)
         leftLayout.addWidget(tagBox,1)
 
-        self.tagTable = QtGui.QTableWidget(1,7)
+        self.tagTable = QtWidgets.QTableWidget(1,7)
         self.tagTable.verticalHeader().hide()
         tagLayout.addWidget(self.tagTable)
 
         # Problems
-        problemsBox = QtGui.QGroupBox(self.tr("Problems"))
-        problemsLayout = QtGui.QVBoxLayout()
+        problemsBox = QtWidgets.QGroupBox(self.tr("Problems"))
+        problemsLayout = QtWidgets.QVBoxLayout()
         problemsBox.setLayout(problemsLayout)
         rightLayout.addWidget(problemsBox,0)
 
-        self.problemsTable = QtGui.QTableWidget(1,2)
+        self.problemsTable = QtWidgets.QTableWidget(1,2)
         self.problemsTable.verticalHeader().hide()
         self.problemsTable.cellClicked.connect(self._handleCellClicked)
         problemsLayout.addWidget(self.problemsTable)
 
-        self.detailLabel = QtGui.QLabel()
+        self.detailLabel = QtWidgets.QLabel()
         problemsLayout.addWidget(self.detailLabel)
         
-        self.detailTable = QtGui.QTableWidget(0,0)
+        self.detailTable = QtWidgets.QTableWidget(0,0)
         self.detailTable.verticalHeader().hide()
         problemsLayout.addWidget(self.detailTable)
 
         # Buttons
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         problemsLayout.addLayout(buttonLayout)
-        self.fixButton = QtGui.QPushButton(QtGui.QIcon(":/maestro/plugins/dbanalyzer/edit-clear.png"),
+        self.fixButton = QtWidgets.QPushButton(QtGui.QIcon(":/maestro/plugins/dbanalyzer/edit-clear.png"),
                                            self.tr("Fix problem"))
         self.fixButton.setEnabled(False)
         self.fixButton.clicked.connect(self._handleFixButton)
         buttonLayout.addWidget(self.fixButton,0)
-        refreshButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('view-refresh'),self.tr("Refresh"))
+        refreshButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('view-refresh'),self.tr("Refresh"))
         refreshButton.clicked.connect(self.fetchData)
         buttonLayout.addWidget(refreshButton,0)
         
         buttonLayout.addStretch(1)
         if dialog:
-            closeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
+            closeButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
             closeButton.clicked.connect(self.close)
             buttonLayout.addWidget(closeButton,0)
 
@@ -157,7 +157,7 @@ class DBAnalyzer(mainwindow.Widget):
         self.statisticsTable.setRowCount(len(statistics))
         for i, tuple in enumerate(statistics):
             for j,data in enumerate(tuple):
-                item = QtGui.QTableWidgetItem(str(data))
+                item = QtWidgets.QTableWidgetItem(str(data))
                 item.setFlags(Qt.ItemIsEnabled)
                 self.statisticsTable.setItem(i,j,item)
         self.statisticsTable.resizeColumnsToContents()
@@ -166,10 +166,10 @@ class DBAnalyzer(mainwindow.Widget):
         tags = self.getTags()
         self.tagTable.setRowCount(len(tags))
         for i,header in enumerate(("id","tagname","tagtype","private",self.tr("Values"),self.tr("Refs"))):
-            self.tagTable.setHorizontalHeaderItem(i,QtGui.QTableWidgetItem(header))
+            self.tagTable.setHorizontalHeaderItem(i,QtWidgets.QTableWidgetItem(header))
         for i,tuple in enumerate(tags):
             for j,data in enumerate(tuple):
-                item = QtGui.QTableWidgetItem(str(data))
+                item = QtWidgets.QTableWidgetItem(str(data))
                 item.setFlags(Qt.ItemIsEnabled)
                 self.tagTable.setItem(i,j,item)
         self.tagTable.resizeColumnsToContents()
@@ -180,18 +180,18 @@ class DBAnalyzer(mainwindow.Widget):
         checkData = [(check.getName(),check.getInfo(),check.getNumber()) for check in self.checks]
         self.problemDetails = {}
         self.problemsTable.setRowCount(len(checkData))
-        self.problemsTable.setHorizontalHeaderItem(0,QtGui.QTableWidgetItem(self.tr("Check")))
-        self.problemsTable.setHorizontalHeaderItem(1,QtGui.QTableWidgetItem(self.tr("Broken")))
+        self.problemsTable.setHorizontalHeaderItem(0,QtWidgets.QTableWidgetItem(self.tr("Check")))
+        self.problemsTable.setHorizontalHeaderItem(1,QtWidgets.QTableWidgetItem(self.tr("Broken")))
         for i,tuple in enumerate(checkData):
             name,info,number = tuple
-            item = QtGui.QTableWidgetItem(name)
+            item = QtWidgets.QTableWidgetItem(name)
             # Use <qt> to enforce rich text handling so that QT automatically breaks lines
             item.setData(Qt.ToolTipRole,"<qt>{}</qt>".format(info))
             if number > 0:
                 item.setIcon(QtGui.QIcon.fromTheme("dialog-warning"))
             item.setFlags(Qt.ItemIsEnabled)
             self.problemsTable.setItem(i,0,item)
-            item = QtGui.QTableWidgetItem(str(number))
+            item = QtWidgets.QTableWidgetItem(str(number))
             item.setData(Qt.ToolTipRole,"<qt>{}</qt>".format(info))
             item.setFlags(Qt.ItemIsEnabled)
             self.problemsTable.setItem(i,1,item)
@@ -223,7 +223,7 @@ class DBAnalyzer(mainwindow.Widget):
         self.detailTable.clear()
         self.detailTable.setColumnCount(len(check._columnHeaders))
         for i,header in enumerate(check.getColumnHeaders()):
-            self.detailTable.setHorizontalHeaderItem(i,QtGui.QTableWidgetItem(header))
+            self.detailTable.setHorizontalHeaderItem(i,QtWidgets.QTableWidgetItem(header))
         
         if check.getNumber() == 0:
             self.detailLabel.setText(self.tr("OK"))
@@ -237,7 +237,7 @@ class DBAnalyzer(mainwindow.Widget):
 
             for i,tuple in enumerate(data):
                 for j,content in enumerate(tuple):
-                    item = QtGui.QTableWidgetItem(str(content))
+                    item = QtWidgets.QTableWidgetItem(str(content))
                     item.setFlags(Qt.ItemIsEnabled)
                     self.detailTable.setItem(i,j,item)
         self.detailTable.resizeColumnsToContents()
@@ -299,7 +299,7 @@ class DBAnalyzer(mainwindow.Widget):
     def close(self):
         config.storage.dbanalyzer.size = (self.width(),self.height())
         config.storage.dbanalyzer.pos = (self.x(),self.y())
-        QtGui.QDialog.close(self)
+        QtWidgets.QDialog.close(self)
 
 
 def _openDialog():
@@ -309,13 +309,13 @@ def _openDialog():
     _widget.show()
     
     
-class DBAnalyzerDialog(QtGui.QDialog):
+class DBAnalyzerDialog(QtWidgets.QDialog):
     """A dialog containing a DBAnalyzer."""
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Maestro version {} – Database Analyzer".format(VERSION))
         self.setWindowIcon(QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         analyzer = DBAnalyzer(widgetClass=_getWidgetClass())
         layout.addWidget(analyzer)
         

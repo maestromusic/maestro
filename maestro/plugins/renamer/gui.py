@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from maestro import logging
@@ -73,7 +73,7 @@ class PathDelegate(delegates.StandardDelegate):
                                                   self.unchangedStyle))
             
     
-class RenameDialog(QtGui.QDialog):
+class RenameDialog(QtWidgets.QDialog):
     """A dialog for pattern-based file renaming.
     
     Shows a tree view with the selected containers, which acts as a preview for renaming. The
@@ -88,11 +88,11 @@ class RenameDialog(QtGui.QDialog):
         elements = list(elements)
         self.level = level
         self.setWindowTitle(self.tr("Rename {} containers").format(len(elements)))
-        mainLayout = QtGui.QVBoxLayout()
+        mainLayout = QtWidgets.QVBoxLayout()
 
         self.profileActionWidget = profiles.ProfileActionWidget(plugin.profileCategory)
         mainLayout.addWidget(self.profileActionWidget, 1)
-        self.statusLabel = QtGui.QLabel()
+        self.statusLabel = QtWidgets.QLabel()
         self.statusLabel.setVisible(False)
         f = self.statusLabel.font()
         f.setBold(True)
@@ -111,7 +111,7 @@ class RenameDialog(QtGui.QDialog):
         self.tree.setItemDelegate(PathDelegate(self.tree))
         self.tree.expandAll()
         
-        self.bb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        self.bb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         self.bb.accepted.connect(self.checkAccept)
         self.bb.rejected.connect(self.reject)
         
@@ -139,16 +139,16 @@ class RenameDialog(QtGui.QDialog):
                         subelem = self.sublevel[elem.id]
                         subelem.url = subelem.url.copy(path=newPath)
                 if len(set(totalResult.values())) != len(totalResult): # duplicate paths!
-                    self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
+                    self.bb.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(False)
                     self.statusLabel.setText(self.tr("New paths are not unique! Please fix"))
                     self.statusLabel.show()
                 else:
                     self.statusLabel.hide()
-                    self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(True)
+                    self.bb.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(True)
             except plugin.FormatSyntaxError:
                 self.statusLabel.setText(self.tr("Syntax error in format string"))
                 self.statusLabel.show()
-                self.bb.button(QtGui.QDialogButtonBox.Ok).setEnabled(False)
+                self.bb.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(False)
             self.model.modelReset.emit()
             self.tree.expandAll()
             self.previewProfile = profile.copy()
@@ -168,12 +168,12 @@ class GrammarConfigurationWidget(profiles.ProfileConfigurationWidget):
     def __init__(self, profile, parent=None):
         super().__init__(profile, parent)
         self.setMinimumWidth(600)
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
 
-        self.formatEdit = QtGui.QTextEdit()
-        self.replaceCharsEdit = QtGui.QLineEdit()
-        self.replaceByEdit = QtGui.QLineEdit()
-        self.removeCharsEdit = QtGui.QLineEdit()
+        self.formatEdit = QtWidgets.QTextEdit()
+        self.replaceCharsEdit = QtWidgets.QLineEdit()
+        self.replaceByEdit = QtWidgets.QLineEdit()
+        self.removeCharsEdit = QtWidgets.QLineEdit()
 
         self.setProfile(profile)
         self.formatEdit.textChanged.connect(self.updateProfile)
@@ -182,13 +182,13 @@ class GrammarConfigurationWidget(profiles.ProfileConfigurationWidget):
         
         layout.addWidget(self.formatEdit)
         
-        hLayout = QtGui.QHBoxLayout()
+        hLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(hLayout)
-        hLayout.addWidget(QtGui.QLabel(self.tr("Replace:")))
+        hLayout.addWidget(QtWidgets.QLabel(self.tr("Replace:")))
         hLayout.addWidget(self.replaceCharsEdit)
-        hLayout.addWidget(QtGui.QLabel(self.tr("By:")))
+        hLayout.addWidget(QtWidgets.QLabel(self.tr("By:")))
         hLayout.addWidget(self.replaceByEdit)
-        hLayout.addWidget(QtGui.QLabel(self.tr("And remove:")))
+        hLayout.addWidget(QtWidgets.QLabel(self.tr("And remove:")))
         hLayout.addWidget(self.removeCharsEdit)
 
     def updateProfile(self):

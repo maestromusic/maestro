@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from maestro import utils
@@ -48,9 +48,9 @@ class EditorTreeView(treeview.DraggingTreeView):
                 self.expand(child)
             
     def _selectDroppedRows(self, parent, start, end):
-        self.selectionModel().select(QtGui.QItemSelection(self.model().index(start, 0, parent),
+        self.selectionModel().select(QtCore.QItemSelection(self.model().index(start, 0, parent),
                                                           self.model().index(end, 0, parent)),
-                                     QtGui.QItemSelectionModel.ClearAndSelect)   
+                                     QtCore.QItemSelectionModel.ClearAndSelect)
         self.setFocus(Qt.MouseFocusReason)
 
 
@@ -66,7 +66,7 @@ class EditorWidget(mainwindow.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         self.hasOptionDialog = True
-        layout = QtGui.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         
@@ -79,11 +79,11 @@ class EditorWidget(mainwindow.Widget):
             state.get('delegate'),
             editordelegate.EditorDelegate.profileType)
         
-        buttonLayout = QtGui.QHBoxLayout()
+        buttonLayout = QtWidgets.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
         layout.addLayout(buttonLayout)
         
-        self.splitter = QtGui.QSplitter(Qt.Vertical)
+        self.splitter = QtWidgets.QSplitter(Qt.Vertical)
         layout.addWidget(self.splitter)
         
         self.editor = EditorTreeView(delegateProfile)
@@ -99,7 +99,7 @@ class EditorWidget(mainwindow.Widget):
         self.splitter.setStretchFactor(1,1)
         
         # Fill buttonLayout
-        self.toolbar = QtGui.QToolBar(self)
+        self.toolbar = QtWidgets.QToolBar(self)
         self.toolbar.addAction(self.editor.treeActions['clearTree'])
         
         self.toolbar.addAction(self.editor.treeActions['commit'])
@@ -130,14 +130,14 @@ class OptionDialog(dialogs.FancyPopup):
     def __init__(self, parent, editor):
         super().__init__(parent)
         self.editor = editor
-        layout = QtGui.QFormLayout(self)
+        layout = QtWidgets.QFormLayout(self)
         
         autoExpandBox = QtGui.QCheckBox()
         autoExpandBox.setChecked(editor.autoExpand)
         autoExpandBox.stateChanged.connect(self._handleAutoExpandBox)
         layout.addRow(self.tr("Auto expand"),autoExpandBox)
         
-        albumGuessLayout = QtGui.QHBoxLayout()
+        albumGuessLayout = QtWidgets.QHBoxLayout()
         albumGuessCheckBox = QtGui.QCheckBox()
         albumGuessCheckBox.setChecked(self.editor.model().guessingEnabled)
         albumGuessCheckBox.setToolTip(self.tr("Auto expand dropped containers"))
@@ -175,7 +175,7 @@ class OptionDialog(dialogs.FancyPopup):
         self.editor.model().guessProfile = profile
     
 
-class ExternalTagsWidget(QtGui.QScrollArea):
+class ExternalTagsWidget(QtWidgets.QScrollArea):
     """This widget displays information about external tags in the editor (including automatically performed
     tag processing)."""
     def __init__(self,editor):
@@ -183,7 +183,7 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         self.editor = editor
         self.editor.model().extTagInfosChanged.connect(self.updateText)
         
-        self.label = QtGui.QLabel()
+        self.label = QtWidgets.QLabel()
         self.label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.setWidget(self.label)
         self.setWidgetResizable(True)
@@ -242,12 +242,12 @@ class ExternalTagsWidget(QtGui.QScrollArea):
         elif action == 'select':
             # Construct a QItemSelection storing the whole selection and add it to the model at once.
             # Otherwise a selectionChanged signal would be emitted after each selected wrapper. 
-            itemSelection = QtGui.QItemSelection()
+            itemSelection = QtCore.QItemSelection()
             for wrapper in self.editor.model().getAllNodes():
                 if wrapper.element in info.elements:
                     index = self.editor.model().getIndex(wrapper)
                     itemSelection.select(index,index)
-            self.editor.selectionModel().select(itemSelection,QtGui.QItemSelectionModel.ClearAndSelect)       
+            self.editor.selectionModel().select(itemSelection,QtCore.QItemSelectionModel.ClearAndSelect)
 
 
 mainwindow.addWidgetClass(mainwindow.WidgetClass(

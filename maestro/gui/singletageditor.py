@@ -16,8 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from . import tagwidgets, dialogs
 from maestro.core import urls
@@ -28,7 +28,7 @@ from ..models import simplelistmodel
 EXPAND_LIMIT = 2
 
 
-class SingleTagEditor(QtGui.QWidget):
+class SingleTagEditor(QtWidgets.QWidget):
     """A SingleTagEditor is the part of an editor used to edit the values of a single tag. It consists of a 
     two misc.widgetlist.WidgetList-instances that display the common records and the uncommon ones,
     respectively. They are separated by a ExpandLine that can be used to expand/hide the second list.
@@ -45,7 +45,7 @@ class SingleTagEditor(QtGui.QWidget):
     EXPAND_LINE_LIMIT = 3
 
     def __init__(self, tagEditor, tag, model, parent=None):
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         self.tagEditor = tagEditor
         self.tag = tag
         self.model = model
@@ -54,7 +54,7 @@ class SingleTagEditor(QtGui.QWidget):
         model.recordRemoved.connect(self._handleRecordRemoved)
         model.recordChanged.connect(self._handleRecordChanged)
         
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setSpacing(0)
         self.layout().setContentsMargins(0,0,0,0)
         palette = QtGui.QPalette()
@@ -62,14 +62,14 @@ class SingleTagEditor(QtGui.QWidget):
         self.setPalette(palette)
         self.setAutoFillBackground(True)
 
-        self.commonList = widgetlist.WidgetList(QtGui.QBoxLayout.TopToBottom)
+        self.commonList = widgetlist.WidgetList(QtWidgets.QBoxLayout.TopToBottom)
         self.layout().addWidget(self.commonList, 1)
         
         self.expandLine = ExpandLine()
         self.expandLine.triggered.connect(self.setExpanded)
         self.layout().addWidget(self.expandLine)
         
-        self.uncommonList = widgetlist.WidgetList(QtGui.QBoxLayout.TopToBottom)
+        self.uncommonList = widgetlist.WidgetList(QtWidgets.QBoxLayout.TopToBottom)
         self.expandLine.doubleClicked.connect(self.uncommonList.selectAll)
         self.layout().addWidget(self.uncommonList, 1)
         
@@ -178,7 +178,7 @@ class SingleTagEditor(QtGui.QWidget):
         if expanded != self.expanded:
             if not self._uncommonLoaded:
                 self.expandLine.setText(self.tr("<i>Loading...</i>"))
-                QtGui.QApplication.processEvents()
+                QtWidgets.QApplication.processEvents()
                 self._loadUncommonRecords()
             self.expanded = expanded
             self._updateListVisibility()
@@ -196,14 +196,14 @@ class SingleTagEditor(QtGui.QWidget):
         else: self.tagEditor.contextMenuEvent(contextMenuEvent, None)
 
 
-class RecordEditor(QtGui.QWidget):
+class RecordEditor(QtWidgets.QWidget):
     """A RecordEditor is used to edit a single record. It consist of a TagValueEditor to edit the value, an
      ExpandLine which is invisible for common records and contains something like "in 4/8 elements" for other
      records and a listview showing the titles of the elements in record.elementsWithValue. The listview can
      be expanded/hidden using the ExpandLine.
      """
     def __init__(self, model, record, parent=None):
-        QtGui.QWidget.__init__(self, parent)
+        QtWidgets.QWidget.__init__(self, parent)
         self.model = model
         self.model.recordChanged.connect(self._handleRecordChanged)
         self.record = record
@@ -211,7 +211,7 @@ class RecordEditor(QtGui.QWidget):
         self.expanded = None # Will be initialized at the end of setRecord
         self.listView = None # Might be created in setRecord
         
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setSpacing(0)
         self.layout().setContentsMargins(0,0,0,0)
         
@@ -228,7 +228,7 @@ class RecordEditor(QtGui.QWidget):
         self.expandLine.setFont(font)
         
         # Using an extra layout for the list view seems to be the only method to indent it by 20px
-        listViewLayout = QtGui.QHBoxLayout()
+        listViewLayout = QtWidgets.QHBoxLayout()
         listViewLayout.setContentsMargins(20,0,0,0)
         self.listView = listview.ListView()
         self.listView.setModel(simplelistmodel.SimpleListModel([], lambda el: el.getTitle()))
@@ -313,7 +313,7 @@ class RecordEditor(QtGui.QWidget):
                         parent=self)
 
 
-class ExpandLine(QtGui.QLabel):
+class ExpandLine(QtWidgets.QLabel):
     """An ExpandLine is used by SingleTagEditors which contain a lot of uncommon records. It is inserted into
     the list of RecordEditors and allows the user to collapse the uncommon records and expand them again."""
     
@@ -327,7 +327,7 @@ class ExpandLine(QtGui.QLabel):
         super().__init__(text)
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.setContentsMargins(20, 5, 5, 5)
-        self.setSizePolicy(QtGui.QSizePolicy.MinimumExpanding, QtGui.QSizePolicy.MinimumExpanding)
+        self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.MinimumExpanding)
         self._expanded = False
         self._expanderVisible = True
         # Use a timer to avoid flickering (unexpand and expand again) on double click events.
@@ -336,7 +336,7 @@ class ExpandLine(QtGui.QLabel):
         self._timer.timeout.connect(self.toggleExpanded)
         # A higher interval leads to lags on single clicks.
         # Also flickering on very slow double clicks is not that bad.
-        self._timer.setInterval(min(QtGui.QApplication.doubleClickInterval(), 150))
+        self._timer.setInterval(min(QtWidgets.QApplication.doubleClickInterval(), 150))
     
     def isExpanded(self):
         """Return whether the line is in expanded state."""
@@ -362,16 +362,16 @@ class ExpandLine(QtGui.QLabel):
           
     def paintEvent(self, event):
         super().paintEvent(event)
-        painter = QtGui.QStylePainter(self)
+        painter = QtWidgets.QStylePainter(self)
         if self._expanderVisible:
-            option = QtGui.QStyleOption()
+            option = QtWidgets.QStyleOption()
             option.initFrom(self)
             option.rect = QtCore.QRect(0, 5, 20, 20)
             # State_Children is necessary to draw an arrow at all, State_Open draws the expanded arro
-            option.state |= QtGui.QStyle.State_Children
+            option.state |= QtWidgets.QStyle.State_Children
             if self._expanded:
-                option.state |= QtGui.QStyle.State_Open
-            painter.drawPrimitive(QtGui.QStyle.PE_IndicatorBranch, option)
+                option.state |= QtWidgets.QStyle.State_Open
+            painter.drawPrimitive(QtWidgets.QStyle.PE_IndicatorBranch, option)
         event.accept()
     
     def mousePressEvent(self, event):

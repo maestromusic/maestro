@@ -18,8 +18,8 @@
 
 import copy, collections
 
-from PyQt4 import QtCore,QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore,QtGui
+from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from ... import config, profiles, logging

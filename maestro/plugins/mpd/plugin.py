@@ -35,7 +35,7 @@ if mpd_version < [0, 5, 1]:
     raise ImportError("The installed version of python-mpd2 is too old. Maestro needs at least "
                       "python-mpd2-0.5.1 to function properly.")
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from maestro import application, player, logging, profiles, stack
 from maestro.gui.misc import lineedits
@@ -103,11 +103,11 @@ class MPDPlayerBackend(player.PlayerBackend):
         self._numFrontends = 0
         
         # actions
-        self.separator = QtGui.QAction("MPD", self)
+        self.separator = QtWidgets.QAction("MPD", self)
         self.separator.setSeparator(True)
-        self.updateDBAction = QtGui.QAction(self.tr("Update Database"), self)
+        self.updateDBAction = QtWidgets.QAction(self.tr("Update Database"), self)
         self.updateDBAction.triggered.connect(self.updateDB)
-        self.configOutputsAction = QtGui.QAction(self.tr("Audio outputs..."), self)
+        self.configOutputsAction = QtWidgets.QAction(self.tr("Audio outputs..."), self)
         self.configOutputsAction.triggered.connect(self.showOutputDialog)
         
         self.stateChanged.connect(self.checkElapsedTimer)
@@ -569,21 +569,21 @@ class MPDPlayerBackend(player.PlayerBackend):
         
     def showOutputDialog(self):
         """Open a dialog to select the active audio outputs MPD uses."""
-        dialog = QtGui.QDialog(application.mainWindow)
-        layout = QtGui.QVBoxLayout()
-        layout.addWidget(QtGui.QLabel(self.tr("Choose which audio outputs to use:")))
+        dialog = QtWidgets.QDialog(application.mainWindow)
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(QtWidgets.QLabel(self.tr("Choose which audio outputs to use:")))
         checkboxes = []
         for output in sorted(self.outputs, key=lambda out:out["outputid"]):
             checkbox = QtGui.QCheckBox(output["outputname"])
             checkbox.setChecked(output["outputenabled"] == "1")
             checkboxes.append(checkbox)
             layout.addWidget(checkbox)
-        dbb = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Cancel | QtGui.QDialogButtonBox.Ok)
+        dbb = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         layout.addWidget(dbb)
         dbb.accepted.connect(dialog.accept)
         dbb.rejected.connect(dialog.reject)
         dialog.setLayout(layout)
-        if dialog.exec_() == QtGui.QDialog.Accepted:
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
             for checkbox, output in zip(checkboxes, self.outputs):
                 if output["outputenabled"] == "0" and checkbox.isChecked():
                     with self.getClient() as client:
@@ -596,23 +596,23 @@ class MPDPlayerBackend(player.PlayerBackend):
         return "MPDPlayerBackend({})".format(self.name)
 
 
-class MPDConfigWidget(QtGui.QWidget):
+class MPDConfigWidget(QtWidgets.QWidget):
     """Widget to configure playback profiles of type MPD."""
     def __init__(self, profile, parent):
         super().__init__(parent)
         
-        layout = QtGui.QVBoxLayout(self)
-        formLayout = QtGui.QFormLayout()
+        layout = QtWidgets.QVBoxLayout(self)
+        formLayout = QtWidgets.QFormLayout()
         layout.addLayout(formLayout)
         
-        self.hostEdit = QtGui.QLineEdit()
+        self.hostEdit = QtWidgets.QLineEdit()
         formLayout.addRow(self.tr("Host:"), self.hostEdit)
         
-        self.portEdit = QtGui.QLineEdit()
+        self.portEdit = QtWidgets.QLineEdit()
         self.portEdit.setValidator(QtGui.QIntValidator(0, 65535, self))
         formLayout.addRow(self.tr("Port:"), self.portEdit)
         
-        self.passwordEdit = QtGui.QLineEdit()
+        self.passwordEdit = QtWidgets.QLineEdit()
         formLayout.addRow(self.tr("Password:"), self.passwordEdit)
         
         self.passwordVisibleBox = QtGui.QCheckBox()
@@ -622,8 +622,8 @@ class MPDConfigWidget(QtGui.QWidget):
         self.pathEdit = lineedits.PathLineEdit(self.tr("Path to music folder"), pathType='existingDirectory')
         formLayout.addRow(self.tr("Path to music folder:"), self.pathEdit)
         
-        self.saveButton = QtGui.QPushButton(self.tr("Save"))
-        self.saveButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        self.saveButton = QtWidgets.QPushButton(self.tr("Save"))
+        self.saveButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         self.saveButton.setEnabled(False)
         self.saveButton.clicked.connect(self.save)
         layout.addWidget(self.saveButton)
@@ -674,18 +674,18 @@ class MPDConfigWidget(QtGui.QWidget):
     
     def _handlePasswordVisibleBox(self,checked):
         """Change whether the password is visible in self.passwordEdit."""
-        self.passwordEdit.setEchoMode(QtGui.QLineEdit.Normal if checked else QtGui.QLineEdit.Password)
+        self.passwordEdit.setEchoMode(QtWidgets.QLineEdit.Normal if checked else QtWidgets.QLineEdit.Password)
         
     def okToClose(self):
         """In case of unsaved configuration data, ask the user what to do."""
         if self.isModified():
-            button = QtGui.QMessageBox.question(
+            button = QtWidgets.QMessageBox.question(
                                     self, self.tr("Unsaved changes"),
                                     self.tr("MPD configuration has been modified. Save changes?"),
-                                    QtGui.QMessageBox.Abort | QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
-            if button == QtGui.QMessageBox.Abort:
+                                    QtWidgets.QMessageBox.Abort | QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+            if button == QtWidgets.QMessageBox.Abort:
                 return False
-            elif button == QtGui.QMessageBox.Yes:
+            elif button == QtWidgets.QMessageBox.Yes:
                 self.save()
             else: self.setProfile(self.profile) # reset
         return True

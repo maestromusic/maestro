@@ -18,8 +18,8 @@
 
 import functools
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 
 from ... import config
 from ...gui import preferences
@@ -42,9 +42,9 @@ def disable():
     
 
 def populateSections(section, parent):
-    item = QtGui.QTreeWidgetItem(parent)
+    item = QtWidgets.QTreeWidgetItem(parent)
     item.setText(0, str(section))
-    if isinstance(parent, QtGui.QTreeWidget):
+    if isinstance(parent, QtWidgets.QTreeWidget):
         prefix = ''
     else:
         prefix = parent.data(0, Qt.UserRole) + '.'
@@ -56,7 +56,7 @@ def populateSections(section, parent):
     item.setExpanded(True)
 
 
-class ConfigItem(QtGui.QTableWidgetItem):
+class ConfigItem(QtWidgets.QTableWidgetItem):
     def __init__(self, widget, option):
         super().__init__()
         self.option = option
@@ -87,7 +87,7 @@ class ConfigItem(QtGui.QTableWidgetItem):
             try:
                 self.option.fromString(value)
             except config.ConfigError:
-                QtGui.QMessageBox.critical(self.widget, translate("ConfigEditor", 'Invalid entry'),
+                QtWidgets.QMessageBox.critical(self.widget, translate("ConfigEditor", 'Invalid entry'),
                             translate("ConfigEditor", 'The data you entered is not valid for this option'))
                 return
             self.dirty = True
@@ -108,13 +108,13 @@ class ConfigItem(QtGui.QTableWidgetItem):
         self.dirty = False
         
         
-class ConfigSectionWidget(QtGui.QTableWidget):
+class ConfigSectionWidget(QtWidgets.QTableWidget):
     def __init__(self, section, parent=None):
         super().__init__(parent)
-        self.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.setSection(section)
-        self.contextMenu = QtGui.QMenu(self)
-        self.resetToDefaultAction = QtGui.QAction(self.tr('Reset to default'), self)
+        self.contextMenu = QtWidgets.QMenu(self)
+        self.resetToDefaultAction = QtWidgets.QAction(self.tr('Reset to default'), self)
         self.contextMenu.addAction(self.resetToDefaultAction)
         self.resetToDefaultAction.triggered.connect(self.setSelectedToDefault)
         
@@ -136,7 +136,7 @@ class ConfigSectionWidget(QtGui.QTableWidget):
         options = list(section.getOptions())
         self.setRowCount(len(options))
         for i, opt in enumerate(options):
-            nameItem = QtGui.QTableWidgetItem(opt.name)
+            nameItem = QtWidgets.QTableWidgetItem(opt.name)
             nameItem.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             nameItem.setToolTip(opt.description)
             self.setItem(i, 0, nameItem)
@@ -160,25 +160,25 @@ class ConfigSectionWidget(QtGui.QTableWidget):
         event.accept()
         
         
-class PreferencesDialog(QtGui.QWidget):
+class PreferencesDialog(QtWidgets.QWidget):
     def __init__(self, dialog, panel):
         super().__init__(panel)
-        mainLayout = QtGui.QVBoxLayout(self)
-        layout = QtGui.QHBoxLayout()
-        self.tree = QtGui.QTreeWidget()
+        mainLayout = QtWidgets.QVBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout()
+        self.tree = QtWidgets.QTreeWidget()
         self.tree.setHeaderLabel(self.tr('Section'))
         options = config.getFile(config.options).section
         populateSections(options, self.tree)
         self.sectionWidget = ConfigSectionWidget(self.tr('<Main>'))
         self.tree.currentItemChanged.connect(self._handleCurrentItemChanged)
         self.tree.setSelectionMode(self.tree.NoSelection)
-        self.tree.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Minimum)
-        self.sectionWidget.setSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
+        self.tree.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.sectionWidget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         layout.addWidget(self.tree)
         layout.addWidget(self.sectionWidget)
         layout.setStretchFactor(self.sectionWidget, 1)
         mainLayout.addLayout(layout)
-        saveButton = QtGui.QPushButton(self.tr('Save'))
+        saveButton = QtWidgets.QPushButton(self.tr('Save'))
         saveButton.clicked.connect(self.sectionWidget.save)
         panel.buttonBar.addStretch(1)
         panel.buttonBar.addWidget(saveButton)
@@ -189,13 +189,13 @@ class PreferencesDialog(QtGui.QWidget):
         if self._ignoreDirty:
             return
         if self.sectionWidget.dirty:
-            ans = QtGui.QMessageBox.question(self, self.tr('Unsaved changes'),
+            ans = QtWidgets.QMessageBox.question(self, self.tr('Unsaved changes'),
                                              self.tr('Do you want to save your changes before proceeding?'),
-                                             QtGui.QMessageBox.Cancel | QtGui.QMessageBox.Ignore |
-                                             QtGui.QMessageBox.Save)
-            if ans == QtGui.QMessageBox.Save:
+                                             QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Ignore |
+                                             QtWidgets.QMessageBox.Save)
+            if ans == QtWidgets.QMessageBox.Save:
                 self.sectionWidget.save()
-            elif ans == QtGui.QMessageBox.Cancel:
+            elif ans == QtWidgets.QMessageBox.Cancel:
                 self._ignoreDirty = True
                 
                 self.tree.setCurrentItem(previous)
