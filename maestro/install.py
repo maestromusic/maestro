@@ -354,10 +354,10 @@ class DomainWidget(SettingsWidget):
                        dialogTitle = self.tr("Choose source directory"),
                        pathType = 'existingDirectory')
         self.domainManager.setModel(model)
-        newDomainAction = QtGui.QAction(getIcon('add.png'), self.tr("Add domain"), self)
+        newDomainAction = QtGui.QAction(QtGui.QIcon.fromTheme('list-add'), self.tr("Add domain"), self)
         newDomainAction.triggered.connect(self._addDomain)
         self.domainManager.addAction(newDomainAction)
-        removeDomainAction = QtGui.QAction(getIcon('delete.png'), self.tr("Remove domain"), self)
+        removeDomainAction = QtGui.QAction(QtGui.QIcon.fromTheme('list-remove'), self.tr("Remove domain"), self)
         removeDomainAction.triggered.connect(self._removeDomain)
         self.domainManager.addAction(removeDomainAction)
         
@@ -432,7 +432,7 @@ class TagWidget(SettingsWidget):
         buttonBarLayout = QtGui.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout)
         addButton = QtGui.QPushButton(self.tr("Add tag"))
-        addButton.setIcon(getIcon('add.png'))
+        addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
         buttonBarLayout.addStretch()

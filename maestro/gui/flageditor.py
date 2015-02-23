@@ -41,7 +41,7 @@ class FlagEditor(QtGui.QWidget):
         self.layout().addWidget(label)
         
         self.addButton = QtGui.QPushButton()
-        self.addButton.setIcon(utils.getIcon("add.png"))
+        self.addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         self.addButton.clicked.connect(self._handleAddButton)
         self.layout().addWidget(self.addButton)
         

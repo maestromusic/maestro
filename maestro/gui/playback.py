@@ -356,10 +356,10 @@ class VolumeButton(QtGui.QToolButton):
     # Inspired by the VolumePopupButton from Amarok 2.7.1
     volumeChanged = QtCore.pyqtSignal(int)
     
-    mutedIcon = utils.images.icon("audio_volume_muted")
-    lowIcon = utils.images.icon("audio_volume_low")
-    mediumIcon = utils.images.icon("audio_volume_medium")
-    highIcon = utils.images.icon("audio_volume_high")
+    mutedIcon = QtGui.QIcon.fromTheme('audio-volume-muted')
+    lowIcon = QtGui.QIcon.fromTheme('audio-volume-low')
+    mediumIcon = QtGui.QIcon.fromTheme('audio-volume-medium')
+    highIcon = QtGui.QIcon.fromTheme('audio-volume-high')
     
     def __init__(self, parent=None):
         super().__init__(parent)

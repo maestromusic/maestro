@@ -178,7 +178,7 @@ class DataPiecesEditor(QtGui.QWidget):
         topLayout.addWidget(self.addDataBox)
         
         removeDataButton = QtGui.QPushButton()
-        removeDataButton.setIcon(utils.getIcon('remove.png'))
+        removeDataButton.setIcon(QtGui.QIcon.fromTheme('list-remove'))
         removeDataButton.clicked.connect(self._handleRemoveData)
         topLayout.addWidget(removeDataButton)
         
@@ -199,7 +199,7 @@ class DataPiecesEditor(QtGui.QWidget):
     def _fillAddDataBox(self):
         """Fill the combobox with a list of all available datapieces."""
         self.addDataBox.clear()
-        self.addDataBox.addItem(utils.getIcon('add.png'),
+        self.addDataBox.addItem(QtGui.QIcon.fromTheme('list-add'),
                         self.tr("Add to left column...") if self.left else self.tr("Add to right column..."))
         separatorInserted = False
         for data in delegates.profiles.availableDataPieces():

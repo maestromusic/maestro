@@ -143,7 +143,7 @@ class ViewConfigurationDialog(QtGui.QDialog):
         
         layout = QtGui.QVBoxLayout(self)
         
-        self.addButton = QtGui.QPushButton(utils.getIcon('add.png'), '')
+        self.addButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('list-add'), '')
         self.addButton.setEnabled(len(self.browser.views) < MAX_SUB_BROWSERS)
         self.addButton.clicked.connect(self._handleAddButton)
                
@@ -202,7 +202,7 @@ class SingleViewConfiguration(QtGui.QWidget):
         for name, (title, theClass) in browsermodel.layerClasses.items():
             self.layerTypeBox.addItem(title, name)
         bottomLine.addWidget(self.layerTypeBox)
-        self.addLayerButton = QtGui.QPushButton(utils.getIcon('add.png'), '')
+        self.addLayerButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('list-add'), '')
         self.addLayerButton.clicked.connect(self._handleAddLayerButton)
         bottomLine.addWidget(self.addLayerButton)
         
@@ -227,7 +227,7 @@ class SingleViewConfiguration(QtGui.QWidget):
             editButton = QtGui.QPushButton(utils.getIcon('pencil.png'), '')
             editButton.clicked.connect(functools.partial(self._handleEditButton, i))
             buttonLayout.addWidget(editButton)
-            removeButton = QtGui.QPushButton(utils.getIcon('remove.png'), '')
+            removeButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('list-remove'))
             removeButton.clicked.connect(functools.partial(self._handleRemoveButton, i))
             buttonLayout.addWidget(removeButton)
             self.table.setIndexWidget(self.table.model().index(i, 1), buttonWidget)

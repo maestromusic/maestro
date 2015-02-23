@@ -123,7 +123,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
         leftLayout.addWidget(toolBar)
 
         self.createButton = QtGui.QToolButton()
-        self.createButton.setIcon(utils.getIcon('add.png'))
+        self.createButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         self.createButton.setToolTip(self.tr("Create profile"))
         self.createButton.clicked.connect(self._handleCreateButton)
         toolBar.addWidget(self.createButton)
@@ -133,7 +133,7 @@ class ProfileConfigurationPanel(QtGui.QWidget):
         self.renameButton.clicked.connect(self._handleRenameButton)
         toolBar.addWidget(self.renameButton)
         self.deleteButton = QtGui.QToolButton()
-        self.deleteButton.setIcon(utils.getIcon('delete.png'))
+        self.deleteButton.setIcon(QtGui.QIcon.fromTheme('edit-delete'))
         self.deleteButton.setToolTip(self.tr("Delete profile"))
         self.deleteButton.clicked.connect(self._handleDeleteButton)
         toolBar.addWidget(self.deleteButton)
@@ -419,7 +419,7 @@ class NoProfileYetWidget(QtGui.QWidget):
 
         label.setText(self.tr("There is no profile yet."))
 
-        self.createButton = QtGui.QPushButton(utils.getIcon('add.png'), self.tr("Create profile"))
+        self.createButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('list-add'), self.tr("Create profile"))
         self.createButton.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
         layout.addWidget(self.createButton)
         layout.addStretch()

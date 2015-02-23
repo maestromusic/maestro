@@ -241,18 +241,18 @@ class GuessProfileConfigWidget(QtGui.QWidget):
         toolBar.addWidget(addTagButton)
 
         removeTagButton = QtGui.QToolButton()
-        removeTagButton.setIcon(utils.getIcon('delete.png'))
+        removeTagButton.setIcon(QtGui.QIcon.fromTheme('list-remove'))
         removeTagButton.setToolTip(self.tr('Remove tag from grouping conditions'))
         removeTagButton.clicked.connect(self.removeTag)
         toolBar.addWidget(removeTagButton)
         self.dirModeButton = QtGui.QPushButton()
-        self.dirModeButton.setIcon(utils.getIcon('folder.svg'))
+        self.dirModeButton.setIcon(QtGui.QIcon.fromTheme('folder'))
         self.dirModeButton.setCheckable(True)
         self.dirModeButton.setToolTip(self.tr('Only files inside a common directory'))
         self.dirModeButton.clicked.connect(self.updateProfile)
         toolBar.addWidget(self.dirModeButton)
         mainButton = QtGui.QToolButton()
-        mainButton.setIcon(utils.getIcon('cd.png'))
+        mainButton.setIcon(QtGui.QIcon.fromTheme('media-optical'))
         mainButton.setToolTip(self.tr("Album tag: use this tag's value as container title"))
         mainButton.clicked.connect(self.setMain)
         toolBar.addWidget(mainButton)
@@ -264,7 +264,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
         self.regexCheck.toggled.connect(self.regexEdit.setEnabled)
         self.regexCheck.clicked.connect(self.updateProfile)
         resetRegexButton = QtGui.QToolButton()
-        resetRegexButton.setIcon(utils.getIcon('undo.png'))
+        resetRegexButton.setIcon(QtGui.QIcon.fromTheme('edit-undo'))
         resetRegexButton.setToolTip(self.tr('Reset to default regular expression'))
         self.regexCheck.toggled.connect(resetRegexButton.setEnabled)
         resetRegexButton.clicked.connect(self._handleRegexReset)
@@ -291,7 +291,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
             self.tagListView.addItem(item)
         if self.tagListView.count() > 0:
             mainItem = self.tagListView.item(0)
-            mainItem.setIcon(utils.getIcon('cd.png'))
+            mainItem.setIcon(QtGui.QIcon.fromTheme('media-optical'))
         if profile.metaRegex:
             self.regexCheck.setChecked(True)
             self.regexEdit.setText(profile.metaRegex)
@@ -336,7 +336,7 @@ class GuessProfileConfigWidget(QtGui.QWidget):
         for i in range(self.tagListView.count()):
             item = self.tagListView.item(i)
             if i == self.tagListView.currentRow():
-                item.setIcon(utils.getIcon('cd.png'))
+                item.setIcon(QtGui.QIcon.fromTheme('media-optical'))
             else:
                 item.setIcon(QtGui.QIcon())
         self.updateProfile()
