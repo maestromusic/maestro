@@ -1,22 +1,23 @@
-README
-============
+Maestro – Music Managing and Playing Application
+================================================
+
 Maestro is a sophisticated music manager that helps you to organize, browse and play your digital music collection.
+It is optimized for large collections that consist of a mixture of classical and modern tracks, allowing to efficiently
+browse and search through your collection while presenting the results in a structured way.
 
 More information can be found on Maestro website https://github.com/maestromusic/maestro
 
-Maestro is copyright of Martin Altmayer <martin.altmayer@web.de> and Michael Helmling <michaelhelmling@posteo.de> and licensed under the GPL v3 (confer the file COPYING).
+Maestro is copyright of [Martin Altmayer](martin.altmayer@web.de) and [Michael Helmling](michaelhelmling@posteo.de) and licensed under the GPL v3 (confer the `LICENSE` file).
 
 INSTALLATION
-==============
-Run
+============
+Download and extract the current repository snapshot and run
 
-# easy_install3 maestro
+# python3 setup.py install
 
 If you want to install Maestro as normal user inside your home directory, run
 
-$ easy_install3 --user maestro
-
-The exact name of the "easy_install for python3" executable may differ on your system. If you have pip, you can also use that.
+$ python3 setup.py install --user
 
 DEVELOPMENT
 =============
@@ -38,7 +39,7 @@ you can simultaneously work with an installed version of Maestro.
 
 
 ATTRIBUTIONS
-==============
+============
 
 Maestro uses icons from the following software / free icon sets:
 Tango       http://tango.freedesktop.org/            released as public domain.
@@ -46,4 +47,4 @@ Silk        http://www.famfamfam.com/lab/icons/silk/ by Mark James licensed unde
 Fugue Icons http://p.yusukekamiyamane.com/           by Yusuke Kamiyamane licensed under CC BY 3.0.
 Amarok      http://amarok.kde.org/                   licensed under GPL v3.
 
-Maestro uses some code (VolumeButton, TimeSlider) of Amarok 2.7.1 (http://amarok.kde.org/) licensed under GPL v3.
+Maestro uses some code (VolumeButton, TimeSlider) of [Amarok 2.7.1](http://amarok.kde.org/) licensed under GPL v3.
