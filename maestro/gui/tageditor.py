@@ -85,7 +85,7 @@ class TagEditorWidget(mainwindow.Widget):
         self.addButton.tagChosen.connect(self._handleAddRecord)
         self.topLayout.addWidget(self.addButton)
         self.removeButton = QtGui.QPushButton()
-        self.removeButton.setIcon(utils.getIcon('remove.png'))
+        self.removeButton.setIcon(QtGui.QIcon.fromTheme('list-remove'))
         self.removeButton.clicked.connect(self._handleRemoveSelected)
         self.topLayout.addWidget(self.removeButton)
         

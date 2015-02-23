@@ -20,7 +20,7 @@ import os, shutil, collections
 from PyQt4 import QtCore
 import taglib
 from maestro.core import levels, urls, tags
-from maestro import application, logging, config, stack
+from maestro import application, logging, config, stack, database as db
 from maestro.filesystem.identification import AudioFileIdentifier
 
 translate = QtCore.QCoreApplication.translate
@@ -33,8 +33,10 @@ def init():
     global _sources
     from maestro.filesystem.sources import Source
     _sources = [Source(**data) for data in config.storage.filesystem.sources]
-    #TODO: remove entries in newfiles that are not contained in any source (may happen if sources are deleted,
-    #path changed, ...
+    paths = [source.path for source in _sources]
+    # delete files not in any source
+    db.query('DELETE FROM {p}newfiles WHERE ' +
+             ' AND '.join('url NOT LIKE "file://{}%"'.format(path.replace('"', '\\"')) for path in paths))
     _sources.sort(key=lambda s: s.name)
         # register the file:// URL scheme
     urls.fileBackends.append(RealFile)

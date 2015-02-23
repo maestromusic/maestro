@@ -78,7 +78,7 @@ class FlexiDateType(sqlalchemy.types.TypeDecorator):
 def createEngine(**kwargs):
     """Create an SqlAlchemy-engine. Usually you should use the module-level variable 'engine'."""
     if kwargs['type'] == 'sqlite':
-        url = 'sqlite:///'+kwargs['path'] # absolute paths will have 4 slashes
+        url = 'sqlite:///' + kwargs['path'] # absolute paths will have 4 slashes
         def creator():
             import sqlite3, re
             connection = sqlite3.connect(kwargs['path'])
@@ -157,7 +157,8 @@ def init(**kwargs):
 
 def shutdown():
     """Close database connection."""
-    engine.dispose()
+    if type != 'sqlite':
+        engine.dispose()
 
 def nextId():
     """Reserve the next free element id and return it."""
@@ -319,31 +320,31 @@ def _contentsParentsHelper(elids,recursive,selectColumn,whereColumn):
 
 # elements-table
 #=======================================================================
-def isFile(elid):
-    """Return whether the element with id *elid* exists and is a file."""
-    return query("SELECT file FROM {p}elements WHERE id = ?", elid).getSingle() == 1
+# def isFile(elid):
+#     """Return whether the element with id *elid* exists and is a file."""
+#     return query("SELECT file FROM {p}elements WHERE id = ?", elid).getSingle() == 1
 
-def isContainer(elid):
-    """Return whether the element with id *elid* exists and is a container."""
-    return query("SELECT file FROM {p}elements WHERE id = ?", elid).getSingle() == 0
+# def isContainer(elid):
+#     """Return whether the element with id *elid* exists and is a container."""
+#     return query("SELECT file FROM {p}elements WHERE id = ?", elid).getSingle() == 0
 
-def isToplevel(elid):
-    """Return whether the element with id *elid* exists and is a toplevel element."""
-    return bool(query("""
-        SELECT COUNT(*)
-        FROM {p}elements AS el LEFT JOIN {p}contents AS c ON el.id = c.element_id
-        WHERE el.id = ? AND c.element_id IS NULL
-        """, elid).getSingle())
+# def isToplevel(elid):
+#     """Return whether the element with id *elid* exists and is a toplevel element."""
+#     return bool(query("""
+#         SELECT COUNT(*)
+#         FROM {p}elements AS el LEFT JOIN {p}contents AS c ON el.id = c.element_id
+#         WHERE el.id = ? AND c.element_id IS NULL
+#         """, elid).getSingle())
     
-def elementCount(elid):
-    """Return the number of children of the element with id *elid* or raise an EmptyResultException if
-    that element does not exist."""
-    return query("SELECT elements FROM {p}elements WHERE id = ?", elid).getSingle()
+# def elementCount(elid):
+#     """Return the number of children of the element with id *elid* or raise an EmptyResultException if
+#     that element does not exist."""
+#     return query("SELECT elements FROM {p}elements WHERE id = ?", elid).getSingle()
 
-def elementType(elid):
-    """Return the type of the element with id *elid* or raise an EmptyResultException if
-    that element does not exist."""
-    return query("SELECT type FROM {p}elements WHERE id = ?", elid).getSingle()
+# def elementType(elid):
+#     """Return the type of the element with id *elid* or raise an EmptyResultException if
+#     that element does not exist."""
+#     return query("SELECT type FROM {p}elements WHERE id = ?", elid).getSingle()
 
 def updateElementsCounter(elids=None):
     """Update the elements counter.
@@ -366,24 +367,24 @@ def updateElementsCounter(elids=None):
 
 # Files-Table
 #================================================
-def url(elid):
-    """Return the url of the file with id *elid* or raise an EmptyResultException if that element does 
-    not exist."""
-    try:
-        return query("SELECT url FROM {p}files WHERE element_id=?", elid).getSingle()
-    except EmptyResultException:
-        raise EmptyResultException(
-                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
+# def url(elid):
+#     """Return the url of the file with id *elid* or raise an EmptyResultException if that element does
+#     not exist."""
+#     try:
+#         return query("SELECT url FROM {p}files WHERE element_id=?", elid).getSingle()
+#     except EmptyResultException:
+#         raise EmptyResultException(
+#                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 
-def hash(elid):
-    """Return the hash of the file with id *elid* or raise an EmptyResultException if that element does
-    not exist.""" 
-    try:
-        return query("SELECT hash FROM {p}files WHERE element_id=?", elid).getSingle()
-    except EmptyResultException:
-        raise EmptyResultException(
-                 "Element with id {} is not a file (or at least not in the files table).".format(elid))
+# def hash(elid):
+#     """Return the hash of the file with id *elid* or raise an EmptyResultException if that element does
+#     not exist."""
+#     try:
+#         return query("SELECT hash FROM {p}files WHERE element_id=?", elid).getSingle()
+#     except EmptyResultException:
+#         raise EmptyResultException(
+#                  "Element with id {} is not a file (or at least not in the files table).".format(elid))
 
 
 def idFromUrl(url):
@@ -397,22 +398,22 @@ def idFromUrl(url):
         return None
 
 
-def idFromHash(hash):
-    """Return the element_id of a file from its hash, or None if it is not found."""
-    result = list(query("SELECT element_id FROM {p}files WHERE hash=?", hash))
-    if len(result) == 1:
-        return result[0][0]
-    elif len(result) == 0:
-        return None
-    else: raise RuntimeError("Hash not unique upon filenames!")
+# def idFromHash(hash):
+#     """Return the element_id of a file from its hash, or None if it is not found."""
+#     result = list(query("SELECT element_id FROM {p}files WHERE hash=?", hash))
+#     if len(result) == 1:
+#         return result[0][0]
+#     elif len(result) == 0:
+#         return None
+#     else: raise RuntimeError("Hash not unique upon filenames!")
 
 
 # flags table
 #=======================================================================
-def flags(elid):
-    from ..core import flags
-    return [flags.get(id) for id in query(
-                    "SELECT flag_id FROM {p}flags WHERE element_id = ?", elid).getSingleColumn()]
+# def flags(elid):
+#     from ..core import flags
+#     return [flags.get(id) for id in query(
+#                     "SELECT flag_id FROM {p}flags WHERE element_id = ?", elid).getSingleColumn()]
 
 
 # Help methods

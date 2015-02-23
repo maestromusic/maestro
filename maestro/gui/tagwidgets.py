@@ -339,7 +339,7 @@ class TagTypeButton(QtGui.QPushButton):
         if text is None:
             text = translate("TagTypeButton", "Add tag")
         super().__init__(text)
-        self.setIcon(utils.getIcon("add.png"))
+        self.setIcon(QtGui.QIcon.fromTheme('list-add'))
         # Unfortunately there is a large margin on the left
         #https://bugreports.qt-project.org/browse/QTBUG-3624
         self.setMenu(QtGui.QMenu())
