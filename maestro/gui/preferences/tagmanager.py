@@ -132,7 +132,7 @@ class TagManagerTableWidget(QtWidgets.QTableWidget):
         
         self.verticalHeader().hide()
         self.setSortingEnabled(True)
-        self.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.horizontalHeader().setStretchLastSection(True)
         self.setDragEnabled(True)
         # I first tried to use InternalMove but Qt doesn't call dropMimeData then and there doesn't seem

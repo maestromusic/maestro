@@ -126,7 +126,7 @@ class PreferencesDialog(QtWidgets.QDialog):
 
         self.treeWidget = QtWidgets.QTreeWidget()
         self.treeWidget.header().hide()
-        self.treeWidget.header().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.treeWidget.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.treeWidget.header().setStretchLastSection(False)
         self.treeWidget.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.treeWidget.itemSelectionChanged.connect(self._handleSelectionChanged)

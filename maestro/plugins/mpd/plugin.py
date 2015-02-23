@@ -574,7 +574,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         layout.addWidget(QtWidgets.QLabel(self.tr("Choose which audio outputs to use:")))
         checkboxes = []
         for output in sorted(self.outputs, key=lambda out:out["outputid"]):
-            checkbox = QtGui.QCheckBox(output["outputname"])
+            checkbox = QtWidgets.QCheckBox(output["outputname"])
             checkbox.setChecked(output["outputenabled"] == "1")
             checkboxes.append(checkbox)
             layout.addWidget(checkbox)
@@ -615,7 +615,7 @@ class MPDConfigWidget(QtWidgets.QWidget):
         self.passwordEdit = QtWidgets.QLineEdit()
         formLayout.addRow(self.tr("Password:"), self.passwordEdit)
         
-        self.passwordVisibleBox = QtGui.QCheckBox()
+        self.passwordVisibleBox = QtWidgets.QCheckBox()
         self.passwordVisibleBox.toggled.connect(self._handlePasswordVisibleBox)
         formLayout.addRow(self.tr("Password visible?"), self.passwordVisibleBox)
         

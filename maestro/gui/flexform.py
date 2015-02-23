@@ -312,9 +312,9 @@ class FlexTable(AbstractFlexForm):
             self.view.selectionModel().selectionChanged.connect(self.selectionChanged)
     
     def _createView(self):
-        self.view = QtGui.QTableView()
+        self.view = QtWidgets.QTableView()
         self.view.verticalHeader().hide()
-        self.view.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.view.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.view.doubleClicked.connect(self._clicked)       
         self.view.setContextMenuPolicy(Qt.CustomContextMenu) 
         self.view.customContextMenuRequested.connect(self._customContextMenuRequested)
@@ -495,7 +495,7 @@ class IntField(Field):
         
     def createEditor(self, parent=None):
         if self.widget == 'spinbox':
-            editor = QtGui.QSpinBox(parent)
+            editor = QtWidgets.QSpinBox(parent)
             editor.setRange(self.min, self.max)
             editor.setSingleStep(self.step)
         elif self.widget == 'lineedit':
@@ -597,7 +597,7 @@ class CheckField(Field):
     methods = ('isChecked', 'setChecked', 'toggled')
     
     def createEditor(self, parent=None):
-        editor = QtGui.QCheckBox(self.hint if self.hint is not None else '', parent)
+        editor = QtWidgets.QCheckBox(self.hint if self.hint is not None else '', parent)
         return editor
    
   
@@ -834,7 +834,7 @@ class PasswordEditor(QtWidgets.QWidget):
         self.lineEdit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.lineEdit.textChanged.connect(self.textChanged)
         layout.addWidget(self.lineEdit)
-        echoModeBox = QtGui.QCheckBox('Show password')
+        echoModeBox = QtWidgets.QCheckBox('Show password')
         echoModeBox.clicked.connect(lambda checked: self.lineEdit.setEchoMode(
                                     QtWidgets.QLineEdit.Normal if checked else QtWidgets.QLineEdit.Password))
         layout.addWidget(echoModeBox)

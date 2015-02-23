@@ -18,7 +18,7 @@
 
 import os.path
 
-from PyQt5 import QtGui, QtCore
+from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
@@ -66,7 +66,7 @@ class FilesystemSettings(QtWidgets.QWidget):
         self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.verticalHeader().hide()
         self.tableWidget.setSortingEnabled(True)
-        self.tableWidget.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.tableWidget.itemChanged.connect(self._handleItemChanged)
         self.tableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
@@ -77,7 +77,7 @@ class FilesystemSettings(QtWidgets.QWidget):
         # self.recheckButton = QtWidgets.QPushButton(self.tr("Force recheck of all files"))
         # self.recheckButton.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         # self.recheckButton.clicked.connect(self._handleRecheckButton)
-        # self.scanIntervalBox = QtGui.QSpinBox()
+        # self.scanIntervalBox = QtWidgets.QSpinBox()
         # self.scanIntervalBox.setMinimum(0)
         # self.scanIntervalBox.setMaximum(24*3600)
         # self.scanIntervalLabel = QtWidgets.QLabel()
@@ -233,7 +233,7 @@ class SourceDialog(QtWidgets.QDialog):
         self.extensionsEdit = QtWidgets.QLineEdit()
         self.extensionsEdit.setText(', '.join(config.options.main.audio_extensions))
         formLayout.addRow(self.tr("Extensions:"), self.extensionsEdit)
-        self.enableBox = QtGui.QCheckBox()
+        self.enableBox = QtWidgets.QCheckBox()
         formLayout.addRow(self.tr("Enabled:"), self.enableBox)
         
         buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)

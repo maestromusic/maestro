@@ -276,19 +276,19 @@ class MergeDialog(QtWidgets.QDialog):
         layout.addWidget(label, row, 0, 1, 2)
         
         row += 1
-        self.commonTagsBox = QtGui.QCheckBox(self.tr("Assign common tags and flags"))
+        self.commonTagsBox = QtWidgets.QCheckBox(self.tr("Assign common tags and flags"))
         self.commonTagsBox.setChecked(True)
         layout.addWidget(self.commonTagsBox, row, 0, 1, 2)
         
         if isinstance(self.parentNode, nodes.Wrapper):
             row += 1
-            self.positionCheckBox = QtGui.QCheckBox(self.tr('Auto-adjust positions'))
+            self.positionCheckBox = QtWidgets.QCheckBox(self.tr('Auto-adjust positions'))
             self.positionCheckBox.setChecked(True)
             layout.addWidget(self.positionCheckBox, row, 0, 1, 2)
         
         if any(element.isContainer() for element in self.elements):
             row += 1
-            self.changeTypeBox = QtGui.QCheckBox(self.tr("Change content container types to:"))
+            self.changeTypeBox = QtWidgets.QCheckBox(self.tr("Change content container types to:"))
             self.changeTypeBox.setChecked(False)
             layout.addWidget(self.changeTypeBox, row, 0)
             self.childrenTypeBox = widgets.ContainerTypeBox(ContainerType.Container)
@@ -298,7 +298,7 @@ class MergeDialog(QtWidgets.QDialog):
         
         if len(prefix) > 0:
             row += 1
-            self.removePrefixBox = QtGui.QCheckBox(self.tr("Remove common title prefix:"))
+            self.removePrefixBox = QtWidgets.QCheckBox(self.tr("Remove common title prefix:"))
             self.removePrefixBox.setChecked(True)
             layout.addWidget(self.removePrefixBox, row, 0)
             self.removeEdit = QtWidgets.QLineEdit(prefix)
@@ -308,7 +308,7 @@ class MergeDialog(QtWidgets.QDialog):
         if len(self.elements) > 1 and any(utils.strings.numberFromPrefix(title[len(prefix):])[0] is not None 
                                           for title in allTitles):
             row += 1
-            self.removeNumbersBox = QtGui.QCheckBox(self.tr("Remove numbers from title start"))
+            self.removeNumbersBox = QtWidgets.QCheckBox(self.tr("Remove numbers from title start"))
             self.removeNumbersBox.setChecked(True)
             layout.addWidget(self.removeNumbersBox, row, 0)
             

@@ -426,7 +426,7 @@ class TagWidget(SettingsWidget):
         self.tableWidget.setColumnCount(len(self.columns))
         self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
         self.tableWidget.verticalHeader().hide()
-        self.tableWidget.horizontalHeader().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.tableWidget.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.layout().addWidget(self.tableWidget)
         
         buttonBarLayout = QtWidgets.QHBoxLayout()
@@ -579,20 +579,20 @@ class AudioWidget(SettingsWidget):
         audioBackendFound = False
         try:
             from PyQt4.phonon import Phonon
-            self.phononBox = QtGui.QCheckBox(self.tr("Phonon"))
+            self.phononBox = QtWidgets.QCheckBox(self.tr("Phonon"))
             self.phononBox.setChecked(True)
             audioBackendFound = True
         except ImportError:
-            self.phononBox = QtGui.QCheckBox(self.tr("Phonon (cannot find PyQt4.phonon)"))
+            self.phononBox = QtWidgets.QCheckBox(self.tr("Phonon (cannot find PyQt4.phonon)"))
             self.phononBox.setEnabled(False)
         self.layout().addWidget(self.phononBox)
         try:
             import mpd
-            self.mpdBox = QtGui.QCheckBox(self.tr("MPD"))
+            self.mpdBox = QtWidgets.QCheckBox(self.tr("MPD"))
             self.mpdBox.setChecked(True)
             audioBackendFound = True
         except ImportError:
-            self.mpdBox = QtGui.QCheckBox(self.tr("MPD (cannot find python-mpd2)"))
+            self.mpdBox = QtWidgets.QCheckBox(self.tr("MPD (cannot find python-mpd2)"))
             self.mpdBox.setEnabled(False)
         self.layout().addWidget(self.mpdBox)
         if not audioBackendFound:

@@ -283,7 +283,7 @@ class ProfileTree(QtWidgets.QTreeWidget):
         self.setItemsExpandable(False)
         self.setRootIsDecorated(False)
         self.header().hide()
-        self.header().setResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.header().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.header().setStretchLastSection(False)
 
         self.category = category

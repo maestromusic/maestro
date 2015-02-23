@@ -258,7 +258,7 @@ class GuessProfileConfigWidget(QtWidgets.QWidget):
         toolBar.addWidget(mainButton)
         mainLayout.addWidget(toolBar)
         regexLayout = QtWidgets.QHBoxLayout()
-        self.regexCheck = QtGui.QCheckBox(self.tr('Detect meta-containers:'))
+        self.regexCheck = QtWidgets.QCheckBox(self.tr('Detect meta-containers:'))
         self.regexEdit = QtWidgets.QLineEdit()
         self.regexEdit.textChanged.connect(self.updateProfile)
         self.regexCheck.toggled.connect(self.regexEdit.setEnabled)

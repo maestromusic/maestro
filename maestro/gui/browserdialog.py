@@ -18,16 +18,14 @@
 
 import functools
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
 from . import dialogs, delegates, search as searchgui, widgets
-from .. import config, utils, database as db
-from ..core import tags, flags
+from .. import utils
+from ..core import tags
 from ..models import browser as browsermodel
-from ..search import criteria
 from .delegates import browser as browserdelegate
-from .misc import lineedits
 from .preferences import profiles as profilesgui
 
 MAX_SUB_BROWSERS = 5
@@ -106,12 +104,12 @@ class BrowserDialog(AbstractBrowserDialog):
         profileChooser.profileChosen.connect(self._handleProfileChosen)
         lineLayout.addWidget(profileChooser)
         
-        instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
+        instantSearchBox = QtWidgets.QCheckBox(self.tr("Instant search"))
         instantSearchBox.setChecked(self.browser.searchBox.instant)
         instantSearchBox.clicked.connect(self.browser.searchBox.setInstantSearch)
         optionLayout.addWidget(instantSearchBox)
         
-        hideInBrowserBox = QtGui.QCheckBox(self.tr("Show hidden values"))
+        hideInBrowserBox = QtWidgets.QCheckBox(self.tr("Show hidden values"))
         hideInBrowserBox.setChecked(self.browser.getShowHiddenValues())
         hideInBrowserBox.clicked.connect(self.browser.setShowHiddenValues)
         optionLayout.addWidget(hideInBrowserBox)

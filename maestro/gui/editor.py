@@ -132,13 +132,13 @@ class OptionDialog(dialogs.FancyPopup):
         self.editor = editor
         layout = QtWidgets.QFormLayout(self)
         
-        autoExpandBox = QtGui.QCheckBox()
+        autoExpandBox = QtWidgets.QCheckBox()
         autoExpandBox.setChecked(editor.autoExpand)
         autoExpandBox.stateChanged.connect(self._handleAutoExpandBox)
         layout.addRow(self.tr("Auto expand"),autoExpandBox)
         
         albumGuessLayout = QtWidgets.QHBoxLayout()
-        albumGuessCheckBox = QtGui.QCheckBox()
+        albumGuessCheckBox = QtWidgets.QCheckBox()
         albumGuessCheckBox.setChecked(self.editor.model().guessingEnabled)
         albumGuessCheckBox.setToolTip(self.tr("Auto expand dropped containers"))
         albumGuessCheckBox.toggled.connect(self._handleAlbumGuessCheckBox)

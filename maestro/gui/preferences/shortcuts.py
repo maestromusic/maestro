@@ -40,7 +40,7 @@ class ShortcutSettings(QtWidgets.QWidget):
             item.setData(0, Qt.UserRole, action)
         tree.expandAll()
         tree.itemActivated.connect(self.handleActivate)
-        tree.header().setResizeMode(0, QtWidgets.QHeaderView.Stretch)
+        tree.header().setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(tree)
         self.setLayout(layout)

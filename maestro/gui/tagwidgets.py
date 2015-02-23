@@ -601,7 +601,7 @@ class AddTagTypeDialog(QtWidgets.QDialog):
         self.titleLineEdit = QtWidgets.QLineEdit(tagType.name.capitalize() if tagType is not None else '')
         formLayout.addRow(self.tr("Title:"), self.titleLineEdit)
         
-        self.privateBox = QtGui.QCheckBox()
+        self.privateBox = QtWidgets.QCheckBox()
         formLayout.addRow(self.tr("Private:"), self.privateBox)
                 
         buttonLayout = QtWidgets.QHBoxLayout()
@@ -737,20 +737,20 @@ class TagValuePropertiesWidget(QtWidgets.QWidget):
         self.label = QtWidgets.QLabel("")
         self.label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.label, 0, 0, 1, 2)
-        self.changeValueCheckbox = QtGui.QCheckBox(self.tr('rename all occurences:'))
+        self.changeValueCheckbox = QtWidgets.QCheckBox(self.tr('rename all occurences:'))
         self.valueEdit = TagValueEditor(tags.TITLE)
         self.changeValueCheckbox.toggled.connect(self.valueEdit.setEnabled)
         layout.addWidget(self.changeValueCheckbox, 1, 0)
         layout.addWidget(self.valueEdit, 1, 1)
         
-        self.sortValueCheckbox = QtGui.QCheckBox(self.tr('distinguished sort value:'))
+        self.sortValueCheckbox = QtWidgets.QCheckBox(self.tr('distinguished sort value:'))
 
         layout.addWidget(self.sortValueCheckbox, 2, 0)
         self.sortEdit = QtWidgets.QLineEdit()
         self.sortValueCheckbox.toggled.connect(self.sortEdit.setEnabled)
         self.sortValueCheckbox.toggled.connect(self._handleSortCheckboxToggled)
         layout.addWidget(self.sortEdit, 2, 1)
-        self.hiddenCheckbox = QtGui.QCheckBox(self.tr('value is hidden'))
+        self.hiddenCheckbox = QtWidgets.QCheckBox(self.tr('value is hidden'))
         layout.addWidget(self.hiddenCheckbox, 3, 0)
         
         self.setLayout(layout)

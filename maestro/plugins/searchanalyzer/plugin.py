@@ -64,7 +64,7 @@ class SearchAnalyzer(mainwindow.Widget):
         self.searchBox.criterionChanged.connect(self._handleCriterionChanged)
         topLayout.addWidget(self.searchBox)
 
-        self.instantSearchBox = QtGui.QCheckBox(self.tr("Instant search"))
+        self.instantSearchBox = QtWidgets.QCheckBox(self.tr("Instant search"))
         self.instantSearchBox.setChecked(True)
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
         topLayout.addWidget(self.instantSearchBox)

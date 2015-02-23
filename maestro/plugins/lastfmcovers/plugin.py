@@ -87,10 +87,12 @@ class LastFMCoverProvider(covers.AbstractCoverProvider):
         tag = tags.ALBUM if tags.ALBUM in element.tags else tags.TITLE
         for artist,album in itertools.product(element.tags[tags.get('artist')], element.tags[tag]):
             url = QtCore.QUrl('http://ws.audioscrobbler.com/2.0/')
-            url.addQueryItem('method','album.getinfo')
-            url.addQueryItem('artist',artist)
-            url.addQueryItem('album',album)
-            url.addQueryItem('api_key',LASTFM_API_KEY)
+            query = QtCore.QUrlQuery()
+            query.addQueryItem('method','album.getinfo')
+            query.addQueryItem('artist',artist)
+            query.addQueryItem('album',album)
+            query.addQueryItem('api_key',LASTFM_API_KEY)
+            url.setQuery(query)
             urls.append(url)
         return urls
         

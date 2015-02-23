@@ -312,14 +312,14 @@ class ConfigWidget(profilesgui.ProfileConfigurationWidget):
         self.structureBox.setCurrentIndex(profile.structure)
         self.structureBox.currentIndexChanged.connect(self._handleStructureBox)
         layout.addRow(self.tr("Structure:"), self.structureBox)
-        self.deleteBox = QtGui.QCheckBox(self.tr("Delete unexported files from target directory"))
+        self.deleteBox = QtWidgets.QCheckBox(self.tr("Delete unexported files from target directory"))
         self.deleteBox.toggled.connect(lambda x: self.profile.setOption(OPTION_DELETE, x))
         layout.addRow(self.deleteBox)
         self.layout().addLayout(layout)
         #self.layout().addWidget(collapsiblepanel.CollapsiblePanel(self.tr("Export location"), layout))
         
         layout = QtWidgets.QFormLayout()
-        self.includeWorkTitlesBox = QtGui.QCheckBox(
+        self.includeWorkTitlesBox = QtWidgets.QCheckBox(
                                             self.tr("Include titles of works into the works' contents."))
         self.includeWorkTitlesBox.toggled.connect(
                                         lambda x: self.profile.setOption(OPTION_INCLUDE_WORK_TITLES, x))

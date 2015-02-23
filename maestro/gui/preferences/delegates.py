@@ -269,7 +269,7 @@ class StringEditor(QtWidgets.QLineEdit):
     valueChanged = QtWidgets.QLineEdit.editingFinished
     
     
-class BoolEditor(QtGui.QCheckBox):
+class BoolEditor(QtWidgets.QCheckBox):
     """Editor for options of type 'bool'."""
     def __init__(self,value,options):
         super().__init__()
@@ -286,7 +286,7 @@ class BoolEditor(QtGui.QCheckBox):
     valueChanged = QtCore.pyqtSignal()
     
 
-class IntEditor(QtGui.QSpinBox):
+class IntEditor(QtWidgets.QSpinBox):
     """Editor for options of type 'int'."""
     def __init__(self,value,options):
         super().__init__()
@@ -297,7 +297,7 @@ class IntEditor(QtGui.QSpinBox):
             if 'maximum' in options:
                 self.setMaximum(options['maximum'])
                 
-    value = property(QtGui.QSpinBox.value,QtGui.QSpinBox.setValue)
+    value = property(QtWidgets.QSpinBox.value,QtWidgets.QSpinBox.setValue)
     # valueChanged is already contained in QSpinBox
 
 
