@@ -129,7 +129,7 @@ class PlaylistTreeView(treeview.DraggingTreeView):
             model = backend.playlist
             self.setRootIsDecorated(True)
             for action in backend.treeActions():
-                self.addLocalAction(action)
+                self.addAction(action)
         else:
             model = self.emptyModel
             self.setRootIsDecorated(False)
