@@ -18,6 +18,7 @@
 
 import urllib.request
 import urllib.error
+import os.path
 
 from lxml import etree
 
@@ -347,8 +348,8 @@ def fillReleaseForDisc(MBrelease, discid):
         tracknr = int(track.findtext('number'))
         MBrec = Recording(recording.get("id"), int(track.findtext("position")), MBmedium, tracknr)
         MBrec.tags.add("title", recording.findtext("title"))
-        MBrec.backendUrl = urls.URL("audiocd://{0}.{1}/{2}/{0}/{1}.flac"
-                                    .format(discid, tracknr, config.options.audiocd.rippath))
+        MBrec.backendUrl = urls.URL("audiocd://{0}.{1}{2}/{0}/{1}.flac"
+                                    .format(discid, tracknr, os.path.abspath(config.options.audiocd.rippath)))
     for _, MBrec in sorted(MBmedium.children.items()):
         MBrec.lookupInfo()
     MBmedium.insertWorks()
