@@ -193,13 +193,21 @@ class ModifiedTagsDialog(QtGui.QDialog):
         self.dbTags = dbTags
         self.fsTags = fsTags
         self.setModal(True)
-        self.setWindowTitle(self.tr('Modified Tags Detected'))
-        layout = QtGui.QGridLayout()
-        layout.addWidget(QtGui.QLabel(self.tr("<b>In Database:</b>")), 0, 0)
-        layout.addWidget(QtGui.QLabel(self.tr("<b>On Disk:</b>")), 0, 1)
+        self.setWindowTitle(self.tr('Detected Modified Tags on Disk'))
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(QtGui.QLabel(self.tr('Maestro has detected that the tags of <center><i>{}</i>'
+            '</center> do not match Maestro\'s database. Please choose which version to keep:')
+            .format(self.file.url.path)))
+        viewLayout = QtGui.QHBoxLayout()
+        leftLayout = QtGui.QVBoxLayout()
+        rightLayout = QtGui.QVBoxLayout()
+        midLayout = QtGui.QVBoxLayout()
+        leftLayout.addWidget(QtGui.QLabel(self.tr('<b>In Maestro\'s database:</b>')))
+        rightLayout.addWidget(QtGui.QLabel(self.tr('<b>In the file:</b>')))
         
         delegateProfile = delegates.profiles.category.getFromStorage(
                                 None, editordelegate.EditorDelegate.profileType)
+        delegateProfile.options['showPaths'] = False
         dbElem = levels.real.collect(file.id)
         
         dbModel = LevelTreeModel(levels.real, [dbElem])
@@ -221,17 +229,27 @@ class ModifiedTagsDialog(QtGui.QDialog):
         fsTree.setModel(fsModel)
         fsTree.setItemDelegate(editordelegate.EditorDelegate(fsTree, delegateProfile))
         
-        layout.addWidget(dbTree, 1, 0)
-        layout.addWidget(fsTree, 1, 1)
-        
-        dbButton = QtGui.QPushButton(self.tr("use DB tags"))
-        fsButton = QtGui.QPushButton(self.tr("use disk tags"))
-        layout.addWidget(dbButton, 2, 0)
-        layout.addWidget(fsButton, 2, 1)
-        
+        leftLayout.addWidget(dbTree)
+        rightLayout.addWidget(fsTree)
+
+        dbButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('go-next'), '')
+        dbButton.setToolTip(self.tr('Write database tags to file'))
+        fsButton = QtGui.QPushButton(QtGui.QIcon.fromTheme('go-previous'), '')
+        fsButton.setToolTip(self.tr('Store tags from file into database'))
         dbButton.clicked.connect(self.useDBTags)
         fsButton.clicked.connect(self.useFSTags)
-        
+
+        midLayout.setAlignment(Qt.AlignVCenter)
+        midLayout.addWidget(dbButton)
+        midLayout.addWidget(fsButton)
+        viewLayout.addLayout(leftLayout)
+        viewLayout.addLayout(midLayout)
+        viewLayout.addLayout(rightLayout)
+        layout.addLayout(viewLayout)
+        bbx = QtGui.QDialogButtonBox()
+        bbx.addButton(self.tr('Cancel (ignore for now)'), bbx.RejectRole)
+        bbx.rejected.connect(self.reject)
+        layout.addWidget(bbx)
         self.setLayout(layout)
         
     def useDBTags(self):
@@ -241,9 +259,9 @@ class ModifiedTagsDialog(QtGui.QDialog):
         try:
             backendFile.saveTags()
             self.accept()
-        except OSError:
+        except OSError as e:
             from maestro.gui.dialogs import warning
-            warning(self.tr('Unable to save tags'), 'Could not save tags: unknown OS error')
+            warning(self.tr('Unable to save tags'), 'Could not save tags:\n{}'.format(e))
             self.reject()
     
     def useFSTags(self):

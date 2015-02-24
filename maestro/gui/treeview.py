@@ -144,7 +144,7 @@ class TreeView(QtGui.QTreeView):
         selection = self.selectionModel().selection()
         return [(self.model().data(itemRange.parent()),itemRange.top(),itemRange.bottom())
                     for itemRange in selection]
-    
+
     
 class DraggingTreeView(TreeView):
     """This is the baseclass of tree views that allow to drag and drop wrappers, e.g. playlist and editor.
