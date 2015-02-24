@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os.path
 from PyQt4.QtGui import QDialogButtonBox
 
 from maestro import config
@@ -475,8 +476,8 @@ class SimpleRipDialog(QtGui.QDialog):
     def finish(self):
         elems = []
         for i, edit in enumerate(self.edits, start=1):
-            url = urls.URL("audiocd://{0}.{1}/{2}/{0}/{1}.flac".format(
-                            self.discid, i, config.options.audiocd.rippath))
+            url = urls.URL("audiocd://{0}.{1}{2}/{0}/{1}.flac".format(
+                            self.discid, i, os.path.abspath(config.options.audiocd.rippath)))
             elem = self.level.collect(url)
             elTags = tags.Storage()
             elTags[tags.TITLE] = [edit.getValue()]
