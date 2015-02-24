@@ -329,7 +329,7 @@ def insertPanel(path, position, *args, **kwargs):
     else: currentPanels = panels
 
     if key in currentPanels:
-        raise ValueError("Panel '{}' does already exist".format('/'.join(keys)))
+        raise ValueError("Panel '{}' does already exist".format('/'.join(key)))
     if position == -1:
         position = len(currentPanels)
     currentPanels.insert(position, key, Panel(path, *args, **kwargs))
