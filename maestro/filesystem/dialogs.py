@@ -19,7 +19,7 @@
 import itertools
 import os.path
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
 from maestro import application, database as db, stack
@@ -75,7 +75,7 @@ class SetPathAction(actions.TreeAction):
     
     def doAction(self):
         elem = next(self.parent().selection.fileWrappers()).element
-        path = QtGui.QFileDialog.getOpenFileName(application.mainWindow,
+        path = QtWidgets.QFileDialog.getOpenFileName(application.mainWindow,
                                                  self.tr("Select new file location"),
                                                  os.path.dirname(elem.url.path))
         if path != "":
@@ -193,13 +193,22 @@ class ModifiedTagsDialog(QtWidgets.QDialog):
         self.dbTags = dbTags
         self.fsTags = fsTags
         self.setModal(True)
-        self.setWindowTitle(self.tr('Modified Tags Detected'))
+
+        self.setWindowTitle(self.tr('Detected Modified Tags on Disk'))
         layout = QtWidgets.QGridLayout()
-        layout.addWidget(QtWidgets.QLabel(self.tr("<b>In Database:</b>")), 0, 0)
-        layout.addWidget(QtWidgets.QLabel(self.tr("<b>On Disk:</b>")), 0, 1)
+        layout.addWidget(QtWidgets.QLabel(self.tr('Maestro has detected that the tags of <center><i>{}</i>'
+            '</center> do not match Maestro\'s database. Please choose which version to keep:')
+            .format(self.file.url.path)))
+        viewLayout = QtWidgets.QHBoxLayout()
+        leftLayout = QtWidgets.QVBoxLayout()
+        rightLayout = QtWidgets.QVBoxLayout()
+        midLayout = QtWidgets.QVBoxLayout()
+        leftLayout.addWidget(QtWidgets.QLabel(self.tr('<b>In Maestro\'s database:</b>')))
+        rightLayout.addWidget(QtWidgets.QLabel(self.tr('<b>In the file:</b>')))
         
         delegateProfile = delegates.profiles.category.getFromStorage(
                                 None, editordelegate.EditorDelegate.profileType)
+        delegateProfile.options['showPaths'] = False
         dbElem = levels.real.collect(file.id)
         
         dbModel = LevelTreeModel(levels.real, [dbElem])
@@ -220,18 +229,28 @@ class ModifiedTagsDialog(QtWidgets.QDialog):
         fsTree.setRootIsDecorated(False)
         fsTree.setModel(fsModel)
         fsTree.setItemDelegate(editordelegate.EditorDelegate(fsTree, delegateProfile))
-        
-        layout.addWidget(dbTree, 1, 0)
-        layout.addWidget(fsTree, 1, 1)
-        
-        dbButton = QtWidgets.QPushButton(self.tr("use DB tags"))
-        fsButton = QtWidgets.QPushButton(self.tr("use disk tags"))
-        layout.addWidget(dbButton, 2, 0)
-        layout.addWidget(fsButton, 2, 1)
-        
+        leftLayout.addWidget(dbTree)
+        rightLayout.addWidget(fsTree)
+
+        dbButton = QtWidgets.QPushButton(QtWidgets.QIcon.fromTheme('go-next'), '')
+        dbButton.setToolTip(self.tr('Write database tags to file'))
+        fsButton = QtWidgets.QPushButton(QtWidgets.QIcon.fromTheme('go-previous'), '')
+        fsButton.setToolTip(self.tr('Store tags from file into database'))
+
         dbButton.clicked.connect(self.useDBTags)
         fsButton.clicked.connect(self.useFSTags)
-        
+
+        midLayout.setAlignment(Qt.AlignVCenter)
+        midLayout.addWidget(dbButton)
+        midLayout.addWidget(fsButton)
+        viewLayout.addLayout(leftLayout)
+        viewLayout.addLayout(midLayout)
+        viewLayout.addLayout(rightLayout)
+        layout.addLayout(viewLayout)
+        bbx = QtWidgets.QDialogButtonBox()
+        bbx.addButton(self.tr('Cancel (ignore for now)'), bbx.RejectRole)
+        bbx.rejected.connect(self.reject)
+        layout.addWidget(bbx)
         self.setLayout(layout)
         
     def useDBTags(self):
@@ -241,9 +260,9 @@ class ModifiedTagsDialog(QtWidgets.QDialog):
         try:
             backendFile.saveTags()
             self.accept()
-        except OSError:
+        except OSError as e:
             from maestro.gui.dialogs import warning
-            warning(self.tr('Unable to save tags'), 'Could not save tags: unknown OS error')
+            warning(self.tr('Unable to save tags'), 'Could not save tags:\n{}'.format(e))
             self.reject()
     
     def useFSTags(self):

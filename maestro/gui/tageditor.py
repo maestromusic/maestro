@@ -167,8 +167,10 @@ class TagEditorWidget(mainwindow.Widget):
         elements. *elements* and *elementsWithContents* are the lists of elements that will be edited when
         the "Include contents" button is not pressed / pressed, respectively.
         """
-        self.levelLabel.setPixmap(utils.getPixmap('real.png' if level in (levels.real, None)
-                                                  else 'editor.png'))
+        if level in (levels.real, None):
+            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('drive-harddisk').pixmap(24))
+        else:
+            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('accessories-text-editor').pixmap(24))
         self.level = level
         self.elements = elements
         if elementsWithContents is not None and elementsWithContents != elements:

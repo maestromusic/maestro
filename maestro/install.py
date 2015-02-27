@@ -325,7 +325,7 @@ class DatabaseWidget(SettingsWidget):
                     return False
         
         try:
-            database.createTables()
+            db.createTables()
         except db.DBException as e:
             logger.error("I cannot create database tables. SQL error: {}".format(e.message))
             QtWidgets.QMessageBox.warning(self, self.tr("Cannot create tables"),
@@ -354,10 +354,10 @@ class DomainWidget(SettingsWidget):
                        dialogTitle = self.tr("Choose source directory"),
                        pathType = 'existingDirectory')
         self.domainManager.setModel(model)
-        newDomainAction = QtWidgets.QAction(getIcon('add.png'), self.tr("Add domain"), self)
+        newDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-add'), self.tr("Add domain"), self)
         newDomainAction.triggered.connect(self._addDomain)
         self.domainManager.addAction(newDomainAction)
-        removeDomainAction = QtWidgets.QAction(getIcon('delete.png'), self.tr("Remove domain"), self)
+        removeDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-remove'), self.tr("Remove domain"), self)
         removeDomainAction.triggered.connect(self._removeDomain)
         self.domainManager.addAction(removeDomainAction)
         
@@ -432,7 +432,7 @@ class TagWidget(SettingsWidget):
         buttonBarLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout)
         addButton = QtWidgets.QPushButton(self.tr("Add tag"))
-        addButton.setIcon(getIcon('add.png'))
+        addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
         buttonBarLayout.addStretch()

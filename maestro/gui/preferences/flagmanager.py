@@ -99,7 +99,7 @@ class FlagManager(flexform.FlexTable):
 class NewFlagAction(QtWidgets.QAction):
     """Ask the user for a name and add a new flag to the database."""
     def __init__(self, parent):
-        super().__init__(utils.getIcon('add.png'), translate("NewFlagAction", "Create new flag..."), parent)
+        super().__init__(QtGui.QIcon.fromTheme('list-add'), translate("NewFlagAction", "Create new flag..."), parent)
         self.triggered.connect(self._triggered)
         
     def _triggered(self):
@@ -111,7 +111,7 @@ class NewFlagAction(QtWidgets.QAction):
 class DeleteFlagAction(QtWidgets.QAction):
     """Confirm and delete a flag from the database."""
     def __init__(self, parent):
-        super().__init__(utils.getIcon('delete.png'), translate("DeleteFlagAction", "Delete flag"), parent)
+        super().__init__(QtGui.QIcon.fromTheme('list-remove'), translate("DeleteFlagAction", "Delete flag"), parent)
         self.triggered.connect(self._triggered)
         parent.selectionChanged.connect(self._selectionChanged)
     

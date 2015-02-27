@@ -18,7 +18,7 @@
 
 import functools
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
 from . import dialogs, delegates, search as searchgui, widgets
@@ -140,8 +140,7 @@ class ViewConfigurationDialog(QtWidgets.QDialog):
         self.browser = browser
         
         layout = QtWidgets.QVBoxLayout(self)
-        
-        self.addButton = QtWidgets.QPushButton(utils.getIcon('add.png'), '')
+        self.addButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('list-add'), '')
         self.addButton.setEnabled(len(self.browser.views) < MAX_SUB_BROWSERS)
         self.addButton.clicked.connect(self._handleAddButton)
                
@@ -200,7 +199,7 @@ class SingleViewConfiguration(QtWidgets.QWidget):
         for name, (title, theClass) in browsermodel.layerClasses.items():
             self.layerTypeBox.addItem(title, name)
         bottomLine.addWidget(self.layerTypeBox)
-        self.addLayerButton = QtWidgets.QPushButton(utils.getIcon('add.png'), '')
+        self.addLayerButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('list-add'), '')
         self.addLayerButton.clicked.connect(self._handleAddLayerButton)
         bottomLine.addWidget(self.addLayerButton)
         
@@ -225,7 +224,7 @@ class SingleViewConfiguration(QtWidgets.QWidget):
             editButton = QtWidgets.QPushButton(utils.getIcon('pencil.png'), '')
             editButton.clicked.connect(functools.partial(self._handleEditButton, i))
             buttonLayout.addWidget(editButton)
-            removeButton = QtWidgets.QPushButton(utils.getIcon('remove.png'), '')
+            removeButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('list-remove'))
             removeButton.clicked.connect(functools.partial(self._handleRemoveButton, i))
             buttonLayout.addWidget(removeButton)
             self.table.setIndexWidget(self.table.model().index(i, 1), buttonWidget)

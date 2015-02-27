@@ -563,14 +563,14 @@ class UndoRedoAction(QtWidgets.QAction):
         if redo:
             self._prefix = self.tr("Redo")
             self.setShortcut(self.tr('Ctrl+Y'))
-            self.setIcon(utils.getIcon('redo.png'))
+            self.setIcon(QtGui.QIcon.fromTheme('edit-redo'))
             stack.canRedoChanged.connect(self.setEnabled)
             stack.redoTextChanged.connect(self.setText)
             self.triggered.connect(stack.redo)
         else:
             self._prefix = self.tr("Undo")
             self.setShortcut(self.tr('Ctrl+Z'))
-            self.setIcon(utils.getIcon('undo.png'))
+            self.setIcon(QtGui.QIcon.fromTheme('edit-undo'))
             stack.canUndoChanged.connect(self.setEnabled)
             stack.undoTextChanged.connect(self.setText)
             self.triggered.connect(stack.undo)

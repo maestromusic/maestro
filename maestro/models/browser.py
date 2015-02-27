@@ -146,8 +146,9 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     
     def reset(self):
         """Reset and reload the browser completely."""
+        self.beginResetModel()
         self.worker.reset()
-        super().reset()
+        self.endResetModel()
         self._startLoading(self.root)
             
     def flags(self, index):

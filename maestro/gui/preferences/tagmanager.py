@@ -39,20 +39,19 @@ class TagManager(QtWidgets.QWidget):
         
         buttonBar = QtWidgets.QToolBar()
         self.layout().addWidget(buttonBar)
-                
+
         addButton = QtWidgets.QToolButton()
-        addButton.setIcon(utils.getIcon("add.png"))
+        addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         addButton.setToolTip(self.tr("Add tag..."))
         addButton.clicked.connect(self._handleAddButton)
         buttonBar.addWidget(addButton)
-        
         self.undoButton = QtWidgets.QToolButton()
-        self.undoButton.setIcon(utils.getIcon("undo.png"))
+        self.undoButton.setIcon(QtGui.QIcon.fromTheme('edit-undo'))
         self.undoButton.setToolTip(self.tr("Undo"))
         self.undoButton.clicked.connect(stack.undo)
         buttonBar.addWidget(self.undoButton)
         self.redoButton = QtWidgets.QToolButton()
-        self.redoButton.setIcon(utils.getIcon("redo.png"))
+        self.redoButton.setIcon(QtGui.QIcon.fromTheme('edit-redo'))
         self.redoButton.setToolTip(self.tr("Redo"))
         self.redoButton.clicked.connect(stack.redo)
         buttonBar.addWidget(self.redoButton)
@@ -63,7 +62,7 @@ class TagManager(QtWidgets.QWidget):
         self.showInBrowserButton.clicked.connect(self._handleShowInBrowserButton)
         buttonBar.addWidget(self.showInBrowserButton)
         self.deleteButton = QtWidgets.QToolButton()
-        self.deleteButton.setIcon(utils.getIcon("delete.png"))
+        self.deleteButton.setIcon(QtWidgets.QIcon.fromTheme('edit-delete'))
         self.deleteButton.setToolTip(self.tr("Delete tag"))
         self.deleteButton.setEnabled(False)
         self.deleteButton.clicked.connect(self._handleDeleteButton)

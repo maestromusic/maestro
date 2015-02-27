@@ -17,13 +17,7 @@
         <file>icons/clear.png</file>
         <file>icons/clear_16.png</file>
         <file>icons/clear_playlist.png</file>
-        <file>icons/add.png</file>
-        <file>icons/remove.png</file>
         <file>icons/flag_blue.png</file>
-        <file>icons/options.png</file>
-        <file>icons/delete.png</file>
-        <file>icons/go-previous.png</file>
-        <file>icons/go-next.png</file>
         <file>tags/album.png</file>
         <file>tags/artist.png</file>
         <file>tags/comment.png</file>
@@ -31,8 +25,6 @@
         <file>tags/date.png</file>
         <file>tags/genre.png</file>
         <file>tags/title.png</file>
-        <file>icons/editor.png</file>
-        <file>icons/real.png</file>
         <file>process-working.png</file>
         <file>icons/recursive.png</file>
         <file>omg_square.svg</file>
@@ -50,14 +42,8 @@
         <file>icons/widgets/playlist.png</file>
         <file>icons/widgets/tageditor.png</file>
         <file>icons/tag_blue.png</file>
-        <file>icons/audio_volume_high.png</file>
-        <file>icons/audio_volume_low.png</file>
-        <file>icons/audio_volume_medium.png</file>
-        <file>icons/audio_volume_muted.png</file>
         <file>playback.svg</file>
         <file>icons/help-browser.png</file>
-        <file>icons/redo.png</file>
-        <file>icons/undo.png</file>
         <file>icons/search_active.png</file>
         <file>icons/search_disabled.png</file>
         <file>icons/search_inactive.png</file>

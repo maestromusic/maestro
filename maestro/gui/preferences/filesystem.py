@@ -22,7 +22,7 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from maestro import application, filesystem, config, stack, utils
+from maestro import application, filesystem, config, stack
 
 
 class FilesystemSettings(QtWidgets.QWidget):
@@ -41,21 +41,22 @@ class FilesystemSettings(QtWidgets.QWidget):
         
         buttonBar = QtWidgets.QToolBar()
         self.layout().addWidget(buttonBar)
+
         addButton = QtWidgets.QToolButton()
-        addButton.setIcon(utils.getIcon('add.png'))
+        addButton.setIcon(QtWidgets.QIcon.fromTheme('list-add'))
         addButton.setToolTip('Add source')
         addButton.clicked.connect(self._handleAddButton)
         buttonBar.addWidget(addButton)
         self.undoButton = QtWidgets.QToolButton()
-        self.undoButton.setIcon(utils.getIcon("undo.png"))
+        self.undoButton.setIcon(QtWidgets.QIcon.fromTheme('edit-undo'))
         self.undoButton.clicked.connect(stack.undo)
         buttonBar.addWidget(self.undoButton)
         self.redoButton = QtWidgets.QToolButton()
-        self.redoButton.setIcon(utils.getIcon("redo.png"))
+        self.redoButton.setIcon(QtWidgets.QIcon.fromTheme('edit-redo'))
         self.redoButton.clicked.connect(stack.redo)
         buttonBar.addWidget(self.redoButton)
         self.deleteButton = QtWidgets.QToolButton()
-        self.deleteButton.setIcon(utils.getIcon("delete.png"))
+        self.deleteButton.setIcon(QtWidgets.QIcon.fromTheme('edit-delete'))
         self.deleteButton.setToolTip(self.tr("Delete source"))
         self.deleteButton.setEnabled(False)
         self.deleteButton.clicked.connect(self._handleDeleteButton)

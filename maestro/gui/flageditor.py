@@ -39,9 +39,9 @@ class FlagEditor(QtWidgets.QWidget):
         label = QtWidgets.QLabel('<img src=":maestro/icons/flag_blue.png"> '+self.tr("Flags: "))
         label.setToolTip(self.tr("Flags"))
         self.layout().addWidget(label)
-        
+
         self.addButton = QtWidgets.QPushButton()
-        self.addButton.setIcon(utils.getIcon("add.png"))
+        self.addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         self.addButton.clicked.connect(self._handleAddButton)
         self.layout().addWidget(self.addButton)
         

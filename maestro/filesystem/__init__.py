@@ -21,7 +21,6 @@ from PyQt5 import QtCore
 import taglib
 from maestro.core import levels, urls, tags
 from maestro import application, logging, config, stack, database as db
-from maestro.filesystem.identification import AudioFileIdentifier
 
 translate = QtCore.QCoreApplication.translate
 _sources = []
@@ -33,12 +32,11 @@ def init():
     global _sources
     from maestro.filesystem.sources import Source
     _sources = [Source(**data) for data in config.storage.filesystem.sources]
-    paths = [source.path for source in _sources]
     # delete files not in any source
-    db.query('DELETE FROM {p}newfiles WHERE ' +
-             ' AND '.join('url NOT LIKE "file://{}%"'.format(path.replace('"', '\\"')) for path in paths))
+    if len(_sources) > 0:
+        db.query('DELETE FROM {p}newfiles WHERE ' + ' AND '.join('url NOT LIKE "file://{}%"'.format(
+                    source.path.replace('"', '\\"')) for source in _sources))
     _sources.sort(key=lambda s: s.name)
-        # register the file:// URL scheme
     urls.fileBackends.append(RealFile)
     parseAutoReplace()
 
@@ -69,7 +67,7 @@ def isValidSourceName(name):
 def addSource(**data):
     from maestro.filesystem.sources import Source
     source = Source(**data)
-    stack.push(translate("Filesystem", "Add source"),
+    stack.push(translate('Filesystem', 'Add source'),
                stack.Call(_addSource, source), stack.Call(_deleteSource, source))
 
 
@@ -80,7 +78,7 @@ def _addSource(source):
 
 
 def deleteSource(source):
-    stack.push(translate("filesystem", "Delete source"),
+    stack.push(translate('filesystem', 'Delete source'),
                stack.Call(_deleteSource, source), stack.Call(_addSource, source))
 
 
@@ -203,7 +201,7 @@ class RealFile(urls.BackendFile):
         if self._taglibFile:
             self._taglibFile = None
         if os.path.exists(newUrl.path):
-            raise OSError("Target exists.")
+            raise OSError('Target exists.')
         dir = os.path.dirname(newUrl.path)
         if not os.path.exists(dir):
             os.makedirs(dir)
