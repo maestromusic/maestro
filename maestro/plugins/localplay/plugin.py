@@ -18,50 +18,46 @@
 
 import os.path
 
-from PyQt5 import QtCore
-try:
-    from PyQt5.phonon import Phonon as phonon
-except ImportError as e:
-    raise ImportError("PyQt4-phonon is not installed.")
+from PyQt5 import QtCore, QtMultimedia
 
-from ... import player, profiles
-from ...models import playlist
+from maestro import player, profiles
+from maestro.models import playlist
         
 translate = QtCore.QCoreApplication.translate
 
 
 def enable():
-    profileType = profiles.ProfileType('phonon',
-                                       translate("PhononPlayerBackend","Phonon"),
-                                       PhononPlayerBackend)
+    profileType = profiles.ProfileType('localplay',
+                                       translate('LocalPlayBackend','Local Playback'),
+                                       LocalPlayerBackend)
     player.profileCategory.addType(profileType)
     # addType loads stored profiles of this type from storage
     # If no profile was loaded, create a default one.
     if len(player.profileCategory.profiles(profileType)) == 0:
-        name = translate("PhononPlayerBackend", "Local playback (Phonon)")
+        name = translate("LocalPlayBackend", 'Local playback')
         if player.profileCategory.get(name) is None:
             player.profileCategory.addProfile(name, profileType)
 
 
 def disable():
-    player.profileCategory.removeType('phonon')
+    player.profileCategory.removeType('localplay')
     
     
 def defaultStorage():
-    return {"phonon": {
+    return {"localplay": {
             "current": None,
             "playlist": ""
         }}
     
 
-class PhononPlayerBackend(player.PlayerBackend):
+class LocalPlayerBackend(player.PlayerBackend):
     
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
         
         # Phonon backends are created when the application starts (profiles!).
         # To increase performance the mediaObject is not created until it is needed.
-        self.mediaObject = None
+        self.player = None
         
         # The list of paths in the playlist and the current song are stored directly in the model's tree
         self.playlist = playlist.PlaylistModel(self)
@@ -73,22 +69,19 @@ class PhononPlayerBackend(player.PlayerBackend):
         
     def registerFrontend(self, frontend):
         self._numFrontends += 1
-        if self._numFrontends == 1 and hasattr(self, "_initState"):
+        if self._numFrontends == 1 and hasattr(self, '_initState'):
             # Initialize Phonon
             state = self._initState
             del self._initState
-            self.mediaObject = phonon.MediaObject()
-            self.mediaObject.finished.connect(self._handleFinished)
-            self.mediaObject.currentSourceChanged.connect(self._handleSourceChanged)
-            self.mediaObject.setTickInterval(200)
-            self.mediaObject.tick.connect(self._handleTick)
-            self.audioOutput = phonon.AudioOutput(phonon.MusicCategory)
-            self.phononPath = phonon.createPath(self.mediaObject,self.audioOutput) 
+            self.player = QtMultimedia.QMediaPlayer()
+            self.player.mediaChanged.connect(self._handleMediaChanged)
+            self.player.setNotifyInterval(1000)
+            self.player.positionChanged.connect(self._handleTick)
             if 'playlist' in state:
                 if self.playlist.initFromWrapperString(state['playlist']):
                     self.setCurrent(state.get('current', None), play=False)
             self.setVolume(state.get('volume', 100))
-            self._nextSource = None # used in self._handleSourceChanged
+            self._nextSource = None # used in self._handleMediaChanged
             self.connectionState = player.ConnectionState.Connected
             self.connectionStateChanged.emit(player.ConnectionState.Connected)
     
@@ -112,45 +105,37 @@ class PhononPlayerBackend(player.PlayerBackend):
     def setPlaylist(self, urls):
         self.playlist.current = None
         self.setState(player.PlayState.Stop)
-    
-    phononToStateMap = { phonon.LoadingState: player.PlayState.Stop,
-                         phonon.StoppedState: player.PlayState.Stop,
-                         phonon.PlayingState: player.PlayState.Play,
-                         phonon.BufferingState: player.PlayState.Play,
-                         phonon.PausedState: player.PlayState.Pause,
-                         phonon.ErrorState: player.PlayState.Stop }
 
     def state(self):
         """Return the current state"""
-        return self.phononToStateMap[self.mediaObject.state()]
+        state = self.player.state()
+        if state == self.player.StoppedState:
+            return player.PlayState.Stop
+        elif state == self.player.PausedState:
+            return player.PlayState.Pause
+        else:
+            return player.PlayState.Play
         
     def setState(self, state: player.PlayState):
         if state != self.state():
             if state is player.PlayState.Stop:
-                self.mediaObject.stop()
+                self.player.stop()
             elif state == player.PlayState.Play:
                 if self.current() is None:
                     offset = self._nextOffset()
                     if offset is not None:
                         self.setCurrent(offset) # this starts playing
-                else: self.mediaObject.play()
-                QtCore.QTimer.singleShot(2000, self.checkPlaying)
-            else: self.mediaObject.pause()
+                else:
+                    self.player.play()
+            else:
+                self.player.pause()
             self.stateChanged.emit(state)
-    
-    def checkPlaying(self):
-        if self.state() != player.PlayState.Play:
-            from ...gui.dialogs import warning
-            warning(self.tr("Error Playing Song"),
-                    self.tr("Phonon could not play back the selected file."))
-            self.stateChanged.emit(self.state())
-    
+
     def volume(self):
-        return int(self.audioOutput.volume() * 100)
+        return self.player.volume()
     
     def setVolume(self, volume):
-        assert type(volume) == int and 0 <= volume <= 100
-        self.audioOutput.setVolume(volume / 100)
+        self.player.setVolume(volume)
         self.volumeChanged.emit(volume)
     
     def current(self):
@@ -165,25 +150,25 @@ class PhononPlayerBackend(player.PlayerBackend):
         if offset != self.currentOffset():
             self.playlist.setCurrent(offset)
             if offset is not None:
-                source = phonon.MediaSource(self._getPath(offset))
-                self.mediaObject.setCurrentSource(source)
+                media = QtMultimedia.QMediaContent(QtCore.QUrl(self._getPath(offset)))
+                self.player.setMedia(media)
                 if play:
-                    self.setState(player.PlayState.Play)
+                    self.play()
             else:
                 self.setState(player.PlayState.Stop)
             self.currentChanged.emit(offset)
         elif offset is not None \
-                and self._getPath(offset) != self.mediaObject.currentSource().url().toString():
-            source = phonon.MediaSource(self._getPath(offset))
-            self.mediaObject.setCurrentSource(source)
+                and self._getPath(offset) != self.player.currentMedia().url().toString():
+            media = QtMultimedia.QMediaContent(QtCore.QUrl(self._getPath(offset)))
+            self.player.setMedia(media)
             if play:
-                self.mediaObject.play()
+                self.play()
     
     def elapsed(self):
-        return self.mediaObject.currentTime() / 1000
+        return self.player.position() / 1000
     
     def setElapsed(self, seconds):
-        self.mediaObject.seek(int(seconds * 1000))
+        self.player.setPosition(int(seconds * 1000))
         self.elapsedChanged.emit(seconds)
     
     def skipForward(self):
@@ -206,22 +191,21 @@ class PhononPlayerBackend(player.PlayerBackend):
         elif self.current().nextLeaf() is not None:
             return self.currentOffset()+1
         return None
-    
-    def _handleFinished(self):
-        self._no = self._nextOffset()
-        if self._no is not None:
-            self._nextSource = phonon.MediaSource(self._getPath(self._no))
-            self.mediaObject.setCurrentSource(self._nextSource)
-            self.mediaObject.play()
-            
-    def _handleSourceChanged(self, newSource):
-        if newSource == self._nextSource:
+
+    def _handleMediaChanged(self, media):
+        if media is None:
+            self._no = self._nextOffset()
+            if self._no is not None:
+                self._nextSource = QtMultimedia.QMediaContent(QtCore.QUrl(self._getPath(self._no)))
+                self.player.setMedia(self._nextSource)
+                self.player.play()
+        if media == self._nextSource:
             self.playlist.setCurrent(self._no)
             self.currentChanged.emit(self.currentOffset())
             self._nextSource = None
             self._no = None
         
-    def _handleTick(self,pos):
+    def _handleTick(self, pos):
         self.elapsedChanged.emit(pos / 1000)
     
     def _getPath(self, offset):
@@ -233,7 +217,7 @@ class PhononPlayerBackend(player.PlayerBackend):
     
     def save(self):
         if hasattr(self, "_initState"):
-            # phonon was never activated -> return previous state
+            # localplayback was never activated -> return previous state
             return self._initState
         result = {}
         playlist = self.playlist.wrapperString()
@@ -246,4 +230,4 @@ class PhononPlayerBackend(player.PlayerBackend):
         return result
         
     def __str__(self):
-        return "PhononAudioBackend({})".format(self.name)
+        return "LocalPlayerBackend({})".format(self.name)

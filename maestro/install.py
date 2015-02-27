@@ -610,8 +610,8 @@ class AudioWidget(SettingsWidget):
         
     def finish(self):
         """Store user input in config variables."""
-        if self.phononBox.isChecked() and "phonon" not in config.options.main.plugins:
-            config.options.main.plugins.append("phonon")
+        if self.phononBox.isChecked() and "localplayback" not in config.options.main.plugins:
+            config.options.main.plugins.append("localplayback")
         elif self.mpdBox.isChecked() and "mpd" not in config.options.main.plugins:
             config.options.main.plugins.append("mpd")
         return True
