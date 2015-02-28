@@ -67,11 +67,12 @@ def collect(qUrls):
     return filePaths
 
 
-def collectAsList(urls):
+def collectAsList(listOfUrls):
     """Find all music files below the given QUrls. This is used in various dropMimeData methods when
     urls are received. Return a list of URLs. Sort files within each directory, but not the list
     as whole.
     """
+    from maestro.core import urls
     def checkUrl(url):
         path = url.path()
         if os.path.isfile(path):
@@ -79,7 +80,7 @@ def collectAsList(urls):
         else:
             return itertools.chain.from_iterable(collect([url]).values())
 
-    return itertools.chain.from_iterable(checkUrl(url) for url in urls)
+    return itertools.chain.from_iterable(checkUrl(url) for url in listOfUrls)
 
 
 def splitPath(path, includeRoot=True):

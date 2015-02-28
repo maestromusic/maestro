@@ -64,7 +64,7 @@ class PlayerBackend(profiles.Profile):
     """
     stateChanged = QtCore.pyqtSignal(PlayState)
     volumeChanged = QtCore.pyqtSignal(int)
-    currentChanged = QtCore.pyqtSignal(int)
+    currentChanged = QtCore.pyqtSignal(object)
     elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(ConnectionState)
     
@@ -133,15 +133,15 @@ class PlayerBackend(profiles.Profile):
     
     def setPlaylist(self, urls):
         """Clear the playlist and set it to the given urls."""
-        pass
+        raise NotImplementedError()
     
     def insertIntoPlaylist(self, pos, urls):
         """Insert the given urls at *pos* into the playlist."""
-        pass
+        raise NotImplementedError()
     
     def removeFromPlaylist(self, begin, end):
         """Remove the songs with offsets >= *begin* and < *end* from the playlist."""
-        pass
+        raise NotImplementedError()
     
     def move(self, fromOffset, toOffset):
         """Move a song within the playlist. If the current song is moved the player should keep playing at
@@ -149,8 +149,8 @@ class PlayerBackend(profiles.Profile):
         *fromOffset* is the old position in the playlist, *toOffset* is the new one, after the move. That
         means that for forward moves, *toOffset* is one less than the insertion position.
         """
-        pass
-     
+        raise NotImplementedError()
+
     def registerFrontend(self, obj):
         """Tell this player class that a frontend object *obj* started to use it. The backend
         can use this information e.g. to make a connection retry or to start polling."""

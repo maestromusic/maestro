@@ -172,7 +172,7 @@ class PlaybackWidget(mainwindow.Widget):
         """Display elapsed and total time on the seek label."""
         current = self.backend.current()
         if current is None:
-            text = ""
+            text = "Stopped"
         elif current.element.length > 0:
             text = "{} - {}".format(utils.strings.formatLength(value),
                                     utils.strings.formatLength(self.seekSlider.maximum()))
@@ -192,7 +192,12 @@ class PlaybackWidget(mainwindow.Widget):
                 self.seekSlider.setRange(0, int(total))
             self.seekSlider.setValue(elapsed)
         self.updateSeekLabel(elapsed)
-    
+
+    def handleCurrentChanged(self, index):
+        self.updateTitleLabel()
+        self.updateMarks()
+        self.updateSeekLabel(self.backend.elapsed())
+
     def updateTitleLabel(self):
         """Display the title of the currently playing song."""
         if self.backend.connectionState == player.ConnectionState.Connected:
@@ -255,20 +260,19 @@ class PlaybackWidget(mainwindow.Widget):
             # RuntimeError: wrapped C/C++ object of type SeekSlider has been deleted
             self.setBackend(None)
     
-    signals = [ ("self.backend.elapsedChanged", "self.updateSlider"),
-                ("self.backend.volumeChanged", "self.volumeButton.setVolume"),
-                ("self.backend.stateChanged", "self.handleStateChange"),
-                ("self.backend.currentChanged", "self.updateTitleLabel"),
-                ("self.backend.currentChanged", "self.updateMarks"),
-                ("self.backend.connectionStateChanged", "self.handleConnectionChange"),
-                ("self.backend.playlist.rowsInserted", "self.handlePlaylistChange"),
-                ("self.backend.playlist.rowsRemoved", "self.handlePlaylistChange"),
-                ("self.volumeButton.volumeChanged", "self.backend.setVolume"),
-                ("self.ppButton.stateChanged", "self.backend.setState"),
-                ("self.stopButton.clicked", "self.backend.stop"),
-                ("self.seekSlider.sliderMoved", "self.backend.setElapsed"),
-                ("self.skipBackwardButton.clicked", "self.backend.skipBackward"),
-                ("self.skipForwardButton.clicked", "self.backend.skipForward")]
+    signals = [('self.backend.elapsedChanged', 'self.updateSlider'),
+               ('self.backend.volumeChanged', 'self.volumeButton.setVolume'),
+               ('self.backend.stateChanged', 'self.handleStateChange'),
+               ('self.backend.currentChanged', 'self.handleCurrentChanged'),
+               ('self.backend.connectionStateChanged', 'self.handleConnectionChange'),
+               ('self.backend.playlist.rowsInserted', 'self.handlePlaylistChange'),
+               ('self.backend.playlist.rowsRemoved', 'self.handlePlaylistChange'),
+               ('self.volumeButton.volumeChanged', 'self.backend.setVolume'),
+               ('self.ppButton.stateChanged', 'self.backend.setState'),
+               ('self.stopButton.clicked', 'self.backend.stop'),
+               ('self.seekSlider.sliderMoved', 'self.backend.setElapsed'),
+               ('self.skipBackwardButton.clicked', 'self.backend.skipBackward'),
+               ('self.skipForwardButton.clicked', 'self.backend.skipForward')]
     
     def setBackend(self, backend):
         """Set or change the player backend of this playback widget.
