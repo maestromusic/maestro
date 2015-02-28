@@ -99,7 +99,6 @@ class LocalPlayerBackend(player.PlayerBackend):
             self.qtPlaylist.addMedia(QtMultimedia.QMediaContent(url.toQUrl()))
 
     def removeFromPlaylist(self, begin, end):
-        print('remove {} {}'.format(begin, end))
         self.qtPlaylist.removeMedia(begin, end - 1)
 
     def setPlaylist(self, urls):
@@ -145,7 +144,6 @@ class LocalPlayerBackend(player.PlayerBackend):
         else: return self.playlist.current.offset()
     
     def setCurrent(self, offset, play=True):
-        print('set current {} {}'.format(offset, play))
         if offset != self.currentOffset():
             self.playlist.setCurrent(offset)
             if offset is not None:

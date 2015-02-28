@@ -128,10 +128,10 @@ class TreeView(QtWidgets.QTreeView):
     
     # def focusInEvent(self, event):
     #     super().focusInEvent(event)
-    #     #self.updateSelection() #TODO: raises a strange segfault bug without any exceptions
+    #     self.updateSelection() #TODO: raises a strange segfault bug without any exceptions
     #     if self.affectGlobalSelection:
     #         selection.setGlobalSelection(self.selection)
-    #
+
     def currentNode(self):
         current = self.currentIndex()
         if current.isValid():
