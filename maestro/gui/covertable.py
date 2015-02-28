@@ -192,9 +192,9 @@ class CoverTableScene(QtWidgets.QGraphicsScene):
         # Note: Setting all tooltips when the scene is generated takes much too long. Reimplementing
         # QGraphicsItem.toolTip does not work for some reason. Thus we reimplement the code that displays
         # tooltips.
-        item = self.itemAt(helpEvent.scenePos())
+        item = self.itemAt(helpEvent.scenePos(), QtGui.QTransform())
         if item is not None:
-            QtGui.QToolTip.showText(helpEvent.screenPos(), self._createToolTip(item))
+            QtWidgets.QToolTip.showText(helpEvent.screenPos(), self._createToolTip(item))
         helpEvent.accept()
             
     def _createToolTip(self, item, coverSize=150, showTags=True, showFlags=False, showParents=True):

@@ -32,7 +32,7 @@ class Plugin(object):
         self.name = name
         self.enabled = False
         self.loaded = False 
-        self.package = importlib.import_module('.'+self.name,'maestro.plugins')
+        self.package = importlib.import_module('.'+self.name, 'maestro.plugins')
         
         self.versionOk = True
         if (hasattr(self.package,'MINVERSION')):
@@ -96,7 +96,8 @@ class Plugin(object):
             self.module.mainWindowInit()
            
     def __str__(self):
-        return self.package.NAME
+        return self.name
+
 
 plugins = None
 loadedPlugins = None
@@ -120,10 +121,9 @@ def init():
                 traceback.print_exc()
 
     plug_ordered = collections.OrderedDict()
-    for pname in sorted(plugins.keys(), key = lambda k: plugins[k].package.NAME):
+    for pname in sorted(plugins.keys(), key=lambda k: plugins[k].name):
         plug_ordered[pname] = plugins[pname]
     plugins = plug_ordered
-
 
 
 def enablePlugins():
