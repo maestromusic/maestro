@@ -62,7 +62,7 @@ class TagManager(QtWidgets.QWidget):
         self.showInBrowserButton.clicked.connect(self._handleShowInBrowserButton)
         buttonBar.addWidget(self.showInBrowserButton)
         self.deleteButton = QtWidgets.QToolButton()
-        self.deleteButton.setIcon(QtWidgets.QIcon.fromTheme('edit-delete'))
+        self.deleteButton.setIcon(QtGui.QIcon.fromTheme('edit-delete'))
         self.deleteButton.setToolTip(self.tr("Delete tag"))
         self.deleteButton.setEnabled(False)
         self.deleteButton.clicked.connect(self._handleDeleteButton)

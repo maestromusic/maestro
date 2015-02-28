@@ -71,6 +71,7 @@ class PlayerBackend(profiles.Profile):
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
         self.connectionState = ConnectionState.Disconnected
+        self.playlist = None
     
     def state(self) -> PlayState:
         """Return the current player state."""
@@ -99,7 +100,7 @@ class PlayerBackend(profiles.Profile):
     
     def current(self):
         """Return the current song as wrapper."""
-        raise NotImplementedError()
+        return self.playlist.current
     
     def setCurrent(self, offset):
         """Set the song at offset *offset* as active and start playing it."""

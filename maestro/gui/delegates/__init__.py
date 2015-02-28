@@ -259,8 +259,7 @@ class StandardDelegate(AbstractDelegate):
             elif dataPiece.data == "filecount":
                 if wrapper.isFile():
                     return '' # Do not display a '1' at every file
-                else: return translate("AbstractDelegate","%n piece(s)","",QtCore.QCoreApplication.CodecForTr,
-                                       wrapper.fileCount())
+                else: return translate("AbstractDelegate","%n piece(s)", n=wrapper.fileCount())
             elif dataPiece.data == "filecount+length":
                 fileCount = self.getData(profiles.DataPiece("filecount"),wrapper)
                 length = self.getData(profiles.DataPiece("length"),wrapper)

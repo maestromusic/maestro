@@ -148,13 +148,11 @@ class Node:
         
         If *reverse* is True, files will be returned in reversed order.
         """
-        assert self.getContents() is not None
         if self.isFile():
             yield self
         else:
             for element in self.getContents() if not reverse else reversed(self.getContents()):
-                for file in element.getAllFiles(reverse):
-                    yield file
+                yield from element.getAllFiles(reverse)
                     
     def getAllContainers(self, contentsFirst=False, reverse=False):
         """Generator which will return all containers contained in this node or in children of it

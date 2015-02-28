@@ -144,7 +144,8 @@ class DataPiecesModel(QtCore.QAbstractListModel):
     def _handleProfileChanged(self,profile):
         """Handle profile changed events from the profile category."""
         if profile == self.profile:
-            self.reset()
+            self.beginResetModel()
+            self.endResetModel()
                 
         
 class MimeData(QtCore.QMimeData):

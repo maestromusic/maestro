@@ -202,19 +202,7 @@ class RootedTreeModel(QtCore.QAbstractItemModel):
         """Generator which will return all nodes contained in the tree (excluding the rootnode) 
         in depth-first-manner. If *skipSelf*."""
         return self.root.getAllNodes(skipSelf=True)
-    
-    def breadthFirstTraversal(self):
-        """Generator which will return all nodes contained in the tree in breadth-first-manner."""
-        # Warning: The autoLoad feature of BrowserModel depends on some implementation details of this method.
-        # (the problem is that CriterionNodes load their contents during the bfs.)
-        queue = [self.root]
-        while len(queue) > 0:
-            node = queue.pop(0)
-            for child in node.getContents():
-                if child.hasContents():
-                    queue.append(child)
-                yield child
-                
+
     def walk(self, node):
         """A tree iterator for nodes, inspired by os.walk.
         

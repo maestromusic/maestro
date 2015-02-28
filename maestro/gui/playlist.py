@@ -121,7 +121,7 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         if self.backend is not None:
             self.model().modelReset.disconnect(self.expandAll)
             for action in self.backend.treeActions():
-                self.removeLocalAction(action)
+                self.removeAction(action)
         self.backend = backend
         if backend is not None:
             global defaultPlaylist

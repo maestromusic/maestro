@@ -655,7 +655,7 @@ class MainWindow(QtWidgets.QMainWindow):
             menu.clear()
             for wClass in widgetClasses:
                 action = QtWidgets.QAction(wClass.name, menu)
-                action.triggered.connect(lambda: method(wClass))
+                action.triggered.connect(functools.partial(self._addWidget, widgetCls=wClass, method=method))
                 if wClass.icon is not None:
                     action.setIcon(wClass.icon)
                 if wClass.unique:
@@ -670,6 +670,9 @@ class MainWindow(QtWidgets.QMainWindow):
         _updateMenu([wClass for wClass in _widgetClasses if wClass.allowedDockAreas() != Qt.NoDockWidgetArea],
                     self.menus['dockwidgets'],
                     self.addDockWidget)
+
+    def _addWidget(self, widgetCls, method, **kwargs):
+        method(widgetCls)
 
     def updatePerspectiveMenu(self):
         """Update the menu that lists available perspectives."""

@@ -409,9 +409,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             except mpd.CommandError:
                 logging.error(__name__, "Problems setting volume. Does MPD allow setting the volume?")
 
-    def current(self):
-        return self.playlist.current
-
     def setCurrent(self, index):
         with self.getClient() as client:
             client.play(index if index is not None else -1)

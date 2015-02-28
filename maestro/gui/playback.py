@@ -445,7 +445,7 @@ class VolumeButton(QtWidgets.QToolButton):
         # When the mouse-wheel is scrolled, the volume is changed only after a short delay.
         # _newVolume is used to store the requested value between several successive wheel-events.  
         volume = self._newVolume if self._newVolume is not None else self.volume
-        req = volume + event.delta() // 20
+        req = volume + event.angleDelta().y() // 20
         if req > 100:
             req = 100
         if req < 0:

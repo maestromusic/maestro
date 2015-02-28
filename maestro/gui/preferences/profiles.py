@@ -123,7 +123,7 @@ class ProfileConfigurationPanel(QtWidgets.QWidget):
         leftLayout.addWidget(toolBar)
 
         self.createButton = QtWidgets.QToolButton()
-        self.createButton.setIcon(QtWidgets.QIcon.fromTheme('list-add'))
+        self.createButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         self.createButton.setToolTip(self.tr("Create profile"))
         self.createButton.clicked.connect(self._handleCreateButton)
         toolBar.addWidget(self.createButton)
@@ -133,7 +133,7 @@ class ProfileConfigurationPanel(QtWidgets.QWidget):
         self.renameButton.clicked.connect(self._handleRenameButton)
         toolBar.addWidget(self.renameButton)
         self.deleteButton = QtWidgets.QToolButton()
-        self.deleteButton.setIcon(QtWidgets.QIcon.fromTheme('edit-delete'))
+        self.deleteButton.setIcon(QtGui.QIcon.fromTheme('edit-delete'))
         self.deleteButton.setToolTip(self.tr("Delete profile"))
         self.deleteButton.clicked.connect(self._handleDeleteButton)
         toolBar.addWidget(self.deleteButton)

@@ -232,9 +232,9 @@ class ModifiedTagsDialog(QtWidgets.QDialog):
         leftLayout.addWidget(dbTree)
         rightLayout.addWidget(fsTree)
 
-        dbButton = QtWidgets.QPushButton(QtWidgets.QIcon.fromTheme('go-next'), '')
+        dbButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('go-next'), '')
         dbButton.setToolTip(self.tr('Write database tags to file'))
-        fsButton = QtWidgets.QPushButton(QtWidgets.QIcon.fromTheme('go-previous'), '')
+        fsButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('go-previous'), '')
         fsButton.setToolTip(self.tr('Store tags from file into database'))
 
         dbButton.clicked.connect(self.useDBTags)
