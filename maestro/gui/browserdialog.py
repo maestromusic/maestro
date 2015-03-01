@@ -187,7 +187,7 @@ class SingleViewConfiguration(QtWidgets.QWidget):
         
         self.table = QtWidgets.QTableWidget()
         self.table.horizontalHeader().setVisible(False)
-        self.table.verticalHeader().setMovable(True)
+        self.table.verticalHeader().setSectionsMovable(True)
         self.table.verticalHeader().sectionMoved.connect(self._handleSectionMoved)
         # Note: only the first column contains an item
         self.table.itemDoubleClicked.connect(lambda item: self._handleEditButton(item.row()))
@@ -224,7 +224,7 @@ class SingleViewConfiguration(QtWidgets.QWidget):
             editButton = QtWidgets.QPushButton(utils.getIcon('pencil.png'), '')
             editButton.clicked.connect(functools.partial(self._handleEditButton, i))
             buttonLayout.addWidget(editButton)
-            removeButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('list-remove'))
+            removeButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('list-remove'), '')
             removeButton.clicked.connect(functools.partial(self._handleRemoveButton, i))
             buttonLayout.addWidget(removeButton)
             self.table.setIndexWidget(self.table.model().index(i, 1), buttonWidget)
