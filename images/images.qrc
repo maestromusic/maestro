@@ -49,6 +49,10 @@
         <file>icons/search_inactive.png</file>
         <file>icons/widgets/details.png</file>
         <file>cover_missing.png</file>
+        <file>icons/audio_volume_high.png</file>
+        <file>icons/audio_volume_low.png</file>
+        <file>icons/audio_volume_medium.png</file>
+        <file>icons/audio_volume_muted.png</file>
     </qresource>
     <qresource prefix="/maestro/flags">
         <file alias="creative-commons.png">flags/fugue/creative-commons.png</file>

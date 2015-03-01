@@ -163,7 +163,8 @@ class PlaybackWidget(mainwindow.Widget):
             self.topLayout.setSpacing(self.style().pixelMetric(QtWidgets.QStyle.PM_LayoutVerticalSpacing))
         else:
             self.topLayout.setDirection(QtWidgets.QBoxLayout.RightToLeft)
-            self.topLayout.setSpacing(30 + self.style().pixelMetric(QtWidgets.QStyle.PM_LayoutHorizontalSpacing))
+            self.topLayout.setSpacing(
+                                30 + self.style().pixelMetric(QtWidgets.QStyle.PM_LayoutHorizontalSpacing))
     
     def createOptionDialog(self, button=None):
         return OptionDialog(button, self)
@@ -360,10 +361,10 @@ class VolumeButton(QtWidgets.QToolButton):
     # Inspired by the VolumePopupButton from Amarok 2.7.1
     volumeChanged = QtCore.pyqtSignal(int)
     
-    mutedIcon = QtGui.QIcon.fromTheme('audio-volume-muted')
-    lowIcon = QtGui.QIcon.fromTheme('audio-volume-low')
-    mediumIcon = QtGui.QIcon.fromTheme('audio-volume-medium')
-    highIcon = QtGui.QIcon.fromTheme('audio-volume-high')
+    mutedIcon = utils.images.icon("audio_volume_muted")
+    lowIcon = utils.images.icon("audio_volume_low")
+    mediumIcon = utils.images.icon("audio_volume_medium")
+    highIcon = utils.images.icon("audio_volume_high")
     
     def __init__(self, parent=None):
         super().__init__(parent)
