@@ -27,23 +27,18 @@ from maestro.core import urls
 
 def question(title, text, parent=None):
     """Display a modal question dialog with the given *title* and *text*. Return True if the
-    user selected "Yes" and False otherwise. The optional argument is the parent widget and default to the
+    user selected "Yes" and False otherwise. The optional argument is the parent widget and defaults to the
     main window.
-    :param str title: Window title
-    :param str text: Main message
-    :param QtWidgets.QWidget parent: (optional) parent window; defaults to Maestro's main window
-    :returns: The user's answer
-    :rtype: bool
     """
     if parent is None:
         from . import mainwindow
         parent = mainwindow.mainWindow
-    ans = QtWidgets.QMessageBox.question(parent,title,text,
+    ans = QtWidgets.QMessageBox.question(parent, title, text,
                                      buttons = QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Yes)
     return ans == QtWidgets.QMessageBox.Yes
 
 
-def warning(title,text,parent=None):
+def warning(title, text, parent=None):
     """Display a modal warning dialog with the given *title* and *text*. The optional argument is the parent
     widget and default to the main window."""
     if parent is None:
@@ -53,6 +48,7 @@ def warning(title,text,parent=None):
 
 
 def getText(title, text, parent=None, default=''):
+    """Show an input dialog and return the text that was entered or None if the user aborted the dialog."""
     result, ok = QtWidgets.QInputDialog.getText(parent, title, text, QtWidgets.QLineEdit.Normal, default)
     if ok:
         return result
@@ -82,8 +78,8 @@ class FancyPopup(QtWidgets.QFrame):
     """Fancy popup that looks like a tooltip. It is shown beneath its parent component (usually the button
     that opens the popup).
     
-    The popup will close itself if the user leaves its parent (the button that opened the popup)
-    unless the popup is entered within a short timespan.
+    The popup will close itself if the user leaves the popup or its parent (unless he enters again within
+    a short timespan).
     """
     
     # Whether a timer is active that will close this widget (to prevent starting more than one timer)
@@ -91,9 +87,7 @@ class FancyPopup(QtWidgets.QFrame):
     
     def __init__(self, parent, width=300, height=170):
         super().__init__(parent)
-        self.setWindowFlags(self.windowFlags() | Qt.Window | Qt.FramelessWindowHint)
-        
-        self.setMouseTracking(True)
+        self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint)
         parent.installEventFilter(self)
         
         # Fancy design code
@@ -101,23 +95,24 @@ class FancyPopup(QtWidgets.QFrame):
         self.setFrameStyle(QtWidgets.QFrame.Box | QtWidgets.QFrame.Plain);
         self.setLineWidth(1);
         p = self.palette()
-        p.setColor(QtGui.QPalette.Window,p.window().color().lighter(105))
+        p.setColor(QtGui.QPalette.Window, p.window().color().lighter(105))
         # Unbelievably this is used for the border...
         p.setColor(QtGui.QPalette.WindowText, Qt.darkGray)
         self.setPalette(p)
         
         effect = QtWidgets.QGraphicsDropShadowEffect()
-        effect.setOffset(0,0)
+        effect.setOffset(0, 0)
         effect.setBlurRadius(20)
         self.setGraphicsEffect(effect)
         
         # Resize and move to the correct position
-        self.resize(width,height)
-        pos = self.parent().mapToGlobal(QtCore.QPoint(0,self.parent().height()))
+        self.resize(width, height)
+        pos = parent.mapToGlobal(QtCore.QPoint(0, self.parent().height()))
         self.move(pos)
         self._moveToScreen()
         
     def _moveToScreen(self):
+        """Move the popup so that it does not stretch beyond screen boundaries.""" 
         # Unfortunately there seems to be no way to get the correct size prior to showing the dialog.
         # Therefore we correct offscreen positions after the dialog is shown as well as before (to try to
         # avoid flickering).
@@ -132,53 +127,52 @@ class FancyPopup(QtWidgets.QFrame):
         self.parent().removeEventFilter(self)
         super().close()
     
-    def showEvent(self,event):
+    def showEvent(self, event):
         super().showEvent(event)
         self._moveToScreen()
     
-    def mouseMoveEvent(self, event):
-        super().mouseMoveEvent(event)
-        self._tryClose(self.mapToGlobal(event.pos()))
-    
+    def leaveEvent(self, event):        
+        super().leaveEvent(event)
+        self._tryClose()
+
     def eventFilter(self, watched, event):
+        # When the mouse leaves the parent widget without entering the popup, we want to close the popup.
+        # For this we need to react to leaveEvents of the parent.
         if event.type() == QtCore.QEvent.Leave:
-            self._tryClose(None)
+            self._tryClose()
         return False
     
-    def _tryClose(self, pos):
-        if self._timerActive:
+    def _tryClose(self, useTimer=True):
+        """Check whether we should close the popup. If so, either start a timer or close it directly."""
+        # do not close while the timer is running, when the widget is under the mouse or when a popup
+        # widget is open (typically a QComboBox inside the FancyPopup)
+        if self._timerActive \
+                or self.underMouse() or self.parent().underMouse() \
+                or QtWidgets.QApplication.activePopupWidget() is not None:
             return
-        if pos is None:
-            underMouse = self.underMouse() or self.parent().underMouse()
-        else:
-            # for mouseMoveEvent of windows, underMouse() doesn't work here. On the last received
-            # mouseMoveEvent when leaving the window, we are still "underMouse" (otherwise we shouldn't
-            # get the event...) but the following test return false and correctly closes the window.
-            widget = QtWidgets.QApplication.widgetAt(pos)
-            if widget is None:
-                underMouse = False
-            else: underMouse = widget is self.parent() or self.isAncestorOf(widget)
-            
-        if not underMouse:
+        
+        # only close after a short delay
+        if useTimer:
             QtCore.QTimer.singleShot(150, self._handleTimer)
             self._timerActive = True
+        else:
+            self.close()
             
     def _handleTimer(self):
         """Close the window shortly after the parent has been left by the cursor unless the cursor has
         entered the popup in the meantime."""
         self._timerActive = False
-        if not self.underMouse():
-            self.close()
+        self._tryClose(useTimer=False)
             
             
 class FancyTabbedPopup(FancyPopup):
     """Fancy popup that contains a fancy TabWidget."""
     
-    def __init__(self,parent,width=370,height=170):
-        super().__init__(parent,width,height)
+    def __init__(self, parent, width=370, height=170):
+        super().__init__(parent, width, height)
         # Create components
         self.setLayout(QtWidgets.QVBoxLayout())
-        self.layout().setContentsMargins(0,0,0,0)
+        self.layout().setContentsMargins(0, 0, 0, 0)
         self.tabWidget = QtWidgets.QTabWidget(self)
         self.tabWidget.setDocumentMode(True)
         self.layout().addWidget(self.tabWidget)
@@ -192,7 +186,7 @@ class FancyTabbedPopup(FancyPopup):
         # After changing the WindowText color for the FancyPopup's border we have to change the tabWidget's
         # palette so that the font is rendered normally.
         p = self.tabWidget.palette()
-        p.setBrush(QtGui.QPalette.WindowText,self.parent().palette().windowText())
+        p.setBrush(QtGui.QPalette.WindowText, self.parent().palette().windowText())
         self.tabWidget.setPalette(p)
         
 
@@ -431,7 +425,7 @@ class DeleteDialog(QtWidgets.QDialog):
     def __init__(self, files, parent):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Delete files?"))
-        self.resize(400,300)
+        self.resize(400, 300)
         layout = QtWidgets.QVBoxLayout(self)
         label = QtWidgets.QLabel(
                              self.tr("You have deleted the following %n file(s) from Maestro. "
