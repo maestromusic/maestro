@@ -48,7 +48,7 @@ class BrowserDelegate(StandardDelegate):
         covers.addCacheSize(self.profile.options['coverSize'])
     
     def layout(self,index,availableWidth):
-        node = self.model.data(index)
+        node = index.model().data(index)
         
         if isinstance(node, browsermodel.TagNode):
             valueList = node.sortValues if self.profile.options['showSortValues'] else node.values

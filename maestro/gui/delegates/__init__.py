@@ -35,7 +35,7 @@ class StandardDelegate(AbstractDelegate):
     values for these options."""
     
     def layout(self,index,availableWidth):
-        node = self.model.data(index)
+        node = index.model().data(index)
         if isinstance(node, TextNode):
             if node.wordWrap:
                 self.addCenter(MultiTextItem([node.text],[]))

@@ -79,9 +79,11 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
     
     Additionally, subclasses may implement ''background'' to give some nodes a background.
     
-    The constructor takes the view that uses this delegate (necessary to compute the available width) and
-    the delegate's profile type and optionally a profile. If it is not given, the type's default will be
-    used.
+    Constructor arguments:
+        - *view*: The view that uses this delegate (used to compute available width and to update it on
+          profile changes). Maybe None.
+        - *profile*: A DelegateProfile.
+        
     """
     hSpace = 3   # horizontal space between DelegateItems
     vSpace = 3   # vertical space between DelegateItems
@@ -92,7 +94,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
     def __init__(self, view, profile):
         super().__init__(view)
         self.view = view
-        self.model = view.model()
+        self.model = view.model() if view is not None else None
         self.font = QtGui.QFont()
         assert profile is not None
         self.profile = profile
@@ -104,7 +106,8 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         if profile is None:
             raise ValueError("Profile must not be None")
         self.profile = profile
-        self.view.scheduleDelayedItemsLayout()
+        if self.view is not None:
+            self.view.scheduleDelayedItemsLayout()
     
     def addLeft(self,item):
         """Add an item to the left region. It will be drawn on the right of all previous items
@@ -137,7 +140,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
             self.setProfile(self.profileType.default())
             
     def _handleProfileChanged(self,profile):
-        if profile == self.profile:
+        if profile == self.profile and self.view is not None:
             self.view.scheduleDelayedItemsLayout()
                     
     def layout(self, index, width):
@@ -155,10 +158,13 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
             sys.exit("Fatal error: AbstractDelegate.sizeHint was called during painting/sizehinting.")
         self.state = SIZE_HINT
 
-        # Total width available. Note that option.rect is useless due to a performance hack in Qt.
-        # (Confer QTreeView::indexRowSizeHint in Qt's sources) 
-        totalWidth = self.parent().viewport().width() - 2*self.hMargin
-        totalWidth -= self.parent().indentation() * self.model.data(index).depth()
+        # Total width available.
+        if self.view is not None:
+            # Note that option.rect is useless due to a performance hack in Qt.
+            # (Confer QTreeView::indexRowSizeHint in Qt's sources) 
+            totalWidth = self.view.viewport().width() - 2*self.hMargin
+            totalWidth -= self.parent().indentation() * self.model.data(index).depth()
+        else: totalWidth = option.rect().width() - 2*self.hMargin
         
         # Collect items
         self.left,self.right,self.center = [],[],[]

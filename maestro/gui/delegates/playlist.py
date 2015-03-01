@@ -44,7 +44,7 @@ class PlaylistDelegate(StandardDelegate):
         covers.addCacheSize(self.profile.options['coverSize'])
     
     def getPreTitleItem(self,wrapper):
-        if wrapper in self.model.currentlyPlayingNodes:
+        if self.model is not None and wrapper in self.model.currentlyPlayingNodes:
             return abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9)
         else: return None
     

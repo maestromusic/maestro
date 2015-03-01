@@ -25,12 +25,13 @@ from PyQt5.QtCore import Qt
 from maestro import player, utils
 from maestro.core import levels
 from maestro.gui import actions, mainwindow, dialogs
+from maestro.gui.delegates import delegatewidget, playlist as playlistdelegate
 from maestro.gui.preferences import profiles as profilesgui
 
 translate = QtCore.QCoreApplication.translate
 renderer = QtSvg.QSvgRenderer(":maestro/playback.svg")
 ICON_SIZE = 16
-
+       
 
 class PlayCommand(enum.Enum):
     PlayPause = 'playPause'
@@ -105,10 +106,9 @@ class PlaybackWidget(mainwindow.Widget):
         self.topLayout = QtWidgets.QBoxLayout(QtWidgets.QBoxLayout.TopToBottom)
         self._areaChanged(self.area) # the direction of topLayout depends on the area 
         self.topLayout.setContentsMargins(0,0,0,0)
-        self.titleLabel = QtWidgets.QLabel()
-        self.titleLabel.setTextFormat(Qt.AutoText)
-        self.titleLabel.linkActivated.connect(lambda: self.backend.connectBackend())
-        self.topLayout.addWidget(self.titleLabel, 1)  
+        profile = playlistdelegate.PlaylistDelegate.profileType.default()
+        self.titleWidget = delegatewidget.DelegateWidget(playlistdelegate.PlaylistDelegate(None, profile))
+        self.topLayout.addWidget(self.titleWidget, 1)  
         
         buttonLayout = QtWidgets.QHBoxLayout()
         buttonLayout.setContentsMargins(0,0,0,0)
@@ -195,17 +195,17 @@ class PlaybackWidget(mainwindow.Widget):
         self.updateSeekLabel(elapsed)
 
     def handleCurrentChanged(self, index):
-        self.updateTitleLabel()
+        self.updateTitleWidget()
         self.updateMarks()
         self.updateSeekLabel(self.backend.elapsed())
 
-    def updateTitleLabel(self):
+    def updateTitleWidget(self):
         """Display the title of the currently playing song."""
         if self.backend.connectionState == player.ConnectionState.Connected:
             current = self.backend.current()
             if current is not None:
-                self.titleLabel.setText(current.getTitle())
-            else: self.titleLabel.setText('')
+                self.titleWidget.setElement(current.element)
+            else: self.titleWidget.setText('')
         
     def updateMarks(self):
         """Create and use SliderMarks for the stickers of type 'MARK' of the current song."""
@@ -231,11 +231,11 @@ class PlaybackWidget(mainwindow.Widget):
                     self.skipForwardButton, self.seekSlider, self.seekLabel, self.volumeButton:
             item.setEnabled(state is player.ConnectionState.Connected)
         if state is player.ConnectionState.Connecting:
-            self.titleLabel.setText(self.tr("connecting..."))
+            self.titleWidget.setText(self.tr("connecting..."))
         elif state is player.ConnectionState.Disconnected:
-            self.titleLabel.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
+            self.titleWidget.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
         else:
-            self.updateTitleLabel()
+            self.updateTitleWidget()
             self.updateMarks()
             self.updateSlider(self.backend.elapsed())
             self.handleStateChange(self.backend.state())
@@ -245,7 +245,7 @@ class PlaybackWidget(mainwindow.Widget):
         """Handle changes of the real-level."""
         current = self.backend.current()
         if current is not None and current.element.id in event.dataIds:
-            self.updateTitleLabel() # title may have changed
+            self.updateTitleWidget() # title may have changed
             self.updateMarks()
             
     def handlePlaylistChange(self, *args):
@@ -285,7 +285,7 @@ class PlaybackWidget(mainwindow.Widget):
                 eval(source).disconnect(eval(sink))
             self.backend.unregisterFrontend(self)
         if backend is None:
-            self.titleLabel.setText(self.tr("No backend selected"))
+            self.titleWidget.setText(self.tr("No backend selected"))
             self.backend = None
             self.setWindowTitle(self.tr("Playback"))
             return
