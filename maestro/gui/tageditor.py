@@ -168,9 +168,9 @@ class TagEditorWidget(mainwindow.Widget):
         the "Include contents" button is not pressed / pressed, respectively.
         """
         if level in (levels.real, None):
-            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('drive-harddisk').pixmap(24))
+            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('drive-harddisk').pixmap(16))
         else:
-            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('accessories-text-editor').pixmap(24))
+            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('accessories-text-editor').pixmap(16))
         self.level = level
         self.elements = elements
         if elementsWithContents is not None and elementsWithContents != elements:
