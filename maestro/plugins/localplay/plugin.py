@@ -18,7 +18,7 @@
 
 import os.path
 
-from PyQt5 import QtCore, QtMultimedia, QtWidgets
+from PyQt5 import QtCore, QtMultimedia
 
 from maestro import player, profiles
 from maestro.models import playlist
@@ -51,42 +51,33 @@ def defaultStorage():
     
 
 class LocalPlayerBackend(player.PlayerBackend):
-    
+    """Player backend implementation using a QtMultimedia.QMediaPlayer for local playback.
+    """
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
-        # To increase performance the QMediaPlayer and QMediaPlaylist are not created until it is needed.
         self.playlist = playlist.PlaylistModel(self)
-        self.qtPlaylist = self.qtPlayer = None
-            
+        self.qtPlayer = None
         if state is None:
             state = {}
         self._initState = state
-        self._numFrontends = 0
         
     def registerFrontend(self, frontend):
-        self._numFrontends += 1
+        super().registerFrontend(frontend)
         if self.qtPlayer is None:
-            # Initialize
+            # Initialize on first frontend registering
             state = self._initState
             self._initState = None
-            self.qtPlaylist = QtMultimedia.QMediaPlaylist()
             self.qtPlayer = QtMultimedia.QMediaPlayer()
-            self.qtPlayer.setPlaylist(self.qtPlaylist)
-            self.qtPlaylist.currentIndexChanged.connect(self.handleIndexChanged)
-            self.qtPlayer.setNotifyInterval(1000)
+            self.qtPlayer.setNotifyInterval(250)
             self.qtPlayer.error.connect(self.handlePlayerError)
+            self.qtPlayer.mediaStatusChanged.connect(self.handleMediaStatusChanged)
             self.qtPlayer.positionChanged.connect(lambda pos: self.elapsedChanged.emit(pos / 1000))
             if 'playlist' in state:
                 if self.playlist.initFromWrapperString(state['playlist']):
-                    self.qtPlaylist.addMedia([QtMultimedia.QMediaContent(file.element.url.toQUrl())
-                                              for file in self.playlist.root.getAllFiles()])
                     self.setCurrent(state.get('current', None), play=False)
             self.setVolume(state.get('volume', 100))
             self.connectionState = player.ConnectionState.Connected
             self.connectionStateChanged.emit(player.ConnectionState.Connected)
-
-    def unregisterFrontend(self, frontend):
-        self._numFrontends -= 1
 
     def insertIntoPlaylist(self, pos, urls):
         urls = list(urls)
@@ -96,26 +87,14 @@ class LocalPlayerBackend(player.PlayerBackend):
             elif not os.path.exists(url.path):
                 raise player.InsertError(self.tr('Cannot play "{}": File does not exist')
                                          .format(url.path), urls[:i])
-            elif not self.qtPlaylist.insertMedia(pos + i, QtMultimedia.QMediaContent(url.toQUrl())):
-                raise player.InsertError('Cannot play {}'.format(url.path))
 
     def removeFromPlaylist(self, begin, end):
-        self.qtPlaylist.removeMedia(begin, end - 1)
-
-    def move(self, fromOffset, toOffset):
-        if fromOffset == toOffset:
-            return
-        fromUrl = self.playlist.root.fileAtOffset(fromOffset).element.url
-        self.removeFromPlaylist(fromOffset, fromOffset + 1)
-        self.insertIntoPlaylist(toOffset, [fromUrl])
+        self.currentChanged.emit(self.playlist.current)
+        if self.playlist.current is None:
+            self.stop()
 
     def setPlaylist(self, urls):
-        self.stop()
-        self.playlist.clearCurrent()
-        self.currentChanged.emit(None)
-        self.qtPlaylist.clear()
-        if len(urls):
-            self.qtPlaylist.addMedia([QtMultimedia.QMediaContent(url.toQUrl()) for url in urls])
+        self.setCurrent(None, play=False)
 
     def state(self):
         """Return the current state"""
@@ -128,20 +107,19 @@ class LocalPlayerBackend(player.PlayerBackend):
             return player.PlayState.Play
         
     def setState(self, state: player.PlayState):
-        if state != self.state():
-            if state is player.PlayState.Stop:
-                self.qtPlayer.stop()
-            elif state == player.PlayState.Play:
-                if self.current() is None:
-                    try:
-                        self.setCurrent(0, play=True)
-                    except IndexError:
-                        pass
-                else:
-                    self.qtPlayer.play()
+        if state is player.PlayState.Stop:
+            self.qtPlayer.stop()
+        elif state == player.PlayState.Play:
+            if self.current() is None:
+                try:
+                    self.setCurrent(0, play=True)
+                except IndexError:
+                    pass
             else:
-                self.qtPlayer.pause()
-            self.stateChanged.emit(state)
+                self.qtPlayer.play()
+        else:
+            self.qtPlayer.pause()
+        self.stateChanged.emit(state)
 
     def volume(self):
         return self.qtPlayer.volume()
@@ -153,21 +131,19 @@ class LocalPlayerBackend(player.PlayerBackend):
     def currentOffset(self):
         if self.playlist.current is None:
             return None
-        else: return self.playlist.current.offset()
+        else:
+            return self.playlist.current.offset()
     
     def setCurrent(self, offset, play=True):
-        if offset != self.currentOffset():
-            self.playlist.setCurrent(offset)
-            if offset is not None and offset < self.qtPlaylist.mediaCount():
-                self.qtPlaylist.setCurrentIndex(offset)
-                if play:
-                    self.play()
-            else:
-                self.setState(player.PlayState.Stop)
-            self.currentChanged.emit(offset)
-        elif play and self.state() != player.PlayState.Play:
-            self.play()
-    
+        success = self.playlist.setCurrent(offset)
+        if not success or offset is None:
+            self.stop()
+        else:
+            self.qtPlayer.setMedia(QtMultimedia.QMediaContent(self.playlist.current.element.url.toQUrl()))
+            if play and self.state() != player.PlayState.Play:
+                self.play()
+        self.currentChanged.emit(offset)
+
     def elapsed(self):
         return self.qtPlayer.position() / 1000
     
@@ -176,12 +152,12 @@ class LocalPlayerBackend(player.PlayerBackend):
         self.elapsedChanged.emit(seconds)
     
     def skipForward(self):
-        self.qtPlaylist.next()
-        self.currentChanged.emit(self.qtPlaylist.currentIndex())
+        self.setCurrent(self.nextOffset())
     
     def skipBackward(self):
-        self.qtPlaylist.previous()
-        self.currentChanged.emit(self.qtPlaylist.currentIndex())
+        cur = self.currentOffset()
+        if cur is not None and cur > 0:
+            self.setCurrent(cur - 1)
     
     def nextOffset(self):
         """Get the next offset that will be played."""
@@ -189,13 +165,8 @@ class LocalPlayerBackend(player.PlayerBackend):
             return None
         if self.currentOffset() is None:
             return 0
-        elif self.current().nextLeaf() is not None:
+        elif self.current().nextLeaf():
             return self.currentOffset() + 1
-        return None
-
-    def handleIndexChanged(self, index):
-        self.playlist.setCurrent(index)
-        self.currentChanged.emit(index)
 
     def handlePlayerError(self, error):
         if error == self.qtPlayer.FormatError:
@@ -204,6 +175,13 @@ class LocalPlayerBackend(player.PlayerBackend):
             self.stop()
         else:
             print('unknown player error {}'.format(error))
+
+    def handleStateChanged(self, state):
+        print('state changed ', state)
+
+    def handleMediaStatusChanged(self, status):
+        if status == QtMultimedia.QMediaPlayer.EndOfMedia:
+            self.skipForward()
 
     def save(self):
         if self._initState is not None:

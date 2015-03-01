@@ -99,8 +99,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.port = state.get('port', 6600)
         self.password = state.get('password', '')
         self.path = state.get('path', '')
-
-        self._numFrontends = 0
         
         # actions
         self.separator = QtWidgets.QAction("MPD", self)
@@ -479,13 +477,13 @@ class MPDPlayerBackend(player.PlayerBackend):
         yield self.configOutputsAction
 
     def registerFrontend(self, obj):
-        self._numFrontends += 1
-        if self._numFrontends == 1:
+        super().registerFrontend(obj)
+        if self.numFrontends == 1:
             self.connectBackend()
     
     def unregisterFrontend(self, obj):
-        self._numFrontends -= 1
-        if self._numFrontends == 0 and self.connectionState is player.ConnectionState.Connected:
+        super().unregisterFrontend(obj)
+        if self.numFrontends == 0 and self.connectionState is player.ConnectionState.Connected:
             self.disconnectClient()
     
     def setPlaylist(self, urls):

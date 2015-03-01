@@ -62,8 +62,9 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
                 self.current = self.root.fileAtOffset(offset)
             except IndexError:
                 self.clearCurrent()
-                return
+                return False
             self._updateCurrentlyPlayingNodes()
+        return True
     
     def _scheduleUpdateCurrentlyPlaying(self):
         """Schedule an update for self.currentlyPlayingNodes."""

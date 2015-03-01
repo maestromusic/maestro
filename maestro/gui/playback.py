@@ -251,8 +251,8 @@ class PlaybackWidget(mainwindow.Widget):
     def handlePlaylistChange(self, *args):
         """Enable or disable play and stop buttons when the playlist becomes empty / is filled."""
         playlistEmpty = len(self.backend.playlist.root.contents) == 0
-        self.ppButton.setEnabled(not playlistEmpty)
-        self.stopButton.setEnabled(not playlistEmpty) 
+        for button in self.ppButton, self.stopButton, self.skipBackwardButton, self.skipForwardButton:
+            button.setEnabled(not playlistEmpty)
                
     def closeEvent(self, event):
         super().closeEvent(event)
@@ -268,6 +268,7 @@ class PlaybackWidget(mainwindow.Widget):
                ('self.backend.connectionStateChanged', 'self.handleConnectionChange'),
                ('self.backend.playlist.rowsInserted', 'self.handlePlaylistChange'),
                ('self.backend.playlist.rowsRemoved', 'self.handlePlaylistChange'),
+               ('self.backend.playlist.modelReset', 'self.handlePlaylistChange'),
                ('self.volumeButton.volumeChanged', 'self.backend.setVolume'),
                ('self.ppButton.stateChanged', 'self.backend.setState'),
                ('self.stopButton.clicked', 'self.backend.stop'),
@@ -332,8 +333,7 @@ class OptionDialog(dialogs.FancyPopup):
 class PlayPauseButton(QtWidgets.QToolButton):
     """Special button with two states. Depending on the state different signals (play and pause)
     are emitted when the button is clicked and the button shows different icons."""
-    
-    # Signals and icons used for the two states
+
     playIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_start", ICON_SIZE, ICON_SIZE))
     pauseIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_pause", ICON_SIZE, ICON_SIZE))
     stateChanged = QtCore.pyqtSignal(player.PlayState)
