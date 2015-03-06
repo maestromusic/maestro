@@ -731,10 +731,15 @@ class Level(application.ChangeEventDispatcher):
                             wrapper.parent = currentWrapper
                     else:
                         wrapper = createFunc(currentWrapper, token) # may raise ValueError
-
-                    if currentWrapper is not None and wrapper.element.id not in currentWrapper.element.contents:
-                        raise ValueError("Invalid wrapper string: {} is not contained in {}."
-                                         .format(wrapper.element.id, currentWrapper.element.id))
+                    if currentWrapper is not None:
+                        # Check whether new wrapper is really contained in parent
+                        if wrapper.element.id not in currentWrapper.element.contents:
+                            raise ValueError("Invalid wrapper string: {} is not contained in {}."
+                                             .format(wrapper.element.id, currentWrapper.element.id))
+                        # Insert position
+                        if wrapper.position is None:
+                            contents = currentWrapper.element.contents
+                            wrapper.position = contents.positionOf(wrapper.element.id)
                     currentList.append(wrapper)
                 except ElementGetError as e:
                     logging.error(__name__, "Error reading a WrapperString: "+str(e))
