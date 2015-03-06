@@ -28,6 +28,7 @@ class DelegateWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self.delegate = delegate
         self.model = rootedtreemodel.RootedTreeModel()
+        self.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Minimum)
         self._node = None
         
     def setNode(self, node):
@@ -36,7 +37,7 @@ class DelegateWidget(QtWidgets.QWidget):
         if node is not None:
             self.model.getRoot().setContents([node])
         else: self.model.getRoot().setContents([])
-        self.update()
+        #self.updateGeometry()
         
     def setElement(self, element):
         """Shortcut: Display the given element (inside a Wrapper)."""
@@ -45,13 +46,19 @@ class DelegateWidget(QtWidgets.QWidget):
     def setText(self, text):
         """Shortcut: Display the given text in a TextNode."""
         self.setNode(TextNode(text))
-        
+    
+    def minimumSize(self):
+        return self.sizeHint()
+    
     def sizeHint(self):
         if self._node is not None:
             option = QtWidgets.QStyleOptionViewItem()
+            if self.width() > 0: # this is sometimes false during startup
+                option.rect = self.rect()
             index = self.model.getIndex(self._node)
             return self.delegate.sizeHint(option, index)
-        else: return QtCore.QSize()
+        else:
+            return QtCore.QSize()
     
     def paintEvent(self, event):
         if self._node is not None:
