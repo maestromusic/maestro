@@ -47,10 +47,10 @@ class DetailsView(mainwindow.Widget):
         #buttonBar.addStretch()
         #self.backButton = QtWidgets.QPushButton()
         #self.backButton.setFlat(True)
-        #self.backButton.setIcon(utils.images.standardIcon("back"))
+        #self.backButton.setIcon(utils.images.icon("go-previous"))
         #buttonBar.addWidget(self.backButton)
         #self.forwardButton = QtWidgets.QPushButton()
-        #self.forwardButton.setIcon(utils.images.standardIcon("forward"))
+        #self.forwardButton.setIcon(utils.images.standardIcon("go-next"))
         #buttonBar.addWidget(self.forwardButton)
         #layout.addLayout(buttonBar)
         
@@ -125,8 +125,8 @@ class DetailsView(mainwindow.Widget):
         def link(href, text):
             return '<a href="{}" style="color: black; text-decoration: none">{}</a>'.format(href, text)
         
-        expander = utils.images.standardPixmap("expander")
-        collapser = utils.images.standardPixmap("collapser")
+        expander = utils.images.pixmap("expander")
+        collapser = utils.images.pixmap("collapser")
         
         el = self.element
         text = []

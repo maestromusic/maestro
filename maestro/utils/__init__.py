@@ -76,12 +76,6 @@ class InverseDifference:
 def getIcon(name):
     """Return a QIcon for the icon with the given name."""
     return QtGui.QIcon(":maestro/icons/" + name)
-
-
-#DEPRECATED use utils.images.getPixmap instead
-def getPixmap(name):
-    """Return a QPixmap for the icon with the given name."""
-    return QtGui.QPixmap(":maestro/icons/" + name)
     
     
 class OrderedDict(dict):

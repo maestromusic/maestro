@@ -36,12 +36,13 @@ class FlagEditor(QtWidgets.QWidget):
         self.layout().setSpacing(0)
         self.layout().setContentsMargins(0, 0, 0, 0)
         
-        label = QtWidgets.QLabel('<img src=":maestro/icons/flag_blue.png"> '+self.tr("Flags: "))
+        flagIconHtml = utils.images.html(utils.images.icon('flag').pixmap(16))
+        label = QtWidgets.QLabel(flagIconHtml+' '+self.tr("Flags: "))
         label.setToolTip(self.tr("Flags"))
         self.layout().addWidget(label)
 
         self.addButton = QtWidgets.QPushButton()
-        self.addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
+        self.addButton.setIcon(utils.images.icon('list-add'))
         self.addButton.clicked.connect(self._handleAddButton)
         self.layout().addWidget(self.addButton)
         

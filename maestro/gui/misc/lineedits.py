@@ -151,7 +151,7 @@ class PathLineEdit(QtWidgets.QWidget):
         self.lineEdit.textChanged.connect(self.textChanged)
         layout.addWidget(self.lineEdit, 1)
         button = QtWidgets.QPushButton()
-        button.setIcon(utils.images.standardIcon('directory'))
+        button.setIcon(utils.images.icon('folder'))
         button.setIconSize(QtCore.QSize(16, 16))
         button.clicked.connect(self._handleButton)
         layout.addWidget(button)

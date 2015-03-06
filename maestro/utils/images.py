@@ -19,66 +19,52 @@
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import Qt
 
-_staticImages = {}
+namedPixmaps = {} 
+namedIcons = {
+    'flag': 'flag_blue.png', # generic flag icon
+}
+_fallbacks = {}
 
 
 def icon(name):
-    """Return a QIcon for the icon with the given name."""
-    return QtGui.QIcon(":maestro/icons/" + name)
+    """Return a QIcon. *name* may be
+        - a name: a name from utils.images.namedIcons or from
+                http://standards.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
+        - a filepath: paths must be relative to the images/icons/-folder and contain an extension.
+    """
+    if '.' in name:
+        return QtGui.QIcon(':maestro/icons/' + name)
+    elif name in namedIcons:
+        return QtGui.QIcon(':maestro/icons/' + namedIcons[name])
+    elif name in _fallbacks:
+        return QtGui.QIcon.fromTheme(name, _fallbacks[name])
+    else:
+        return QtGui.QIcon.fromTheme(name)
+
 
 def pixmap(name):
-    """Return a QPixmap for the icon with the given name."""
-    return QtGui.QPixmap(":maestro/icons/" + name)
-
-
-def standardIcon(name):
-    style = QtWidgets.QApplication.style()
-    qtIcons = {
-        "file": QtWidgets.QStyle.SP_FileIcon,
-        "directory": QtWidgets.QStyle.SP_DirIcon,
-        "ok": QtWidgets.QStyle.SP_DialogOkButton,
-        "cancel": QtWidgets.QStyle.SP_DialogCancelButton,
-        "help": QtWidgets.QStyle.SP_DialogHelpButton,
-        "open": QtWidgets.QStyle.SP_DialogOpenButton,
-        "save": QtWidgets.QStyle.SP_DialogSaveButton,
-        "close": QtWidgets.QStyle.SP_DialogCloseButton,
-        "apply": QtWidgets.QStyle.SP_DialogApplyButton,
-        "reset": QtWidgets.QStyle.SP_DialogResetButton,
-        "discard": QtWidgets.QStyle.SP_DialogDiscardButton,
-        "yes": QtWidgets.QStyle.SP_DialogYesButton,
-        "no": QtWidgets.QStyle.SP_DialogNoButton,
-        "up": QtWidgets.QStyle.SP_ArrowUp,
-        "down": QtWidgets.QStyle.SP_ArrowDown,
-        "left": QtWidgets.QStyle.SP_ArrowLeft,
-        "right": QtWidgets.QStyle.SP_ArrowRight,
-        "back": QtWidgets.QStyle.SP_ArrowBack,
-        "forward": QtWidgets.QStyle.SP_ArrowForward,
-    }
-    if name in qtIcons:
-        return style.standardIcon(qtIcons[name])
-    else:
-        return QtGui.QIcon()
-
-
-def standardPixmap(name):
-    style = QtWidgets.QApplication.style()
-    if name in ["expander", "collapser"]:
-        if name in _staticImages:
-            return _staticImages[name]
-        else:
-            pixmap = QtGui.QPixmap(16, 12)
-            pixmap.fill(Qt.transparent)
-            option = QtWidgets.QStyleOption()
-            option.type = QtWidgets.QStyleOption.SO_ViewItem
-            option.rect = QtCore.QRect(QtCore.QPoint(0, 0), QtCore.QPoint(10, 10))
-            option.state = QtWidgets.QStyle.State_Children
-            if name == "collapser":
-                option.state |=  QtWidgets.QStyle.State_Open
-            painter = QtGui.QPainter(pixmap)
-            style.drawPrimitive(QtWidgets.QStyle.PE_IndicatorBranch, option, painter)
-            painter.end()
-            _staticImages[name] = pixmap
-            return pixmap
+    """Return a QPixmap. *name* may be either a filepath (relative to images-folder) or name from
+    utils.images.namedPixmaps. Additionally the special names 'expander' and 'collapser' are supported.
+    They will return the platform-specific pixmap to expand/collapse items in QTreeViews.
+    """
+    if '.' in name:
+        return QtGui.QPixmap(':maestro/' + name)
+    elif name in namedPixmaps:
+        return QtGui.QPixmap(':maestro/' + namedPixmaps[name])
+    elif name in ['expander', 'collapser']:
+        pixmap = QtGui.QPixmap(16, 12)
+        pixmap.fill(Qt.transparent)
+        option = QtWidgets.QStyleOption()
+        option.type = QtWidgets.QStyleOption.SO_ViewItem
+        option.rect = QtCore.QRect(QtCore.QPoint(0, 0), QtCore.QPoint(10, 10))
+        option.state = QtWidgets.QStyle.State_Children
+        if name == 'collapser':
+            option.state |=  QtWidgets.QStyle.State_Open
+        painter = QtGui.QPainter(pixmap)
+        style.drawPrimitive(QtWidgets.QStyle.PE_IndicatorBranch, option, painter)
+        painter.end()
+        namedPixmaps[name] = pixmap
+        return pixmap
     else:
         return QtGui.QPixmap()
 

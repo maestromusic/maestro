@@ -58,12 +58,7 @@ class ContainerType(enum.Enum):
     def icon(self):
         path = self.iconPath()
         if path:
-            return utils.getIcon(path)
-
-    def pixmap(self):
-        path = self.iconPath()
-        if path:
-            return utils.getPixmap(path)
+            return utils.images.icon(path)
 
 
 class Element:
