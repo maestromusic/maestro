@@ -99,8 +99,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         self.port = state.get('port', 6600)
         self.password = state.get('password', '')
         self.path = state.get('path', '')
-
-        self._numFrontends = 0
         
         # actions
         self.separator = QtWidgets.QAction("MPD", self)
@@ -126,9 +124,9 @@ class MPDPlayerBackend(player.PlayerBackend):
         
         self.idling = False
         self.playlistVersion = None
-        self._state = None
-        self._currentLength = None
-        self._volume = None
+        self._state = player.PlayState.Stop
+        self._currentStart = 0
+        self._volume = 0
         self.seekRequest = None
         self.outputs = None
         self.client = None
@@ -354,14 +352,6 @@ class MPDPlayerBackend(player.PlayerBackend):
         else:
             current = None
         if current != self.playlist.current:
-            if current is None:
-                self._currentLength = 0 # no current song
-            else:
-                mpdCurrent = self.client.currentsong()
-                if "time" in mpdCurrent:
-                    self._currentLength = int(mpdCurrent["time"])
-                else:
-                    self._currentLength = -1
             self.playlist.setCurrent(current)
             self.currentChanged.emit(current)
         
@@ -375,10 +365,9 @@ class MPDPlayerBackend(player.PlayerBackend):
         if state != self._state:
             self._state = state
             self.stateChanged.emit(state)
-            if state == player.PlayState.Stop:
-                self._currentLength = 0
-                self.playlist.setCurrent(None)
-                self.currentChanged.emit(None)
+            # if state == player.PlayState.Stop:
+            #     self.playlist.setCurrent(None)
+            #     self.currentChanged.emit(None)
         self._state = state
 
     def updateOutputs(self):
@@ -435,7 +424,6 @@ class MPDPlayerBackend(player.PlayerBackend):
             with self.getClient() as client:
                 client.seekcur(self.seekRequest)
         self.seekRequest = None
-
     
     def updateElapsed(self):
         if not self.seekTimer.isActive():
@@ -479,13 +467,13 @@ class MPDPlayerBackend(player.PlayerBackend):
         yield self.configOutputsAction
 
     def registerFrontend(self, obj):
-        self._numFrontends += 1
-        if self._numFrontends == 1:
+        super().registerFrontend(obj)
+        if self.numFrontends == 1:
             self.connectBackend()
     
     def unregisterFrontend(self, obj):
-        self._numFrontends -= 1
-        if self._numFrontends == 0 and self.connectionState is player.ConnectionState.Connected:
+        super().unregisterFrontend(obj)
+        if self.numFrontends == 0 and self.connectionState is player.ConnectionState.Connected:
             self.disconnectClient()
     
     def setPlaylist(self, urls):

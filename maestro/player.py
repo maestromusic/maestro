@@ -72,6 +72,7 @@ class PlayerBackend(profiles.Profile):
         super().__init__(name, type, state)
         self.connectionState = ConnectionState.Disconnected
         self.playlist = None
+        self.numFrontends = 0
     
     def state(self) -> PlayState:
         """Return the current player state."""
@@ -149,18 +150,18 @@ class PlayerBackend(profiles.Profile):
         *fromOffset* is the old position in the playlist, *toOffset* is the new one, after the move. That
         means that for forward moves, *toOffset* is one less than the insertion position.
         """
-        raise NotImplementedError()
+        pass
 
     def registerFrontend(self, obj):
         """Tell this player class that a frontend object *obj* started to use it. The backend
         can use this information e.g. to make a connection retry or to start polling."""
-        pass
+        self.numFrontends += 1
     
     def unregisterFrontend(self, obj):
         """Tell this player class that a frontend object *obj* thas stopped using the backend.
         This may be used to stop time-consuming backend operations as soon as nobody is using
         it anymore."""
-        pass
+        self.numFrontends -= 1
     
     def connectBackend(self):
         pass

@@ -37,11 +37,9 @@ import collections, os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-# This script tries to include as few modules as possible
 from maestro import config, logging, database as db
 from maestro.application import loadTranslators
 from maestro.core.tags import isValidTagName
-from maestro.core.domains import isValidName as isValidDomainName
 from maestro.gui import flexform
 
 logger = logging.getLogger("Install tool")
@@ -68,7 +66,7 @@ class InstallToolWindow(QtWidgets.QWidget):
         logging.init()
         
         loadTranslators(app, logger)
-        self.setWindowTitle(self.tr("Maestro Install Tool"))
+        self.setWindowTitle(self.tr('Maestro Install Tool'))
         self.resize(630, 550)
         self.move(QtWidgets.QApplication.desktop().screen().rect().center() - self.rect().center())
         
@@ -80,13 +78,13 @@ class InstallToolWindow(QtWidgets.QWidget):
         buttonLayout = QtWidgets.QHBoxLayout()
         style = QtWidgets.QApplication.style()
         layout.addLayout(buttonLayout)
-        self.prevButton = QtWidgets.QPushButton(self.tr("Previous"))
+        self.prevButton = QtWidgets.QPushButton(self.tr('Previous'))
         self.prevButton.setIcon(style.standardIcon(QtWidgets.QStyle.SP_ArrowLeft))
         self.prevButton.clicked.connect(self._handlePrevButton)
         self.prevButton.setEnabled(False)
         buttonLayout.addWidget(self.prevButton)
         buttonLayout.addStretch()
-        self.nextButton = QtWidgets.QPushButton(self.tr("Next"))
+        self.nextButton = QtWidgets.QPushButton(self.tr('Next'))
         self.nextButton.setIcon(style.standardIcon(QtWidgets.QStyle.SP_ArrowRight))
         self.nextButton.clicked.connect(self._handleNextButton)
         self.nextButton.setDefault(True)
@@ -116,14 +114,14 @@ class InstallToolWindow(QtWidgets.QWidget):
         self.stackedLayout.setCurrentWidget(self.stateWidgets[state])
         self.prevButton.setEnabled(self.state not in ['language', 'database'])
         if state == 'audio':
-            self.nextButton.setText(self.tr("Finish"))
-        else: self.nextButton.setText(self.tr("Next"))
+            self.nextButton.setText(self.tr('Finish'))
+        else: self.nextButton.setText(self.tr('Next'))
     
     def finish(self):
-        """Write config file, close the install tool and start Maestro."""
+        '''Write config file, close the install tool and start Maestro.'''
         # Write config values
         config.shutdown()
-        logger.info("Install tool finished. Ready to start Maestro.")
+        logger.info('Install tool finished. Ready to start Maestro.')
         from maestro.application import executeEntryPoint
         executeEntryPoint('maestro')
     
@@ -199,27 +197,27 @@ class LanguageWidget(SettingsWidget):
     """Widget to choose the language (locale would be more appropriate)."""
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
-        self.setTitle(self.tr("Language"))
+        self.setTitle(self.tr('Language'))
         formLayout = QtWidgets.QFormLayout()
         self.layout().addLayout(formLayout)
         self.layout().addStretch()
         
         self.languageBox = QtWidgets.QComboBox()
-        self.languageBox.addItem("English", "en")
-        self.languageBox.addItem("Deutsch", "de")
+        self.languageBox.addItem('English', 'en')
+        self.languageBox.addItem('Deutsch', 'de')
         locale = QtCore.QLocale.system().name()
         if locale == 'de' or locale.startswith('de_'):
             self.languageBox.setCurrentIndex(1)
-        formLayout.addRow(self.tr("Please choose a language: "), self.languageBox)
+        formLayout.addRow(self.tr('Please choose a language: '), self.languageBox)
         
     def finish(self):
-        """Set the locale and update InstallToolWidget to the new language."""
+        '''Set the locale and update InstallToolWidget to the new language.'''
         config.options.i18n.locale = self.languageBox.itemData(self.languageBox.currentIndex())
         loadTranslators(app, logger)
         # Update the texts which already have been translated
-        self.installTool.nextButton.setText(self.tr("Next"))
-        self.installTool.prevButton.setText(self.tr("Previous"))
-        self.installTool.setWindowTitle(self.tr("Maestro Install Tool"))
+        self.installTool.nextButton.setText(self.tr('Next'))
+        self.installTool.prevButton.setText(self.tr('Previous'))
+        self.installTool.setWindowTitle(self.tr('Maestro Install Tool'))
         self.installTool.createOtherWidgets()
         return True
 
@@ -227,44 +225,44 @@ class LanguageWidget(SettingsWidget):
 class DatabaseWidget(SettingsWidget):
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
-        self.setTitle(self.tr("Database settings"))
-        self.setText(self.tr("Choose a database type and enter the necessary connection parameters."))
-        groupBox = QtWidgets.QGroupBox(self.tr("Database type"))
+        self.setTitle(self.tr('Database settings'))
+        self.setText(self.tr('Choose a database type and enter the necessary connection parameters.'))
+        groupBox = QtWidgets.QGroupBox(self.tr('Database type'))
         layout = QtWidgets.QVBoxLayout(groupBox)
-        self.sqliteButton = QtGui.QRadioButton(self.tr("SQLite"))
+        self.sqliteButton = QtGui.QRadioButton(self.tr('SQLite'))
         self.sqliteButton.setChecked(True)
         self.sqliteButton.toggled.connect(self._handleTypeButton)
         layout.addWidget(self.sqliteButton)
-        self.mysqlButton = QtGui.QRadioButton(self.tr("MySQL"))
+        self.mysqlButton = QtGui.QRadioButton(self.tr('MySQL'))
         self.mysqlButton.toggled.connect(self._handleTypeButton)
         layout.addWidget(self.mysqlButton)
         self.layout().addWidget(groupBox)
         
-        groupBox = QtWidgets.QGroupBox(self.tr("Connection settings"))
+        groupBox = QtWidgets.QGroupBox(self.tr('Connection settings'))
         self.stackedLayout = QtWidgets.QStackedLayout(groupBox)
         self.layout().addWidget(groupBox)
         
         flexConfig = flexform.FlexFormConfig()
-        flexConfig.addField('path', self.tr("Database file"), 'path',
-                            dialogTitle=self.tr("Choose database file"),
+        flexConfig.addField('path', self.tr('Database file'), 'path',
+                            dialogTitle=self.tr('Choose database file'),
                             default=config.options.database.sqlite_path)
-        flexConfig.addField('prefix', self.tr("Table prefix (optional)"), 'string',
+        flexConfig.addField('prefix', self.tr('Table prefix (optional)'), 'string',
                             default=config.options.database.prefix)
         self.sqliteFlexForm = flexform.FlexForm(flexConfig, self)
         self.stackedLayout.addWidget(self.sqliteFlexForm)
         
         flexConfig = flexform.FlexFormConfig()
-        flexConfig.addField('name', self.tr("Database name"), 'string',
+        flexConfig.addField('name', self.tr('Database name'), 'string',
                             default=config.options.database.name)
-        flexConfig.addField('user', self.tr("User name"), 'string',
+        flexConfig.addField('user', self.tr('User name'), 'string',
                             default=config.options.database.user)
-        flexConfig.addField('password', self.tr("Password"), 'password',
+        flexConfig.addField('password', self.tr('Password'), 'password',
                             default=config.options.database.password)
-        flexConfig.addField('host', self.tr("Host"), 'string',
+        flexConfig.addField('host', self.tr('Host'), 'string',
                             default=config.options.database.host)
-        flexConfig.addField('port', self.tr("Port (optional)"), 'integer',
+        flexConfig.addField('port', self.tr('Port (optional)'), 'integer',
                             default=config.options.database.port)
-        flexConfig.addField('prefix', self.tr("Table prefix (optional)"), 'string',
+        flexConfig.addField('prefix', self.tr('Table prefix (optional)'), 'string',
                             default=config.options.database.prefix)
         self.mysqlFlexForm = flexform.FlexForm(flexConfig)
         self.stackedLayout.addWidget(self.mysqlFlexForm)
@@ -296,9 +294,9 @@ class DatabaseWidget(SettingsWidget):
         try:
             db.init()
         except db.DBException as e:
-            logger.error("I cannot connect to the database. SQL error: {}".format(e.message))
-            QtWidgets.QMessageBox.warning(self, self.tr("Database connection failed"),
-                                      self.tr("I cannot connect to the database."))
+            logger.error('I cannot connect to the database. SQL error: {}'.format(e.message))
+            QtWidgets.QMessageBox.warning(self, self.tr('Database connection failed'),
+                                      self.tr('I cannot connect to the database.'))
             return False 
         
         from .database import tables
@@ -308,17 +306,17 @@ class DatabaseWidget(SettingsWidget):
         if len(db.listTables()) > 0: # otherwise we assume a new installation and create all tables
             buttons = QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Abort
             if not any(table.exists() for table in tables.tables): 
-                if QtWidgets.QMessageBox.question(self, self.tr("Database tables missing"),
-                        self.tr("Although the database is not empty, I cannot find any of my tables. If you "
-                                "use a table prefix, please check whether it is correct. Shall I continue "
-                                "and create the missing tables?"),
+                if QtWidgets.QMessageBox.question(self, self.tr('Database tables missing'),
+                        self.tr('Although the database is not empty, I cannot find any of my tables. If you '
+                                'use a table prefix, please check whether it is correct. Shall I continue '
+                                'and create the missing tables?'),
                           buttons, QtWidgets.QMessageBox.Yes) != QtWidgets.QMessageBox.Yes:
                     db.close()
                     return False
             else:
                 missingTables = [table.name for table in tables.tables if not table.exists()]
-                if QtWidgets.QMessageBox.question(self, self.tr("Database table(s) missing"),
-                          self.tr("Some tables are missing: {}. Shall I continue and create them?")
+                if QtWidgets.QMessageBox.question(self, self.tr('Database table(s) missing'),
+                          self.tr('Some tables are missing: {}. Shall I continue and create them?')
                                     .format(', '.join(missingTables)),
                           buttons, QtWidgets.QMessageBox.Yes) != QtWidgets.QMessageBox.Yes:
                     db.close()
@@ -327,10 +325,10 @@ class DatabaseWidget(SettingsWidget):
         try:
             db.createTables()
         except db.DBException as e:
-            logger.error("I cannot create database tables. SQL error: {}".format(e.message))
-            QtWidgets.QMessageBox.warning(self, self.tr("Cannot create tables"),
-                                      self.tr("I cannot create the database tables. Please make sure that "
-                                              "the specified user has the necessary permissions."))
+            logger.error('I cannot create database tables. SQL error: {}'.format(e.message))
+            QtWidgets.QMessageBox.warning(self, self.tr('Cannot create tables'),
+                                      self.tr('I cannot create the database tables. Please make sure that '
+                                              'the specified user has the necessary permissions.'))
             db.close()
             return False 
         return True
@@ -340,10 +338,10 @@ class DomainWidget(SettingsWidget):
     """Let the user create at least one domain. Also create one source for each domain."""
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
-        self.setTitle(self.tr("Domain settings"))
+        self.setTitle(self.tr('Domain settings'))
         self.setText(self.tr(
-            "Maestro separates different types of media into domains like \"Music\", \"Movies\".\n"
-            "Enable / create one or more domains that you want to use."
+            'Maestro separates different types of media into domains like \'Music\', \'Movies\'.\n'
+            'Enable / create one or more domains that you want to use.'
             ))
         
         self.domainManager = flexform.FlexTable(self)
@@ -354,10 +352,10 @@ class DomainWidget(SettingsWidget):
                        dialogTitle = self.tr("Choose source directory"),
                        pathType = 'existingDirectory')
         self.domainManager.setModel(model)
-        newDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-add'), self.tr("Add domain"), self)
+        newDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-add'), self.tr('Add domain'), self)
         newDomainAction.triggered.connect(self._addDomain)
         self.domainManager.addAction(newDomainAction)
-        removeDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-remove'), self.tr("Remove domain"), self)
+        removeDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-remove'), self.tr('Remove domain'), self)
         removeDomainAction.triggered.connect(self._removeDomain)
         self.domainManager.addAction(removeDomainAction)
         
@@ -365,9 +363,9 @@ class DomainWidget(SettingsWidget):
         self.layout().addStretch()
         
         # Note: The domain widget is only displayed, if no domain exists in the database
-        self._addDomain(True, self.tr("Music"), os.path.expanduser(self.tr('~/Music')))
-        self._addDomain(False, self.tr("Movies"), os.path.expanduser(self.tr('~/Movies')))
-        self._addDomain(False, self.tr("Documents"), os.path.expanduser(self.tr('~/Documents')))
+        self._addDomain(True, self.tr('Music'), os.path.expanduser(self.tr('~/Music')))
+        self._addDomain(False, self.tr('Movies'), os.path.expanduser(self.tr('~/Movies')))
+        self._addDomain(False, self.tr('Documents'), os.path.expanduser(self.tr('~/Documents')))
 
     def _addDomain(self, enabled=True, title=None, path=''):
         if title is None:
@@ -383,15 +381,15 @@ class DomainWidget(SettingsWidget):
     def finish(self):
         items = [item for item in self.domainManager.model.items if item[0]] # enabled items
         if len(items) == 0:
-            QtWidgets.QMessageBox.warning(self, self.tr("No domain"),
-                                      self.tr("Please create and activate at least one domain."))
+            QtWidgets.QMessageBox.warning(self, self.tr('No domain'),
+                                      self.tr('Please create and activate at least one domain.'))
             return False
         if any(len(set(item[i] for item in items)) < len(items) for i in (1,2)):
-            QtWidgets.QMessageBox.warning(self, self.tr("Names not unique"),
-                                      self.tr("Please give each domain a unique name and path."))
+            QtWidgets.QMessageBox.warning(self, self.tr('Names not unique'),
+                                      self.tr('Please give each domain a unique name and path.'))
             return False
         
-        db.multiQuery("INSERT INTO {p}domains (name) VALUES (?)", [(item[1],) for item in items])
+        db.multiQuery('INSERT INTO {p}domains (name) VALUES (?)', [(item[1],) for item in items])
         
         # Create one source for each domain
         config.storage.filesystem.sources = [
@@ -408,18 +406,18 @@ class TagWidget(SettingsWidget):
     """ 
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
-        self.setTitle(self.tr("Tag settings (optional)"))
-        self.setText(self.tr("Uncheck tags that you do not want to be created. "
-                             "The first two tags play a special role: "
-                             "They are used for songtitles and albumtitles. "
-                             "Do not change their names unless you really know what you do!"))
+        self.setTitle(self.tr('Tag settings (optional)'))
+        self.setText(self.tr('Uncheck tags that you do not want to be created. '
+                             'The first two tags play a special role: '
+                             'They are used for songtitles and albumtitles. '
+                             'Do not change their names unless you really know what you do!'))
         
         self.columns = [
-                ("name",    self.tr("Name")),
-                ("type",    self.tr("Value-Type")),
-                ("title",   self.tr("Title")),
-                ("icon",    self.tr("Icon")),
-                ("private", self.tr("Private?")),
+                ('name',    self.tr('Name')),
+                ('type',    self.tr('Value-Type')),
+                ('title',   self.tr('Title')),
+                ('icon',    self.tr('Icon')),
+                ('private', self.tr('Private?')),
                 ]
         
         self.tableWidget = QtWidgets.QTableWidget()
@@ -431,22 +429,22 @@ class TagWidget(SettingsWidget):
         
         buttonBarLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout)
-        addButton = QtWidgets.QPushButton(self.tr("Add tag"))
+        addButton = QtWidgets.QPushButton(self.tr('Add tag'))
         addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
         buttonBarLayout.addStretch()
         
         tagList = [
-                ('title', 'varchar', self.tr("Title")),
-                ('album', 'varchar', self.tr("Album")),
-                ('composer', 'varchar', self.tr("Composer")),
-                ('artist', 'varchar', self.tr("Artist")),
-                ('performer', 'varchar', self.tr("Performer")),
-                ('conductor', 'varchar', self.tr("Conductor")),
-                ('genre', 'varchar', self.tr("Genre")),
-                ('date', 'date', self.tr("Date")),
-                ('comment', 'text', self.tr("Comment")),
+                ('title', 'varchar', self.tr('Title')),
+                ('album', 'varchar', self.tr('Album')),
+                ('composer', 'varchar', self.tr('Composer')),
+                ('artist', 'varchar', self.tr('Artist')),
+                ('performer', 'varchar', self.tr('Performer')),
+                ('conductor', 'varchar', self.tr('Conductor')),
+                ('genre', 'varchar', self.tr('Genre')),
+                ('date', 'date', self.tr('Date')),
+                ('comment', 'text', self.tr('Comment')),
         ]
         self.tableWidget.setRowCount(len(tagList))
         for row, data in enumerate(tagList):
@@ -562,46 +560,46 @@ class TagWidget(SettingsWidget):
         for i in range(len(self.columns)):
             if self.columns[i][0] == columnKey:
                 return i
-        raise ValueError("Invalid key {}".format(columnKey))
+        raise ValueError('Invalid key {}'.format(columnKey))
         
 
 class AudioWidget(SettingsWidget):
-    """Check which audio backend plugins are available (i.e. the third-party library can be imported) and
-    let the user choose one or more."""
+    '''Check which audio backend plugins are available (i.e. the third-party library can be imported) and
+    let the user choose one or more.'''
     def __init__(self, installTool, titleNumber):
         super().__init__(installTool, titleNumber)
-        self.setTitle(self.tr("Audio settings"))
+        self.setTitle(self.tr('Audio settings'))
         self.setText(self.tr(
-            "Maestro can play music using various backends. All of them require third-party libraries "
-            "to be installed and a plugin to be enabled. "
-            "Please choose the backends that you want to enable."))
+            'Maestro can play music using various backends. All of them require third-party libraries '
+            'to be installed and a plugin to be enabled. '
+            'Please choose the backends that you want to enable.'))
         
         audioBackendFound = False
         try:
-            from PyQt4.phonon import Phonon
-            self.phononBox = QtWidgets.QCheckBox(self.tr("Phonon"))
-            self.phononBox.setChecked(True)
+            from PyQt5 import QtMultimedia
+            self.localPlayBox = QtWidgets.QCheckBox(self.tr('Local playback'))
+            self.localPlayBox.setChecked(True)
             audioBackendFound = True
         except ImportError:
-            self.phononBox = QtWidgets.QCheckBox(self.tr("Phonon (cannot find PyQt4.phonon)"))
-            self.phononBox.setEnabled(False)
-        self.layout().addWidget(self.phononBox)
+            self.localPlayBox = QtWidgets.QCheckBox(self.tr('Local playback (cannot import QtMultimedia)'))
+            self.localPlayBox.setEnabled(False)
+        self.layout().addWidget(self.localPlayBox)
         try:
             import mpd
-            self.mpdBox = QtWidgets.QCheckBox(self.tr("MPD"))
+            self.mpdBox = QtWidgets.QCheckBox(self.tr('MPD'))
             self.mpdBox.setChecked(True)
             audioBackendFound = True
         except ImportError:
-            self.mpdBox = QtWidgets.QCheckBox(self.tr("MPD (cannot find python-mpd2)"))
+            self.mpdBox = QtWidgets.QCheckBox(self.tr('MPD (cannot find python-mpd2)'))
             self.mpdBox.setEnabled(False)
         self.layout().addWidget(self.mpdBox)
         if not audioBackendFound:
-            noBackendBox = QtGui.QRadioButton(self.tr("No backend"))
+            noBackendBox = QtGui.QRadioButton(self.tr('No backend'))
             noBackendBox.setChecked(True)
             self.layout().addWidget(noBackendBox)
             label = QtWidgets.QLabel(self.tr(
-                "You will not be able to play music. Please install one of the missing packages. "
-                "If you continue, you will also need to enable the corresponding plugin in the preferences."
+                'You will not be able to play music. Please install one of the missing packages. '
+                'If you continue, you will also need to enable the corresponding plugin in the preferences.'
                 ))
             label.setWordWrap(True)
             self.layout().addWidget(label)
@@ -610,16 +608,16 @@ class AudioWidget(SettingsWidget):
         
     def finish(self):
         """Store user input in config variables."""
-        if self.phononBox.isChecked() and "localplayback" not in config.options.main.plugins:
-            config.options.main.plugins.append("localplayback")
-        elif self.mpdBox.isChecked() and "mpd" not in config.options.main.plugins:
-            config.options.main.plugins.append("mpd")
+        if self.localPlayBox.isChecked() and 'localplay' not in config.options.main.plugins:
+            config.options.main.plugins.append('localplay')
+        if self.mpdBox.isChecked() and 'mpd' not in config.options.main.plugins:
+            config.options.main.plugins.append('mpd')
         return True
         
         
 def getIcon(name):
     """Return a QIcon for the icon with the given name."""
-    return QtGui.QIcon(":maestro/icons/" + name)
+    return QtGui.QIcon(':maestro/icons/' + name)
 
 
 class IconLabel(QtWidgets.QLabel):
@@ -642,12 +640,12 @@ class IconLabel(QtWidgets.QLabel):
     def contextMenuEvent(self, event):
         menu = QtWidgets.QMenu(self)
         if self.path is None:
-            changeAction = QtWidgets.QAction(self.tr("Add icon..."), menu)
-        else:changeAction = QtWidgets.QAction(self.tr("Change icon..."), menu)
+            changeAction = QtWidgets.QAction(self.tr('Add icon...'), menu)
+        else:changeAction = QtWidgets.QAction(self.tr('Change icon...'), menu)
         changeAction.triggered.connect(lambda: self.mouseDoubleClickEvent(None))
         menu.addAction(changeAction)
         
-        removeAction = QtWidgets.QAction(self.tr("Remove icon"), menu)
+        removeAction = QtWidgets.QAction(self.tr('Remove icon'), menu)
         removeAction.setEnabled(self.path is not None)
         removeAction.triggered.connect(lambda: self.setPath(None))
         menu.addAction(removeAction)
@@ -668,5 +666,5 @@ def run():
     widget.show()
     app.exec_()
     
-if __name__ == "__main__":
+if __name__ == '__main__':
     run()

@@ -22,32 +22,24 @@
 import os, shutil, re, tempfile
 from os.path import dirname, exists,join
 import subprocess
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
-from maestro import database as db, logging, config, filesystem
+from maestro import database as db, config, filesystem
 from maestro.core import urls, levels
 from maestro.gui import mainwindow
 from .plugin import parseNetloc
 
-translate = QtCore.QCoreApplication.translate
-logger = logging.getLogger(__name__)
-
 finishedTracks = []
-activeRipper = None
-
-fromToRe = re.compile(r'from sector\s+(?P<fromSec>[0-9]+).*track\s+(?P<fromTrack>[0-9]+)\s'
-                          '.*\n.*to sector\s+(?P<toSec>[0-9]+).*track\s+(?P<toTrack>[0-9]+)')
-statusRe = re.compile(r'^##:\s-?[0-9]+\s\[(\w+)\]\s@\s([0-9]+)', re.M)
-currentRe = re.compile(r'outputting\sto\strack([0-9]+)\.')
 
 
 class RipperStatusWidget(QtWidgets.QWidget):
+    """Widget for Maestro's status bar that shows the progress of the current rip operation."""
 
     cancelled = QtCore.pyqtSignal()
 
     def __init__(self):
         super().__init__()
-        self.progress = QtGui.QProgressBar()
+        self.progress = QtWidgets.QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setValue(0)
         self.progress.setFormat(self.tr('starting ripper...'))
@@ -70,8 +62,8 @@ class RipperStatusWidget(QtWidgets.QWidget):
         self.progress.setValue(val)
 
 
-
 class Ripper(QtCore.QObject):
+    """Class to create a process that rips the contents of an audio CD into a temporary directory."""
 
     currentTrackChanged = QtCore.pyqtSignal(int)
     currentByteChanged = QtCore.pyqtSignal(int)
@@ -83,16 +75,14 @@ class Ripper(QtCore.QObject):
         self.tmpdir = tempfile.mkdtemp(prefix='maestro_rip')
         self.encodingProcess = self.ripProcess = None
         QtWidgets.qApp.aboutToQuit.connect(self.cleanup)
-        global activeRipper
         self.fromTrack, self.toTrack = fromTrack, toTrack
         self.currentTrack = None
-        activeRipper = self
 
     def start(self):
         self.watcher = QtCore.QFileSystemWatcher([self.tmpdir])
         self.ripProcess = QtCore.QProcess()
         self.ripProcess.setWorkingDirectory(self.tmpdir)
-        self.ripProcess.setReadChannelMode(QtCore.QProcess.MergedChannels)
+        self.ripProcess.setProcessChannelMode(QtCore.QProcess.MergedChannels)
         self.ripProcess.readyRead.connect(self.parseParanoiaOutput)
         self.ripProcess.finished.connect(self.handleRipFinish)
         trackArg = str(self.fromTrack) + '-' + (str(self.toTrack) if self.toTrack else '')
@@ -102,23 +92,29 @@ class Ripper(QtCore.QObject):
         self.currentByteChanged.connect(self.statusWidget.setByte)
         self.statusWidget.cancelled.connect(self.cancel)
 
+    # regular expressions used for parsing cdparanoia's output
+    fromToRe = re.compile(r'from sector\s+(?P<fromSec>[0-9]+).*track\s+(?P<fromTrack>[0-9]+)\s'
+                          '.*\n.*to sector\s+(?P<toSec>[0-9]+).*track\s+(?P<toTrack>[0-9]+)')
+    statusRe = re.compile(r'^##:\s-?[0-9]+\s\[(\w+)\]\s@\s([0-9]+)', re.M)
+    currentRe = re.compile(r'outputting\sto\strack([0-9]+)\.')
+
     def parseParanoiaOutput(self):
         procOut = self.ripProcess.readAll().data().decode()
         if self.statusWidget.fromSector is None:
-            found = fromToRe.search(procOut)
+            found = Ripper.fromToRe.search(procOut)
             if found:
                 self.statusWidget.setSectorRange(*map(int, found.group('fromSec', 'toSec')))
                 toTrack = int(found.group('toTrack'))
                 if self.toTrack is not None:
                     assert self.toTrack == toTrack
                 self.toTrack = toTrack
-        found = statusRe.findall(procOut)
+        found = Ripper.statusRe.findall(procOut)
         for mode, byte in found:
             if mode == 'wrote':
                 self.currentByteChanged.emit(int(byte))
             elif mode == 'finished':
                 self.encodeTrack(self.currentFile, self.currentTrack)
-        found = currentRe.search(procOut)
+        found = Ripper.currentRe.search(procOut)
         if found:
             self.currentFile = 'track{}.cdda.wav'.format(found.group(1))
             self.currentTrack = int(found.group(1))
@@ -167,14 +163,14 @@ class Ripper(QtCore.QObject):
 
 
 class InsertRippedFileCommand(QtCore.QObject):
-    """Command to replace a file of backend type `AudioCDURL` by the ripped real file.
+    """Command to replace a file with audiocd URL scheme by the ripped real file.
     """
 
     def __init__(self, element, tmpPath):
         super().__init__()
         self.element = element
         self.tmpPath = tmpPath
-        self.text = translate('AudioCD Plugin', 'Rip Track {}'.format(element.url.netloc))
+        self.text = self.tr('Rip Track {}'.format(element.url.netloc))
 
     def redo(self):
         target = self.element.url.path
