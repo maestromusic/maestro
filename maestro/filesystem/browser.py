@@ -44,15 +44,15 @@ class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
     """
     
     folderIcons = {
-        FilesystemState.unsynced : utils.getIcon("folder_unsynced.svg"),
-        FilesystemState.synced   : utils.getIcon("folder_ok.svg"),
-        FilesystemState.empty    : utils.getIcon("folder.svg"),
-        FilesystemState.unknown  : utils.getIcon("folder_unknown.svg")}
+        FilesystemState.unsynced : utils.images.icon('folder-unsynchronized'),
+        FilesystemState.synced   : utils.images.icon('folder-synchronized'),
+        FilesystemState.empty    : utils.images.icon('folder'),
+        FilesystemState.unknown  : utils.images.icon('folder')}
     
     fileIcons = {
-        FilesystemState.unsynced : utils.getIcon("file_unsynced.svg"),
-        FilesystemState.synced   : utils.getIcon("file_ok.svg"),
-        FilesystemState.unknown  : utils.getIcon("file_unknown.svg")}
+        FilesystemState.unsynced : utils.images.icon('audio-x-unsynchronized'),
+        FilesystemState.synced   : utils.images.icon('audio-x-synchronized'),
+        FilesystemState.unknown  : utils.images.icon('audio-x-generic')}
     
     descriptions = {
         FilesystemState.unsynced : translate("FileSystemBrowserModel",
@@ -79,7 +79,7 @@ class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
             source.folderStateChanged.connect(self.handleStateChange)
             source.fileStateChanged.connect(self.handleStateChange)
             
-    def columnCount(self, index):
+    def columnCount(self, parent=None):
         return 1
 
     def handleStateChange(self, path):
@@ -215,7 +215,7 @@ class FileSystemBrowser(widgets.Widget):
         else: return None
     
     def createOptionDialog(self, button=None):
-        from . import preferences
+        from maestro.gui import preferences
         preferences.show("main/filesystem")
     
     def _handleSourceChanged(self, source):
@@ -253,8 +253,8 @@ class FileSystemSelection(selection.Selection):
         
 # register this widget in the main application
 widgets.addClass(
-    id = "filesystembrowser",
-    name = translate("FileSystemBrowser", "File System Browser"),
+    id = 'filesystembrowser',
+    name = translate('FileSystemBrowser', 'File System Browser'),
     icon = utils.images.icon('widgets/filesystembrowser.png'),
     theClass = FileSystemBrowser,
     areas = 'dock',
