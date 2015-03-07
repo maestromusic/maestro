@@ -27,10 +27,10 @@ from maestro.gui import mainwindow
 
 class DockWidget(QtWidgets.QDockWidget):
     """QDockWidget subclass that uses our custom DockWidgetTitleBar and respects the 'Hide title bars'
-    option. DockWidgets are created automatically by MainWindow when a mainwindow.Widget is added to a
+    option. DockWidgets are created automatically by MainWindow when a widgets.Widget is added to a
     dock area.
     
-    *widget* is the mainwindow.Widget-instance for the dock. *title* and *icon* are used for the
+    *widget* is the widgets.Widget-instance for the dock. *title* and *icon* are used for the
     dockwidget's title bar. 
     """    
     def __init__(self, widget, title='', icon=None):

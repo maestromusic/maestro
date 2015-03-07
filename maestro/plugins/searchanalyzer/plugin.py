@@ -22,26 +22,27 @@ table without any fancy grouping as the browser does (it will add titles, though
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from ...core import tags, domains
-from ... import search, config, application, database as db, utils
-from ...search import criteria
-from ...gui import mainwindow, dialogs, search as searchgui, widgets
+from maestro import search, config, application, database as db, utils, widgets
+from maestro.core import tags, domains
+from maestro.search import criteria
+from maestro.gui import dialogs, search as searchgui
 from . import resources
 
 
 def enable():
-    mainwindow.addWidgetClass(mainwindow.WidgetClass(
+    widgets.addClass(
         id = "searchanalyzer",
         name = QtWidgets.QApplication.translate("SearchAnalyzer", "Search Analyzer"),
         icon = QtGui.QIcon(":/maestro/plugins/searchanalyzer/searchanalyzer.png"),
-        theClass = SearchAnalyzer))
+        theClass = SearchAnalyzer
+    )
 
 
 def disable():
-    mainwindow.removeWidgetClass("searchanalyzer")
+    widgets.removeClass("searchanalyzer")
 
 
-class SearchAnalyzer(mainwindow.Widget):
+class SearchAnalyzer(widgets.Widget):
     """Display search result tables and allow the user to search the database."""
 
     def __init__(self, state=None, **args):

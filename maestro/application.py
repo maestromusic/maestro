@@ -278,8 +278,9 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     splash.showMessage(translate('Splash', 'Loading GUI classes'))
     from maestro.gui import mainwindow
     # First import all modules that want to register WidgetClass-instances
-    from .gui import filesystembrowser, editor, browser, tageditor, playback, playlist, \
+    from maestro.gui import filesystembrowser, editor, browser, tageditor, playlist, \
                         coverbrowser, covertable, coverdesk, details
+    from maestro.widgets import playback
     
     global mainWindow
     splash.showMessage(translate('Splash', 'Creating main window'))

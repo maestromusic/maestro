@@ -22,9 +22,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from ... import database as db
-from ...core import tags, elements, levels
-from ...gui import mainwindow
+from maestro import database as db, widgets
+from maestro.core import tags, elements, levels
 
 try:
     import matplotlib.pyplot as pyplot
@@ -36,19 +35,19 @@ except ImportError as e:
 
 
 def enable():
-    mainwindow.addWidgetClass(mainwindow.WidgetClass(
+    widgets.addClass(
         id = "statistics",
         name = QtWidgets.QApplication.translate("Statistics", "Statistics"),
         theClass = StatisticsWidget,
         icon = QtGui.QIcon(":/maestro/plugins/statistics/statistics.png")
-        ))
+    )
 
 
 def disable():
-    mainwindow.removeWidgetClass("statistics")
+    widgets.removeClass("statistics")
     
 
-class StatisticsWidget(mainwindow.Widget):
+class StatisticsWidget(widgets.Widget):
     """Widget that displays some statistics (or an error message if matplotlib cannot be loaded)."""
     def __init__(self, state=None, **kwargs):
         super().__init__(**kwargs)

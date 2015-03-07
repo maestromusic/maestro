@@ -38,6 +38,7 @@ class DelegateWidget(QtWidgets.QWidget):
             self.model.getRoot().setContents([node])
         else: self.model.getRoot().setContents([])
         #self.updateGeometry()
+        self.update()
         
     def setElement(self, element):
         """Shortcut: Display the given element (inside a Wrapper)."""
@@ -47,8 +48,9 @@ class DelegateWidget(QtWidgets.QWidget):
         """Shortcut: Display the given text in a TextNode."""
         self.setNode(TextNode(text))
     
-    def minimumSize(self):
-        return self.sizeHint()
+    def minimumSizeHint(self):
+        print(self.delegate.getFontMetrics().lineSpacing())
+        return QtCore.QSize(20, 3*self.delegate.getFontMetrics().lineSpacing())
     
     def sizeHint(self):
         if self._node is not None:

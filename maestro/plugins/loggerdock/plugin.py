@@ -21,8 +21,7 @@ import logging
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from ... import logging as maestrologging
-from ...gui import mainwindow
+from maestro import logging as maestrologging, widgets
 
 _signaller = None
 
@@ -30,16 +29,17 @@ _signaller = None
 def enable():
     global _signaller    
     _signaller = StreamSignaller()
-    mainwindow.addWidgetClass(mainwindow.WidgetClass(
+    widgets.addClass(
         id = "loggerdock",
-        name = QtWidgets.QApplication.translate("LoggerDock","Logger"),
+        name = QtWidgets.QApplication.translate("LoggerDock", "Logger"),
         icon = QtGui.QIcon(":/maestro/plugins/loggerdock/loggerdock.png"),
         theClass = LoggerDock,
-        preferredDockArea = 'bottom'))
+        preferredDockArea = 'bottom'
+    )
 
 
 def disable():
-    mainwindow.removeWidgetClass("loggerdock")
+    widgets.removeClass("loggerdock")
 
 
 class StreamSignaller(QtCore.QObject):
@@ -60,7 +60,7 @@ class StreamSignaller(QtCore.QObject):
         pass
 
 
-class LoggerDock(mainwindow.Widget):
+class LoggerDock(widgets.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         layout = QtWidgets.QVBoxLayout(self)

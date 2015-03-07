@@ -23,8 +23,7 @@ them. It is provided as central widget, dialog (in the extras menu) and standalo
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from ... import database as db, application, config, utils, VERSION
-from ...gui import mainwindow
+from maestro import database as db, application, config, utils, VERSION, widgets
 from . import resources, checks
 
 
@@ -37,7 +36,7 @@ def enable():
     _action = QtWidgets.QAction(application.mainWindow)
     _action.setText(QtWidgets.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"))
     _action.triggered.connect(_openDialog)
-    mainwindow.addWidgetClass(_getWidgetClass())
+    widgets.addClass(_getWidgetClass())
 
 
 def mainWindowInit():
@@ -46,7 +45,7 @@ def mainWindowInit():
 
 def disable():
     application.mainWindow.menus['extras'].removeAction(_action)
-    mainwindow.removeWidgetClass("dbanalyzer")
+    widgets.removeClass("dbanalyzer")
 
 
 def defaultStorage():
@@ -57,15 +56,16 @@ def defaultStorage():
     
     
 def _getWidgetClass():
-    return mainwindow.WidgetClass(
+    return widgets.WidgetClass(
         id = "dbanalyzer",
         name = QtWidgets.QApplication.translate("DBAnalyzerDialog", "DB Analyzer"),
         theClass = DBAnalyzer,
         areas = 'central',
-        icon = QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png"))
+        icon = QtGui.QIcon(":/maestro/plugins/dbanalyzer/dbanalyzer.png")
+    )
     
 
-class DBAnalyzer(mainwindow.Widget):
+class DBAnalyzer(widgets.Widget):
     """This widget displays statistics about the database, finds errors in it and allows the user to
     correct them."""
     currentCheck = None # The check that is currently displayed in the details view.

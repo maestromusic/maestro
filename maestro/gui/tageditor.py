@@ -21,16 +21,16 @@ import os.path, functools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import utils, config, logging, stack
+from maestro import utils, config, logging, stack, widgets
 from maestro.core import tags, levels, urls
 from maestro.models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from maestro.gui import singletageditor, tagwidgets, mainwindow, flageditor, dialogs
+from maestro.gui import singletageditor, tagwidgets, flageditor, dialogs
 from maestro.gui.misc import widgetlist
         
 translate = QtCore.QCoreApplication.translate
 
 
-class TagEditorWidget(mainwindow.Widget):
+class TagEditorWidget(widgets.Widget):
     """A TagEditorWidget contains of a row of buttons, a TagEditorLayout forming the actual tageditor and
     a flageditor. The TagEditorLayout displays pairs of a TagTypeBox and a SingleTagEditor - one for each
     tag present in the tageditor. The displays the tagtype while the SingleTagEditor shows all records for
@@ -69,34 +69,27 @@ class TagEditorWidget(mainwindow.Widget):
         self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setSpacing(1)
         self.layout().setContentsMargins(0,0,0,0)
-        self.topLayout = QtWidgets.QHBoxLayout()
-        # Spacings and margins are inherited. Reset the horizontal values for topLayout
-        style = QtWidgets.QApplication.style()
-        self.topLayout.setSpacing(style.pixelMetric(style.PM_LayoutHorizontalSpacing))
-        self.topLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin), 0,
-                                          style.pixelMetric(style.PM_LayoutRightMargin), 0)
-        self.layout().addLayout(self.topLayout)
+        self.toolBar = QtWidgets.QToolBar()
+        self.layout().addWidget(self.toolBar)
 
         self.levelLabel = QtWidgets.QLabel()
-        self.topLayout.addWidget(self.levelLabel)
-        
-        # Texts will be set in _changeLayout because they are only displayed in horizontal mode
+        self.toolBar.addWidget(self.levelLabel)
+                
         self.addButton = tagwidgets.TagTypeButton()
         self.addButton.tagChosen.connect(self._handleAddRecord)
-        self.topLayout.addWidget(self.addButton)
-        self.removeButton = QtWidgets.QPushButton()
-        self.removeButton.setIcon(QtGui.QIcon.fromTheme('list-remove'))
+        self.toolBar.addWidget(self.addButton)
+        self.removeButton = QtWidgets.QToolButton()
+        self.removeButton.setIcon(utils.images.icon('list-remove'))
         self.removeButton.clicked.connect(self._handleRemoveSelected)
-        self.topLayout.addWidget(self.removeButton)
+        self.toolBar.addWidget(self.removeButton)
         
-        self.includeContentsButton = QtWidgets.QPushButton()
+        self.includeContentsButton = QtWidgets.QToolButton()
         self.includeContentsButton.setCheckable(True)
         self.includeContentsButton.setChecked(state is not None and state.get('includeContents', False))
         self.includeContentsButton.setToolTip(self.tr("Include all contents"))
         self.includeContentsButton.setIcon(utils.getIcon('recursive.png'))
         self.includeContentsButton.toggled.connect(self._updateElements)
-        self.topLayout.addWidget(self.includeContentsButton)
-        self.topLayout.addStretch(1)
+        self.toolBar.addWidget(self.includeContentsButton)
         
         scrollArea = QtWidgets.QScrollArea()
         scrollArea.setWidgetResizable(True)
@@ -168,9 +161,11 @@ class TagEditorWidget(mainwindow.Widget):
         the "Include contents" button is not pressed / pressed, respectively.
         """
         if level in (levels.real, None):
-            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('drive-harddisk').pixmap(16))
+            self.levelLabel.setPixmap(utils.images.icon('drive-harddisk').pixmap(20))
+            self.levelLabel.setToolTip(self.tr("Normal mode"))
         else:
-            self.levelLabel.setPixmap(QtGui.QIcon.fromTheme('accessories-text-editor').pixmap(16))
+            self.levelLabel.setPixmap(utils.images.icon('accessories-text-editor').pixmap(20))
+            self.levelLabel.setToolTip(self.tr("Editor mode: Changes are only written on editor commit."))
         self.level = level
         self.elements = elements
         if elementsWithContents is not None and elementsWithContents != elements:
@@ -470,15 +465,15 @@ class TagEditorWidget(mainwindow.Widget):
         self.includeContentsButton.setChecked(value)
 
 
-widgetClass = mainwindow.WidgetClass(
-        id = "tageditor",
-        name = translate("Tageditor", "Tageditor"),
-        icon = utils.getIcon('widgets/tageditor.png'),
-        theClass = TagEditorWidget,
-        unique = True,
-        areas = 'dock',
-        preferredDockArea = 'right')
-mainwindow.addWidgetClass(widgetClass)
+widgetClass = widgets.addClass(
+    id = "tageditor",
+    name = translate("Tageditor", "Tageditor"),
+    icon = utils.images.icon('widgets/tageditor.png'),
+    theClass = TagEditorWidget,
+    unique = True,
+    areas = 'dock',
+    preferredDockArea = 'right'
+)
 
 
 class RecordDialog(QtWidgets.QDialog):

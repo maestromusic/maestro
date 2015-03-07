@@ -24,9 +24,9 @@ from maestro.core import urls
 
 translate = QtCore.QCoreApplication.translate
 
-from .. import application, filesystem, utils
-from . import mainwindow, selection, widgets
-from ..core import levels
+from maestro import application, filesystem, utils, widgets
+from maestro.gui import selection, widgets as guiwidgets
+from maestro.core import levels
 from maestro.filesystem.sources import FilesystemState
 
 
@@ -183,7 +183,7 @@ class FileSystemBrowserTreeView(QtWidgets.QTreeView):
             selection.setGlobalSelection(s) 
     
         
-class FileSystemBrowser(mainwindow.Widget):
+class FileSystemBrowser(widgets.Widget):
     """A DockWidget wrapper for the FileSystemBrowser."""
     def __init__(self, state=None, **args):
         super().__init__(**args)
@@ -192,7 +192,7 @@ class FileSystemBrowser(mainwindow.Widget):
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
         application.dispatcher.connect(self._handleDispatcher)
-        self.sourceChooser = widgets.SourceBox()
+        self.sourceChooser = guiwidgets.SourceBox()
         self.sourceChooser.sourceChanged.connect(self._handleSourceChanged)
         layout.addWidget(self.sourceChooser)
         
@@ -205,7 +205,7 @@ class FileSystemBrowser(mainwindow.Widget):
         if state is not None and 'source' in state:
             source = filesystem.sourceByName(state['source'])
         if source is None and len(filesystem._sources) > 0:
-            source = filesystem.sources[0]
+            source = filesystem._sources[0]
         self._handleSourceChanged(source) # initialize
         
     def saveState(self):
@@ -252,10 +252,11 @@ class FileSystemSelection(selection.Selection):
         
         
 # register this widget in the main application
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "filesystembrowser",
-        name = translate("FileSystemBrowser", "File System Browser"),
-        icon = utils.images.icon('widgets/filesystembrowser.png'),
-        theClass = FileSystemBrowser,
-        areas = 'dock',
-        preferredDockArea = 'right'))
+widgets.addClass(
+    id = "filesystembrowser",
+    name = translate("FileSystemBrowser", "File System Browser"),
+    icon = utils.images.icon('widgets/filesystembrowser.png'),
+    theClass = FileSystemBrowser,
+    areas = 'dock',
+    preferredDockArea = 'right'
+)
