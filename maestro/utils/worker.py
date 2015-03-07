@@ -16,13 +16,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import threading, functools
+import enum
+import threading
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui
 from PyQt5.QtCore import Qt
 
-# Internal states that are used to manage the worker thread
-STATE_INIT, STATE_RUNNING, STATE_QUIT = 1,2,3
+
+class State(enum.Enum):
+    """Internal states that are used to manage the worker thread"""
+    Init = 0
+    Running = 1
+    Quit = 3
+
 
 class ResetException(Exception):
     """This exception is used to abort tasks when the worker thread has been resetted or quitted."""
@@ -30,19 +36,14 @@ class ResetException(Exception):
 
 
 class Task:
-    """A unit of work that can be given to a worker thread. The worker will call *callable* with the given
-    arguments. It is also possible to subclass Task and implement custom behaviour in the process-method.
-    """ 
-    def __init__(self, callable, *args, **kwargs):
-        self.callable = callable
-        self.args = args
-        self.kwargs = kwargs
+    """A unit of work that can be given to a worker thread.
+    """
         
     def process(self):
         """Called from the worker thread to get this task done. Big tasks can implement this as a generator
         which yields between each major step. This gives the worker the chance to abort the task in between.
         """
-        self.result = self.callable(*self.args, **self.kwargs)
+        raise NotImplementedError()
         
     def processImmediately(self):
         """In subclasses that return a generator in "process" this can be used to process the task
@@ -90,8 +91,8 @@ class Queue:
             with self._lock:
                 if len(self._tasks) > 0:
                     return self._tasks.pop(0)
-                self._fullEvent.clear() # This line must be covered by the lock, the next one must not!
-            self._fullEvent.wait() # If no item was available, block until something is put into the queue
+                self._fullEvent.clear()  # This line must be covered by the lock, the next one must not!
+            self._fullEvent.wait()  # If no item was available, block until something is put into the queue
         
     def clear(self):
         """Clear the queue."""
@@ -110,7 +111,7 @@ class Worker(QtCore.QObject):
     
     def __init__(self):
         super().__init__()
-        self.state = STATE_INIT
+        self.state = State.Init
         self._resetCount = 0
         self._done.connect(self._handleDone, Qt.QueuedConnection)
         self._queue = Queue()
@@ -123,7 +124,7 @@ class Worker(QtCore.QObject):
     
     def submit(self, task):
         """Submit a task to be processed in the worker thread."""
-        if self.state != STATE_QUIT:
+        if self.state != State.Quit:
             self._emptyEvent.clear()
             task._resetCount = self._resetCount
             self._queue.put(task)
@@ -135,15 +136,15 @@ class Worker(QtCore.QObject):
             
     def reset(self):
         """Reset the worker thread, i.e. stop and remove all submitted tasks."""
-        if self.state != STATE_QUIT:
+        if self.state != State.Quit:
             self._resetCount += 1
-            self._queue.put(None) # wake up worker if it is blocking in queue.get
+            self._queue.put(None)  # wake up worker if it is blocking in queue.get
     
     def quit(self):
         """Quit the worker thread."""
-        self.state = STATE_QUIT
-        self._resetCount += 1 # don't handle tasks anymore
-        self._queue.put(None) # wake up worker if it is blocking in queue.get
+        self.state = State.Quit
+        self._resetCount += 1  # don't handle tasks anymore
+        self._queue.put(None)  # wake up worker if it is blocking in queue.get
         
     def join(self, timeout=None):
         """Block until all tasks have been processed (or *timeout* has elapsed)."""
@@ -158,7 +159,7 @@ class Worker(QtCore.QObject):
         pass
     
     def run(self):
-        self.state = STATE_RUNNING
+        self.state = State.Running
         self.runInit()
         try:
             while True:
@@ -177,11 +178,11 @@ class Worker(QtCore.QObject):
                                 raise ResetException()
                     self._done.emit(task)
                 except ResetException:
-                    if self.state == STATE_QUIT:
+                    if self.state == State.Quit:
                         break
         finally:
-            self.state = STATE_QUIT # don't accept new tasks (if execution stopped due to an exception)
-            self._emptyEvent.set() # don't forget to unblock threads waiting for this event
+            self.state = State.Quit  # don't accept new tasks (if execution stopped due to an exception)
+            self._emptyEvent.set()  # don't forget to unblock threads waiting for this event
             self.runShutdown()
     
     def _handleDone(self, task):
@@ -189,20 +190,6 @@ class Worker(QtCore.QObject):
         # This method is executed in the main thread, not in the worker thread
         if task._resetCount == self._resetCount:
             self.done.emit(task)
-    
-    def loadImage(self, path, size=None):
-        """Start loading the image from *path* and return a FutureImage-instance for it.
-        If *size* is given, scale the image after loading to *size* (a QSize)."""
-        task = LoadImageTask(path, size)
-        self.submit(task)
-        return tasks
-    
-    def loadImages(self, paths, size=None):
-        """Start loading images from *paths* and return a list of LoadImageTask-instances for them.
-        If *size* is given, scale all images after loading to *size* (a QSize)."""
-        tasks = [LoadImageTasks(path, size) for path in paths]
-        self.submitMany(tasks)
-        return tasks
 
 
 class LoadImageTask(Task):
@@ -229,9 +216,8 @@ class LoadImageTask(Task):
             return self._pixmap
         elif self._image is not None:
             self._pixmap = QtGui.QPixmap.fromImage(self._image)
-            self._image = None # save memory
+            self._image = None  # save memory
             return self._pixmap
-        else: None
 
     def process(self):
         # QPixmap may only be used in the GUI thread. Thus we have to load the images as QImage and
@@ -243,4 +229,3 @@ class LoadImageTask(Task):
 
     def merge(self, other):
         return self.path == other.path and self.size == other.size
-    
