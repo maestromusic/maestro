@@ -21,7 +21,7 @@ from PyQt5.QtCore import Qt
 
 namedPixmaps = {} 
 namedIcons = {
-    'flag': 'flag_blue.png', # generic flag icon
+    'flag': 'flag_blue.png',  # generic flag icon
 }
 _fallbacks = {}
 

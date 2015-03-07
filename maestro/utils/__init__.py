@@ -72,8 +72,10 @@ class InverseDifference:
         return self._diff.getAdditions()
     
 
-#DEPRECATED use utils.images.getIcon instead
+#DEPRECATED use utils.images.icon instead
 def getIcon(name):
+    import warnings
+    warnings.warn('use utils.images.icon instead of getIcon', DeprecationWarning, 2)
     """Return a QIcon for the icon with the given name."""
     return QtGui.QIcon(":maestro/icons/" + name)
     
