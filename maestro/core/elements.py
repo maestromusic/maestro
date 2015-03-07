@@ -56,9 +56,12 @@ class ContainerType(enum.Enum):
             return 'cdbox.png'
 
     def icon(self):
-        path = self.iconPath()
-        if path:
-            return utils.images.icon(path)
+        if self.iconPath():
+            return utils.images.icon(self.iconPath())
+
+    def pixmap(self):
+        if self.iconPath():
+            return utils.images.pixmap(self.iconPath())
 
 
 class Element:

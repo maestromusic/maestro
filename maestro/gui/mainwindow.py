@@ -295,8 +295,9 @@ class MainWindow(QtWidgets.QMainWindow):
             # (for example if it belongs to a widget from a plugin and this plugin has been removed
             # since the last application shutdown). Simply do not load this widget
             if widgetClass is not None:
-                widget = self.addCentralWidget(widgetClass, state)
-            else: logging.info(__name__, "Could not load central widget '{}'".format(widgetClass.id))
+                self.addCentralWidget(widgetClass, state)
+            else:
+                logging.info(__name__, "Could not load central widget '{}'".format(widgetClass.id))
         if perspective['centralTabIndex'] < self.centralWidget().count():
             self.centralWidget().setCurrentIndex(perspective['centralTabIndex'])
 
@@ -308,10 +309,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 widget = self._createDockWidget(widgetClass, area, objectName, state)
                 if widget is None:
                     continue
-                widget.setParent(self) # necessary for QMainWindow.restoreState
+                widget.setParent(self)  # necessary for QMainWindow.restoreState
                 dockWidgets.append(widget)
-            else: logging.info(__name__, "Could not load dock widget '{}' with object name '{}'"
-                                         .format(widgetClass.id, objectName))
+            else:
+                logging.info(__name__, "Could not load dock widget {} named '{}'".format(id, objectName))
 
         self.hideTitleBarsAction.setChecked(perspective['hideTitleBars'])
 

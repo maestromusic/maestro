@@ -26,6 +26,7 @@ from maestro.models import playlist
 translate = QtCore.QCoreApplication.translate
 
 
+# noinspection PyTypeChecker,PyArgumentList
 def enable():
     profileType = profiles.ProfileType('localplay',
                                        translate('LocalPlayBackend','Local Playback'),
@@ -176,9 +177,6 @@ class LocalPlayerBackend(player.PlayerBackend):
         else:
             print('unknown player error {}'.format(error))
 
-    def handleStateChanged(self, state):
-        print('state changed ', state)
-
     def handleMediaStatusChanged(self, status):
         if status == QtMultimedia.QMediaPlayer.EndOfMedia:
             self.skipForward()
@@ -188,9 +186,9 @@ class LocalPlayerBackend(player.PlayerBackend):
             # localplayback was never activated -> return previous state
             return self._initState
         result = {}
-        playlist = self.playlist.wrapperString()
-        if len(playlist):
-            result['playlist'] = playlist
+        playlistStr = self.playlist.wrapperString()
+        if len(playlistStr):
+            result['playlist'] = playlistStr
         if self.playlist.current is not None:
             result['current'] = self.playlist.current.offset()
         if self.volume() != 100:
@@ -202,4 +200,4 @@ class LocalPlayerBackend(player.PlayerBackend):
         return None
 
     def __str__(self):
-        return "LocalPlayerBackend({})".format(self.name)
+        return 'LocalPlayerBackend({})'.format(self.name)

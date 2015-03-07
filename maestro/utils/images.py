@@ -21,7 +21,13 @@ from PyQt5.QtCore import Qt
 
 namedPixmaps = {} 
 namedIcons = {
-    'flag': 'flag_blue.png', # generic flag icon
+    'flag': 'flag_blue.png',  # generic flag icon
+    'folder': 'folder.svgz',
+    'folder-synchronized': 'folder-synced.svgz',
+    'folder-unsynchronized': 'folder-unsynced.svgz',
+    'audio-x-synchronized': 'audio-x-synced.svgz',
+    'audio-x-unsynchronized': 'audio-x-unsynced.svgz',
+    'audio-x-generic': 'audio-x-generic.svgz'
 }
 _fallbacks = {}
 

@@ -18,16 +18,17 @@
 
 import itertools, collections, functools, locale
 
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from maestro import config, database as db, logging, utils, search
-from maestro.models import rootedtreemodel
 from maestro.core import tags, levels, elements
 from maestro.core.nodes import Node, Wrapper, TextNode
+from maestro.models import rootedtreemodel
 from maestro.gui import selection, dialogs
 from maestro.widgets.browser import nodes as bnodes
+
 
 # Registered layer classes. Maps names -> (title, class)
 layerClasses = collections.OrderedDict()
@@ -69,11 +70,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
     """
     nodeLoaded = QtCore.pyqtSignal(Node)
     hasContentsChanged = QtCore.pyqtSignal(bool)
-    
+
     def __init__(self, domain, layers, filter):
         super().__init__()
         self.domain = domain
-        self.level = levels.real # this is used by the selection-module
+        self.level = levels.real  # this is used by the selection-module
         self.layers = layers
         self.filter = filter
         self.worker = utils.worker.Worker()
@@ -120,8 +121,8 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         
     def moveLayer(self, fromIndex, toIndex):
         """Move a layer. *toIndex* must pertain to the list after *fromIndex* has been deleted."""
-        if toIndex in (fromIndex, fromIndex+1):
-            return # no change
+        if toIndex in (fromIndex, fromIndex + 1):
+            return  # no change
         layer = self.layers[fromIndex]
         del self.layers[fromIndex]
         self.layers.insert(toIndex, layer)
@@ -142,7 +143,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         """Return whether the current model contains elements."""
         # A textnode is only used in empty models to display e.g. "no search results"
         return self.root.contents is not None and len(self.root.contents) >= 1 \
-                and not (isinstance(self.root.contents[0], TextNode))
+            and not isinstance(self.root.contents[0], TextNode)
     
     def reset(self):
         """Reset and reload the browser completely."""
@@ -152,10 +153,11 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
         self._startLoading(self.root)
             
     def flags(self, index):
-        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self,index)
+        defaultFlags = rootedtreemodel.RootedTreeModel.flags(self, index)
         if index.isValid():
             return defaultFlags | Qt.ItemIsDragEnabled
-        else: return defaultFlags
+        else:
+            return defaultFlags
     
     def mimeTypes(self):
         return [config.options.gui.mime]
@@ -178,7 +180,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             layer = None
             layerIndex = None
         else:
-            layerIndex = 0 if node is self.root else node.layerIndex+1
+            layerIndex = 0 if node is self.root else node.layerIndex + 1
             layer = self.layers[layerIndex] if layerIndex < len(self.layers) else None
         task = None
         if hasattr(node, 'getElids'):
@@ -200,7 +202,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             # Usually nodes are only loaded when the _loaded-signal arrives. But usually when block=True
             # is used, the caller expects nodes to be loaded after this method.
             # So: Don't wait for the signal. 
-            self._loaded(task) # Do not wait for the signal to arrive because the caller often expe
+            self._loaded(task)  # Do not wait for the signal to arrive because the caller often expe
     
     def _loaded(self, task):
         """This is called (in the main thread) when a task has been processed. It will insert the loaded
@@ -228,10 +230,10 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             # Only use beginRemoveRows and friends if there are already contents. If we add contents for
             # the first time, we must not call those methods or Qt will try to access the contents...
             # resulting in _startLoading.
-            self.beginRemoveRows(self.getIndex(node), 0, len(node.contents)-1)
+            self.beginRemoveRows(self.getIndex(node), 0, len(node.contents) - 1)
             node.setContents([])
             self.endRemoveRows()
-            self.beginInsertRows(self.getIndex(node), 0, len(contents)-1)
+            self.beginInsertRows(self.getIndex(node), 0, len(contents) - 1)
             node.setContents(contents)
             self.endInsertRows()
         else:
@@ -268,17 +270,18 @@ class LoadTask(utils.worker.Task):
         elif self.criterion is not None:
             yield from search.SearchTask(self.criterion, self.domain).process()
             elids = self.criterion.result
-        else: elids = None # display all nodes
+        else:
+            elids = None  # display all nodes
         matchingTags = self.criterion.getMatchingTags() if self.criterion is not None else []
         if matchingTags is None:
             matchingTags = []
         if self.layer is not None:
             self.contents = self.layer.build(self.layerIndex, self.domain, elids, matchingTags)
-        else: self.contents = _buildContainerTree(self.domain, elids)
+        else:
+            self.contents = _buildContainerTree(self.domain, elids)
     
     def __repr__(self):
-        return "<TASK: Load {} with '{}'".format(self.node,
-                                         self.criterion if self.criterion is not None else self.elids)
+        return '<TASK: Load {} with {}'.format(self.node, self.criterion if self.criterion is not None else self.elids)
 
 
 class Layer:
@@ -325,7 +328,8 @@ class TagLayer(Layer):
             logging.warning(__name__, "Only tags of type varchar are permitted in the browser's layers.")
             tagList = {tag for tag in tagList if tag.type == tags.TYPE_VARCHAR}
         self.tagList = tagList
-        
+
+    # noinspection PyTypeChecker
     def text(self):
         return '{}: {}'.format(translate("BrowserModel", "Tag layer"),
                                ', '.join(tag.title for tag in self.tagList))
@@ -400,7 +404,7 @@ class TagLayer(Layer):
             WHERE t.tag_id IN ({tagFilter}) AND t.element_id IN ({idFilter})
             """, tagFilter=tagFilter, idFilter=idFilter)
         for tagId, valueId, value, hide, sortValue in result:
-            matching = (tagId,valueId) in matchingTags
+            matching = (tagId, valueId) in matchingTags
             nodes[value].addTagValue(tagId, valueId, value, hide, sortValue, matching)
             
         # 5. Optimize TagNodes (if there are only few of them)
@@ -413,7 +417,8 @@ class TagLayer(Layer):
                 node.elids = set()
             if elids is not None:
                 idFilter = "t.element_id IN ({})".format(db.csList(elids))
-            else: idFilter = '1'
+            else:
+                idFilter = '1'
             result = db.query("""
                 SELECT DISTINCT tag_id, value_id, element_id
                 FROM {p}tags AS t
@@ -423,7 +428,8 @@ class TagLayer(Layer):
             for tagId, valueId, elementId in result:
                 if (tagId, valueId) in nodes:
                     node = nodes[(tagId, valueId)]
-                else: continue # this means that this value does not appear in a 'toplevel' node
+                else:
+                    continue # this means that this value does not appear in a 'toplevel' node
                 node.elids.add(elementId)
                 if (tagId, valueId) in matchingTags:
                     withinMatchingTags.add(elementId)
@@ -442,7 +448,8 @@ class TagLayer(Layer):
                     if node.hide == superNode.hide:
                         superNode.merge(node)
                         return True
-                    else: return node.hide
+                    else:
+                        return node.hide
                 
             for k in list(nodes.keys()):
                 node = nodes[k]
@@ -487,7 +494,6 @@ class TagLayer(Layer):
     @staticmethod
     def openDialog(parent, model, layer=None):
         """Open a dialog to configure a new or existing TagLayer."""
-        from PyQt5 import QtGui
         tagList = layer.tagList if layer is not None else TagLayer.defaultTagList()
         text, ok = QtWidgets.QInputDialog.getText(parent, translate("TagLayer", "Configure tag layer"),
                         translate("TagLayer", "Enter the names/titles of the tags that should "
