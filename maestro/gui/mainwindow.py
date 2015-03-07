@@ -415,7 +415,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menus['view'].addAction(fullscreenAction)
 
         # Playback
-        from maestro.gui import playback
+        from maestro.widgets import playback
         self.menus['playback'] = self.menuBar().addMenu(self.tr("Playback"))
         for command in playback.PlayCommand:
             self.menus['playback'].addAction(playback.PlayControlAction(self, command))
