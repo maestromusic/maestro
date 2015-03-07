@@ -394,7 +394,7 @@ class BrowserTreeView(treeview.TreeView):
                 and not utils.files.isMusicFile(wrappers[0].element.url.path):
             QtGui.QDesktopServices.openUrl(wrappers[0].element.url.toQUrl())
         else:
-            from . import playlist
+            from maestro.gui import playlist
             playlist.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
 
 
