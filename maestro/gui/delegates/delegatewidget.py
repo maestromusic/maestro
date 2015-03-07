@@ -38,6 +38,7 @@ class DelegateWidget(QtWidgets.QWidget):
             self.model.getRoot().setContents([node])
         else: self.model.getRoot().setContents([])
         #self.updateGeometry()
+        self.update()
         
     def setElement(self, element):
         """Shortcut: Display the given element (inside a Wrapper)."""

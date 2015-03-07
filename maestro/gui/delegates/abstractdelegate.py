@@ -164,7 +164,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
             # (Confer QTreeView::indexRowSizeHint in Qt's sources) 
             totalWidth = self.view.viewport().width() - 2*self.hMargin
             totalWidth -= self.parent().indentation() * self.model.data(index).depth()
-        else: totalWidth = option.rect().width() - 2*self.hMargin
+        else: totalWidth = option.rect.width() - 2*self.hMargin
         
         # Collect items
         self.left,self.right,self.center = [],[],[]

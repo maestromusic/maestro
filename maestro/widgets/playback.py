@@ -112,7 +112,7 @@ class PlaybackWidget(widgets.Widget):
         
         buttonLayout = QtWidgets.QHBoxLayout()
         buttonLayout.setContentsMargins(0,0,0,0)
-        # Do not inhertit spacing from self.topLayout, see self._areaChanged
+        # Do not inherit spacing from self.topLayout, see self._areaChanged
         buttonLayout.setSpacing(self.style().pixelMetric(QtWidgets.QStyle.PM_LayoutHorizontalSpacing))
         self.topLayout.addLayout(buttonLayout)
         
