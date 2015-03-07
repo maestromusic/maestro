@@ -330,18 +330,16 @@ class TagTypeBox(QtWidgets.QStackedWidget):
             self._createItems()
 
 
-class TagTypeButton(QtWidgets.QPushButton):
+class TagTypeButton(QtWidgets.QToolButton):
     """Button with a menu to choose a tagtype from. When a tagtype has been chosen the signal tagChosen is
     emitted with that tagtype."""
     tagChosen = QtCore.pyqtSignal(tags.Tag)
     
-    def __init__(self, text=None):
-        if text is None:
-            text = translate("TagTypeButton", "Add tag")
-        super().__init__(text)
-        self.setIcon(QtGui.QIcon.fromTheme('list-add'))
-        # Unfortunately there is a large margin on the left
-        #https://bugreports.qt-project.org/browse/QTBUG-3624
+    def __init__(self):
+        super().__init__()
+        self.setText(self.tr("Add tag"))
+        self.setIcon(utils.images.icon('list-add'))
+        self.setPopupMode(QtWidgets.QToolButton.InstantPopup)
         self.setMenu(QtWidgets.QMenu())
         self._fillMenu()
         application.dispatcher.connect(self._handleDispatcher)
