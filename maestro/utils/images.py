@@ -61,6 +61,7 @@ def pixmap(name):
         if name == 'collapser':
             option.state |=  QtWidgets.QStyle.State_Open
         painter = QtGui.QPainter(pixmap)
+        style = QtWidgets.QApplication.style()
         style.drawPrimitive(QtWidgets.QStyle.PE_IndicatorBranch, option, painter)
         painter.end()
         namedPixmaps[name] = pixmap
