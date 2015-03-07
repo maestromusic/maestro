@@ -49,9 +49,9 @@ def pixmap(name):
     """
     if '.' in name:
         return QtGui.QPixmap(':maestro/' + name)
-    elif name in namedPixmaps:
-        return QtGui.QPixmap(':maestro/' + namedPixmaps[name])
     elif name in ['expander', 'collapser']:
+        if name in namedPixmaps:
+            return namedPixmaps[name]
         pixmap = QtGui.QPixmap(16, 12)
         pixmap.fill(Qt.transparent)
         option = QtWidgets.QStyleOption()
@@ -66,6 +66,8 @@ def pixmap(name):
         painter.end()
         namedPixmaps[name] = pixmap
         return pixmap
+    elif name in namedPixmaps:
+        return QtGui.QPixmap(':maestro/' + namedPixmaps[name])
     else:
         return QtGui.QPixmap()
 
