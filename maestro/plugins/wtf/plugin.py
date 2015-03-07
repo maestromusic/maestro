@@ -491,8 +491,8 @@ def export(profile):
 def exportSQLite():
     """Ask the user for an SQLite-database file and export the whole database to it."""
     from maestro.gui import mainwindow
-    path = QtGui.QFileDialog.getSaveFileName(mainwindow.mainWindow, "Choose export location",
-                                             os.path.expanduser('~'))
+    path, _ = QtWidgets.QFileDialog.getSaveFileName(mainwindow.mainWindow, "Choose export location",
+                                                    os.path.expanduser('~'))
     if not path:
         return
     if os.path.exists(path):
