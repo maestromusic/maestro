@@ -19,10 +19,10 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import player, utils
+from maestro import player, utils, widgets
 from maestro.core import levels, nodes
 from maestro.models import rootedtreemodel
-from maestro.gui import actions, dialogs, treeview, mainwindow, delegates, tageditor
+from maestro.gui import actions, dialogs, treeview, delegates, tageditor
 from maestro.gui.delegates import playlist as playlistdelegate
 from maestro.gui.preferences import profiles as profilesgui
 
@@ -150,7 +150,7 @@ for definition in 'editTags', 'removeFromPL', 'clearPL':
     PlaylistTreeView.addActionDefinition(definition)
 
 
-class PlaylistWidget(mainwindow.Widget):
+class PlaylistWidget(widgets.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         self.hasOptionDialog = True
@@ -218,11 +218,12 @@ class PlaylistWidget(mainwindow.Widget):
         return OptionDialog(button, self)
         
         
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "playlist",
-        name = translate("Playlist", "Playlist"),
-        icon = utils.getIcon('widgets/playlist.png'),
-        theClass = PlaylistWidget))
+widgets.addClass(
+    id = "playlist",
+    name = translate("Playlist", "Playlist"),
+    icon = utils.images.icon('widgets/playlist.png'),
+    theClass = PlaylistWidget
+)
 
 
 class OptionDialog(dialogs.FancyPopup):

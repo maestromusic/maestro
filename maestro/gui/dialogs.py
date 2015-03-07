@@ -18,11 +18,9 @@
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from .. import utils, config
-from ..core import elements, levels, nodes, tags
-from ..core.elements import ContainerType
-from . import widgets
-from maestro.core import urls
+from maestro import utils, config
+from maestro.core import elements, levels, nodes, tags, urls
+from maestro.core.elements import ContainerType
 
 
 def question(title, text, parent=None):
@@ -251,16 +249,18 @@ class MergeDialog(QtWidgets.QDialog):
         self.titleEdit = QtWidgets.QLineEdit(titleHint)
         titleLineLayout.addWidget(self.titleEdit)
         
+        from maestro.gui import widgets as guiwidgets
+        
         row += 1
         label = QtWidgets.QLabel(self.tr('Domain:'))
         layout.addWidget(label, row, 0)
-        self.domainBox = widgets.DomainBox(domain)
+        self.domainBox = guiwidgets.DomainBox(domain)
         layout.addWidget(self.domainBox, row, 1)
         
         row += 1
         label = QtWidgets.QLabel(self.tr('Container type:'))
         layout.addWidget(label, row, 0)
-        self.parentTypeBox = widgets.ContainerTypeBox(containerType)
+        self.parentTypeBox = guiwidgets.ContainerTypeBox(containerType)
         layout.addWidget(self.parentTypeBox, row, 1)
         
         row += 1
@@ -285,7 +285,7 @@ class MergeDialog(QtWidgets.QDialog):
             self.changeTypeBox = QtWidgets.QCheckBox(self.tr("Change content container types to:"))
             self.changeTypeBox.setChecked(False)
             layout.addWidget(self.changeTypeBox, row, 0)
-            self.childrenTypeBox = widgets.ContainerTypeBox(ContainerType.Container)
+            self.childrenTypeBox = guiwidgets.ContainerTypeBox(ContainerType.Container)
             layout.addWidget(self.childrenTypeBox, row, 1)
             self.childrenTypeBox.setEnabled(False)
             self.changeTypeBox.toggled.connect(self.childrenTypeBox.setEnabled)

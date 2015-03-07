@@ -20,11 +20,11 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from maestro import utils
+from maestro import utils, widgets
 from maestro.core import levels, tags
 from maestro.models import albumguesser
 from maestro.models.editor import EditorModel
-from maestro.gui import treeview, mainwindow, treeactions, tagwidgets, dialogs, delegates
+from maestro.gui import treeview, treeactions, tagwidgets, dialogs, delegates
 from maestro.gui.delegates import editor as editordelegate
 from maestro.gui.preferences import profiles as profilesgui
 
@@ -60,7 +60,7 @@ treeactions.SetElementTypeAction.addSubmenu(EditorTreeView.actionConf.root)
 treeactions.ChangePositionAction.addSubmenu(EditorTreeView.actionConf.root)
 
 
-class EditorWidget(mainwindow.Widget):
+class EditorWidget(widgets.Widget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
     def __init__(self, state=None, **args):
@@ -250,9 +250,10 @@ class ExternalTagsWidget(QtWidgets.QScrollArea):
             self.editor.selectionModel().select(itemSelection,QtCore.QItemSelectionModel.ClearAndSelect)
 
 
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "editor",
-        name = translate("Editor", "editor"),
-        icon = utils.getIcon('widgets/editor.png'),
-        theClass = EditorWidget,
-        preferredDockArea = 'right'))
+widgets.addClass(
+    id = "editor",
+    name = translate("Editor", "editor"),
+    icon = utils.getIcon('widgets/editor.png'),
+    theClass = EditorWidget,
+    preferredDockArea = 'right'
+)

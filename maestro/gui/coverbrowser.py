@@ -21,9 +21,9 @@ import functools, weakref
 from PyQt5 import QtCore, QtGui, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
-from . import mainwindow, browserdialog, selection, dockwidget, search as searchgui, browser
-from .. import database as db, utils, search, logging
-from ..core import flags, levels, tags, domains
+from maestro import database as db, utils, search, logging, widgets
+from maestro.core import flags, levels, tags, domains
+from maestro.gui import browserdialog, selection, dockwidget, search as searchgui, browser, mainwindow
 
 _displayClasses = {}
 _coverBrowsers = weakref.WeakSet()
@@ -53,7 +53,7 @@ def removeDisplayClass(key):
         coverBrowser.updateDisplayChooser()
     
 
-class CoverBrowser(mainwindow.Widget):
+class CoverBrowser(widgets.Widget):
     """A cover browser is similar to the usual browser but shows covers instead of a tree structure of
     elements. Like the browser it has a search box and a configuration widget that allows to set filters.
     
@@ -316,11 +316,12 @@ class CoverBrowser(mainwindow.Widget):
             self.setDisplayKey(key)
         
 
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "coverbrowser",
-        name = translate("CoverBrowser","Cover Browser"),
-        icon = utils.getIcon('widgets/coverbrowser.png'),
-        theClass = CoverBrowser))
+widgets.addClass(
+    id = "coverbrowser",
+    name = translate("CoverBrowser", "Cover Browser"),
+    icon = utils.images.icon('widgets/coverbrowser.png'),
+    theClass = CoverBrowser
+)
 
 
 class AbstractCoverWidget(QtWidgets.QWidget):

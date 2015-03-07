@@ -22,12 +22,12 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import mainwindow, selection
-from .. import logging, utils
-from ..core import levels, tags
+from maestro import widgets, logging, utils
+from maestro.core import levels, tags
+from maestro.gui import selection
 
 
-class DetailsView(mainwindow.Widget):
+class DetailsView(widgets.Widget):
     """A widget that lists all known information about a single element."""
     def __init__(self, state=None, **args):
         super().__init__(**args)        
@@ -112,7 +112,7 @@ class DetailsView(mainwindow.Widget):
             dialog = CoverDialog(self.element, self)
             dialog.exec_()
         elif href.startswith('{'):
-            browser = mainwindow.mainWindow.defaultWidget('browser')
+            browser = widgets.current('browser')
             if browser is not None:
                 browser.search(href)
     
@@ -251,12 +251,13 @@ class DetailsView(mainwindow.Widget):
         self.label.setText(''.join(text))
 
 
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "details",
-        name = translate("DetailsView", "Details"),
-        theClass = DetailsView,
-        icon = utils.images.icon('widgets/details.png'),
-        preferredDockArea = 'right'))
+widgets.addClass(
+    id = "details",
+    name = translate("DetailsView", "Details"),
+    theClass = DetailsView,
+    icon = utils.images.icon('widgets/details.png'),
+    preferredDockArea = 'right'
+)
 
 
 class CoverDialog(QtWidgets.QDialog):

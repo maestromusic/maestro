@@ -22,30 +22,30 @@ Maestro's widget system."""
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from ... import utils
-from ...gui import mainwindow
+from maestro import utils, widgets
 
 
 def enable():
-    mainwindow.addWidgetClass(mainwindow.WidgetClass(
+    widgets.addClass(
         id = "logodock",
         name = QtWidgets.QApplication.translate("LogoDock", "Logo"),
         icon = QtGui.QIcon(":/maestro/plugins/logodock/omg.png"),
         theClass = LogoDock,
         areas = 'dock',
-        preferredDockArea = 'right'))
+        preferredDockArea = 'right'
+    )
 
 
 def disable():
-    mainwindow.removeWidgetClass("logodock")
+    widgets.removeClass("logodock")
 
 
-class LogoDock(mainwindow.Widget):
+class LogoDock(widgets.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         layout = QtWidgets.QHBoxLayout(self)
         label = QtWidgets.QLabel()
-        label.setPixmap(QtGui.QPixmap(':/maestro/omg.png'))
+        label.setPixmap(utils.images.pixmap(':/maestro/omg.png'))
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)
 

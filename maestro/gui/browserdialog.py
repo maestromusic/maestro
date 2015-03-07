@@ -21,7 +21,7 @@ import functools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from . import dialogs, delegates, search as searchgui, widgets
+from . import dialogs, delegates, search as searchgui, widgets as guiwidgets
 from .. import utils
 from ..core import tags
 from ..models import browser as browsermodel
@@ -61,7 +61,7 @@ class AbstractBrowserDialog(dialogs.FancyTabbedPopup):
         
         domainLayout = QtWidgets.QHBoxLayout()
         domainLayout.addWidget(QtWidgets.QLabel(self.tr("Domain:")))
-        self.domainBox = widgets.DomainBox(self.browser.getDomain())
+        self.domainBox = guiwidgets.DomainBox(self.browser.getDomain())
         self.domainBox.domainChanged.connect(self.browser.setDomain)
         domainLayout.addWidget(self.domainBox)
         filterTab.layout().addLayout(domainLayout)

@@ -22,7 +22,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from maestro import application, database as db, logging, utils, search
+from maestro import application, database as db, logging, utils, search, widgets
 from maestro.core import flags, levels, domains
 from maestro.core.elements import Element
 from maestro.models import browser as browsermodel
@@ -59,7 +59,7 @@ CompleteContainerAction.register('completeContainer', context='browser',
                                  description=translate('CompleteContainerAction', 'Load complete container'))
 
 
-class Browser(mainwindow.Widget):
+class Browser(widgets.Widget):
     """Browser to search the music collection. The browser contains a searchbox and one or more views.
     The browser displays all elements or a subset defined by three different criteria (combined with AND):
         - the search criterion entered in the search box ('searchCriterion'),
@@ -365,13 +365,14 @@ class Browser(mainwindow.Widget):
         super().closeEvent(event)
 
 
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "browser",
-        name = translate("Browser","Browser"),
-        icon = utils.getIcon('widgets/browser.png'),
-        theClass = Browser,
-        areas = 'dock',
-        preferredDockArea = 'left'))
+widgets.addClass(
+    id = "browser",
+    name = translate("Browser", "Browser"),
+    icon = utils.images.icon('widgets/browser.png'),
+    theClass = Browser,
+    areas = 'dock',
+    preferredDockArea = 'left'
+)
 
 
 class BrowserTreeView(treeview.TreeView):

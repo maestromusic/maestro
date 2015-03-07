@@ -21,16 +21,16 @@ import os.path, functools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import utils, config, logging, stack
+from maestro import utils, config, logging, stack, widgets
 from maestro.core import tags, levels, urls
 from maestro.models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from maestro.gui import singletageditor, tagwidgets, mainwindow, flageditor, dialogs
+from maestro.gui import singletageditor, tagwidgets, flageditor, dialogs
 from maestro.gui.misc import widgetlist
         
 translate = QtCore.QCoreApplication.translate
 
 
-class TagEditorWidget(mainwindow.Widget):
+class TagEditorWidget(widgets.Widget):
     """A TagEditorWidget contains of a row of buttons, a TagEditorLayout forming the actual tageditor and
     a flageditor. The TagEditorLayout displays pairs of a TagTypeBox and a SingleTagEditor - one for each
     tag present in the tageditor. The displays the tagtype while the SingleTagEditor shows all records for
@@ -470,15 +470,15 @@ class TagEditorWidget(mainwindow.Widget):
         self.includeContentsButton.setChecked(value)
 
 
-widgetClass = mainwindow.WidgetClass(
-        id = "tageditor",
-        name = translate("Tageditor", "Tageditor"),
-        icon = utils.getIcon('widgets/tageditor.png'),
-        theClass = TagEditorWidget,
-        unique = True,
-        areas = 'dock',
-        preferredDockArea = 'right')
-mainwindow.addWidgetClass(widgetClass)
+widgetClass = widgets.addClass(
+    id = "tageditor",
+    name = translate("Tageditor", "Tageditor"),
+    icon = utils.images.icon('widgets/tageditor.png'),
+    theClass = TagEditorWidget,
+    unique = True,
+    areas = 'dock',
+    preferredDockArea = 'right'
+)
 
 
 class RecordDialog(QtWidgets.QDialog):

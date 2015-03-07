@@ -22,9 +22,9 @@ import functools
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import Qt
 
-from maestro import player, utils
+from maestro import player, utils, widgets
 from maestro.core import levels
-from maestro.gui import actions, mainwindow, dialogs
+from maestro.gui import actions, dialogs
 from maestro.gui.delegates import delegatewidget, playlist as playlistdelegate
 from maestro.gui.preferences import profiles as profilesgui
 
@@ -62,7 +62,7 @@ class PlayControlAction(actions.GlobalAction):
 
     def doAction(self):
 
-        currentWidget = mainwindow.mainWindow.currentWidgets.get('playback')
+        currentWidget = widgets.current('playback')
         currentBackend = None if currentWidget is None else currentWidget.backend
         backends = [b for b in player.profileCategory.profiles()
                     if b.connectionState is player.ConnectionState.Connected]
@@ -94,7 +94,7 @@ for command in PlayCommand:
                                shortcut=Qt.Key_Space if command is PlayCommand.PlayPause else None)
 
 
-class PlaybackWidget(mainwindow.Widget):
+class PlaybackWidget(widgets.Widget):
     """A dock widget providing playback controls for the selected player backend.
     """
     def __init__(self, state=None, **args):
@@ -306,13 +306,14 @@ class PlaybackWidget(mainwindow.Widget):
         return self.backend.name if self.backend is not None else None
 
     
-mainwindow.addWidgetClass(mainwindow.WidgetClass(
-        id = "playback",
-        name = translate("Playback", "playback"),
-        icon = utils.images.icon('widgets/playback.png'),
-        theClass = PlaybackWidget,
-        areas = 'dock',
-        preferredDockArea = 'left'))
+widgets.addClass(
+    id = "playback",
+    name = translate("Playback", "playback"),
+    icon = utils.images.icon('widgets/playback.png'),
+    theClass = PlaybackWidget,
+    areas = 'dock',
+    preferredDockArea = 'left'
+)
 
 
 class OptionDialog(dialogs.FancyPopup):
