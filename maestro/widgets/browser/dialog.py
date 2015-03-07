@@ -21,12 +21,12 @@ import functools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from . import dialogs, delegates, search as searchgui, widgets as guiwidgets
-from .. import utils
-from ..core import tags
-from ..models import browser as browsermodel
-from .delegates import browser as browserdelegate
-from .preferences import profiles as profilesgui
+from maestro import utils
+from maestro.core import tags
+from maestro.gui import dialogs, delegates, search as searchgui, widgets as guiwidgets
+from maestro.gui.delegates import browser as browserdelegate
+from maestro.gui.preferences import profiles as profilesgui
+from maestro.widgets.browser import model
 
 MAX_SUB_BROWSERS = 5
 
@@ -196,7 +196,7 @@ class SingleViewConfiguration(QtWidgets.QWidget):
         bottomLine = QtWidgets.QHBoxLayout()
         bottomLine.addWidget(QtWidgets.QLabel(self.tr("Add layer:")))
         self.layerTypeBox = QtWidgets.QComboBox()
-        for name, (title, theClass) in browsermodel.layerClasses.items():
+        for name, (title, theClass) in model.layerClasses.items():
             self.layerTypeBox.addItem(title, name)
         bottomLine.addWidget(self.layerTypeBox)
         self.addLayerButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('list-add'), '')
@@ -240,7 +240,7 @@ class SingleViewConfiguration(QtWidgets.QWidget):
         
     def _handleAddLayerButton(self):
         layerName = self.layerTypeBox.itemData(self.layerTypeBox.currentIndex())
-        theClass = browsermodel.layerClasses[layerName][1]
+        theClass = model.layerClasses[layerName][1]
         layer = theClass.openDialog(self, self.model)
         if layer is not None:
             self.model.addLayer(layer)

@@ -24,7 +24,7 @@ from PyQt5.QtCore import Qt
 from maestro import stack
 from maestro.utils import images
 from maestro.core import elements, nodes, urls, levels
-from maestro.models import leveltreemodel, browser
+from maestro.models import leveltreemodel
 from maestro.gui import actions, dialogs
 
 translate = QtCore.QCoreApplication.translate
@@ -77,10 +77,11 @@ class RemoveFromParentAction(actions.TreeAction):
             byParent[parent] = sorted(set(indexes))
 
         stack.beginMacro('remove')
+        from maestro.widgets import browser
         if isinstance(model, leveltreemodel.LevelTreeModel):
             for parent, indexes in byParent.items():
                 model.removeElements(parent, indexes)
-        elif isinstance(model, browser.BrowserModel):
+        elif isinstance(model, browser.model.BrowserModel):
             for parent, indexes in byParent.items():
                 self.level().removeContentsAuto(parent.element, indexes=indexes)
         else:

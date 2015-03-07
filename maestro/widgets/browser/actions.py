@@ -18,12 +18,10 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
+translate = QtCore.QCoreApplication.translate
 
 from maestro.core import tags
-from maestro.models import browser as browsermodel
 from maestro.gui import actions
-
-translate = QtCore.QCoreApplication.translate
 
 
 class TagValueAction(actions.TreeAction):
@@ -34,7 +32,7 @@ class TagValueAction(actions.TreeAction):
 
     def initialize(self, selection):
         node = self.parent().currentNode()
-        from ..models.browser import TagNode
+        from maestro.widgets.browser.nodes import TagNode
         if not isinstance(node, TagNode):
             self.setText(self.tr('Manage tag value'))
             self.setEnabled(False)
@@ -45,7 +43,7 @@ class TagValueAction(actions.TreeAction):
         self.setText(self.tr('Manage tag value "{}" ...').format(self.value))
 
     def doAction(self):
-        from ..gui.tagwidgets import TagValuePropertiesWidget
+        from maestro.gui.tagwidgets import TagValuePropertiesWidget
         if len(self.tagIds) > 1:
             tagNames = [tags.get(tagId).name for tagId, valueId in self.tagIds]
             answer, ok = QtWidgets.QInputDialog.getItem(self.parent(), self.tr("Choose tag mode"),
@@ -102,7 +100,8 @@ class AddToPlaylistAction(actions.TreeAction):
             self.setText(self.tr('Append to playlist'))
 
     def doAction(self):
-        mimeData = browsermodel.BrowserMimeData(self.parent().selection)
+        from maestro.widgets import browser
+        mimeData = browser.model.BrowserMimeData(self.parent().selection)
         wrappers = [w.copy() for w in mimeData.wrappers()]
         from maestro.gui import playlist
         playlist.appendToDefaultPlaylist(wrappers, replace=self.replace)
@@ -121,10 +120,38 @@ class GlobalSearchAction(actions.GlobalAction):
     label = translate('GlobalSearchAction', 'Jump to browser search')
 
     def doAction(self):
-        from maestro.gui import mainwindow
-        browser = mainwindow.mainWindow.currentWidgets.get('browser')
-        if browser:
+        from maestro import widgets
+        browser = widgets.current('browser')
+        if browser is not None:
             browser.containingWidget().raise_()
             browser.searchBox.setFocus()
 
 GlobalSearchAction.register('navigation', shortcut=QtGui.QKeySequence.Find)
+
+
+class CompleteContainerAction(actions.TreeAction):
+    """This action replaces the contents of a container wrapper by all contents of the corresponding element.
+    """
+
+    label = translate('CompleteContainerAction', 'Complete container')
+
+    def initialize(self, selection):
+        self.setEnabled(any(w.isContainer()
+                                and (w.contents is None or len(w.contents) < len(w.element.contents))
+                            for w in selection.wrappers()))
+    
+    def doAction(self):
+        treeView = self.parent()
+        model = treeView.model()
+        for wrapper in treeView.selection.wrappers():
+            if wrapper.isContainer() and (wrapper.contents is None 
+                                            or len(wrapper.contents) < len(wrapper.element.contents)):
+                model.beginRemoveRows(model.getIndex(wrapper), 0, len(wrapper.contents)-1)
+                wrapper.setContents([])
+                model.endRemoveRows()
+                model.beginInsertRows(model.getIndex(wrapper), 0, len(wrapper.element.contents)-1)
+                wrapper.loadContents(recursive=True)
+                model.endInsertRows()
+
+CompleteContainerAction.register('completeContainer', context='browser',
+                                 description=translate('CompleteContainerAction', 'Load complete container'))

@@ -23,7 +23,8 @@ translate = QtCore.QCoreApplication.translate
 
 from maestro import database as db, utils, search, logging, widgets
 from maestro.core import flags, levels, tags, domains
-from maestro.gui import browserdialog, selection, dockwidget, search as searchgui, browser, mainwindow
+from maestro.gui import selection, dockwidget, search as searchgui, mainwindow
+from maestro.widgets.browser import dialog as browserdialog
 
 _displayClasses = {}
 _coverBrowsers = weakref.WeakSet()
@@ -99,7 +100,8 @@ class CoverBrowser(widgets.Widget):
         self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox, 1)
         
-        self.filterButton = browser.FilterButton()
+        from maestro.widgets.browser.browser import FilterButton
+        self.filterButton = FilterButton()
         self.filterButton.setEnabled(self.getFilter() is not None)
         controlLineLayout.addWidget(self.filterButton)
         self.filterButton.clicked.connect(self._handleFilterButton)

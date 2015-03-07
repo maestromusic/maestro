@@ -21,8 +21,9 @@ import os.path
 from PyQt5 import QtCore, QtGui, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
-from ...core import covers, levels, nodes
-from ...gui import coverbrowser, playlist, selection
+from maestro.core import covers, levels, nodes
+from maestro.gui import playlist, selection
+from maestro.widgets.browser import coverbrowser
 
 try:
     import imageflow

@@ -21,7 +21,6 @@ from PyQt5 import QtCore
 from ...core import tags, covers
 from ...core.nodes import Wrapper
 from . import profiles, StandardDelegate, TextItem, STD_STYLE, ITALIC_STYLE, BOLD_STYLE
-from ...models import browser as browsermodel
 
 translate = QtCore.QCoreApplication.translate
 
@@ -49,17 +48,18 @@ class BrowserDelegate(StandardDelegate):
     
     def layout(self,index,availableWidth):
         node = index.model().data(index)
+        from maestro.widgets import browser
         
-        if isinstance(node, browsermodel.TagNode):
+        if isinstance(node, browser.nodes.TagNode):
             valueList = node.sortValues if self.profile.options['showSortValues'] else node.values
             for value, matching in valueList:
                 self.addCenter(TextItem(value, style=BOLD_STYLE if matching else STD_STYLE))
                 self.newRow()
-        elif isinstance(node,browsermodel.VariousNode):
+        elif isinstance(node, browser.nodes.VariousNode):
             self.addCenter(TextItem(self.tr("Unknown/Various"),ITALIC_STYLE))
-        elif isinstance(node,browsermodel.HiddenValuesNode):
+        elif isinstance(node, browser.nodes.HiddenValuesNode):
             self.addCenter(TextItem(self.tr("Hidden"),ITALIC_STYLE))
-        elif isinstance(node,browsermodel.LoadingNode):
+        elif isinstance(node, browser.nodes.LoadingNode):
             self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
         else:
             super().layout(index,availableWidth)

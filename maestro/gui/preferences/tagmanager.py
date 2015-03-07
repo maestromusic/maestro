@@ -88,17 +88,18 @@ class TagManager(QtWidgets.QWidget):
         
     def _handleSelectionChanged(self):
         rows = self.table.selectionModel().selectedRows()
-        from .. import browser
-        self.showInBrowserButton.setEnabled(len(rows) == 1 and browser.defaultBrowser is not None)
+        from maestro import widgets
+        self.showInBrowserButton.setEnabled(len(rows) == 1 and widgets.current('browser') is not None)
         self.deleteButton.setEnabled(len(rows) == 1)
     
     def _handleShowInBrowserButton(self):
         """Load all elements containing the selected tag into the default browser."""
-        from .. import browser
+        from maestro import widgets
+        browser = widgets.current('browser')
         rows = self.table.selectionModel().selectedRows()
-        if len(rows) == 1 and browser.defaultBrowser is not None:
+        if len(rows) == 1 and browser is not None:
             tag = self.table.getTag(rows[0].row())
-            browser.defaultBrowser.search('{tag='+tag.name+'}')
+            browser.search('{tag='+tag.name+'}')
         
     def _handleDeleteButton(self):
         """Ask the user if he really wants this and if so, delete the tag."""

@@ -25,38 +25,9 @@ translate = QtCore.QCoreApplication.translate
 from maestro import application, database as db, logging, utils, search, widgets
 from maestro.core import flags, levels, domains
 from maestro.core.elements import Element
-from maestro.models import browser as browsermodel
-from maestro.gui import actions, treeactions, mainwindow, treeview, delegates, dockwidget, search as searchgui
-from maestro.gui import browserdialog, browseractions
+from maestro.gui import treeactions, mainwindow, treeview, delegates, dockwidget, search as searchgui
 from maestro.gui.delegates import browser as browserdelegate
-
-
-class CompleteContainerAction(actions.TreeAction):
-    """This action replaces the contents of a container wrapper by all contents of the corresponding element.
-    """
-
-    label = translate('CompleteContainerAction', 'Complete container')
-
-    def initialize(self, selection):
-        self.setEnabled(any(w.isContainer()
-                                and (w.contents is None or len(w.contents) < len(w.element.contents))
-                            for w in selection.wrappers()))
-    
-    def doAction(self):
-        treeView = self.parent()
-        model = treeView.model()
-        for wrapper in treeView.selection.wrappers():
-            if wrapper.isContainer() and (wrapper.contents is None 
-                                            or len(wrapper.contents) < len(wrapper.element.contents)):
-                model.beginRemoveRows(model.getIndex(wrapper), 0, len(wrapper.contents)-1)
-                wrapper.setContents([])
-                model.endRemoveRows()
-                model.beginInsertRows(model.getIndex(wrapper), 0, len(wrapper.element.contents)-1)
-                wrapper.loadContents(recursive=True)
-                model.endInsertRows()
-
-CompleteContainerAction.register('completeContainer', context='browser',
-                                 description=translate('CompleteContainerAction', 'Load complete container'))
+from maestro.widgets.browser import model, nodes as bnodes
 
 
 class Browser(widgets.Widget):
@@ -84,7 +55,7 @@ class Browser(widgets.Widget):
            either clear, that the next level does not fit into the view or it can be expanded.
  
     """
-    table = db.prefix + "elements" # The MySQL-table whose contents are currently displayed
+    table = db.prefix + "elements" # The database table whose contents are currently displayed
 
     # Whether or not hidden values should be displayed.
     showHiddenValues = False
@@ -155,8 +126,8 @@ class Browser(widgets.Widget):
                     for layerConfig in layersConfig: 
                         try:
                             className, layerState = layerConfig
-                            if className in browsermodel.layerClasses:
-                                theClass = browsermodel.layerClasses[className][1]
+                            if className in model.layerClasses:
+                                theClass = model.layerClasses[className][1]
                                 layer = theClass(state=layerState)
                                 layers.append(layer)
                         except Exception:
@@ -338,7 +309,8 @@ class Browser(widgets.Widget):
         self.reload()
     
     def createOptionDialog(self, button=None):
-        return browserdialog.BrowserDialog(button, self)
+        from maestro.widgets.browser import dialog
+        return dialog.BrowserDialog(button, self)
     
     def _handleHideTitleBarAction(self, checked):
         """React to the 'Hide title bar' action in the view menu."""
@@ -354,9 +326,9 @@ class Browser(widgets.Widget):
               
     def defaultLayers(self):
         """Return the default list of layers for a view."""
-        tagList = browsermodel.TagLayer.defaultTagList()
+        tagList = model.TagLayer.defaultTagList()
         if len(tagList) > 0:
-            return [browsermodel.TagLayer(tagList)]
+            return [model.TagLayer(tagList)]
         else: return []
 
     def closeEvent(self, event):
@@ -384,7 +356,7 @@ class BrowserTreeView(treeview.TreeView):
     def __init__(self, browser, domain, layers, filter, delegateProfile):
         super().__init__(levels.real)
         self.browser = browser
-        self.setModel(browsermodel.BrowserModel(domain, layers, filter))
+        self.setModel(model.BrowserModel(domain, layers, filter))
         self.header().sectionResized.connect(lambda x, y, z: self.model().layoutChanged)
         
         # If there are no contents, the browser model contains a help message (e.g. "no search results"),
@@ -416,7 +388,7 @@ class BrowserTreeView(treeview.TreeView):
         index = self.indexAt(event.pos())
         if not index.isValid():
             return
-        mimeData = browsermodel.BrowserMimeData.fromIndexes(self.model(), [index])
+        mimeData = model.BrowserMimeData.fromIndexes(self.model(), [index])
         wrappers = [w.copy() for w in mimeData.wrappers()]
         if len(wrappers) == 1 and wrappers[0].isFile() \
                 and not utils.files.isMusicFile(wrappers[0].element.url.path):
@@ -470,7 +442,7 @@ class RestoreExpander:
     def getKey(self, node):
         """Get an identifier for *node*, which is unique among all siblings and will be the same for an
         equivalent node after reloading the model."""
-        if isinstance(node, browsermodel.CriterionNode) and hasattr(node, 'getKey'):
+        if isinstance(node, bnodes.CriterionNode) and hasattr(node, 'getKey'):
             return node.getKey()
         elif isinstance(node, Element):
             return node.id    
@@ -499,7 +471,7 @@ class RestoreExpander:
                         # After expanding this node, process expanded nodes below this one
                         toExpand.append((child, expanded))
                     # If this is a CriterionNode expanding the node will start a search and we have to wait.
-                    mustSearch = isinstance(child, browsermodel.CriterionNode) and not child.hasLoaded()
+                    mustSearch = isinstance(child, bnodes.CriterionNode) and not child.hasLoaded()
                     self.view.expand(model.getIndex(child))
                     if mustSearch:
                         yield child
@@ -553,7 +525,7 @@ class VisibleLevelsExpander:
         """
         if not node.hasContents():
             return 0
-        if isinstance(node, browsermodel.CriterionNode) and not node.hasLoaded():
+        if isinstance(node, bnodes.CriterionNode) and not node.hasLoaded():
             node.loadContents()
             return None
         height = 0
@@ -561,7 +533,7 @@ class VisibleLevelsExpander:
             if depth == 1:
                 height += self.view.itemDelegate().sizeHint(None, self.view.model().getIndex(child)).height()
             else:
-                if node.hasContents() and not isinstance(node, browsermodel.HiddenValuesNode):
+                if node.hasContents() and not isinstance(node, bnodes.HiddenValuesNode):
                     newHeight = self._getHeightOfDepth(child, depth-1, maxHeight-height)
                     if newHeight is None:
                         return None # A node is not loaded yet
@@ -577,7 +549,7 @@ class VisibleLevelsExpander:
         if parent is None:
             parent = self.view.model().getRoot()
         for node in parent.contents:
-            if node.hasContents() and not isinstance(node, browsermodel.HiddenValuesNode):
+            if node.hasContents() and not isinstance(node, bnodes.HiddenValuesNode):
                 self.view.expand(self.view.model().getIndex(node))
                 if depth > 1:
                     self.expandToDepth(depth-1, parent=node)

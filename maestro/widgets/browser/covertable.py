@@ -22,8 +22,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from . import coverbrowser, selection
-from ..core import nodes, covers, levels, elements, tags
+from maestro.core import nodes, covers, levels, elements, tags
+from maestro.gui import selection
+from maestro.widgets.browser import coverbrowser
 
 
 class CoverTable(coverbrowser.AbstractCoverWidget):

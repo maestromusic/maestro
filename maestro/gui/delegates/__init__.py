@@ -25,7 +25,6 @@ from .abstractdelegate import *
 from ... import config, database as db, utils
 from ...core import tags, levels, elements
 from ...core.nodes import RootNode, Wrapper, TextNode
-from ...models import browser as browsermodel
 from . import profiles
 
 
@@ -282,6 +281,7 @@ class StandardDelegate(AbstractDelegate):
             return []
         values = list(wrapper.element.tags[tagType]) # copy!
         
+        from maestro.widgets import browser
         parent = wrapper
         while len(values) > 0:
             parent = parent.parent
@@ -291,7 +291,7 @@ class StandardDelegate(AbstractDelegate):
                 else: parentValues = []
             elif isinstance(parent,RootNode):
                 break
-            elif isinstance(parent, browsermodel.TagNode):
+            elif isinstance(parent, browser.nodes.TagNode):
                 parentValues = parent.getValues()
             else:
                 parentValues = []

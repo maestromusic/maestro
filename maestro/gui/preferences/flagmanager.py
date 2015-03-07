@@ -141,14 +141,15 @@ class ShowInBrowserAction(QtWidgets.QAction):
         self._selectionChanged()
     
     def _selectionChanged(self):
-        from .. import browser
-        self.setEnabled(len(self.parent().selectedItems()) == 1 and browser.defaultBrowser is not None)
+        from maestro import widgets 
+        self.setEnabled(len(self.parent().selectedItems()) == 1 and widgets.current('browser') is not None)
     
     def _triggered(self):
-        from .. import browser
-        if len(self.parent().selectedItems()) == 1 and browser.defaultBrowser is not None:
+        from maestro import widgets
+        browser = widgets.current('browser')
+        if len(self.parent().selectedItems()) == 1 and browser is not None:
             flag = self.parent().selectedItems()[0]
-            browser.defaultBrowser.search('{flag='+flag.name+'}') 
+            browser.search('{flag='+flag.name+'}') 
     
     
 def createNewFlagType(parent=None):

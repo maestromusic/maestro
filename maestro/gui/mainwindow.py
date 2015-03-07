@@ -389,8 +389,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # VIEW
         self.menus['view'] = self.menuBar().addMenu(self.tr("&View"))
 
-        from maestro.gui import browseractions
-        self.menus['view'].addAction(browseractions.GlobalSearchAction(self))
+        from maestro.widgets import browser
+        self.menus['view'].addAction(browser.actions.GlobalSearchAction(self))
         self.menus['view'].addSeparator()
 
         self.menus['centralwidgets'] = self.menus['view'].addMenu(self.tr("New central widget"))
