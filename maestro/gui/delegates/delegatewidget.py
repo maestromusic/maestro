@@ -49,7 +49,6 @@ class DelegateWidget(QtWidgets.QWidget):
         self.setNode(TextNode(text))
     
     def minimumSizeHint(self):
-        print(self.delegate.getFontMetrics().lineSpacing())
         return QtCore.QSize(20, 3*self.delegate.getFontMetrics().lineSpacing())
     
     def sizeHint(self):
@@ -69,4 +68,3 @@ class DelegateWidget(QtWidgets.QWidget):
             option.rect = self.rect()
             index = self.model.getIndex(self._node)
             self.delegate.paint(painter, option, index)
-            

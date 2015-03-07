@@ -176,9 +176,6 @@ class LocalPlayerBackend(player.PlayerBackend):
         else:
             print('unknown player error {}'.format(error))
 
-    def handleStateChanged(self, state):
-        print('state changed ', state)
-
     def handleMediaStatusChanged(self, status):
         if status == QtMultimedia.QMediaPlayer.EndOfMedia:
             self.skipForward()
