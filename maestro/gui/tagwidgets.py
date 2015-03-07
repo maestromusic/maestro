@@ -812,8 +812,8 @@ class TagValuePropertiesWidget(QtWidgets.QWidget):
             command = tagcommands.ChangeSortValueCommand(self.tag, self.valueId, self.origSortValue, None)
             stack.push(command)
         if self.hiddenCheckbox.isChecked() != self.orig_hidden:
-            command = tagcommands.HiddenAttributeCommand(self. tag, self.valueId,
-                                                      self.hiddenCheckbox.isChecked())
+            command = tagcommands.HiddenAttributeCommand(self.tag, [self.valueId],
+                                                         self.hiddenCheckbox.isChecked())
             stack.push(command)
     
     @staticmethod

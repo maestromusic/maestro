@@ -398,7 +398,7 @@ class BrowserTreeView(treeview.TreeView):
             playlist.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
 
 
-for identifier in ('tagValue', 'editTags', 'changeURLs', 'delete', 'merge', 'completeContainer',
+for identifier in ('hideTagValues', 'tagValue', 'editTags', 'changeURLs', 'delete', 'merge', 'completeContainer',
                    'collapseAll', 'expandAll', 'appendToPL', 'replacePL'):
     BrowserTreeView.addActionDefinition(identifier)
 treeactions.SetElementTypeAction.addSubmenu(BrowserTreeView.actionConf.root)

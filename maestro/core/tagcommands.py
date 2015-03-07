@@ -54,22 +54,19 @@ class ChangeSortValueCommand:
 
 class HiddenAttributeChangeEvent(application.ChangeEvent):
     """This event is emitted when the "hidden" attribute of a tag value changes."""
-    def __init__(self, tag, valueId, newState):
-        (self.tag, self.valueId, self.newState) = (tag, valueId, newState)
+    def __init__(self, tag, valueIds, newState):
+        self.tag = tag
+        self.valueIds = valueIds
+        self.newState = newState
 
 
 class HiddenAttributeCommand:
-    """A command to change the "hidden" attribute of a tag value."""
-    
-    def __init__(self, tag, valueId, newState=None):
-        """Create the command. If newState is None, then the old one will be fetched from the database
-        and the new one set to its negative.
-        Otherwise, this class assumes that the current state is (not newState), so don't call this
-        whith newState = oldState."""
+    """A command to change the "hidden" attribute of several tag values."""
+    def __init__(self, tag, valueIds, newState):
         self.text = translate("HiddenAttributeCommand", "change hidden flag")
         self.tag = tag
-        self.valueId = valueId
-        self.newState = db.tags.hidden(tag, valueId) if newState is None else newState
+        self.valueIds = valueIds
+        self.newState = newState
        
     def redo(self):
         self.setHidden(self.newState)
@@ -78,9 +75,10 @@ class HiddenAttributeCommand:
         self.setHidden(not self.newState)
         
     def setHidden(self, newState):
-        db.query("UPDATE {}values_{} SET hide = ? WHERE tag_id = ? AND id = ?"
-                 .format(db.prefix, self.tag.type), newState, self.tag.id, self.valueId)
-        application.dispatcher.emit(HiddenAttributeChangeEvent(self.tag, self.valueId, newState))
+        if len(self.valueIds) > 0:
+            db.query("UPDATE {p}values_varchar SET hide = ? WHERE tag_id = ? AND id IN ({vids})",
+                     newState, self.tag.id, vids=db.csList(self.valueIds))
+            application.dispatcher.emit(HiddenAttributeChangeEvent(self.tag, self.valueIds, newState))
 
 
 def renameTagValue(tag, oldValue, newValue):

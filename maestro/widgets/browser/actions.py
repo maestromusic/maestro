@@ -20,6 +20,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
+from maestro import database as db, stack
 from maestro.core import tags
 from maestro.gui import actions
 
@@ -155,3 +156,133 @@ class CompleteContainerAction(actions.TreeAction):
 
 CompleteContainerAction.register('completeContainer', context='browser',
                                  description=translate('CompleteContainerAction', 'Load complete container'))
+
+
+class HideTagValuesAction(actions.TreeAction):
+    """Hide all tag values which appear only below a single selected container (not tags of the container
+    itself!). Only tags which appear in a TagLayer of the browser are considered.
+    Before tags are hidden a HideTagValuesDialog is displayed, which explains the action and allows the
+    user to save some values from being hidden.
+    """
+    label = translate('HideTagValuesAction', "Hide tag values...")
+    
+    def initialize(self, selection):
+        self.setEnabled(selection.hasContainers())
+    
+    def doAction(self):
+        treeView = self.parent()
+        
+        # Collect tags
+        tags = set()
+        from maestro.widgets.browser.model import TagLayer
+        for layer in treeView.model().layers:
+            if isinstance(layer, TagLayer):
+                tags.update(layer.tagList)
+        
+        # Collect values
+        valuesToHide = {tag: [] for tag in tags}
+        for wrapper in treeView.selection.wrappers():
+            if not wrapper.isContainer():
+                continue
+            
+            # Collect all children ids and tag values 
+            wrapper.loadContents(recursive=True)
+            ids = []
+            allValues = {tag: set() for tag in tags}
+            for child in wrapper.getAllNodes(skipSelf=True):
+                element = child.element
+                ids.append(element.id)
+                for tag in tags:
+                    if tag in element.tags:
+                        allValues[tag].update(db.tags.id(tag, value) for value in element.tags[tag])
+                    
+            # Check which tag values appear outside the children ids (thus possibly in wrapper itself)
+            for tag, vids in allValues.items():
+                if len(vids) > 0:
+                    result = db.query("""
+                        SELECT value_id
+                        FROM {p}tags
+                        WHERE tag_id=? AND element_id NOT IN ({elids}) AND value_id IN ({vids})
+                        GROUP BY value_id
+                        """, tag.id, elids=db.csList(ids), vids=db.csList(vids))
+                    # We will not hide the values returned from the query because they appear elsewhere
+                    vids.difference_update(result.getSingleColumn())
+                    # these lists should be disjoint for different wrappers
+                    # (unless one is an ancestor of the other one)
+                    valuesToHide[tag].extend(vids)
+            
+            dialog = HideTagValuesDialog(treeView, valuesToHide)
+            dialog.exec_()
+                
+HideTagValuesAction.register('hideTagValues', context='browser',
+                 description=translate('HideTagValuesAction',
+                                       'Hide tag values which appear only below this container'))
+
+
+class HideTagValuesDialog(QtWidgets.QDialog):
+    """This dialog is shown when the HideTagValuesAction is executed. It displays all values that will
+    be hidden to the user and allows him to unselect some of them. In the end, only the selected values
+    will be hidden. Values are displayed in a QTreeWidget, grouped by tags.
+    """
+    def __init__(self, parent, valuesToHide):
+        super().__init__(parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        label = QtWidgets.QLabel(self.tr("The following tag values appear only below a single selected"
+                                         " container. You might wish to hide them."))
+        label.setWordWrap(True)
+        layout.addWidget(label)
+            
+        # Treeview          
+        self.treeWidget = QtWidgets.QTreeWidget()
+        self.treeWidget.setHeaderHidden(True)
+        layout.addWidget(self.treeWidget)
+
+        tagItems = []
+        for tag, valueIds in valuesToHide.items():
+            if len(valueIds) > 0:
+                tagItem = QtWidgets.QTreeWidgetItem()
+                tagItem.setText(0, tag.title)
+                tagItem.setData(0, Qt.UserRole, tag)
+                # Note: Due to a bug in Qt5 it is possible for the user to select the "partial" state.
+                # https://bugreports.qt.io/browse/QTBUG-40060
+                tagItem.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsTristate)
+                tagItem.setCheckState(0, Qt.Checked)
+                valueItems = []
+                for vid in valueIds:
+                    valueItem = QtWidgets.QTreeWidgetItem()
+                    valueItem.setText(0, db.tags.value(tag, vid))
+                    valueItem.setData(0, Qt.UserRole, vid)
+                    valueItem.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+                    valueItem.setCheckState(0, Qt.Checked)
+                    valueItems.append(valueItem)
+                valueItems.sort(key=lambda item: item.text(0))
+                tagItem.addChildren(valueItems)
+                tagItems.append(tagItem)
+        tagItems.sort(key=lambda item: item.text(0))
+        self.treeWidget.addTopLevelItems(tagItems)
+        self.treeWidget.expandAll()
+        
+        # Buttons
+        buttonBox = QtWidgets.QDialogButtonBox()
+        layout.addWidget(buttonBox)
+        buttonBox.addButton(self.tr("Hide values"), QtWidgets.QDialogButtonBox.AcceptRole)
+        buttonBox.addButton(QtWidgets.QDialogButtonBox.Cancel)
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.close)
+        
+    def accept(self):
+        stack.beginMacro(self.tr("Hide values"), transaction=True)
+        from maestro.core import tagcommands
+        for i in range(self.treeWidget.topLevelItemCount()):
+            tagItem = self.treeWidget.topLevelItem(i)
+            tag = tagItem.data(0, Qt.UserRole)
+            vids = []
+            if tagItem.checkState(0) != Qt.Unchecked:
+                for j in range(tagItem.childCount()):
+                    valueItem = tagItem.child(j)
+                    if valueItem.checkState(0) == Qt.Checked:
+                        vids.append(valueItem.data(0, Qt.UserRole))
+            if len(vids) > 0:
+                stack.push(tagcommands.HiddenAttributeCommand(tag, vids, True))
+        stack.endMacro()
+        self.close()
