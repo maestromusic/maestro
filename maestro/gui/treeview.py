@@ -196,12 +196,10 @@ class DraggingTreeView(TreeView):
             
     def dragEnterEvent(self, event):
         self._changeDropAction(event)
-        event.accept()
         super().dragEnterEvent(event)
-        
+    
     def dragMoveEvent(self, event):
         self._changeDropAction(event)
-        event.accept()
         super().dragMoveEvent(event)
         
     def dropEvent(self, event):
