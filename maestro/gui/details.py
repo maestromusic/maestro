@@ -56,6 +56,7 @@ class DetailsView(widgets.Widget):
         
         scrollArea = QtWidgets.QScrollArea()
         layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(scrollArea)
         scrollArea.setWidgetResizable(True)
         #layout.addWidget(scrollArea, 1)
