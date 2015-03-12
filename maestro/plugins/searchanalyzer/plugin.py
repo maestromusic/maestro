@@ -25,7 +25,7 @@ from PyQt5.QtCore import Qt
 from maestro import search, config, application, database as db, utils, widgets
 from maestro.core import tags, domains
 from maestro.search import criteria
-from maestro.gui import dialogs, search as searchgui
+from maestro.gui import dialogs, search as searchgui, widgets as guiwidgets
 from . import resources
 
 
@@ -70,13 +70,14 @@ class SearchAnalyzer(widgets.Widget):
         self.instantSearchBox.clicked.connect(self.searchBox.setInstantSearch)
         topLayout.addWidget(self.instantSearchBox)
         
-        self.domainBox = widgets.DomainBox()
+        self.domainBox = guiwidgets.DomainBox()
         self.domainBox.domainChanged.connect(self.setDomain)
         topLayout.addWidget(self.domainBox)
         
         topLayout.addStretch(1)
 
         self.table = QtWidgets.QTableWidget()
+        self.table.horizontalHeader().hide()
         layout.addWidget(self.table)
         
     def closeEvent(self, event):
