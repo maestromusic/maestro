@@ -94,8 +94,14 @@ class CoverBrowser(widgets.Widget):
         self.worker.start()
         
         layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         controlLineLayout = QtWidgets.QHBoxLayout()
+        style = self.style()
+        controlLineLayout.setContentsMargins(style.pixelMetric(style.PM_LayoutLeftMargin),
+                                             style.pixelMetric(style.PM_LayoutTopMargin),
+                                             style.pixelMetric(style.PM_LayoutRightMargin),
+                                             1)
         self.searchBox = searchgui.SearchBox()
         self.searchBox.criterionChanged.connect(self.search)
         controlLineLayout.addWidget(self.searchBox, 1)
@@ -236,6 +242,7 @@ class CoverBrowser(widgets.Widget):
         if self.filterButton.active:
             criterion = self.getFilter()
         
+        self.worker.reset()
         if criterion is not None:
             self.worker.submit(search.SearchTask(criterion, domain=self.domain))
         else: self._loaded(None)
@@ -278,6 +285,7 @@ class CoverBrowser(widgets.Widget):
         
     def _handleSelectionChanged(self):
         """React to selection changes in the current display widget."""
+        return #TODO
         s = self._displayWidgets[self._display].selection()
         if s is not None:
             selection.setGlobalSelection(s)
@@ -361,7 +369,6 @@ class BrowserDialog(browserdialog.AbstractBrowserDialog):
     the configuration widget provided by AbstractCoverWidget.createConfigWidget."""
     def __init__(self, parent, browser):
         super().__init__(parent, browser)
-        return
         optionLayout = self.optionTab.layout()
                 
         instantSearchBox = QtWidgets.QCheckBox(self.tr("Instant search"))

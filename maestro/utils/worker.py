@@ -53,7 +53,8 @@ class Task:
         if generator is not None:
             for n in self.process():
                 pass
-        
+    
+    #TODO: This is not used anymore; maybe use Python's built-in queue instead
     def merge(self, other):
         """Try to merge the task *other* in this task and return whether it was successful. The worker queue
         will try to merge new tasks into older tasks instead of putting them into the queue."""
@@ -222,10 +223,9 @@ class LoadImageTask(Task):
     def process(self):
         # QPixmap may only be used in the GUI thread. Thus we have to load the images as QImage and
         # transform them later in the GUI thread (see FutureImage.pixmap).
+        import time       # TODO: This hack can speed up the application start significantly
+        time.sleep(0.005) # The reason is probably that QImage.__init__ and .scale do not release the GIL.
         image = QtGui.QImage(self.path)
         if not image.isNull() and self.size is not None and image.size() != self.size:
             image = image.scaled(self.size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self._image = image
-
-    def merge(self, other):
-        return self.path == other.path and self.size == other.size

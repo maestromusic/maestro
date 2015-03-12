@@ -33,6 +33,7 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
     def __init__(self, state, coverBrowser):
         super().__init__(coverBrowser)
         layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.view = QtWidgets.QGraphicsView(CoverTableScene(self, coverBrowser.worker,
                                                         state.get('size') if state is not None else 80))
         self.view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
@@ -228,11 +229,12 @@ class CoverTableScene(QtWidgets.QGraphicsScene):
         
         if coverSize is not None and el.hasCover():
             imgTag = el.getCoverHTML(coverSize, 'style="float: left"')
-            return imgTag + '<div style="margin-left: {}">{}</div>'.format(coverSize+5, lines)
-        else:
-            # enclose in a div so that Qt formats this as rich text.
-            # Otherwise HTML escapes would be printed as plain text.
-            return '<div>{}</div>'.format(lines)
+            if imgTag is not None:
+                return imgTag + '<div style="margin-left: {}">{}</div>'.format(coverSize+5, lines)
+
+        # enclose in a div so that Qt formats this as rich text.
+        # Otherwise HTML escapes would be printed as plain text.
+        return '<div>{}</div>'.format(lines)
 
 
 class CoverItem(QtWidgets.QGraphicsItem):
@@ -258,7 +260,6 @@ class CoverItem(QtWidgets.QGraphicsItem):
         self.scene.worker.submit(self.cover)
         if not self.cover.loaded:
             self.scene.loadingTimer.timeout.connect(self._handleTimer)
-        else: self._addShadow()
         self.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable)
     
     def reload(self):
@@ -269,21 +270,12 @@ class CoverItem(QtWidgets.QGraphicsItem):
         """React to the scene's loading timer: Move loading animation to the next frame."""
         if self.cover.loaded:
             self.scene.loadingTimer.timeout.disconnect(self._handleTimer)
-            self._addShadow()
             self._oldCover = None
         else:
             self.frame += 1
             if self.frame >= 32:
                 self.frame = 1
         self.update()
-        
-    def _addShadow(self):
-        """Add a shadow to the item. The shadow should be added when the image is loaded, so that the
-        loading animation is drawn without a shadow."""
-        if self.graphicsEffect() is None:
-            effect = QtWidgets.QGraphicsDropShadowEffect()
-            effect.setOffset(5)
-            self.setGraphicsEffect(effect)
         
     def boundingRect(self):
         return QtCore.QRectF(0, 0, self.scene.coverSize+2, self.scene.coverSize+2)
@@ -297,6 +289,12 @@ class CoverItem(QtWidgets.QGraphicsItem):
                     pixmap = self.cover.pixmap
                 else: pixmap = QtGui.QPixmap(':maestro/cover_missing.png')
             else: pixmap = self._oldCover.pixmap
+            
+            # Draw the loaded cover with a shadow; do not add a shadow to the loading animation
+            if self.graphicsEffect() is None:
+                effect = QtWidgets.QGraphicsDropShadowEffect()
+                effect.setOffset(5)
+                self.setGraphicsEffect(effect)
 
             # Scale correctly
             w, h = pixmap.width(), pixmap.height()
