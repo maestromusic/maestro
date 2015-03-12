@@ -155,6 +155,8 @@ class Source(QtCore.QObject):
         self.enabled = False
         if enabled and not config.options.filesystem.disable:
             self.enable()
+        else:
+            self.files = {}
 
     def setEnabled(self, enabled: bool):
         if enabled and not self.enabled:
