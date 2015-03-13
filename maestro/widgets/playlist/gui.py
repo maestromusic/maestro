@@ -22,7 +22,7 @@ from PyQt5.QtCore import Qt
 from maestro import player, utils, widgets
 from maestro.core import levels, nodes
 from maestro.models import rootedtreemodel
-from maestro.gui import actions, dialogs, treeview, delegates, tageditor
+from maestro.gui import actions, dialogs, treeview, delegates, treeactions
 from maestro.gui.delegates import playlist as playlistdelegate
 from maestro.gui.preferences import profiles as profilesgui
 
