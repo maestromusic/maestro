@@ -18,9 +18,9 @@
 
 import collections
 
-from .. import database as db
-from ..core import levels
-from ..core.nodes import RootNode, Wrapper
+from maestro import database as db
+from maestro.core import levels
+from maestro.core.nodes import RootNode, Wrapper
  
 
 class Sequence:

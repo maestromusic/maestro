@@ -16,12 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import itertools, urllib
+import itertools
+import urllib
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro.models import wrappertreemodel, treebuilder
+from maestro.models import wrappertreemodel
+from maestro.widgets.playlist import treebuilder
 from maestro import config, logging, player, utils
 from maestro.core import levels, urls
 from maestro.core.nodes import RootNode, Wrapper
