@@ -19,10 +19,9 @@
 import os.path
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
 
 from maestro import stack
-from maestro.utils import images
+from maestro import utils
 from maestro.core import elements, nodes, urls, levels
 from maestro.models import leveltreemodel
 from maestro.gui import actions, dialogs
@@ -225,7 +224,7 @@ class ClearTreeAction(actions.TreeAction):
 
     def __init__(self, parent, identifier):
         super().__init__(parent, identifier)
-        self.setIcon(QtGui.QIcon.fromTheme('edit-clear'))
+        self.setIcon(utils.images.icon('edit-clear-list'))
         self.setText(self.tr('Clear'))
 
     def initialize(self, selection):
@@ -244,7 +243,7 @@ class CommitTreeAction(actions.TreeAction):
 
     def __init__(self, parent, identifier):
         super().__init__(parent, identifier)
-        self.setIcon(QtGui.QIcon.fromTheme('document-save'))
+        self.setIcon(utils.images.icon('document-save'))
         self.setText(self.tr('Store'))
 
     def initialize(self, selection):

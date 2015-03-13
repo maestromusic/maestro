@@ -57,14 +57,19 @@ class Panel:
         - *icon*: Icon that will be displayed in the preferences' menu.
 
     \ """
-    def __init__(self, path, title, callable, iconPath=None, pixmapPath=None, description=''):
+    def __init__(self, path, title, callable, iconName=None, description=''):
         self.path = path
         self.title = title
         self._callable = callable
-        self.iconPath = iconPath
-        self.pixmapPath = pixmapPath or ':maestro/icons/preferences/preferences.png'
+        self.iconName = iconName
         self.description = description
         self.subPanels = utils.OrderedDict()
+
+    def icon(self):
+        return utils.images.icon(self.iconName)
+
+    def pixmap(self):
+        return utils.images.icon(self.iconName).pixmap(48)
 
     def createWidget(self, dialog, panel):
         """Create a configuration widget for this panel using the 'callable' argument of the constructor.
@@ -87,7 +92,8 @@ class Panel:
             return QtWidgets.QWidget()
         elif not isinstance(self._callable, tuple):
             return self._callable(dialog, panel)
-        else: return self._callable[0](dialog, panel, *self._callable[1:])
+        else:
+            return self._callable[0](dialog, panel, *self._callable[1:])
 
 
 class PreferencesDialog(QtWidgets.QDialog):
@@ -102,7 +108,7 @@ class PreferencesDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Preferences - Maestro"))
-        self.setWindowIcon(utils.getIcon('preferences/preferences_small.png'))
+        self.setWindowIcon(utils.images.icon('preferences-other'))
         self.finished.connect(self._handleFinished)
 
         # Restore geometry
@@ -147,8 +153,7 @@ class PreferencesDialog(QtWidgets.QDialog):
         for path, panel in panels.items():
             item = QtWidgets.QTreeWidgetItem([panel.title])
             item.setData(0, Qt.UserRole, path)
-            if panel.iconPath is not None:
-                item.setIcon(0, QtGui.QIcon(panel.iconPath))
+            item.setIcon(0, panel.icon())
             self.treeWidget.addTopLevelItem(item)
             if len(panel.subPanels) > 0:
                 self._addSubPanels(panel, item)
@@ -159,8 +164,7 @@ class PreferencesDialog(QtWidgets.QDialog):
             newPath = '{}/{}'.format(panel.path, p)
             newItem = QtWidgets.QTreeWidgetItem([subPanel.title])
             newItem.setData(0, Qt.UserRole, newPath)
-            if subPanel.iconPath is not None:
-                newItem.setIcon(0, QtGui.QIcon(subPanel.iconPath))
+            newItem.setIcon(0, subPanel.icon())
             item.addChild(newItem)
             if len(subPanel.subPanels) > 0:
                 self._addSubPanels(subPanel, newItem)
@@ -258,10 +262,10 @@ class PanelWidget(QtWidgets.QWidget):
         self.titleLabel.setWordWrap(True)
         self.titleLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         titleLayout.addWidget(self.titleLabel, 1)
-        self.pixmapLabel = QtWidgets.QLabel()
-        self.pixmapLabel.setPixmap(QtGui.QPixmap(panel.pixmapPath))
-        self.pixmapLabel.setContentsMargins(20, 0, 20, 0)
-        titleLayout.addWidget(self.pixmapLabel)
+        pixmapLabel = QtWidgets.QLabel()
+        pixmapLabel.setPixmap(panel.pixmap())
+        pixmapLabel.setContentsMargins(20, 0, 20, 0)
+        titleLayout.addWidget(pixmapLabel)
 
         self.buttonBar = QtWidgets.QHBoxLayout()
 
@@ -326,7 +330,8 @@ def insertPanel(path, position, *args, **kwargs):
     parent, key = _getParentPanel(path)
     if parent is not None:
         currentPanels = parent.subPanels
-    else: currentPanels = panels
+    else:
+        currentPanels = panels
 
     if key in currentPanels:
         raise ValueError("Panel '{}' does already exist".format('/'.join(key)))
@@ -352,63 +357,66 @@ def removePanel(path):
 
 
 # Add core panels
-addPanel('main', translate('Preferences', 'Main'), None)
+addPanel('main', translate('Preferences', 'Main'), None, iconName='preferences-other')
 addPanel('main/domainmanager', translate('Preferences', 'Domain manager'),
     callable = ('gui.preferences.domainmanager', 'DomainManager'),
     description = translate('Preferences',
         'A domain is a big category of elements, like "Music", "Movies", etc..'),
-    iconPath = ':maestro/icons/preferences/domains_small.png'
-)
+    iconName='preferences-domains')
+
 addPanel('main/tagmanager', translate('Preferences', 'Tag manager'),
     callable = ('gui.preferences.tagmanager', 'TagManager'),
     description = translate('Preferences',
         'Note that you cannot change or remove tags that already appear in elements.'
         '<br />Use drag&drop to change the order in which tags are usually displayed.'),
-    iconPath = ':maestro/icons/tag_blue.png'
-)
+    iconName='tag')
+
 addPanel('main/flagmanager', translate('Preferences', 'Flag manager'),
     ('gui.preferences.flagmanager', 'FlagManager'),
     description = translate('Preferences', 'Flags can be added to elements to mark e.g. your favourite '
         'songs, CDs that you own, music that should go on your portable music player etc. Flags are not '
         'stored in music files, but only in the database.'),
-    iconPath = ':maestro/icons/flag_blue.png')
+    iconName='flag')
+
 addPanel('main/filesystem', translate('Preferences', 'File system'),
     ('gui.preferences.filesystem', 'FilesystemSettings'),
-    iconPath = ':maestro/icons/folder.svg')
+    iconName='folder')
+
 addPanel('main/shortcuts', translate('Preferences', 'Keyboard shortcuts'),
     ('gui.preferences.shortcuts', 'ShortcutSettings'),
     description=translate('Preferences', 'Assign shortcuts to common actions in Maestro. Double click on an '
-                          'entry to set a keyboard shortcut.'))
+                          'entry to set a keyboard shortcut.'),
+    iconName='configure-shortcuts')
+
 
 # Profile panels
 def _addProfileCategory(category):
     classTuple = ('gui.preferences.profiles', 'ProfileConfigurationPanel', category)
-    addPanel(path = "profiles/" + category.name,
-             title = category.title,
-             callable = classTuple,
-             description = category.description,
-             iconPath = category.iconPath,
-             pixmapPath = category.pixmapPath)
+    addPanel(path='profiles/' + category.name,
+             title=category.title,
+             callable=classTuple,
+             description=category.description,
+             iconName=category.iconName)
+
 
 def _removeProfileCategory(category):
     removePanel("profiles/" + category.name)
 
 addPanel("profiles", translate("Preferences", "Profiles"),
-         description = translate("Preferences",
-                        "To manage groups of configuration Maestro uses profiles of various categories."),
-         callable = ('gui.preferences.profiles', 'CategoryMenu'),
-         iconPath = ':maestro/icons/preferences/profiles_small.png',
-         pixmapPath = ':maestro/icons/preferences/profiles.png')
+         description=translate("Preferences",
+                    "To manage groups of configuration Maestro uses profiles of various categories."),
+         callable=('gui.preferences.profiles', 'CategoryMenu'),
+         iconName='preferences-profiles',)
 
 # Bugfix: do not call this profiles, otherwise the submodule is unreachable
-from ... import profiles as profilesModule
+from maestro import profiles as profilesModule
 profilesModule.manager.categoryAdded.connect(_addProfileCategory)
 profilesModule.manager.categoryRemoved.connect(_removeProfileCategory)
 for category in profilesModule.manager.categories:
     _addProfileCategory(category)
 
 
-addPanel("plugins", translate("Preferences", "Plugins"), ('gui.preferences.plugins', 'PluginPanel'),
-         iconPath = ':maestro/icons/preferences/plugin.png',
-         description = translate("Preferences", "Enable or disable plugins.<br />"
+addPanel('plugins', translate("Preferences", "Plugins"), ('gui.preferences.plugins', 'PluginPanel'),
+         iconName='preferences-plugin',
+         description=translate("Preferences", "Enable or disable plugins.<br />"
                                  "<b>Warning:</b> Changes will be performed immediately!"))

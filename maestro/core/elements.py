@@ -47,21 +47,15 @@ class ContainerType(enum.Enum):
         elif self == ContainerType.Collection:
             return translate('Elements', 'Collection')
 
-    def iconPath(self):
-        if self == ContainerType.Album:
-            return 'cd.png'
-        elif self == ContainerType.Work:
-            return 'work.png'
-        elif self == ContainerType.Collection:
-            return 'cdbox.png'
-
     def icon(self):
-        if self.iconPath():
-            return utils.images.icon(self.iconPath())
+        try:
+            return self._icon
+        except AttributeError:
+            self._icon = utils.images.icon(self.name.lower())
+            return self._icon
 
-    def pixmap(self):
-        if self.iconPath():
-            return utils.images.pixmap(self.iconPath())
+    def pixmap(self, size=24):
+        return self.icon().pixmap(size)
 
 
 class Element:

@@ -16,13 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt5 import QtCore, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
-from ... import application, database as db, utils, stack
-from ...core import flags
-from .. import dialogs, flexform
+from maestro import application, database as db, utils, stack
+from maestro.core import flags
+from maestro.gui import dialogs, flexform
 
 
 class FlagModel(flexform.FlexTableModel):
@@ -99,7 +98,7 @@ class FlagManager(flexform.FlexTable):
 class NewFlagAction(QtWidgets.QAction):
     """Ask the user for a name and add a new flag to the database."""
     def __init__(self, parent):
-        super().__init__(QtGui.QIcon.fromTheme('list-add'), translate("NewFlagAction", "Create new flag..."), parent)
+        super().__init__(utils.images.icon('list-add'), translate("NewFlagAction", "Create new flag..."), parent)
         self.triggered.connect(self._triggered)
         
     def _triggered(self):
@@ -111,7 +110,7 @@ class NewFlagAction(QtWidgets.QAction):
 class DeleteFlagAction(QtWidgets.QAction):
     """Confirm and delete a flag from the database."""
     def __init__(self, parent):
-        super().__init__(QtGui.QIcon.fromTheme('list-remove'), translate("DeleteFlagAction", "Delete flag"), parent)
+        super().__init__(utils.images.icon('list-remove'), translate("DeleteFlagAction", "Delete flag"), parent)
         self.triggered.connect(self._triggered)
         parent.selectionChanged.connect(self._selectionChanged)
     
@@ -133,7 +132,7 @@ class DeleteFlagAction(QtWidgets.QAction):
 class ShowInBrowserAction(QtWidgets.QAction):
     """Load all elements containing the selected flag into the default browser."""
     def __init__(self, parent):
-        super().__init__(utils.getIcon('preferences/goto.png'),
+        super().__init__(utils.images.icon('edit-find'),
                          translate("ShowInBrowserAction", "Show in browser"),
                          parent)
         parent.selectionChanged.connect(self._selectionChanged)

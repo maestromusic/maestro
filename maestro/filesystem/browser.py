@@ -255,7 +255,7 @@ class FileSystemSelection(selection.Selection):
 widgets.addClass(
     id = 'filesystembrowser',
     name = translate('FileSystemBrowser', 'File System Browser'),
-    icon = utils.images.icon('widgets/filesystembrowser.png'),
+    icon = utils.images.icon('filesystembrowser'),
     theClass = FileSystemBrowser,
     areas = 'dock',
     preferredDockArea = 'right'

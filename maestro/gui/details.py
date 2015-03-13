@@ -256,7 +256,7 @@ widgets.addClass(
     id = "details",
     name = translate("DetailsView", "Details"),
     theClass = DetailsView,
-    icon = utils.images.icon('widgets/details.png'),
+    icon = utils.images.icon('help-about'),
     preferredDockArea = 'right'
 )
 

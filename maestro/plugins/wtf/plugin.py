@@ -18,23 +18,22 @@
 
 """WTF - The write-to-filesystem plugin."""
 
-import functools, os, os.path, shutil, copy, itertools
+import os, os.path, shutil, copy, itertools
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt5 import QtCore, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
-from ... import utils, profiles, config, application, database as db, search, logging, filesystem
-from ...core import levels, domains, elements, tags
-from ...gui import search as searchgui, dialogs, widgets
-from ...gui.misc import lineedits
-from ...gui.preferences import profiles as profilesgui
-from ...search import criteria
+from maestro import utils, profiles, config, application, database as db, search, logging, filesystem
+from maestro.core import levels, domains, elements, tags
+from maestro.gui import search as searchgui, dialogs, widgets
+from maestro.gui.misc import lineedits
+from maestro.gui.preferences import profiles as profilesgui
+from maestro.search import criteria
 from . import filetree
 
 
-_action = None # the action that is inserted into the Extras menu
-_widget = None # the dialog widget must be stored in a variable or it will vanish immediately
+_action = None  # the action that is inserted into the Extras menu
+_widget = None  # the dialog widget must be stored in a variable or it will vanish immediately
 
 profileCategory = None
 
@@ -44,14 +43,15 @@ OPTION_DELETE = 'delete'
 OPTION_INCLUDE_WORK_TITLES = 'includeWorkTitles'
 OPTIONS_ALL = [OPTION_DELETE, OPTION_INCLUDE_WORK_TITLES]
 
+
 def enable():
     global _action, profileCategory
     profileCategory = profiles.ProfileCategory(
-                            name = "wtf",
-                            title = translate("wtf", "Export"),
-                            storageOption = config.getOption(config.storage, 'wtf.profiles'),
-                            profileClass = Profile
-                            )
+                            name='wtf',
+                            title=translate("wtf", "Export"),
+                            storageOption=config.getOption(config.storage, 'wtf.profiles'),
+                            profileClass=Profile,
+                            iconName='actions-export')
     profiles.manager.addCategory(profileCategory)
     
     _action = QtWidgets.QAction(application.mainWindow)
@@ -74,11 +74,7 @@ def disable():
 
 
 def defaultStorage():
-    return {"wtf": {
-            "size": (800,600),
-            "pos": None, # Position of the window as tuple or None to center the window
-            "profiles": ({},),
-        }}
+    return dict(wtf=dict(size=(800, 600), pos=None, profiles=({},)))
 
 
 class Profile(profiles.Profile):
@@ -292,7 +288,7 @@ class ConfigWidget(profilesgui.ProfileConfigurationWidget):
         lineLayout.addWidget(self.criterionLineEdit, 1)
         layout.addRow(self.tr("Filter:"), lineLayout)
         self.flagButton = QtWidgets.QPushButton()
-        self.flagButton.setIcon(utils.getIcon("flag_blue.png"))
+        self.flagButton.setIcon(utils.images.icon('flag'))
         self.flagButton.setIconSize(QtCore.QSize(16, 16))
         self.flagButton.clicked.connect(self._handleFlagButton)
         lineLayout.addWidget(self.flagButton)

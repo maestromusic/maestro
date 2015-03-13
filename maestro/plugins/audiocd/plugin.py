@@ -20,10 +20,12 @@ try:
     import discid
 except ImportError:
     raise ImportError('discid module not installed')
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
+
 from maestro import application, database as db
-from maestro.gui import editor
+from maestro.widgets.editor import editor
 from maestro.core import urls, tags
+
 
 translate = QtCore.QCoreApplication.translate
 

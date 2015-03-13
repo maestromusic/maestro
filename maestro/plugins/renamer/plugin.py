@@ -20,6 +20,7 @@ import pyparsing
 from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums
 
 from PyQt5 import QtCore
+
 translate = QtCore.QCoreApplication.translate
 
 from ...core import tags
@@ -46,11 +47,12 @@ def enable():
     profileCategory = profiles.ProfileCategory("renamer",
                                                translate("Renamer","Renamer"),
                                                config.getOption(config.storage, 'renamer.profiles'),
-                                               profileClass=GrammarRenamer)
+                                               profileClass=GrammarRenamer,
+                                               iconName='edit-rename')
     profiles.manager.addCategory(profileCategory)
     
     from .gui import RenameFilesAction
-    from maestro.gui import editor
+    from maestro.widgets.editor import editor
     from maestro.widgets import browser
     RenameFilesAction.register('renamer', context='plugins',
                                shortcut=translate('RenameFilesAction', 'Ctrl+R'))

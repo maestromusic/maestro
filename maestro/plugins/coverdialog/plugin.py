@@ -16,7 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os.path, functools
+import os.path
+import functools
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtNetwork
 from PyQt5.QtCore import Qt
@@ -37,7 +38,7 @@ SMALL_COVER_SIZE = 40
 
 
 def enable():
-    from maestro.gui import editor
+    from maestro.widgets.editor import editor
     from maestro.widgets import browser
     CoverAction.register('editCovers', context='plugins', description=translate('CoverAction', 'Edit covers'))
     editor.EditorTreeView.addActionDefinition('editCovers')

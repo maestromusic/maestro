@@ -98,8 +98,7 @@ class DomainManager(flexform.FlexTable):
 class NewDomainAction(QtWidgets.QAction):
     """Ask the user for a name and create a new domain."""
     def __init__(self, parent):
-        super().__init__(QtGui.QIcon.fromTheme('list-add'), translate("NewDomainAction", "Create new domain..."),
-                         parent)
+        super().__init__(utils.images.icon('list-add'), translate("NewDomainAction", "Create new domain..."), parent)
         self.triggered.connect(self._triggered)
                    
     def _triggered(self):
@@ -111,7 +110,7 @@ class NewDomainAction(QtWidgets.QAction):
 class DeleteDomainAction(QtWidgets.QAction):
     """Delete an empty domain."""
     def __init__(self, parent):
-        super().__init__(QtGui.QIcon.fromTheme('list-remove'), translate("DeleteDomainAction", "Delete domain"),
+        super().__init__(utils.images.icon('list-remove'), translate("DeleteDomainAction", "Delete domain"),
                          parent)
         self.triggered.connect(self._triggered)
         parent.selectionChanged.connect(self._selectionChanged)

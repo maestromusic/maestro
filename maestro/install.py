@@ -37,7 +37,7 @@ import collections, os
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import config, logging, database as db
+from maestro import config, logging, database as db, utils
 from maestro.application import loadTranslators
 from maestro.core.tags import isValidTagName
 from maestro.gui import flexform
@@ -352,10 +352,10 @@ class DomainWidget(SettingsWidget):
                        dialogTitle = self.tr("Choose source directory"),
                        pathType = 'existingDirectory')
         self.domainManager.setModel(model)
-        newDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-add'), self.tr('Add domain'), self)
+        newDomainAction = QtWidgets.QAction(utils.images.icon('list-add'), self.tr('Add domain'), self)
         newDomainAction.triggered.connect(self._addDomain)
         self.domainManager.addAction(newDomainAction)
-        removeDomainAction = QtWidgets.QAction(QtGui.QIcon.fromTheme('list-remove'), self.tr('Remove domain'), self)
+        removeDomainAction = QtWidgets.QAction(utils.images.icon('list-remove'), self.tr('Remove domain'), self)
         removeDomainAction.triggered.connect(self._removeDomain)
         self.domainManager.addAction(removeDomainAction)
         
@@ -430,7 +430,7 @@ class TagWidget(SettingsWidget):
         buttonBarLayout = QtWidgets.QHBoxLayout()
         self.layout().addLayout(buttonBarLayout)
         addButton = QtWidgets.QPushButton(self.tr('Add tag'))
-        addButton.setIcon(QtGui.QIcon.fromTheme('list-add'))
+        addButton.setIcon(utils.images.icon('list-add'))
         addButton.clicked.connect(self._handleAddButton)
         buttonBarLayout.addWidget(addButton)
         buttonBarLayout.addStretch()

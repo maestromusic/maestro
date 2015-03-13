@@ -20,9 +20,8 @@
 
 import unittest
 
-from maestro import application, config, database as db, utils
-from maestro.models import playlist as playlistmodel
-
+from maestro import application
+from maestro.widgets.playlist import model as playlistmodel
 from .testlevel import *
 
 

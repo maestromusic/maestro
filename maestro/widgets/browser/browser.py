@@ -20,6 +20,7 @@ import functools
 
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import Qt
+
 translate = QtCore.QCoreApplication.translate
 
 from maestro import application, database as db, logging, utils, search, widgets
@@ -340,7 +341,7 @@ class Browser(widgets.Widget):
 widgets.addClass(
     id = "browser",
     name = translate("Browser", "Browser"),
-    icon = utils.images.icon('widgets/browser.png'),
+    icon = utils.images.icon('browser'),
     theClass = Browser,
     areas = 'dock',
     preferredDockArea = 'left'
@@ -394,8 +395,9 @@ class BrowserTreeView(treeview.TreeView):
                 and not utils.files.isMusicFile(wrappers[0].element.url.path):
             QtGui.QDesktopServices.openUrl(wrappers[0].element.url.toQUrl())
         else:
-            from maestro.gui import playlist
-            playlist.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
+            from maestro.widgets.playlist import gui
+
+            gui.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
 
 
 for identifier in ('hideTagValues', 'tagValue', 'editTags', 'changeURLs', 'delete', 'merge', 'completeContainer',
