@@ -70,8 +70,8 @@ def formatLength(lengthInSeconds):
         timeString = "{0:d}:{1:02d}:{2:02d}".format(hours % 24, minutes, seconds)
         if hours < 24:
             return timeString
-        else: return translate("formatLength", "%n days", '', QtCore.QCoreApplication.CodecForTr,
-                               int(hours/24)) + ' ' + timeString
+        else:
+            return translate("formatLength", "%n days", '', int(hours/24)) + ' ' + timeString
 
 
 def formatSize(size):

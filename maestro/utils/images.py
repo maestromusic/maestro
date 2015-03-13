@@ -35,9 +35,15 @@ namedIcons = {
     'document-edit': 'document-edit.svgz',
     'document-save': 'document-save.svgz',
     'drive-harddisk': 'drive-harddisk.svgz',
+    'edit-clear': 'edit-clear.svgz',
     'edit-clear-list': 'edit-clear-list.svgz',
+    'edit-delete': 'edit-delete.svgz',
     'edit-rename': 'edit-rename.svgz',
+    'edit-undo': 'edit-undo.svgz',
+    'edit-redo': 'edit-redo.svgz',
     'edit-find': 'edit-find.svgz',
+    'go-next': 'go-next.svgz',
+    'go-previous': 'go-previous.svgz',
     'filesystembrowser': 'widgets/filesystembrowser.svgz',
     'flag': 'flag.svgz',  # generic flag icon
     'folder': 'folder.svgz',
@@ -57,6 +63,7 @@ namedIcons = {
     'tag': 'tag.svgz',  # generic tag icon
     'tageditor': 'widgets/tageditor.svgz',
     'view-media-playlist': 'widgets/view-media-playlist.svgz',
+    'view-refresh': 'view-refresh.svgz',
     'work': 'work.svgz',
 }
 

@@ -14,19 +14,24 @@
         <file>icons/collection.svgz</file>
         <file>icons/configure-shortcuts.svgz</file>
         <file>icons/container.svgz</file>
-        <file>icons/clear.png</file>
         <file>icons/clear_16.png</file>
         <file>icons/document-edit.svgz</file>
         <file>icons/document-save.svgz</file>
         <file>icons/drive-harddisk.svgz</file>
+        <file>icons/edit-clear.svgz</file>
         <file>icons/edit-clear-list.svgz</file>
+        <file>icons/edit-delete.svgz</file>
         <file>icons/edit-find.svgz</file>
         <file>icons/edit-rename.svgz</file>
+        <file>icons/edit-undo.svgz</file>
+        <file>icons/edit-redo.svgz</file>
         <file>icons/expand.png</file>
         <file>icons/folder-unsynced.svgz</file>
         <file>icons/folder-synced.svgz</file>
         <file>icons/folder.svgz</file>
         <file>icons/flag.svgz</file>
+        <file>icons/go-next.svgz</file>
+        <file>icons/go-previous.svgz</file>
         <file>icons/help-about.svgz</file>
         <file>icons/list-add.svgz</file>
         <file>icons/list-remove.svgz</file>
@@ -34,6 +39,7 @@
         <file>icons/media-playback-start.svgz</file>
         <file>icons/recursive.svgz</file>
         <file>icons/tag.svgz</file>
+        <file>icons/view-refresh.svgz</file>
         <file>icons/work.svgz</file>
 
         <file>tags/album.png</file>

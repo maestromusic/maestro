@@ -70,7 +70,7 @@ class DBAnalyzer(widgets.Widget):
     correct them."""
     currentCheck = None # The check that is currently displayed in the details view.
     
-    def __init__(self, state=None, dialog=False, **args):
+    def __init__(self, state=None, **args):
         super().__init__(**args)
         layout = QtWidgets.QHBoxLayout(self)
         splitter = QtWidgets.QSplitter()
@@ -111,9 +111,9 @@ class DBAnalyzer(widgets.Widget):
         problemsBox = QtWidgets.QGroupBox(self.tr("Problems"))
         problemsLayout = QtWidgets.QVBoxLayout()
         problemsBox.setLayout(problemsLayout)
-        rightLayout.addWidget(problemsBox,0)
+        rightLayout.addWidget(problemsBox, 0)
 
-        self.problemsTable = QtWidgets.QTableWidget(1,2)
+        self.problemsTable = QtWidgets.QTableWidget(1, 2)
         self.problemsTable.verticalHeader().hide()
         self.problemsTable.cellClicked.connect(self._handleCellClicked)
         problemsLayout.addWidget(self.problemsTable)
@@ -121,28 +121,21 @@ class DBAnalyzer(widgets.Widget):
         self.detailLabel = QtWidgets.QLabel()
         problemsLayout.addWidget(self.detailLabel)
         
-        self.detailTable = QtWidgets.QTableWidget(0,0)
+        self.detailTable = QtWidgets.QTableWidget(0, 0)
         self.detailTable.verticalHeader().hide()
         problemsLayout.addWidget(self.detailTable)
 
         # Buttons
         buttonLayout = QtWidgets.QHBoxLayout()
         problemsLayout.addLayout(buttonLayout)
-        self.fixButton = QtWidgets.QPushButton(QtGui.QIcon(":/maestro/plugins/dbanalyzer/edit-clear.png"),
-                                           self.tr("Fix problem"))
+        self.fixButton = QtWidgets.QPushButton(utils.images.icon('edit-clear'), self.tr("Fix problem"))
         self.fixButton.setEnabled(False)
         self.fixButton.clicked.connect(self._handleFixButton)
-        buttonLayout.addWidget(self.fixButton,0)
-        refreshButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('view-refresh'),self.tr("Refresh"))
+        buttonLayout.addWidget(self.fixButton, 0)
+        refreshButton = QtWidgets.QPushButton(utils.images.icon('view-refresh'), self.tr("Refresh"))
         refreshButton.clicked.connect(self.fetchData)
-        buttonLayout.addWidget(refreshButton,0)
-        
+        buttonLayout.addWidget(refreshButton, 0)
         buttonLayout.addStretch(1)
-        if dialog:
-            closeButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('window-close'),self.tr("Close"))
-            closeButton.clicked.connect(self.close)
-            buttonLayout.addWidget(closeButton,0)
-
         self.fetchData()
     
     def fetchData(self):
@@ -320,7 +313,7 @@ class DBAnalyzerDialog(QtWidgets.QDialog):
         layout.addWidget(analyzer)
         
         # TODO: use restoreGeometry
-        screen = QtGui.QDesktopWidget().screenGeometry()
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
         size = QtCore.QSize(*config.storage.dbanalyzer.size)
         self.resize(size)
         pos = config.storage.dbanalyzer.pos
