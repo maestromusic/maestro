@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
@@ -251,9 +251,9 @@ class ExternalTagsWidget(QtWidgets.QScrollArea):
 
 
 widgets.addClass(
-    id = "editor",
-    name = translate("Editor", "editor"),
-    icon = utils.getIcon('widgets/editor.png'),
-    theClass = EditorWidget,
+    id='editor',
+    name=translate("Editor", "editor"),
+    icon=utils.images.icon('accessories-text-editor'),
+    theClass=EditorWidget,
     preferredDockArea = 'right'
 )

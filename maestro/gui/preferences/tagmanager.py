@@ -56,7 +56,7 @@ class TagManager(QtWidgets.QWidget):
         self.redoButton.clicked.connect(stack.redo)
         buttonBar.addWidget(self.redoButton)
         self.showInBrowserButton = QtWidgets.QToolButton()
-        self.showInBrowserButton.setIcon(utils.getIcon("preferences/goto.png"))
+        self.showInBrowserButton.setIcon(utils.images.icon('edit-find'))
         self.showInBrowserButton.setToolTip(self.tr("Show in browser"))
         self.showInBrowserButton.setEnabled(False)
         self.showInBrowserButton.clicked.connect(self._handleShowInBrowserButton)

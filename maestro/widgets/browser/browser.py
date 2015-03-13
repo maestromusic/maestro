@@ -340,7 +340,7 @@ class Browser(widgets.Widget):
 widgets.addClass(
     id = "browser",
     name = translate("Browser", "Browser"),
-    icon = utils.images.icon('widgets/browser.png'),
+    icon = utils.images.icon('browser'),
     theClass = Browser,
     areas = 'dock',
     preferredDockArea = 'left'

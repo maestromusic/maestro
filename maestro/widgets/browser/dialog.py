@@ -221,7 +221,7 @@ class SingleViewConfiguration(QtWidgets.QWidget):
             buttonWidget = QtWidgets.QWidget()
             buttonLayout = QtWidgets.QHBoxLayout(buttonWidget)
             buttonLayout.setContentsMargins(0, 0, 0, 0)
-            editButton = QtWidgets.QPushButton(utils.getIcon('pencil.png'), '')
+            editButton = QtWidgets.QPushButton(utils.images.icon('document-edit'), '')
             editButton.clicked.connect(functools.partial(self._handleEditButton, i))
             buttonLayout.addWidget(editButton)
             removeButton = QtWidgets.QPushButton(QtGui.QIcon.fromTheme('list-remove'), '')

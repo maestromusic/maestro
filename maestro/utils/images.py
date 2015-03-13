@@ -21,31 +21,59 @@ from PyQt5.QtCore import Qt
 
 namedPixmaps = {} 
 namedIcons = {
-    'flag': 'flag_blue.png',  # generic flag icon
+    'actions-export': 'actions-export.svgz',
+    'accessories-text-editor': 'accessories-text-editor.svgz',
+    'album': 'media-optical-audio.svgz',
+    'applications-development': 'applications-development.svgz',
+    'audio-x-synchronized': 'audio-x-synced.svgz',
+    'audio-x-unsynchronized': 'audio-x-unsynced.svgz',
+    'audio-x-generic': 'audio-x-generic.svgz',
+    'browser': 'widgets/browser.svgz',
+    'collection': 'collection.svgz',
+    'configure-shortcuts': 'configure-shortcuts.svgz',
+    'container': 'container.svgz',
+    'document-edit': 'document-edit.svgz',
+    'document-save': 'document-save.svgz',
+    'drive-harddisk': 'drive-harddisk.svgz',
+    'edit-clear-list': 'edit-clear-list.svgz',
+    'edit-rename': 'edit-rename.svgz',
+    'edit-find': 'edit-find.svgz',
+    'filesystembrowser': 'widgets/filesystembrowser.svgz',
+    'flag': 'flag.svgz',  # generic flag icon
     'folder': 'folder.svgz',
     'folder-synchronized': 'folder-synced.svgz',
     'folder-unsynchronized': 'folder-unsynced.svgz',
-    'audio-x-synchronized': 'audio-x-synced.svgz',
-    'audio-x-unsynchronized': 'audio-x-unsynced.svgz',
-    'audio-x-generic': 'audio-x-generic.svgz'
+    'help-about': 'help-about.svgz',
+    'list-add': 'list-add.svgz',
+    'list-remove': 'list-remove.svgz',
+    'media-playback-start': 'media-playback-start.svgz',
+    'preferences-delegates': 'preferences/delegates.svgz',
+    'preferences-domains': 'preferences/domains.svgz',
+    'preferences-profiles': 'preferences/profiles.svgz',
+    'preferences-plugin': 'preferences/plugin.svgz',
+    'preferences-sound': 'preferences/sound.svgz',
+    'preferences-other': 'preferences/preferences.svgz',
+    'recursive': 'recursive.svgz',
+    'tag': 'tag.svgz',  # generic tag icon
+    'tageditor': 'widgets/tageditor.svgz',
+    'view-media-playlist': 'widgets/view-media-playlist.svgz',
+    'work': 'work.svgz',
 }
-_fallbacks = {}
 
 
 def icon(name):
     """Return a QIcon. *name* may be
-        - a name: a name from utils.images.namedIcons or from
-                http://standards.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
+        - a name: a name from utils.images.namedIcons
         - a filepath: paths must be relative to the images/icons/-folder and contain an extension.
     """
+    if name is None:
+        return QtGui.QIcon()
     if '.' in name:
         return QtGui.QIcon(':maestro/icons/' + name)
     elif name in namedIcons:
         return QtGui.QIcon(':maestro/icons/' + namedIcons[name])
-    elif name in _fallbacks:
-        return QtGui.QIcon.fromTheme(name, _fallbacks[name])
     else:
-        return QtGui.QIcon.fromTheme(name)
+        raise ValueError('icon name {} not found'.format(name))
 
 
 def pixmap(name):

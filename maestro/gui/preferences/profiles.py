@@ -128,7 +128,7 @@ class ProfileConfigurationPanel(QtWidgets.QWidget):
         self.createButton.clicked.connect(self._handleCreateButton)
         toolBar.addWidget(self.createButton)
         self.renameButton = QtWidgets.QToolButton()
-        self.renameButton.setIcon(utils.getIcon('pencil.png'))
+        self.renameButton.setIcon(utils.images.icon('document-edit'))
         self.renameButton.setToolTip(self.tr("Rename profile"))
         self.renameButton.clicked.connect(self._handleRenameButton)
         toolBar.addWidget(self.renameButton)

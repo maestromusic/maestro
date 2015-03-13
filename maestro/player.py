@@ -43,8 +43,7 @@ profileCategory = profiles.TypedProfileCategory(
     description = translate("PlayerBackend",
                     "Maestro can control more than one audio backend. To easily switch between them, "
                     "their configuration is stored in profiles."),
-    iconPath = ':maestro/icons/preferences/audiobackends_small.png',
-    pixmapPath = ':maestro/icons/preferences/audiobackends.png')
+    iconName='preferences-sound')
 profiles.manager.addCategory(profileCategory)
 
 

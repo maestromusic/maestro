@@ -3,18 +3,39 @@
         <file>omg.png</file>
         <file>omg_splash.png</file>
         <file>lastfm.gif</file>
-        <file>icons/folder-unsynced.svgz</file>
-        <file>icons/folder-synced.svgz</file>
-        <file>icons/folder.svgz</file>
+        <file>process-working.png</file>
+        <file>icons/accessories-text-editor.svgz</file>
+        <file>icons/actions-export.svgz</file>
+        <file>icons/applications-development.svgz</file>
         <file>icons/audio-x-unsynced.svgz</file>
         <file>icons/audio-x-synced.svgz</file>
         <file>icons/audio-x-generic.svgz</file>
-        <file>icons/expand.png</file>
         <file>icons/collapse.png</file>
+        <file>icons/collection.svgz</file>
+        <file>icons/configure-shortcuts.svgz</file>
+        <file>icons/container.svgz</file>
         <file>icons/clear.png</file>
         <file>icons/clear_16.png</file>
-        <file>icons/clear_playlist.png</file>
-        <file>icons/flag_blue.png</file>
+        <file>icons/document-edit.svgz</file>
+        <file>icons/document-save.svgz</file>
+        <file>icons/drive-harddisk.svgz</file>
+        <file>icons/edit-clear-list.svgz</file>
+        <file>icons/edit-find.svgz</file>
+        <file>icons/edit-rename.svgz</file>
+        <file>icons/expand.png</file>
+        <file>icons/folder-unsynced.svgz</file>
+        <file>icons/folder-synced.svgz</file>
+        <file>icons/folder.svgz</file>
+        <file>icons/flag.svgz</file>
+        <file>icons/help-about.svgz</file>
+        <file>icons/list-add.svgz</file>
+        <file>icons/list-remove.svgz</file>
+        <file>icons/media-optical-audio.svgz</file>
+        <file>icons/media-playback-start.svgz</file>
+        <file>icons/recursive.svgz</file>
+        <file>icons/tag.svgz</file>
+        <file>icons/work.svgz</file>
+
         <file>tags/album.png</file>
         <file>tags/artist.png</file>
         <file>tags/comment.png</file>
@@ -22,25 +43,17 @@
         <file>tags/date.png</file>
         <file>tags/genre.png</file>
         <file>tags/title.png</file>
-        <file>process-working.png</file>
-        <file>icons/recursive.png</file>
+
         <file>omg_square.svg</file>
-        <file>icons/pencil.png</file>
-        <file>icons/cd.png</file>
-        <file>icons/cdbox.png</file>
-        <file>icons/work.png</file>
+
         <file>icons/dockwidgetarrow_gtk.png</file>
         <file>icons/dockwidgetarrow_oxygen.png</file>
-        <file>icons/widgets/browser.png</file>
+        <file>icons/widgets/browser.svgz</file>
         <file>icons/widgets/coverbrowser.png</file>
-        <file>icons/widgets/editor.png</file>
-        <file>icons/widgets/filesystembrowser.png</file>
-        <file>icons/widgets/playback.png</file>
-        <file>icons/widgets/playlist.png</file>
-        <file>icons/widgets/tageditor.png</file>
-        <file>icons/tag_blue.png</file>
+        <file>icons/widgets/filesystembrowser.svgz</file>
+        <file>icons/widgets/view-media-playlist.svgz</file>
+        <file>icons/widgets/tageditor.svgz</file>
         <file>playback.svg</file>
-        <file>icons/help-browser.png</file>
         <file>icons/search_active.png</file>
         <file>icons/search_disabled.png</file>
         <file>icons/search_inactive.png</file>
@@ -75,7 +88,6 @@
         <file alias="emoticon_smile.png">flags/silk/emoticon_smile.png</file>
         <file alias="emoticon_unhappy.png">flags/silk/emoticon_unhappy.png</file>
         <file alias="female.png">flags/silk/female.png</file>
-        <file alias="flag_blue.png">flags/silk/flag_blue.png</file>
         <file alias="flag_green.png">flags/silk/flag_green.png</file>
         <file alias="flag_orange.png">flags/silk/flag_orange.png</file>
         <file alias="flag_pink.png">flags/silk/flag_pink.png</file>
@@ -101,16 +113,11 @@
         <file alias="cross.png">flags/silk/cross.png</file>
     </qresource>
     <qresource prefix="/maestro/icons/preferences">
-        <file alias="delegates.png">icons/preferences/delegates.png</file>
-        <file alias="delegates_small.png">icons/preferences/delegates_small.png</file>
-        <file alias="goto.png">icons/preferences/goto.png</file>
-        <file alias="plugin.png">icons/preferences/plugin.png</file>
-        <file alias="preferences.png">icons/preferences/preferences.png</file>
-        <file alias="preferences_small.png">icons/preferences/preferences_small.png</file>
-        <file alias="profiles.png">icons/preferences/profiles.png</file>
-        <file alias="profiles_small.png">icons/preferences/profiles_small.png</file>
-        <file alias="audiobackends.png">icons/preferences/audiobackends.png</file>
-        <file alias="audiobackends_small.png">icons/preferences/audiobackends_small.png</file>
-        <file alias="domains_small.png">icons/preferences/domains_small.png</file>
+        <file alias="delegates.svgz">icons/preferences/delegates.svgz</file>
+        <file alias="plugin.svgz">icons/preferences/plugin.svgz</file>
+        <file alias="preferences.svgz">icons/preferences/preferences.svgz</file>
+        <file alias="profiles.svgz">icons/preferences/profiles.svgz</file>
+        <file alias="sound.svgz">icons/preferences/sound.svgz</file>
+        <file alias="domains.svgz">icons/preferences/domains.svgz</file>
     </qresource>
 </RCC>

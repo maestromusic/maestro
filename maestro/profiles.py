@@ -23,7 +23,7 @@ managed by the ProfileManager."""
 
 from PyQt5 import QtCore
 
-from . import config
+from maestro import config, utils
 
 
 class Profile(QtCore.QObject):
@@ -116,12 +116,15 @@ class ProfileCategory(QtCore.QObject):
     profileClass = Profile
     
     def __init__(self, name, title, storageOption, profileClass=None, defaultProfileName=None,
-                 description='', iconPath='', pixmapPath=''):
+                 description='', iconName=None):
         super().__init__()
         self.name = name
         self.title = title
-        self.iconPath = iconPath
-        self.pixmapPath = pixmapPath
+        self.iconName = iconName
+        if iconName:
+            self.icon = utils.images.icon(iconName)
+        else:
+            self.icon = None
         assert isinstance(storageOption,config.Option)
         
         self.storageOption = storageOption

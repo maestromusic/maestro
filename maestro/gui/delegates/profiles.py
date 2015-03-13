@@ -41,8 +41,7 @@ category = DelegateProfileCategory(
        storageOption = config.getOption(config.storage, 'gui.delegates'),
        description = translate("Delegates",
                 "Configure how elements are rendered in treeviews like browser, editor and playlist."),
-       iconPath = ':maestro/icons/preferences/delegates_small.png',
-       pixmapPath = ':maestro/icons/preferences/delegates.png'
+       iconName='preferences-delegates',
 )
                                    
 profiles.manager.addCategory(category)

@@ -16,30 +16,29 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
-
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from ... import config
-from ...gui import preferences
+from maestro import config
+from maestro.gui import preferences
 
 translate = QtCore.QCoreApplication.translate
 
 
 def enable():
     preferences.addPanel(
-        path = 'plugins/configeditor',
-        title = translate("ConfigEditor", "Configuration Editor"),
-        callable = PreferencesDialog,
-        description = translate("ConfigEditor", "Edit the configuration file <i>{}</i>.")
-                                .format(config.getFile(config.options).path),
+        path='plugins/configeditor',
+        title=translate("ConfigEditor", "Configuration Editor"),
+        callable=PreferencesDialog,
+        description=translate("ConfigEditor", "Edit the configuration file <i>{}</i>.")
+        .format(config.getFile(config.options).path),
+        iconName='applications-development',
     )
 
 
 def disable():
     preferences.removePanel('plugins/configeditor')
-    
+
 
 def populateSections(section, parent):
     item = QtWidgets.QTreeWidgetItem(parent)
@@ -60,7 +59,7 @@ class ConfigItem(QtWidgets.QTableWidgetItem):
     def __init__(self, widget, option):
         super().__init__()
         self.option = option
-        
+
         if option.type is bool:
             self.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             self.setCheckState(Qt.Checked if option.getValue() else Qt.Unchecked)
@@ -71,24 +70,26 @@ class ConfigItem(QtWidgets.QTableWidgetItem):
             self.setFont(f)
         self.dirty = False
         self.widget = widget
-        
+
     def data(self, role=Qt.DisplayRole):
         if role == Qt.ToolTipRole:
             if self.option.getValue() == self.option.default:
                 return translate("ConfigEditor", 'Default value')
-            else: return translate("ConfigEditor", 'Value differs from default')
+            else:
+                return translate("ConfigEditor", 'Value differs from default')
         if role == Qt.DisplayRole and self.option.type is bool:
             return self.checkState() == Qt.Checked
         return super().data(role)
-    
+
     def setData(self, role, value):
-        
+
         if role == Qt.EditRole:
             try:
                 self.option.fromString(value)
             except config.ConfigError:
                 QtWidgets.QMessageBox.critical(self.widget, translate("ConfigEditor", 'Invalid entry'),
-                            translate("ConfigEditor", 'The data you entered is not valid for this option'))
+                                               translate("ConfigEditor",
+                                                         'The data you entered is not valid for this option'))
                 return
             self.dirty = True
             self.widget.dirty = True
@@ -96,18 +97,18 @@ class ConfigItem(QtWidgets.QTableWidgetItem):
             f.setBold(self.option.getValue() != self.option.default)
             self.setFont(f)
         super().setData(role, value)
-    
+
     def resetToDefault(self):
         self.option.resetToDefault()
         self.dirty = True
         self.widget.dirty = True
-        super().setData(Qt.EditRole,self.option.export())
-        
+        super().setData(Qt.EditRole, self.option.export())
+
     def save(self):
         self.option.setValue(self.option.parseString(self.text()))
         self.dirty = False
-        
-        
+
+
 class ConfigSectionWidget(QtWidgets.QTableWidget):
     def __init__(self, section, parent=None):
         super().__init__(parent)
@@ -117,11 +118,12 @@ class ConfigSectionWidget(QtWidgets.QTableWidget):
         self.resetToDefaultAction = QtWidgets.QAction(self.tr('Reset to default'), self)
         self.contextMenu.addAction(self.resetToDefaultAction)
         self.resetToDefaultAction.triggered.connect(self.setSelectedToDefault)
-        
+
     def setSelectedToDefault(self):
         items = [i for i in self.selectedItems() if i.column() == 1]
         for i in items:
             i.resetToDefault()
+
     def setSection(self, section):
         self.clear()
         self.dirty = False
@@ -141,10 +143,10 @@ class ConfigSectionWidget(QtWidgets.QTableWidget):
             nameItem.setToolTip(opt.description)
             self.setItem(i, 0, nameItem)
 
-            valueItem = ConfigItem(self, opt)            
+            valueItem = ConfigItem(self, opt)
             self.setItem(i, 1, valueItem)
         self.resizeColumnsToContents()
-    
+
     def save(self):
         '''Saves everything in the current section to the config file.'''
         for row in range(self.rowCount()):
@@ -156,10 +158,10 @@ class ConfigSectionWidget(QtWidgets.QTableWidget):
     def contextMenuEvent(self, event):
         item = self.itemAt(event.pos())
         if item is not None:
-            self.contextMenu.popup(event.globalPos() + QtCore.QPoint(2,2))
+            self.contextMenu.popup(event.globalPos() + QtCore.QPoint(2, 2))
         event.accept()
-        
-        
+
+
 class PreferencesDialog(QtWidgets.QWidget):
     def __init__(self, dialog, panel):
         super().__init__(panel)
@@ -184,25 +186,25 @@ class PreferencesDialog(QtWidgets.QWidget):
         panel.buttonBar.addWidget(saveButton)
         self.setLayout(mainLayout)
         self._ignoreDirty = False
-        
+
     def _handleCurrentItemChanged(self, current, previous):
         if self._ignoreDirty:
             return
         if self.sectionWidget.dirty:
             ans = QtWidgets.QMessageBox.question(self, self.tr('Unsaved changes'),
-                                             self.tr('Do you want to save your changes before proceeding?'),
-                                             QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Ignore |
-                                             QtWidgets.QMessageBox.Save)
+                                                 self.tr('Do you want to save your changes before proceeding?'),
+                                                 QtWidgets.QMessageBox.Cancel | QtWidgets.QMessageBox.Ignore |
+                                                 QtWidgets.QMessageBox.Save)
             if ans == QtWidgets.QMessageBox.Save:
                 self.sectionWidget.save()
             elif ans == QtWidgets.QMessageBox.Cancel:
                 self._ignoreDirty = True
-                
+
                 self.tree.setCurrentItem(previous)
-                
-                #self.tree.setSelect
+
+                # self.tree.setSelect
                 self._ignoreDirty = False
                 return
-            
+
         self.sectionWidget.setSection(current.data(0, Qt.UserRole))
         

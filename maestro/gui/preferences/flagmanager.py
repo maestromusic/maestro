@@ -133,7 +133,7 @@ class DeleteFlagAction(QtWidgets.QAction):
 class ShowInBrowserAction(QtWidgets.QAction):
     """Load all elements containing the selected flag into the default browser."""
     def __init__(self, parent):
-        super().__init__(utils.getIcon('preferences/goto.png'),
+        super().__init__(utils.images.icon('edit-find'),
                          translate("ShowInBrowserAction", "Show in browser"),
                          parent)
         parent.selectionChanged.connect(self._selectionChanged)

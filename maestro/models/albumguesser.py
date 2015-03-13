@@ -207,11 +207,12 @@ class StandardGuesser(profiles.Profile):
 
 
 profileCategory = profiles.TypedProfileCategory(
-    name = 'albumguesser',
-    title = translate('Albumguesser','Album guesser'),
-    description = translate("Albumguesser", "Configure how the editor tries to guess album structure "
+    name='albumguesser',
+    title=translate('Albumguesser','Album guesser'),
+    description=translate("Albumguesser", "Configure how the editor tries to guess album structure "
                             "when files are dropped into it."),
-    storageOption = config.getOption(config.storage, 'editor.albumguesser_profiles')
+    storageOption=config.getOption(config.storage, 'editor.albumguesser_profiles'),
+    iconName='container',
 )
 
 profileCategory.addType(profiles.ProfileType('standard',

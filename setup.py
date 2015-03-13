@@ -62,19 +62,19 @@ if exists(join(dirname(__file__), '.git')):
 
     def updateResources():
         """Update resource files with pyrcc5 if necessary."""
-        resources = [ (["images/images.qrc"], "maestro/resources.py"),
-                      (["i18n/translations.qrc"] + glob.glob("i18n/*.qm"), "maestro/translations.py") ]
-        pluginBaseDir = os.path.join("maestro", "plugins")
+        resources = [ (['images/images.qrc'], 'maestro/resources.py'),
+                      (['i18n/translations.qrc'] + glob.glob('i18n/*.qm'), 'maestro/translations.py') ]
+        pluginBaseDir = os.path.join('maestro', 'plugins')
         for subdir in os.listdir(pluginBaseDir):
             pluginDir = os.path.join(pluginBaseDir, subdir)
-            if os.path.exists(os.path.join(pluginDir, "resources.qrc")):
-                resources.append( ([os.path.join(pluginDir, "resources.qrc")],
-                                   os.path.join(pluginDir, "resources.py")) )
+            if os.path.exists(os.path.join(pluginDir, 'resources.qrc')):
+                resources.append( ([os.path.join(pluginDir, 'resources.qrc')],
+                                   os.path.join(pluginDir, 'resources.py')) )
         for sources, py in resources:
             for source in sources:
                 if not os.path.exists(py) or getmtime(source) > getmtime(py):
-                    print("Updating resource file: {}".format(py))
-                    subprocess.check_call(["pyrcc5", "-o", py, sources[0]])
+                    print('Updating resource file: {}'.format(py))
+                    subprocess.check_call(['pyrcc5', '-o', py, sources[0]])
                     break
     
     # Now we monkey-patch the relevant commands to update i18n & resources on demand

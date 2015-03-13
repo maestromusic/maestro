@@ -46,7 +46,8 @@ def enable():
     profileCategory = profiles.ProfileCategory("renamer",
                                                translate("Renamer","Renamer"),
                                                config.getOption(config.storage, 'renamer.profiles'),
-                                               profileClass=GrammarRenamer)
+                                               profileClass=GrammarRenamer,
+                                               iconName='edit-rename')
     profiles.manager.addCategory(profileCategory)
     
     from .gui import RenameFilesAction

@@ -380,9 +380,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menus['edit'].addAction(stack.createUndoAction())
         self.menus['edit'].addAction(stack.createRedoAction())
 
-        action = QtWidgets.QAction(utils.getIcon('preferences/preferences_small.png'),
-                               self.tr("Preferences..."),
-                               self)
+        action = QtWidgets.QAction(utils.images.icon('preferences-other'), self.tr("Preferences..."), self)
         
         action.triggered.connect(self.showPreferences)
         self.menus['edit'].addAction(action)

@@ -221,7 +221,7 @@ class PlaylistWidget(widgets.Widget):
 widgets.addClass(
     id = "playlist",
     name = translate("Playlist", "Playlist"),
-    icon = utils.images.icon('widgets/playlist.png'),
+    icon = utils.images.icon('view-media-playlist'),
     theClass = PlaylistWidget
 )
 

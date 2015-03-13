@@ -87,7 +87,7 @@ class TagEditorWidget(widgets.Widget):
         self.includeContentsButton.setCheckable(True)
         self.includeContentsButton.setChecked(state is not None and state.get('includeContents', False))
         self.includeContentsButton.setToolTip(self.tr("Include all contents"))
-        self.includeContentsButton.setIcon(utils.getIcon('recursive.png'))
+        self.includeContentsButton.setIcon(utils.images.icon('recursive'))
         self.includeContentsButton.toggled.connect(self._updateElements)
         self.toolBar.addWidget(self.includeContentsButton)
         
@@ -468,7 +468,7 @@ class TagEditorWidget(widgets.Widget):
 widgetClass = widgets.addClass(
     id = "tageditor",
     name = translate("Tageditor", "Tageditor"),
-    icon = utils.images.icon('widgets/tageditor.png'),
+    icon = utils.images.icon('tageditor'),
     theClass = TagEditorWidget,
     unique = True,
     areas = 'dock',

@@ -307,12 +307,12 @@ class PlaybackWidget(widgets.Widget):
 
     
 widgets.addClass(
-    id = "playback",
-    name = translate("Playback", "playback"),
-    icon = utils.images.icon('widgets/playback.png'),
-    theClass = PlaybackWidget,
-    areas = 'dock',
-    preferredDockArea = 'left'
+    id='playback',
+    name=translate('Playback', 'playback'),
+    icon=utils.images.icon('media-playback-start'),
+    theClass=PlaybackWidget,
+    areas='dock',
+    preferredDockArea='left'
 )
 
 
