@@ -21,10 +21,10 @@ import weakref
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
 
-from . import leveltreemodel
-from ..core import elements, levels, tags
-from ..core.elements import Element
-from .. import application, stack
+from maestro.models import leveltreemodel
+from maestro.core import elements, levels, tags
+from maestro.core.elements import Element
+from maestro import application, stack
 
 
 class ProcessingInfo:

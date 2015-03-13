@@ -23,7 +23,7 @@ translate = QtCore.QCoreApplication.translate
 from maestro import utils, widgets
 from maestro.core import levels, tags
 from maestro.models import albumguesser
-from maestro.models.editor import EditorModel
+from maestro.widgets.editor.model import EditorModel
 from maestro.gui import treeview, treeactions, tagwidgets, dialogs, delegates
 from maestro.gui.delegates import editor as editordelegate
 from maestro.gui.preferences import profiles as profilesgui

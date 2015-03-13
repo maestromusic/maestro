@@ -15,5 +15,5 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from maestro.widgets.playlist import model
-from maestro.widgets.playlist.gui import PlaylistWidget, PlaylistTreeView
+from maestro.widgets.editor import model
+from maestro.widgets.editor.editor import EditorTreeView, EditorWidget
