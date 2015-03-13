@@ -18,11 +18,13 @@
 
 import os.path
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui
+
 translate = QtCore.QCoreApplication.translate
 
 from maestro.core import covers, levels, nodes
-from maestro.gui import playlist, selection
+from maestro.gui import selection
+from maestro.widgets.playlist import gui
 from maestro.widgets.browser import coverbrowser
 
 try:
@@ -77,5 +79,5 @@ class CoverFlowWidget(imageflow.ImageFlowWidget):
     def _handleDoubleClicked(self, cover):
         wrapper = nodes.Wrapper(levels.real.collect(cover.elid))
         wrapper.loadContents(recursive=True)
-        playlist.appendToDefaultPlaylist([wrapper])
+        gui.appendToDefaultPlaylist([wrapper])
     

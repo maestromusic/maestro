@@ -21,10 +21,10 @@ import itertools, urllib
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from . import wrappertreemodel, treebuilder
-from .. import config, logging, player, utils
-from ..core import levels, urls
-from ..core.nodes import RootNode, Wrapper
+from maestro.models import wrappertreemodel, treebuilder
+from maestro import config, logging, player, utils
+from maestro.core import levels, urls
+from maestro.core.nodes import RootNode, Wrapper
 
  
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
@@ -39,7 +39,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         self.backend = backend
         self.current = None
         if stack is None:
-            from .. import stack
+            from maestro import stack
             self.stack = stack.stack
         else: self.stack = stack
         # self.current and all of its parents. The delegate draws an arrow in front of these nodes

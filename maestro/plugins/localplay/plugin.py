@@ -21,8 +21,8 @@ import os.path
 from PyQt5 import QtCore, QtMultimedia
 
 from maestro import player, profiles
-from maestro.models import playlist
-        
+from maestro.widgets.playlist import model
+
 translate = QtCore.QCoreApplication.translate
 
 
@@ -56,7 +56,7 @@ class LocalPlayerBackend(player.PlayerBackend):
     """
     def __init__(self, name, type, state):
         super().__init__(name, type, state)
-        self.playlist = playlist.PlaylistModel(self)
+        self.playlist = model.PlaylistModel(self)
         self.qtPlayer = None
         if state is None:
             state = {}

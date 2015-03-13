@@ -18,6 +18,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
+
 translate = QtCore.QCoreApplication.translate
 
 from maestro import database as db, stack
@@ -104,8 +105,9 @@ class AddToPlaylistAction(actions.TreeAction):
         from maestro.widgets import browser
         mimeData = browser.model.BrowserMimeData(self.parent().selection)
         wrappers = [w.copy() for w in mimeData.wrappers()]
-        from maestro.gui import playlist
-        playlist.appendToDefaultPlaylist(wrappers, replace=self.replace)
+        from maestro.widgets.playlist import gui
+
+        gui.appendToDefaultPlaylist(wrappers, replace=self.replace)
 
 AddToPlaylistAction.register('appendToPL', context='playback',
                              description=translate('AddToPlaylistAction', 'Append selection to playlist'),

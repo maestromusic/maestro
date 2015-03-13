@@ -279,10 +279,10 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     from maestro.gui import mainwindow
     # First import all modules that want to register WidgetClass-instances
 
-    from maestro.widgets import browser, playback
-    from maestro.gui import editor, tageditor, playlist, coverdesk, details
+    from maestro.widgets import browser, playback, playlist
+    from maestro.gui import editor, tageditor, coverdesk, details
     from maestro.filesystem import browser as fsbrowser
-    
+
     global mainWindow
     splash.showMessage(translate('Splash', 'Creating main window'))
     mainWindow = mainwindow.MainWindow()

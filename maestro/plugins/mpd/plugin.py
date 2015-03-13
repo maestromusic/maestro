@@ -40,7 +40,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from maestro import application, player, logging, profiles, stack
 from maestro.gui.misc import lineedits
 from maestro.core import tags, urls
-from maestro.models import playlist
+from maestro.widgets.playlist import model
 
 translate = QtCore.QCoreApplication.translate
 
@@ -61,8 +61,8 @@ class MPDFile(urls.BackendFile):
     scheme = 'mpd'
 
     def readTags(self):
-        mpdProfile = player.profileCategory.get(self.url.profile)
-        self.tags, self.length = mpdProfile.getInfo(self.url.path)
+        mpdProfile = player.profileCategory.get(self.url.netloc)
+        self.tags, self.length = mpdProfile.getInfo(self.url.path[1:])
 
 
 MPDState = {item.name.lower(): item for item in player.PlayState}
@@ -91,7 +91,7 @@ class MPDPlayerBackend(player.PlayerBackend):
         """
         super().__init__(name, type, state)
         self.stack = stack.createSubstack()
-        self.playlist = playlist.PlaylistModel(self, stack=self.stack)
+        self.playlist = model.PlaylistModel(self, stack=self.stack)
 
         if state is None:
             state = {}
