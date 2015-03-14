@@ -19,10 +19,11 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from . import dialogs
-from .. import utils, config
-from ..core import flags
-from ..models import flageditor as flageditormodel, simplelistmodel
+from maestro import utils, config
+from maestro.core import flags
+from maestro.gui import dialogs
+from maestro.models import simplelistmodel
+from maestro.widgets.tageditor import flageditormodel
 
 
 class FlagEditor(QtWidgets.QWidget):

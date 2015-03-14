@@ -283,8 +283,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     from maestro.gui import mainwindow
     # First import all modules that want to register WidgetClass-instances
 
-    from maestro.widgets import browser, playback, playlist, editor, details
-    from maestro.gui import tageditor, coverdesk
+    from maestro.widgets import browser, playback, playlist, editor, details, tageditor
+    from maestro.gui import coverdesk
     from maestro.filesystem import browser as fsbrowser
 
     global mainWindow

@@ -20,9 +20,8 @@ import collections
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from . import tageditor
-from .. import application
-from ..core import tags, flags, levels
+from maestro import application
+from maestro.core import tags, flags, levels
 
 
 class Record:

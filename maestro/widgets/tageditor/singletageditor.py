@@ -19,11 +19,10 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from . import tagwidgets, dialogs
-from maestro.core import urls
-from .misc import listview, widgetlist
-from ..core import tags
-from ..models import simplelistmodel
+from maestro.core import urls, tags
+from maestro.gui import tagwidgets, dialogs
+from maestro.gui.misc import listview, widgetlist
+from maestro.models import simplelistmodel
 
 EXPAND_LIMIT = 2
 

@@ -21,8 +21,8 @@ import collections, itertools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from .. import utils
-from ..core import levels, tags
+from maestro import utils
+from maestro.core import levels, tags
 
 translate = QtCore.QCoreApplication.translate
 
@@ -306,7 +306,7 @@ class TagEditorModel(QtCore.QObject):
         self.recordChanged = self.records.recordChanged
         
         if stack is None:
-            from .. import stack
+            from maestro import stack
             self.stack = stack.stack
         else: self.stack = stack
         self.substack = self.stack.createSubstack()

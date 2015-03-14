@@ -23,8 +23,9 @@ from PyQt5.QtCore import Qt
 
 from maestro import utils, config, logging, stack, widgets
 from maestro.core import tags, levels, urls
-from maestro.models import tageditor as tageditormodel, simplelistmodel, flageditor as flageditormodel
-from maestro.gui import singletageditor, tagwidgets, flageditor, dialogs
+from maestro.models import simplelistmodel
+from maestro.widgets.tageditor import singletageditor, flageditor, tageditormodel, flageditormodel
+from maestro.gui import tagwidgets, dialogs
 from maestro.gui.misc import widgetlist
         
 translate = QtCore.QCoreApplication.translate
@@ -111,7 +112,7 @@ class TagEditorWidget(widgets.Widget):
         self.tagBoxes = {}
         
         if useGlobalSelection:
-            from . import selection
+            from maestro.gui import selection
             selection.changed.connect(self._handleSelectionChanged)
             self._handleSelectionChanged(selection.getGlobalSelection())
         
