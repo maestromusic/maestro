@@ -105,7 +105,14 @@ class ChangeEventDispatcher(QtCore.QObject):
 
 # The global dispatcher. Each level is its own dispatcher
 dispatcher = None
- 
+
+
+def qtMsgHandler(msgType, msgLogContext, msgString):
+    """Custom message handler which redirects Qt messages to our own logging."""
+    if not msgString.startswith("Could not resolve property"): # ignore hundreds of SVG warnings
+        level = {0: "DEBUG", 1: "WARNING"}.get(msgType, "CRITICAL")
+        logging.log('QT', level, msgString)
+    
 
 class Splash(QtWidgets.QSplashScreen):
     """Splash screen showing a logo and the loading progress."""
@@ -155,6 +162,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName("Maestro")
     app.setApplicationVersion(VERSION)
+    from PyQt5.QtCore import qInstallMessageHandler
+    qInstallMessageHandler(qtMsgHandler)
 
     from . import resources
     if type == "gui":
