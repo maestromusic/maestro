@@ -191,7 +191,7 @@ class FlagWidget(QtWidgets.QWidget):
         
     \ """
     # Used to render the removeButton
-    clearPixmap = utils.getIcon('clear_16.png').pixmap(16, 16)
+    clearPixmap = utils.images.icon('edit-clear-locationbar-rtl').pixmap(16, 16)
 
     # Whether the removeButton is visible
     _showRemoveButton = False

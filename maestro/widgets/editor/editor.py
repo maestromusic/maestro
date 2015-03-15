@@ -63,9 +63,11 @@ treeactions.ChangePositionAction.addSubmenu(EditorTreeView.actionConf.root)
 class EditorWidget(widgets.Widget):
     """The editor is a dock widget for editing elements and their structure. It provides methods to "guess"
     the album structure of new files that are dropped from the filesystem."""
+
+    hasOptionDialog = True
+
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        self.hasOptionDialog = True
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)

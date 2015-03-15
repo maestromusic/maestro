@@ -97,9 +97,11 @@ for command in PlayCommand:
 class PlaybackWidget(widgets.Widget):
     """A dock widget providing playback controls for the selected player backend.
     """
+
+    hasOptionDialog = True
+
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        self.hasOptionDialog = True
         self.backend = None
         self.areaChanged.connect(self._areaChanged)
         

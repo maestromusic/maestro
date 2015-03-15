@@ -14,7 +14,8 @@
         <file>icons/collection.svgz</file>
         <file>icons/configure-shortcuts.svgz</file>
         <file>icons/container.svgz</file>
-        <file>icons/clear_16.png</file>
+        <file>icons/dialog-ok-apply.svgz</file>
+        <file>icons/dialog-warning.svgz</file>
         <file>icons/document-edit.svgz</file>
         <file>icons/document-save.svgz</file>
         <file>icons/drive-harddisk.svgz</file>

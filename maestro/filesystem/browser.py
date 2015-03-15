@@ -17,6 +17,7 @@
 #
 
 import os
+import os.path
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
@@ -35,7 +36,47 @@ Folders which contain music files that are not yet present in the database are m
 special icon."""
 
 
-class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
+class FilesystemFilterModel(QtCore.QSortFilterProxyModel):
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.filterText = ''
+        self.showSynced = True
+        self.showUnsynced = True
+
+    def filterAcceptsRow(self, row, parent):
+        sIndex = self.sourceModel().index(row, 0, parent)
+        info = self.sourceModel().fileInfo(sIndex)
+        path = info.filePath()
+        source = self.sourceModel().source
+        if not source.contains(path):
+            return True  # avoid filtering parents of the source's root!
+        relPath = os.path.relpath(path, source.path)
+        if relPath == '.':
+            return True
+        if '/' not in relPath and self.filterText not in relPath:
+            return False
+        status = source.folderState(path) if info.isDir() else source.fileState(path)
+        if not self.showSynced and status is FilesystemState.synced:
+            return False
+        if not self.showUnsynced and status is FilesystemState.unsynced:
+            return False
+        return True
+
+    def setFilterText(self, text):
+        self.filterText = text
+        self.invalidateFilter()
+
+    def setShowSynced(self, state):
+        self.showSynced = state
+        self.invalidateFilter()
+
+    def setShowUnsynced(self, state):
+        self.showUnsynced = state
+        self.invalidateFilter()
+
+
+class FilesystemBrowserModel(QtWidgets.QFileSystemModel):
     """Model class for the file system browser.
     
     In contrast to QFileSystemModel, this returns folder and file icons depending on the state
@@ -43,13 +84,13 @@ class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
     """
 
     descriptions = {
-        FilesystemState.unsynced: translate('FileSystemBrowserModel',
+        FilesystemState.unsynced: translate('FilesystemBrowserModel',
                                             'contains files that are not in Maestro\'s database'),
-        FilesystemState.synced  : translate('FileSystemBrowserModel',
+        FilesystemState.synced  : translate('FilesystemBrowserModel',
                                             'in sync with Maestro\'s database'),
-        FilesystemState.empty   : translate('FileSystemBrowserModel',
+        FilesystemState.empty   : translate('FilesystemBrowserModel',
                                             'empty directory'),
-        FilesystemState.unknown : translate('FileSystemBrowserModel', 'unknown status')}
+        FilesystemState.unknown : translate('FilesystemBrowserModel', 'unknown status')}
     
     def __init__(self, parent=None):
         QtWidgets.QFileSystemModel.__init__(self, parent)
@@ -96,7 +137,7 @@ class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
         return super().data(index, role) 
 
 
-class FileSystemBrowserTreeView(QtWidgets.QTreeView):
+class FilesystemBrowserTreeView(QtWidgets.QTreeView):
     
     rescanRequested = QtCore.pyqtSignal(str)
     
@@ -105,118 +146,112 @@ class FileSystemBrowserTreeView(QtWidgets.QTreeView):
         self.setAlternatingRowColors(True)
         self.setTextElideMode(Qt.ElideMiddle)
         self.setHeaderHidden(True)   
-        self.setEnabled(False)        
-        
+        self.setEnabled(False)
         self.setSelectionMode(self.ExtendedSelection)
         self.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
-        
-        self.rescanDirectoryAction = QtWidgets.QAction(self.tr("rescan"), self)
-        self.addAction(self.rescanDirectoryAction)
-        self.rescanDirectoryAction.triggered.connect(self._handleRescan)
-        self.deleteFileAction = QtWidgets.QAction(self.tr('delete'), self)
-        self.addAction(self.deleteFileAction)
-        self.deleteFileAction.triggered.connect(self._handleDelete)
         application.dispatcher.connect(self._handleDispatcher)
-        self.setRootIndex(QtCore.QModelIndex())
-    
-    def getSource(self):
-        return self.model().source if self.model() is not None else None
+        self.setModel(FilesystemFilterModel())
+        self.fsModel = FilesystemBrowserModel()
     
     def setSource(self, source):
-        oldSource = self.model().source if self.model() is not None else None 
+        oldSource = self.fsModel.source
         if source != oldSource:
-            if source is not None:
-                if self.model() is None:
-                    self.setModel(FileSystemBrowserModel())
-                self.model().setSource(source)
-                self.setRootIndex(self.model().index(source.path))
+            if source:
+                self.model().setSourceModel(self.fsModel)
+                self.fsModel.setSource(source)
+                self.setRootIndex(self.model().mapFromSource(self.fsModel.index(source.path)))
                 self.setEnabled(True)
             else:
-                self.setModel(None)
+                self.fsModel.setSourceModel(None)
                 self.setEnabled(False)
             
     def _handleDispatcher(self, event):
-        if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.getSource():
+        if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.model().source:
             if event.action == application.ChangeType.deleted:
                 self.setSource(None)
-            else: self.setRootIndex(self.model().index(event.source.path))
+            else:
+                self.setSource(event.source)
     
-    def contextMenuEvent(self, event):
-        index = self.indexAt(event.pos())
-        menu = QtWidgets.QMenu(self)
-        if self.model().isDir(index):
-            menu.addAction(self.rescanDirectoryAction)
-        else:
-            menu.addAction(self.deleteFileAction)
-        menu.popup(event.globalPos())
-        event.accept()
-            
-    def _handleRescan(self):
-        path = self.model().filePath(self.currentIndex())
-        self.rescanRequested.emit(path)
-
-    def _handleDelete(self):
-        path = self.model().filePath(self.currentIndex())
-        url = urls.URL.fileURL(path)
-        elem = levels.real.collect(url)
-        levels.real.deleteElements([elem], fromDisk=True)
-
     def selectionChanged(self, selected, deselected):
         super().selectionChanged(selected, deselected)
-        paths = [self.model().filePath(index)
+        paths = [self.fsModel.filePath(self.model().mapToSource(index))
                  for index in self.selectedIndexes()
-                 if not self.model().isDir(index)]  # TODO: remove this restriction
+                 if not self.fsModel.isDir(self.model().mapToSource(index))]
         s = FileSystemSelection([urls.URL.fileURL(path) for path in paths])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
     
         
-class FileSystemBrowser(widgets.Widget):
-    """A DockWidget wrapper for the FileSystemBrowser."""
+class FilesystemBrowser(widgets.Widget):
+    """A DockWidget wrapper for the FilesystemBrowser."""
+
+    hasOptionDialog = True
+
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        self.hasOptionDialog = True
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
         application.dispatcher.connect(self._handleDispatcher)
         self.sourceChooser = guiwidgets.SourceBox()
         self.sourceChooser.sourceChanged.connect(self._handleSourceChanged)
-        layout.addWidget(self.sourceChooser)
-        
-        self.treeView = FileSystemBrowserTreeView()
-        layout.addWidget(self.treeView, 1)
+
+        toolLayout = QtWidgets.QHBoxLayout()
+        self.treeview = FilesystemBrowserTreeView()
+        self.filterEdit = QtWidgets.QLineEdit()
+        self.filterEdit.setPlaceholderText(self.tr('filter first-level'))
+        self.filterEdit.textChanged.connect(self.treeview.model().setFilterText)
+        self.filterEdit.setClearButtonEnabled(True)
+        syncButton = QtWidgets.QToolButton()
+        syncButton.setIcon(utils.images.icon('synchronized'))
+        syncButton.setIconSize(QtCore.QSize(16, 16))
+        syncButton.setToolTip(self.tr('Show synchronized files and folders'))
+        syncButton.setCheckable(True)
+        syncButton.setChecked(True)
+        syncButton.toggled.connect(self.treeview.model().setShowSynced)
+        unsyncButton = QtWidgets.QToolButton()
+        unsyncButton.setIconSize(QtCore.QSize(16, 16))
+        unsyncButton.setIcon(utils.images.icon('unsynchronized'))
+        unsyncButton.setToolTip(self.tr('Show unsynchronized fils and folders'))
+        unsyncButton.setCheckable(True)
+        unsyncButton.setChecked(True)
+        unsyncButton.toggled.connect(self.treeview.model().setShowUnsynced)
+
+        toolLayout.addWidget(self.sourceChooser)
+        toolLayout.addWidget(self.filterEdit)
+        toolLayout.addWidget(syncButton)
+        toolLayout.addWidget(unsyncButton)
+        layout.addLayout(toolLayout)
+        layout.addWidget(self.treeview)
         
     def initialize(self, state=None):
         super().initialize(state)
         source = None
         if state and 'source' in state:
             source = filesystem.sourceByName(state['source'])
-        if source and len(filesystem.allSources) > 0:
+        if not source and len(filesystem.allSources) > 0:
             source = filesystem.allSources[0]
         self._handleSourceChanged(source)
         
     def saveState(self):
-        source = self.treeView.getSource()
-        if source is not None:
+        source = self.treeview.fsModel.source
+        if source:
             return dict(source=source.name)
-        else:
-            return None
     
     def createOptionDialog(self, button=None):
         from maestro.gui import preferences
         preferences.show("main/filesystem")
     
     def _handleSourceChanged(self, source):
-        self.treeView.setSource(source)
+        self.treeview.setSource(source)
         self._updateTitle()
             
     def _handleDispatcher(self, event):
-        if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.treeView.getSource():
+        if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.treeview.fsModel.source:
             self._updateTitle()
             
     def _updateTitle(self):
-        source = self.treeView.getSource()
+        source = self.treeview.fsModel.source
         title = source.name if source is not None else self.tr("No source")
         self.setWindowTitle(self.tr("Filesystem: {}").format(title))
         
@@ -243,8 +278,8 @@ class FileSystemSelection(selection.Selection):
 # register this widget in the main application
 widgets.addClass(
     id='filesystembrowser',
-    theClass=FileSystemBrowser,
-    name=translate('FileSystemBrowser', 'File System Browser'),
+    theClass=FilesystemBrowser,
+    name=translate('FilesystemBrowser', 'File System Browser'),
     icon=utils.images.icon('filesystembrowser'),
     areas='dock', preferredDockArea='right'
 )

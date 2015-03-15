@@ -26,9 +26,11 @@ from maestro.core import levels, covers, tags, elements
 
 
 class CoverDesk(widgets.Widget):
+
+    hasOptionDialog = True
+
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        self.hasOptionDialog = True
         layout = QtWidgets.QHBoxLayout(self)
         scene = CoverDeskScene(self)
         

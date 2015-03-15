@@ -151,10 +151,11 @@ for definition in 'editTags', 'removeFromPL', 'clearPL':
 
 
 class PlaylistWidget(widgets.Widget):
+
+    hasOptionDialog = True
+
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        self.hasOptionDialog = True
-        
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
         if state is None:

@@ -250,7 +250,7 @@ class Source(QtCore.QObject):
             return None
         if path in self.folders:
             return self.folders[path]
-        parentPath = None if path == '/' else os.path.split(path)[0]
+        parentPath = None if path == self.path else os.path.split(path)[0]
         folder = Folder(path, parent=self.getFolder(parentPath))
         self.folders[path] = folder
         return folder

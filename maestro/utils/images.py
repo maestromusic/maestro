@@ -61,8 +61,10 @@ namedIcons = {
     'preferences-sound': 'preferences/sound.svgz',
     'preferences-other': 'preferences/preferences.svgz',
     'recursive': 'recursive.svgz',
+    'synchronized': 'dialog-ok-apply.svgz',
     'tag': 'tag.svgz',  # generic tag icon
     'tageditor': 'widgets/tageditor.svgz',
+    'unsynchronized': 'dialog-warning.svgz',
     'view-media-playlist': 'widgets/view-media-playlist.svgz',
     'view-refresh': 'view-refresh.svgz',
     'work': 'work.svgz',

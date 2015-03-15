@@ -67,12 +67,12 @@ class Browser(widgets.Widget):
     # Called when the selection changes in any of the views
     selectionChanged = QtCore.pyqtSignal(QtCore.QItemSelectionModel,
                                          QtCore.QItemSelection, QtCore.QItemSelection)
-    
+
+    hasOptionDialog = True
+
     def __init__(self, state=None, **args):
         """Initialize a new Browser with the given parent."""
         super().__init__(**args)
-        self.hasOptionDialog = True
-        
         self.views = [] # List of treeviews
         self.domain = domains.domains[0]
         

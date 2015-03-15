@@ -66,12 +66,11 @@ class CoverBrowser(widgets.Widget):
     # The option dialog if it is open, and the index of the tab that was active when the dialog was closed.
     _dialog = None
     _lastDialogTabIndex = 0
+    hasOptionDialog = True
     
     def __init__(self, state=None, **args):
         super().__init__(**args)
-        self.hasOptionDialog = True
         _coverBrowsers.add(self)
-        
         self.domain = domains.domains[0]
         self.flagCriterion = None
         self.filterCriterion = None

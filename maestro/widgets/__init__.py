@@ -147,20 +147,21 @@ class Widget(QtWidgets.QWidget):
           ['top', 'bottom', 'left', 'right', 'central', 'dock', 'all']
     """
     areaChanged = QtCore.pyqtSignal(str) # emitted when the widget is moved from one dock area to another
-        
+    hasOptionDialog = False
+
     def __init__(self, widgetClass, area=None):
         super().__init__()
         self.widgetClass = widgetClass
-        self.hasOptionDialog = False
+
         self.area = area
-        self._dialog = None          # The option dialog if it is open,
-        self._lastDialogTabIndex = 0 # and the index of the tab that was active when the dialog was closed.
+        self._dialog = None           # The option dialog if it is open,
+        self._lastDialogTabIndex = 0  # and the index of the tab that was active when the dialog was closed.
         if self.widgetClass.unique:
             application.mainWindow._setUniqueWidgetActionEnabled(self.widgetClass.id, False)
     
     def initialize(self, state=None):
         """This method is called after the widget has been added to its dock widget or to the central 
-        tab widget. Thus methods like getContainingWidget().setWindowTitle can be used here (but not
+        tab widget. Thus methods like containingWidget().setWindowTitle can be used here (but not
         in the constructor. Remember to call the base implementation!
         """
         if self.area != 'central':
@@ -193,7 +194,8 @@ class Widget(QtWidgets.QWidget):
         """Return the DockWidget or the central TabWidget containing this widget."""
         if self.area == 'central':
             return application.mainWindow.centralWidget()
-        else: return self.parent() # the QDockWidget
+        else:
+            return self.parent()  # the QDockWidget
         
     def saveState(self):
         """Return something (usually a dict) that can be encoded as JSON and stores the state of this widget.
