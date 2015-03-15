@@ -18,14 +18,14 @@
 
 import os.path
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt5 import QtCore, QtWidgets
 translate = QtCore.QCoreApplication.translate
 
-from ...core import nodes
-from ...models import rootedtreemodel
-from ... import utils
-from ...gui import delegates
+from maestro import utils
+from maestro.core import nodes
+from maestro.models import rootedtreemodel
+from maestro.gui import delegates
+
 
 class Directory(nodes.Node):
     def __init__(self, name):
