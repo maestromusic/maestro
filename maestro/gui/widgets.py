@@ -16,12 +16,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
-from ..core import domains, elements
-from .. import application
+from maestro import application, filesystem
+from maestro.core import domains, elements
 from maestro.filesystem import sources
-from maestro import filesystem
 
 
 class ContainerTypeBox(QtWidgets.QComboBox):
@@ -114,8 +113,8 @@ class SourceBox(QtWidgets.QComboBox):
     def _fillBox(self, currentSource):
         """Fill the box with all existing domains."""
         self.clear()
-        if len(filesystem.sources) > 0:
-            for source in filesystem.sources:
+        if len(filesystem.allSources) > 0:
+            for source in filesystem.allSources:
                 self.addItem(source.name, source)
                 if source == currentSource:
                     self.setCurrentIndex(self.count() - 1)
@@ -134,7 +133,7 @@ class SourceBox(QtWidgets.QComboBox):
             self.sourceChanged.emit(source)
         
     def _activated(self, i):
-        if len(filesystem.sources) == 0 and i == 0:
+        if len(filesystem.allSources) == 0 and i == 0:
             from . import preferences
             preferences.show("main/filesystem")
             

@@ -41,18 +41,7 @@ class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
     In contrast to QFileSystemModel, this returns folder and file icons depending on the state
     ("nomusic", "unsynced", etc.) and according tooltips.
     """
-    
-    folderIcons = {
-        FilesystemState.unsynced: utils.images.icon('folder-unsynchronized'),
-        FilesystemState.synced  : utils.images.icon('folder-synchronized'),
-        FilesystemState.empty   : utils.images.icon('folder'),
-        FilesystemState.unknown : utils.images.icon('folder')}
-    
-    fileIcons = {
-        FilesystemState.unsynced: utils.images.icon('audio-x-unsynchronized'),
-        FilesystemState.synced  : utils.images.icon('audio-x-synchronized'),
-        FilesystemState.unknown : utils.images.icon('audio-x-generic')}
-    
+
     descriptions = {
         FilesystemState.unsynced: translate('FileSystemBrowserModel',
                                             'contains files that are not in Maestro\'s database'),
@@ -95,13 +84,13 @@ class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
                     return super().data(index, role)
                 status = self.source.folderState(dirpath)
                 if role == Qt.DecorationRole:
-                    return self.folderIcons[status]
+                    return status.folderIcon()
                 else:
                     return dirpath + '\n' + self.descriptions[status]
             else:
                 status = self.source.fileState(info.absoluteFilePath())
                 if role == Qt.DecorationRole:
-                    return self.fileIcons[status]
+                    return status.fileIcon()
                 else:
                     return str(info.absoluteFilePath()) + '\n' + self.descriptions[status]
         return super().data(index, role) 
@@ -203,8 +192,8 @@ class FileSystemBrowser(widgets.Widget):
         source = None
         if state and 'source' in state:
             source = filesystem.sourceByName(state['source'])
-        if source and len(filesystem.sources) > 0:
-            source = filesystem.sources[0]
+        if source and len(filesystem.allSources) > 0:
+            source = filesystem.allSources[0]
         self._handleSourceChanged(source)
         
     def saveState(self):

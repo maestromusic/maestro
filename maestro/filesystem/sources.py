@@ -42,6 +42,22 @@ class FilesystemState(enum.Enum):
         """
         return FilesystemState(max(self.value, other.value))
 
+    def fileIcon(self):
+        """Return an icon that is appropriate for a file of the respective state."""
+        if self is FilesystemState.synced:
+            return utils.images.icon('audio-x-synchronized')
+        if self is FilesystemState.unsynced:
+            return utils.images.icon('audio-x-unsynchronized')
+        return utils.images.icon('audio-x-generic')
+
+    def folderIcon(self):
+        """Return an icon that is appropriate for a folder of the respective state."""
+        if self is FilesystemState.synced:
+            return utils.images.icon('folder-synchronized')
+        if self is FilesystemState.unsynced:
+            return utils.images.icon('folder-unsynchronized')
+        return utils.images.icon('folder')
+
 
 class File:
     """Representation of a tracked file in a Source."""

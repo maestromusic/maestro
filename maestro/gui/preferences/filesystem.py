@@ -104,7 +104,7 @@ class FilesystemSettings(QtWidgets.QWidget):
     def _loadSources(self):
         """Load sources information from filesystem.sources."""
         self.tableWidget.itemChanged.disconnect(self._handleItemChanged)
-        self._sources = list(filesystem.sources)
+        self._sources = list(filesystem.allSources)
         self.tableWidget.clear()
         self.tableWidget.setHorizontalHeaderLabels([column[1] for column in self.columns])
         self.tableWidget.setRowCount(len(self._sources))
@@ -208,12 +208,12 @@ class DomainItemDelegate(QtWidgets.QStyledItemDelegate):
         return widgets.DomainBox(parent=parent)
         
     def setEditorData(self, editor, index):
-        domain = filesystem.sources[index.row()].domain
+        domain = filesystem.allSources[index.row()].domain
         editor.setCurrentDomain(domain)
         
     def setModelData(self, editor, model, index):
         domain = editor.currentDomain()
-        source = filesystem.sources[index.row()]
+        source = filesystem.allSources[index.row()]
         filesystem.changeSource(source, domain=domain)
 
 
@@ -263,7 +263,7 @@ def checkSourceName(parent, name, source=None):
                     translate("Filesystem", "'{}' is not a valid source name.").format(name))
         return False
     
-    for s in filesystem.sources:
+    for s in filesystem.allSources:
         if s != source and s.name == name:
             QtWidgets.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                    translate("Filesystem", "A source named '{}' already exists.").format(name))
@@ -277,7 +277,7 @@ def checkSourcePath(parent, path, source=None):
         QtWidgets.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                     translate("Filesystem", "The path '{}' does not exist.").format(path))
         return False
-    if any(s.contains(path) for s in filesystem.sources if s != source):
+    if any(s.contains(path) for s in filesystem.allSources if s != source):
         QtWidgets.QMessageBox.warning(parent, translate("Filesystem", "Cannot change source"),
                 translate("Filesystem", "The path '{}' is contained in an existing source.").format(path))
         return False
