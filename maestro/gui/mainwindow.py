@@ -66,7 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setDockNestingEnabled(True)
         self.setWindowTitle(self.tr('Maestro version {}').format(VERSION))
-        self.setWindowIcon(QtGui.QIcon(":maestro/omg_square.svg"))
+        self.setWindowIcon(QtGui.QIcon(":maestro/logo.png"))
 
         selection.changed = self._globalSelectionChanged
 
@@ -489,7 +489,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def showAboutDialog(self):
         """Display the About dialog."""
         box = QtWidgets.QMessageBox(QtWidgets.QMessageBox.NoIcon, self.tr("About Maestro"),
-                '<div align="center"><img src=":maestro/omg.png" /><br />'
+                '<div align="center"><img src=":maestro/logo.png" /><br />'
                 + self.tr("This is Maestro version {} by Martin Altmayer and Michael Helmling.")
                              .format(VERSION)
                 + '</div>',

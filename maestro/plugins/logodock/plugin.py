@@ -29,7 +29,7 @@ def enable():
     widgets.addClass(
         id = "logodock",
         name = QtWidgets.QApplication.translate("LogoDock", "Logo"),
-        icon = QtGui.QIcon(":/maestro/plugins/logodock/omg.png"),
+        icon = QtGui.QIcon(":/maestro/logo.png"),
         theClass = LogoDock,
         areas = 'dock',
         preferredDockArea = 'right'
@@ -45,7 +45,7 @@ class LogoDock(widgets.Widget):
         super().__init__(**args)
         layout = QtWidgets.QHBoxLayout(self)
         label = QtWidgets.QLabel()
-        label.setPixmap(utils.images.pixmap(':/maestro/omg.png'))
+        label.setPixmap(utils.images.pixmap(':/maestro/logo.png'))
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)
 

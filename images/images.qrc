@@ -1,7 +1,7 @@
 <RCC>
     <qresource prefix="/maestro">
-        <file>omg.png</file>
-        <file>omg_splash.png</file>
+        <file>logo.png</file>
+        <file>splash.png</file>
         <file>lastfm.gif</file>
         <file>process-working.png</file>
         <file>icons/accessories-text-editor.svgz</file>
@@ -50,8 +50,6 @@
         <file>tags/date.png</file>
         <file>tags/genre.png</file>
         <file>tags/title.png</file>
-
-        <file>omg_square.svg</file>
 
         <file>icons/dockwidgetarrow_gtk.png</file>
         <file>icons/dockwidgetarrow_oxygen.png</file>

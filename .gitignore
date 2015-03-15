@@ -4,7 +4,7 @@
 .settings
 .pydevproject
 .idea
-omg.egg-info/
+maestro.egg-info/
 dist
 resources.py
 translations.py

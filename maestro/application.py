@@ -117,7 +117,7 @@ def qtMsgHandler(msgType, msgLogContext, msgString):
 class Splash(QtWidgets.QSplashScreen):
     """Splash screen showing a logo and the loading progress."""
     def __init__(self, message):
-        super().__init__(QtGui.QPixmap(":/maestro/omg_splash.png"))
+        super().__init__(QtGui.QPixmap(':/maestro/splash.png'))
         self.message = message
         
     def showMessage(self, message):
@@ -127,9 +127,11 @@ class Splash(QtWidgets.QSplashScreen):
     def drawContents(self, painter):
         super().drawContents(painter)
         font = painter.font()
-        font.setPointSize(14)
+        font.setPointSize(12)
+        font.setItalic(True)
+        painter.setPen(Qt.white)
         painter.setFont(font)
-        painter.drawText(QtCore.QPoint(20, 70), self.message)
+        painter.drawText(QtCore.QPoint(56, 285), self.message)
         
     
 def run(cmdConfig=[], type='gui', exitPoint=None):
@@ -178,15 +180,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     logging.init()
     global logger
     logger = logging.getLogger(__name__)
-    
-    # install a global exception handler so that exceptions are passed to the logging module
-    def exceptionHandler(type, value, tb):
-        import traceback
-        logger.error("Uncaught exception: {}\n{}"
-                     .format(str(value), "\n".join(traceback.format_tb(tb))))
-        sys.__excepthook__(type, value, tb)
-    # sys.excepthook = exceptionHandler
-    
+
     logger.debug("START")
 
     if exitPoint == 'config':
@@ -359,7 +353,7 @@ def lock():
         sys.exit(-1)
     
     
-def loadTranslators(app,logger):
+def loadTranslators(app, logger):
     """Load a translator for Qt's strings and one for Maestro's strings."""
     from . import translations
     # Try up to two different locales

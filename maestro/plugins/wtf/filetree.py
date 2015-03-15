@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# OMG Music Manager  -  http://omg.mathematik.uni-kl.de
+# Maestro Music Manager  -  http://omg.mathematik.uni-kl.de
 # Copyright (C) 2009-2014 Martin Altmayer, Michael Helmling
 #
 # This program is free software: you can redistribute it and/or modify
