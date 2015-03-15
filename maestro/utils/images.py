@@ -67,6 +67,7 @@ namedIcons = {
     'view-refresh': 'view-refresh.svgz',
     'work': 'work.svgz',
 }
+cachedIcons = {}
 
 
 def icon(name):
@@ -76,12 +77,18 @@ def icon(name):
     """
     if name is None:
         return QtGui.QIcon()
-    if '.' in name:
-        return QtGui.QIcon(':maestro/icons/' + name)
-    elif name in namedIcons:
-        return QtGui.QIcon(':maestro/icons/' + namedIcons[name])
-    else:
-        raise ValueError('icon name {} not found'.format(name))
+    if name not in cachedIcons:
+        if '.' in name:
+            theIcon = QtGui.QIcon(':maestro/icons/' + name)
+        elif name in namedIcons:
+            theIcon = QtGui.QIcon(':maestro/icons/' + namedIcons[name])
+        else:
+            raise ValueError('icon name {} not found'.format(name))
+        cachedIcons[name] = theIcon
+    return cachedIcons[name]
+
+
+
 
 
 def pixmap(name):

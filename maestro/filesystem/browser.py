@@ -20,15 +20,14 @@ import os
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
+
 from maestro.core import urls
-
-translate = QtCore.QCoreApplication.translate
-
 from maestro import application, filesystem, utils, widgets
 from maestro.gui import selection, widgets as guiwidgets
 from maestro.core import levels
 from maestro.filesystem.sources import FilesystemState
 
+translate = QtCore.QCoreApplication.translate
 
 """This module contains a dock widget that displays the music in directory view, i.e. without
 considering the container structure in the database. It is meant to help building up the database.
@@ -44,24 +43,24 @@ class FileSystemBrowserModel(QtWidgets.QFileSystemModel):
     """
     
     folderIcons = {
-        FilesystemState.unsynced : utils.images.icon('folder-unsynchronized'),
-        FilesystemState.synced   : utils.images.icon('folder-synchronized'),
-        FilesystemState.empty    : utils.images.icon('folder'),
-        FilesystemState.unknown  : utils.images.icon('folder')}
+        FilesystemState.unsynced: utils.images.icon('folder-unsynchronized'),
+        FilesystemState.synced  : utils.images.icon('folder-synchronized'),
+        FilesystemState.empty   : utils.images.icon('folder'),
+        FilesystemState.unknown : utils.images.icon('folder')}
     
     fileIcons = {
-        FilesystemState.unsynced : utils.images.icon('audio-x-unsynchronized'),
-        FilesystemState.synced   : utils.images.icon('audio-x-synchronized'),
-        FilesystemState.unknown  : utils.images.icon('audio-x-generic')}
+        FilesystemState.unsynced: utils.images.icon('audio-x-unsynchronized'),
+        FilesystemState.synced  : utils.images.icon('audio-x-synchronized'),
+        FilesystemState.unknown : utils.images.icon('audio-x-generic')}
     
     descriptions = {
-        FilesystemState.unsynced : translate("FileSystemBrowserModel",
-                                             "contains files that are not in Maestro's database"),
-        FilesystemState.synced   : translate("FileSystemBrowserModel",
-                                             "in sync with Maestro's database"),
-        FilesystemState.empty    : translate("FileSystemBrowserModel",
-                                             "empty directory"),
-        FilesystemState.unknown  : translate("FileSystemBrowserModel", "unknown status")}
+        FilesystemState.unsynced: translate('FileSystemBrowserModel',
+                                            'contains files that are not in Maestro\'s database'),
+        FilesystemState.synced  : translate('FileSystemBrowserModel',
+                                            'in sync with Maestro\'s database'),
+        FilesystemState.empty   : translate('FileSystemBrowserModel',
+                                            'empty directory'),
+        FilesystemState.unknown : translate('FileSystemBrowserModel', 'unknown status')}
     
     def __init__(self, parent=None):
         QtWidgets.QFileSystemModel.__init__(self, parent)
@@ -177,7 +176,7 @@ class FileSystemBrowserTreeView(QtWidgets.QTreeView):
         super().selectionChanged(selected, deselected)
         paths = [self.model().filePath(index)
                  for index in self.selectedIndexes()
-                 if not self.model().isDir(index)] # TODO: remove this restriction
+                 if not self.model().isDir(index)]  # TODO: remove this restriction
         s = FileSystemSelection([urls.URL.fileURL(path) for path in paths])
         if s.hasFiles():
             selection.setGlobalSelection(s) 
@@ -190,7 +189,7 @@ class FileSystemBrowser(widgets.Widget):
         self.hasOptionDialog = True
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0, 0, 0, 0)
         application.dispatcher.connect(self._handleDispatcher)
         self.sourceChooser = guiwidgets.SourceBox()
         self.sourceChooser.sourceChanged.connect(self._handleSourceChanged)
@@ -199,20 +198,21 @@ class FileSystemBrowser(widgets.Widget):
         self.treeView = FileSystemBrowserTreeView()
         layout.addWidget(self.treeView, 1)
         
-    def initialize(self, state):
+    def initialize(self, state=None):
         super().initialize(state)
         source = None
-        if state is not None and 'source' in state:
+        if state and 'source' in state:
             source = filesystem.sourceByName(state['source'])
-        if source is None and len(filesystem._sources) > 0:
-            source = filesystem._sources[0]
-        self._handleSourceChanged(source) # initialize
+        if source and len(filesystem.sources) > 0:
+            source = filesystem.sources[0]
+        self._handleSourceChanged(source)
         
     def saveState(self):
         source = self.treeView.getSource()
         if source is not None:
-            return {'source': source.name}
-        else: return None
+            return dict(source=source.name)
+        else:
+            return None
     
     def createOptionDialog(self, button=None):
         from maestro.gui import preferences
@@ -234,14 +234,14 @@ class FileSystemBrowser(widgets.Widget):
 
 class FileSystemSelection(selection.Selection):
     
-    def __init__(self, urls):
-        super().__init__(levels.real,[])
-        self._files = levels.real.collect(urls)
+    def __init__(self, selectedUrls):
+        super().__init__(levels.real, [])
+        self._files = levels.real.collect(selectedUrls)
         
-    def elements(self,recursive=False):
+    def elements(self, recursive=False):
         return self._files
     
-    def files(self,recursive=False):
+    def files(self, recursive=False):
         return self._files
         
     def hasFiles(self):
@@ -253,10 +253,9 @@ class FileSystemSelection(selection.Selection):
         
 # register this widget in the main application
 widgets.addClass(
-    id = 'filesystembrowser',
-    name = translate('FileSystemBrowser', 'File System Browser'),
-    icon = utils.images.icon('filesystembrowser'),
-    theClass = FileSystemBrowser,
-    areas = 'dock',
-    preferredDockArea = 'right'
+    id='filesystembrowser',
+    theClass=FileSystemBrowser,
+    name=translate('FileSystemBrowser', 'File System Browser'),
+    icon=utils.images.icon('filesystembrowser'),
+    areas='dock', preferredDockArea='right'
 )

@@ -48,11 +48,7 @@ class ContainerType(enum.Enum):
             return translate('Elements', 'Collection')
 
     def icon(self):
-        try:
-            return self._icon
-        except AttributeError:
-            self._icon = utils.images.icon(self.name.lower())
-            return self._icon
+        return utils.images.icon(self.name.lower())
 
     def pixmap(self, size=24):
         return self.icon().pixmap(size)

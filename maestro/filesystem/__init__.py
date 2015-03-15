@@ -23,39 +23,39 @@ from maestro.core import levels, urls, tags
 from maestro import application, logging, config, stack, database as db
 
 translate = QtCore.QCoreApplication.translate
-_sources = []
+sources = []
 
 
 def init():
     """Initialize filesystem module. Creates :class:`Source` instances for all configured sources.
     """
-    global _sources
+    global sources
     from maestro.filesystem.sources import Source
-    _sources = [Source(**data) for data in config.storage.filesystem.sources]
+    sources = [Source(**data) for data in config.storage.filesystem.sources]
     # delete files not in any source
-    if len(_sources) > 0:
+    if len(sources) > 0:
         db.query('DELETE FROM {p}newfiles WHERE ' + ' AND '.join('url NOT LIKE "file://{}%"'.format(
-                    source.path.replace('"', '\\"')) for source in _sources))
-    _sources.sort(key=lambda s: s.name)
+                 source.path.replace('"', '\\"')) for source in sources))
+    sources.sort(key=lambda s: s.name)
     urls.fileBackends.append(RealFile)
     parseAutoReplace()
 
 
 def shutdown():
     """Terminates this module, storing the state of all sources."""
-    global _sources
-    config.storage.filesystem.sources = [s.save() for s in _sources]
-    _sources = None
+    global sources
+    config.storage.filesystem.sources = [s.save() for s in sources]
+    sources = None
 
 
 def sourceByName(name):
-    for source in _sources:
+    for source in sources:
         if source.name == name:
             return source
 
 
 def sourceByPath(path):
-    for source in _sources:
+    for source in sources:
         if source.contains(path):
             return source
 
@@ -72,8 +72,8 @@ def addSource(**data):
 
 
 def _addSource(source):
-    _sources.append(source)
-    _sources.sort(key=lambda s: s.name)
+    sources.append(source)
+    sources.sort(key=lambda s: s.name)
     application.dispatcher.emit(SourceChangeEvent(application.ChangeType.added, source))
 
 
@@ -83,7 +83,7 @@ def deleteSource(source):
 
 
 def _deleteSource(source):
-    _sources.remove(source)
+    sources.remove(source)
     application.dispatcher.emit(SourceChangeEvent(application.ChangeType.deleted, source))
 
 
