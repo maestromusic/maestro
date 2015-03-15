@@ -37,6 +37,7 @@ namedIcons = {
     'drive-harddisk': 'drive-harddisk.svgz',
     'edit-clear': 'edit-clear.svgz',
     'edit-clear-list': 'edit-clear-list.svgz',
+    'edit-clear-locationbar-rtl': 'edit-clear-locationbar-rtl.svgz',
     'edit-delete': 'edit-delete.svgz',
     'edit-rename': 'edit-rename.svgz',
     'edit-undo': 'edit-undo.svgz',

@@ -32,7 +32,7 @@ class SearchBox(IconLineEdit):
     criterionChanged = QtCore.pyqtSignal()
 
     def __init__(self, text=''):
-        super().__init__(utils.images.icon('edit-clear'))
+        super().__init__(utils.images.icon('edit-clear-locationbar-rtl'))
         self.setText(text)
         self.button.clicked.connect(self._handleButton)
         self.textChanged.connect(self._handleTextChanged)
@@ -97,7 +97,7 @@ class CriterionLineEdit(IconLineEdit):
     criterionCleared = QtCore.pyqtSignal()
     
     def __init__(self, criterion=None):
-        super().__init__(utils.images.icon('edit-clear'))
+        super().__init__(utils.images.icon('edit-clear-locationbar-rtl'))
         self.button.clicked.connect(self.clear)
         self.button.clicked.connect(self._handleChange)
         self._criterion = None
