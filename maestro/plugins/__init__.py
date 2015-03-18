@@ -126,11 +126,17 @@ def init():
     plugins = plug_ordered
 
 
-def enablePlugins():
-    """Import all plugins which should be loaded and enable them."""
+def enablePlugins(asIterator=False):
+    """Import all plugins which should be loaded and enable them.
+
+    If *asIterator* is provided and True, yields the name of the plugin that is currently being loaded
+    (can be used for splash screen).
+    """
     for pluginName in config.options.main.plugins:
         if pluginName != '':
             if pluginName in plugins:
+                if asIterator:
+                    yield pluginName
                 try:
                     plugins[pluginName].enable()
                 except ImportError as e:

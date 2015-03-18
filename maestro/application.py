@@ -82,17 +82,19 @@ class ChangeEventDispatcher(QtCore.QObject):
         if stack is None:
             from . import stack
             self.stack = stack.stack
-        else: self.stack = stack
+        else:
+            self.stack = stack
         if config.options.misc.debug_events:
             def _debugAll(event):
                 logger.debug("EVENT: " + str(event))
             self.connect(_debugAll)
         
-    def emit(self,event):
+    def emit(self, event):
         """Emit an event."""
         if not self.stack.shouldDelayEvents():
             self._signal.emit(event)
-        else: self.stack.addEvent(self,event)
+        else:
+            self.stack.addEvent(self, event)
     
     def connect(self, handler, type=Qt.AutoConnection):
         """Connect a function to this dispatcher."""
@@ -109,7 +111,7 @@ dispatcher = None
 
 def qtMsgHandler(msgType, msgLogContext, msgString):
     """Custom message handler which redirects Qt messages to our own logging."""
-    if not msgString.startswith("Could not resolve property"): # ignore hundreds of SVG warnings
+    if not msgString.startswith("Could not resolve property"):  # ignore hundreds of SVG warnings
         level = {0: "DEBUG", 1: "WARNING"}.get(msgType, "CRITICAL")
         logging.log('QT', level, msgString)
     
@@ -123,6 +125,7 @@ class Splash(QtWidgets.QSplashScreen):
     def showMessage(self, message):
         self.message = message + '…'
         QtWidgets.QApplication.instance().processEvents()
+        self.repaint()
         
     def drawContents(self, painter):
         super().drawContents(painter)
@@ -167,7 +170,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     from PyQt5.QtCore import qInstallMessageHandler
     qInstallMessageHandler(qtMsgHandler)
 
-    from . import resources
+    from maestro import resources
     if type == "gui":
         splash = Splash("Loading Maestro")
         splash.show()
@@ -216,7 +219,6 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
             
     if exitPoint == 'database':
         return app
-    
     # Initialize undo/redo and event handling
     from . import stack
     stack.init()
@@ -231,7 +233,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     except RuntimeError:
         if type == 'gui':
             runInstaller()
-        else: sys.exit(1)
+        else:
+            sys.exit(1)
                        
     if type == 'gui':
         # Do not start without a domain
@@ -271,9 +274,11 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     # Load Plugins
     if type == 'gui':
         splash.showMessage(translate('Splash', 'Loading plugins'))
-    from . import plugins
+    from maestro import plugins
     plugins.init()
-    plugins.enablePlugins()
+    for pluginName in plugins.enablePlugins(True):
+        if type == 'gui':
+            splash.showMessage(translate('Splash', 'Enabling plugin »{}«').format(pluginName))
     
     if type != 'gui':
         return app
@@ -319,15 +324,13 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
 def handleCommandLineOptions(cmdConfig):
     """Parse command line options and act accordingly (e.g. print version and exit). Add config option
     overwrites (with the --config/-c option) to the list *cmdConfig*."""
-    opts, args = getopt.getopt(sys.argv[1:],
-        "vVc:",
-        ['version','config=', 'install'])
+    opts, args = getopt.getopt(sys.argv[1:], "vVc:", ['version', 'config=', 'install'])
 
-    for opt,arg in opts:
-        if opt in ('-v','-V', '--version'):
+    for opt, arg in opts:
+        if opt in ('-v', '-V', '--version'):
             print('This is Maestro version {}. Nice to meet you.'.format(VERSION))
             sys.exit(0)
-        elif opt in ('-c','--config'):
+        elif opt in ('-c', '--config'):
             cmdConfig.append(arg)
         elif opt == '--install':
             runInstaller()
@@ -339,15 +342,15 @@ def lock():
     """Lock the lockfile so that no other instance can be started. Quit the application if it is already
     locked."""
     # Confer http://packages.python.org/tendo/_modules/tendo/singleton.html#SingleInstance
-    lockFile = os.path.join(config.CONFDIR,'lock')
+    lockFile = os.path.join(config.CONFDIR, 'lock')
     try:
         # For a long time the built-in function open was used here. But one day it stopped working oO
-        fileDescriptor = os.open(lockFile,os.O_WRONLY | os.O_CREAT)
+        fileDescriptor = os.open(lockFile, os.O_WRONLY | os.O_CREAT)
     except IOError:
         logger.error("Cannot open lock file {}".format(lockFile))
         sys.exit(-1)
     try:
-        fcntl.lockf(fileDescriptor,fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.lockf(fileDescriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except IOError:
         logger.error("Another instance is already running, quitting.")
         sys.exit(-1)
@@ -355,13 +358,13 @@ def lock():
     
 def loadTranslators(app, logger):
     """Load a translator for Qt's strings and one for Maestro's strings."""
-    from . import translations
+    from maestro import translations
     # Try up to two different locales
     for translator in _translators:
         app.removeTranslator(translator)
     locales = [QtCore.QLocale.system().name()]
     if config.options.i18n.locale:
-        locales.insert(0,config.options.i18n.locale)
+        locales.insert(0, config.options.i18n.locale)
         QtCore.QLocale.setDefault(QtCore.QLocale(config.options.i18n.locale))
         
     # Install a translator for Qt's own strings
@@ -369,29 +372,29 @@ def loadTranslators(app, logger):
     translatorDir = QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath)
     for locale in locales:
         if locale == 'en':
-            continue # This is the default and qt_en does therefore not exist
+            continue  # This is the default and qt_en does therefore not exist
         translatorFile = "qt_" + locale
-        if qtTranslator.load(translatorFile,translatorDir):
+        if qtTranslator.load(translatorFile, translatorDir):
             app.installTranslator(qtTranslator)
             _translators.append(qtTranslator)
             break
-        else: logger.warning("Unable to load Qt's translator file {} from directory {}."
-                                .format(translatorFile,translatorDir))
+        else:
+            logger.warning("Unable to load Qt's translator file {}".format(translatorFile))
 
     # Load a translator for our strings
     translator = QtCore.QTranslator(app)
     translatorDir = os.path.join(":maestro/i18n")
     for locale in locales:
-        translatorFile = 'maestro.'+locale
-        if translator.load(translatorFile,translatorDir):
+        translatorFile = 'maestro.' + locale
+        if translator.load(translatorFile, translatorDir):
             app.installTranslator(translator)
             _translators.append(translator)
             break
-        else: logger.warning("Unable to load translator file {} from directory {}."
-                                .format(translatorFile,translatorDir))
+        else:
+            logger.warning("Unable to load translator file {}".format(translatorFile))
 
 
-def init(cmdConfig=[],type='console',exitPoint='noplugins'):
+def init(cmdConfig=[], type='console', exitPoint='noplugins'):
     """Initialize Maestro's framework (database, tags etc.) but do not run a GUI. Use this for tests on the
     terminal:
 
@@ -404,17 +407,17 @@ def init(cmdConfig=[],type='console',exitPoint='noplugins'):
     If *exitPoint* is not None, return the created QApplication-instance.
     Actually this method is the same as run, but with different default arguments.
     """
-    return run(cmdConfig,type,exitPoint)
+    return run(cmdConfig, type, exitPoint)
 
 
 def executeEntryPoint(name, category='gui_scripts'):
     """Replace this process by a new one, running one of Maestro's entrypoints. *category* and *name* specify
     the entrypoint, see setup.py."""
     os.execl(sys.executable, os.path.basename(sys.executable), "-c",
-        "import sys, pkg_resources;"
-        "sys.exit(pkg_resources.load_entry_point('maestro=={}', '{}', '{}')())"
-            .format(VERSION, category, name)
-        )
+             "import sys, pkg_resources;"
+             "sys.exit(pkg_resources.load_entry_point('maestro=={}', '{}', '{}')())"
+                .format(VERSION, category, name)
+             )
 
 
 def runInstaller():
