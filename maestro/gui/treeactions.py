@@ -42,7 +42,7 @@ class EditTagsAction(actions.TreeAction):
         """Open a dialog to edit the tags of the currently selected elements (and the children, if
         *recursive* is True). This is called by the edit tags actions in the contextmenu.
         """
-        from ..gui import tageditor
+        from maestro.widgets.tageditor import tageditor
         dialog = tageditor.TagEditorDialog(parent=self.parent())
         dialog.useElementsFromSelection(self.parent().selection)
         dialog.exec_()

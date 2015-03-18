@@ -223,7 +223,7 @@ def tagsFromQuery(xml):
     for relType in ('arranger', 'performer', 'engineer', 'producer', 'editor', 'mastering',
                     'conductor', 'composer', 'lyricist', 'orchestrator', 'librettist', 'writer'):
         typeMap[relType] = relType
-    voices = 'soprano', 'mezzo-soprano', 'tenor', 'baritone', 'bass'
+    voices = 'soprano', 'mezzo-soprano', 'tenor', 'baritone', 'bass', 'contralto'
     artistFlags = ('solo', 'guest')
 
     def logWarning(msg, xml):
