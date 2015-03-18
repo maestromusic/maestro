@@ -109,8 +109,13 @@ class PlaybackWidget(widgets.Widget):
         self._areaChanged(self.area) # the direction of topLayout depends on the area 
         self.topLayout.setContentsMargins(0,0,0,0)
         profile = playlistdelegate.PlaylistDelegate.profileType.default()
+        self.stackWidget = QtWidgets.QStackedWidget()
         self.titleWidget = delegatewidget.DelegateWidget(playlistdelegate.PlaylistDelegate(None, profile))
-        self.topLayout.addWidget(self.titleWidget, 1)  
+        self.stackWidget.addWidget(self.titleWidget)
+        self.statusLabel = QtWidgets.QLabel()
+        self.statusLabel.linkActivated.connect(lambda: self.backend.connectBackend())
+        self.stackWidget.addWidget(self.statusLabel)
+        self.topLayout.addWidget(self.stackWidget, 1)
         
         buttonLayout = QtWidgets.QHBoxLayout()
         buttonLayout.setContentsMargins(0,0,0,0)
@@ -233,10 +238,13 @@ class PlaybackWidget(widgets.Widget):
                     self.skipForwardButton, self.seekSlider, self.seekLabel, self.volumeButton:
             item.setEnabled(state is player.ConnectionState.Connected)
         if state is player.ConnectionState.Connecting:
-            self.titleWidget.setText(self.tr("connecting..."))
+            self.statusLabel.setText(self.tr('connecting...'))
+            self.stackWidget.setCurrentWidget(self.statusLabel)
         elif state is player.ConnectionState.Disconnected:
-            self.titleWidget.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
+            self.statusLabel.setText(self.tr('Connection failed. <a href="#connect">Retry?</a>'))
+            self.stackWidget.setCurrentWidget(self.statusLabel)
         else:
+            self.stackWidget.setCurrentWidget(self.titleWidget)
             self.updateTitleWidget()
             self.updateMarks()
             self.updateSlider(self.backend.elapsed())
