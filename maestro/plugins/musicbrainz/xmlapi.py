@@ -22,10 +22,10 @@ import os.path
 
 from lxml import etree
 
-from ... import config, database as db, logging
-from ...core import tags, urls
-from ...core.elements import ContainerType
-from ...utils import FlexiDate
+from maestro import config, database as db, logging
+from maestro.core import tags, urls
+from maestro.core.elements import ContainerType
+from maestro.utils import FlexiDate
 
 from . import plugin as mbplugin
 
@@ -44,7 +44,7 @@ def query(resource, mbid, includes=[]):
     
     Returns an LXML ElementTree root node. All namespaces are removed from the result.
     """
-    url = "{}/{}/{}".format(wsURL, resource, mbid)
+    url = '{}/{}/{}'.format(wsURL, resource, mbid)
     if queryCallback:
         queryCallback(url)
     if len(includes) > 0:
@@ -105,7 +105,7 @@ class MBTagStorage(dict):
                     tag = mapping[key]
             else:
                 tag = tags.get(key)
-            ret[tag] = [ str(v) for v in values ] # converts AliasEntities to strings
+            ret[tag] = [str(v) for v in values]  # converts AliasEntities to strings
         return ret
 
 
@@ -163,7 +163,6 @@ class AliasEntity:
             ent.name, ent.sortName = ans
         AliasEntity._entities[mbid] = ent
         return ent
-        
     
     def __init__(self, type, mbid, name, sortName):
         self.type = type
@@ -362,4 +361,3 @@ def fillReleaseForDisc(MBrelease, discid):
     for p in list(MBrelease.children.keys()):
         if isinstance(MBrelease.children[p], Medium) and MBrelease.children[p] != MBmedium:
             MBrelease.children[p].ignore = True
-            
