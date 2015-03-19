@@ -22,63 +22,9 @@ from PyQt5.QtCore import Qt
 from ... import utils
 
 
-class IconLineEdit(QtWidgets.QLineEdit):
-    """This is simply a line edit that displays an icon inside the lineedit at the right end. In fact the
-    icon is a QToolButton that may be accessed via the attribute ''button''. The following will make the
-    button clear the text::
-    
-        iconLineEdit.button.clicked.connect(iconLineEdit.clear)
-    
-    If the property ''hideIconWhenEmpty'' is set (default), the button will only be displayed, if the
-    lineedit is not empty.
-    """ 
-    def __init__(self, icon, parent = None):
-        QtWidgets.QLineEdit.__init__(self, parent)
-        self.button = QtWidgets.QToolButton(self)
-        self.button.setIcon(QtGui.QIcon(icon))
-        self.button.setCursor(Qt.ArrowCursor)
-
-        # Do not render a button
-        self.button.setStyleSheet("QToolButton { padding: 0px; border: none; }")
-        # This ensures that there is no text over or under the icon
-        paddingRight = self.button.sizeHint().width() + 2
-        self.setStyleSheet("QLineEdit { padding-right: "+str(paddingRight)+"px; }")
-        
-        # Keep at least the size of the icon
-        min = self.minimumSizeHint()
-        self.setMinimumSize(max(min.width(), self.button.sizeHint().height() + 2),
-                            max(min.height(), self.button.sizeHint().height() + 2))
-                            
-        self.hideIconWhenEmpty = None
-        self.setHideIconWhenEmpty(True)
-
-    def getHideIconWhenEmpty(self):
-        """Return whether the icon will be hidden when there is no text."""
-        return self.hideIconWhenEmpty
-        
-    def setHideIconWhenEmpty(self,hide):
-        """Set whether the icon will be hidden when there is no text."""
-        if hide != self.hideIconWhenEmpty:
-            self.hideIconWhenEmpty = hide
-            if hide:
-                self.button.setVisible(len(self.text()) > 0)
-                self.textChanged.connect(self._updateIcon)
-            else:
-                self.button.setVisible(True)
-                self.textChanged.disconnect(self._updateIcon)
-    
-    def _updateIcon(self,text):
-        if self.hideIconWhenEmpty:
-            self.button.setVisible(len(text) > 0)
-        
-    def resizeEvent(self,resizeEvent):
-        sizeHint = self.button.sizeHint()
-        self.button.move(self.rect().right() - sizeHint.width(), self.rect().bottom() - sizeHint.height())
-
-
 class LineEditWithHint(QtWidgets.QLineEdit):
     """A lineedit with the additional feature that it draws a gray text in its right corner. The text is
-    only visible if there is enough space."""
+    only visible if there is enough space. (Note that this is different to QLineEdit.setPlaceholderText)."""
     def __init__(self,text='',parent=None):
         super().__init__(text,parent)
         self._rightText = None

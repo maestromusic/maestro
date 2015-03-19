@@ -22,19 +22,18 @@ from PyQt5.QtCore import Qt
 from .. import utils, logging
 from ..core import flags
 from ..search import criteria
-from .misc.lineedits import IconLineEdit
 
 
-class SearchBox(IconLineEdit):
+class SearchBox(QtWidgets.QLineEdit):
     """This is a lineedit that will parse the given text as a search criterion and will emit criterionChanged
     whenever a new valid criterion is entered. If the attribute 'instant' is set to False, the signal
     will only be emitted when the user hits return/enter."""
     criterionChanged = QtCore.pyqtSignal()
 
-    def __init__(self, text=''):
-        super().__init__(utils.images.icon('edit-clear-locationbar-rtl'))
+    def __init__(self, text='', parent=None):
+        super().__init__(parent)
         self.setText(text)
-        self.button.clicked.connect(self._handleButton)
+        self.setClearButtonEnabled(True)
         self.textChanged.connect(self._handleTextChanged)
         self.instant = True
         self._criterion = None
@@ -47,11 +46,6 @@ class SearchBox(IconLineEdit):
         """Set the attribute 'instant'. This is a convenience method to be connected to e.g. the
         toggled-signal of checkboxes."""
         self.instant = instant
-
-    def _handleButton(self):
-        self.clear()
-        if not self.instant: # otherwise it happened already in _handleTextChanged
-            self._updateCriterion()
             
     def _handleTextChanged(self, text):
         if self.instant:
@@ -85,7 +79,7 @@ class SearchBox(IconLineEdit):
         super().focusOutEvent(event)
 
 
-class CriterionLineEdit(IconLineEdit):
+class CriterionLineEdit(QtWidgets.QLineEdit):
     """Special LineEdit to enter search strings. When the focus leaves the box or Enter is pressed, it will
     check the syntax of the string (see search.criteria.parse) and emit criterionChanged with the given
     criterion or criterionCleared if the criterion is None.
@@ -96,10 +90,9 @@ class CriterionLineEdit(IconLineEdit):
     criterionChanged = QtCore.pyqtSignal(criteria.Criterion)
     criterionCleared = QtCore.pyqtSignal()
     
-    def __init__(self, criterion=None):
-        super().__init__(utils.images.icon('edit-clear-locationbar-rtl'))
-        self.button.clicked.connect(self.clear)
-        self.button.clicked.connect(self._handleChange)
+    def __init__(self, criterion=None, parent=None):
+        super().__init__(parent)
+        self.setClearButtonEnabled(True)
         self._criterion = None
         if isinstance(criterion, criteria.Criterion):
             self.setText(repr(criterion))
