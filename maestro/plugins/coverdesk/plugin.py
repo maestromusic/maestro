@@ -21,12 +21,25 @@ from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
 from maestro import config, utils, widgets
-from maestro.gui import selection
 from maestro.core import levels, covers, tags, elements
+from maestro.gui import selection
 
 
+def enable():        
+    widgets.addClass(
+        id = "coverdesk",
+        name = translate("CoverDesk", "Coverdesk"),
+        icon = utils.images.icon('widgets/coverdesk.png'),
+        theClass = CoverDesk,
+        areas = 'central, dock',
+        preferredDockArea = 'right'
+    )
+    
+def disable():
+    widgets.removeClass("coverdesk")
+    
+    
 class CoverDesk(widgets.Widget):
-
     hasOptionDialog = True
 
     def __init__(self, state=None, **args):
@@ -53,15 +66,7 @@ class CoverDesk(widgets.Widget):
         for item in self.view.scene().items():
             elements.append((item.elid, (item.scenePos().x(), item.scenePos().y())))
         return {'elements': elements}
-        
-widgets.addClass(
-    id = "coverdesk",
-    name = translate("CoverDesk", "Coverdesk"),
-    icon = utils.images.icon('widgets/coverdesk.png'),
-    theClass = CoverDesk,
-    areas = 'central, dock',
-    preferredDockArea = 'right'
-)
+
 
     
 class CoverDeskScene(QtWidgets.QGraphicsScene):
