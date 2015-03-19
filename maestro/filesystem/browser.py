@@ -49,12 +49,13 @@ class FilesystemFilterModel(QtCore.QSortFilterProxyModel):
         info = self.sourceModel().fileInfo(sIndex)
         path = info.filePath()
         source = self.sourceModel().source
+        filterText = self.filterText.lower()
         if not source.contains(path):
             return True  # avoid filtering parents of the source's root!
-        relPath = os.path.relpath(path, source.path)
+        relPath = os.path.relpath(path, source.path).lower()
         if relPath == '.':
             return True
-        if '/' not in relPath and self.filterText not in relPath:
+        if '/' not in relPath and filterText not in relPath:
             return False
         status = source.folderState(path) if info.isDir() else source.fileState(path)
         if not self.showSynced and status is FilesystemState.synced:
