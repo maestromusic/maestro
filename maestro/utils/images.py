@@ -90,9 +90,6 @@ def icon(name):
     return cachedIcons[name]
 
 
-
-
-
 def pixmap(name):
     """Return a QPixmap. *name* may be either a filepath (relative to images-folder) or name from
     utils.images.namedPixmaps. Additionally the special names 'expander' and 'collapser' are supported.
@@ -146,3 +143,16 @@ def renderSvg(fileOrRenderer, name, width, height, background=Qt.transparent):
     renderer.render(painter, name)
     painter.end()
     return pixmap
+
+
+def scale(pixmap, size):
+    """Scale a QPixmap so that it fits into a rectangle of the given size (*size* can be either a QSize or
+    an integer which will be used for both width and height). Because the scaling keeps the aspect ratio,
+    the resulting pixmap might be smaller than size. A pixmap is never enlarged by this function.
+    """
+    if isinstance(size, QtCore.QSize):
+        width, height = size.width(), size.height()
+    else: width = height = size
+    if pixmap.width() > width or pixmap.height() > height:
+        return pixmap.scaled(width, height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    else: return pixmap
