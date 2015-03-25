@@ -28,7 +28,7 @@ from maestro.core import tags, elements, levels
 try:
     import matplotlib.pyplot as pyplot
     from matplotlib.figure import Figure
-    from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 except ImportError as e:
     pyplot = None
     pyplotError = str(e)

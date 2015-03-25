@@ -16,21 +16,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import math,itertools
+import math, itertools
 
-from PyQt5 import QtCore,QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from ... import utils
-from . import profiles
+from maestro.gui.delegates import profiles
 
 translate = QtCore.QCoreApplication.translate
 
-# Constants for delegate.state
-SIZE_HINT, PAINT = 1,2
-
-# Constants to specify alignment
-LEFT,RIGHT = 1,2
+__all__ = ['AbstractDelegate', 'MultiTextItem', 'TextItem', 'ImageItem', 'ColorBarItem', 'IconBarItem',
+           'DelegateStyle', 'STD_STYLE', 'ITALIC_STYLE', 'BOLD_STYLE']
 
 
 class DelegateStyle:
@@ -47,9 +43,9 @@ class DelegateStyle:
             
 
 # Some standard styles used in the delegates
-STD_STYLE = DelegateStyle(1,False,False)
-ITALIC_STYLE = DelegateStyle(1,False,True)
-BOLD_STYLE = DelegateStyle(1,True,False)
+STD_STYLE = DelegateStyle(1, False, False)
+ITALIC_STYLE = DelegateStyle(1, False, True)
+BOLD_STYLE = DelegateStyle(1, True, False)
             
             
 class AbstractDelegate(QtWidgets.QStyledItemDelegate):
@@ -89,7 +85,6 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
     vSpace = 3   # vertical space between DelegateItems
     hMargin = 1  # horizontal margin at the left and right side of the content
     vMargin = 2  # vertical margin at the top and bottom of the content
-    state = None # whether we are processing paint or sizeHint. Used for error detection 
             
     def __init__(self, view, profile):
         super().__init__(view)
@@ -101,7 +96,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         profiles.category.profileRemoved.connect(self._handleProfileRemoved)
         profiles.category.profileChanged.connect(self._handleProfileChanged)
     
-    def setProfile(self,profile):
+    def setProfile(self, profile):
         """Set the profile and redraw the whole view."""
         if profile is None:
             raise ValueError("Profile must not be None")
@@ -109,12 +104,12 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         if self.view is not None:
             self.view.scheduleDelayedItemsLayout()
     
-    def addLeft(self,item):
+    def addLeft(self, item):
         """Add an item to the left region. It will be drawn on the right of all previous items
         in that region."""
         self.left.append(item)
         
-    def addRight(self,item):
+    def addRight(self, item):
         """Add an item to the right region. It will be drawn on the left of all previous items
         in that region."""
         self.right.append(item)
@@ -123,9 +118,9 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         """Start a new row in the center. Use addCenter to add items to it."""
         self.center.append([])
         
-    def addCenter(self, item, align=LEFT):
+    def addCenter(self, item, align=Qt.AlignLeft):
         """Add an item to the current row in the center. Depending on the optional parameter *align*, which
-        must be one of the module constants ''LEFT'' or ''RIGHT'', the item will be drawn on the right or on
+        must be one of the module constants ''Qt.AlignLeft'' or ''Qt.AlignRight'', the item will be drawn on the right or on
         the left of the row (default is left). In both cases items added first will be drawn further on the
         sides and items added later will be more in the middle.
         
@@ -133,13 +128,13 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         """
         if len(self.center) == 0:
             self.newRow()
-        self.center[-1].append((item,align))
+        self.center[-1].append((item, align))
 
-    def _handleProfileRemoved(self,profile):
+    def _handleProfileRemoved(self, profile):
         if profile == self.profile:
             self.setProfile(self.profileType.default())
             
-    def _handleProfileChanged(self,profile):
+    def _handleProfileChanged(self, profile):
         if profile == self.profile and self.view is not None:
             self.view.scheduleDelayedItemsLayout()
                     
@@ -148,30 +143,27 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         implemented in subclasses."""
         raise NotImplementedError()
 
-    def sizeHint(self,option,index):
+    def sizeHint(self, option, index):
         """Implementation of QtWidgets.QStyleItemDelegate.sizHint. This method is called by Qt. It will call
         self.layout (implemented in subclasses) to fill the lists ''left'', ''center'' and ''right'' and
         then compute the sizeHint based on the DelegateItems in those lists.
         """
-        if self.state is not None:
-            import sys
-            sys.exit("Fatal error: AbstractDelegate.sizeHint was called during painting/sizehinting.")
-        self.state = SIZE_HINT
 
         # Total width available.
         if self.view is not None:
             # Note that option.rect is useless due to a performance hack in Qt.
             # (Confer QTreeView::indexRowSizeHint in Qt's sources) 
-            totalWidth = self.view.viewport().width() - 2*self.hMargin
+            totalWidth = self.view.viewport().width() - 2 * self.hMargin
             totalWidth -= self.parent().indentation() * self.model.data(index).depth()
-        else: totalWidth = option.rect.width() - 2*self.hMargin
+        else:
+            totalWidth = option.rect.width() - 2 * self.hMargin
         
         # Collect items
-        self.left,self.right,self.center = [],[],[]
+        self.left, self.right, self.center = [], [], []
         self.layout(index, totalWidth)
                        
-        leftWidth,leftMaxHeight = self._rowDimensions(self.left)
-        rightWidth,rightMaxHeight = self._rowDimensions(self.right)
+        leftWidth, leftMaxHeight = self._rowDimensions(self.left)
+        rightWidth, rightMaxHeight = self._rowDimensions(self.right)
         
         # Add the space separating the parts
         if leftWidth > 0:
@@ -187,32 +179,26 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         for row in self.center:
             if len(row) == 0:
                 continue
-            rowWidth,rowMaxHeight = self._rowDimensions((item for item,align in row),remainingWidth)
+            rowWidth, rowMaxHeight = self._rowDimensions((item for item,align in row),remainingWidth)
             centerHeight += rowMaxHeight + self.vSpace
             if rowWidth > centerMaxWidth: 
                 centerMaxWidth = rowWidth
         if centerHeight > 0:
-            centerHeight -= self.vSpace # above loop adds one space too much
+            centerHeight -= self.vSpace  # above loop adds one space too much
         
-        self.state = None
-        
-        return QtCore.QSize(leftWidth + centerMaxWidth + rightWidth + 2*self.hMargin,
-                            max(leftMaxHeight,centerHeight,rightMaxHeight) + 2* self.vMargin)
+        return QtCore.QSize(leftWidth + centerMaxWidth + rightWidth + 2 * self.hMargin,
+                            max(leftMaxHeight, centerHeight, rightMaxHeight) + 2 * self.vMargin)
     
     def background(self, index):
         """Defines the background brush for the given ModelIndex. If None is returned, the default
         background is used. Reimplement this in subclasses to use custom background colors."""
         return None
         
-    def paint(self,painter,option,index):
+    def paint(self, painter, option, index):
         """Implementation of QtWidgets.QStyleItemDelegate.paint. This method is called by Qt. It will call
         self.layout (implemented in subclasses) to fill the lists ''left'', ''center'' and ''right'' and
         then paint the DelegateItems in those lists.
         """
-        if self.state is not None:
-            import sys
-            sys.exit("Fatal error: AbstractDelegate.paint was called during painting/sizehinting.")
-        self.state = PAINT
         
         # Initialize. Subclasses or delegate items may access painter and option.
         self.painter = painter
@@ -234,14 +220,14 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         availableHeight = option.rect.height() - 2*self.vMargin
         
         # Draw left and right regions
-        for align,itemList in [(LEFT,self.left),(RIGHT,self.right)]:
+        for align,itemList in [(Qt.AlignLeft,self.left),(Qt.AlignRight,self.right)]:
             for item in itemList:
                 availableWidth = option.rect.width() - leftOffset - rightOffset
                 if availableWidth <= 0:
                     break
                 rect = QtCore.QRect(leftOffset,self.vMargin,availableWidth,availableHeight)
                 width,height = item.paint(self,rect,align)
-                if align == LEFT:
+                if align == Qt.AlignLeft:
                     leftOffset += width + self.hSpace
                 else: rightOffset += width + self.hSpace
             
@@ -254,12 +240,12 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
                 rowLength = option.rect.width() - lOff - rOff
                 if rowLength <= 0:
                     break
-                rect = QtCore.QRect(lOff,rowOffset,rowLength,option.rect.height()-rowOffset-self.vMargin)
-                if align == LEFT:
-                    width,height = item.paint(self,rect)
+                rect = QtCore.QRect(lOff, rowOffset, rowLength, option.rect.height() -rowOffset - self.vMargin)
+                if align == Qt.AlignLeft:
+                    width, height = item.paint(self, rect)
                     lOff += width + self.hSpace
                 else:
-                    width,height = item.paint(self,rect,align=RIGHT)
+                    width, height = item.paint(self, rect, align=Qt.AlignRight)
                     rOff += width + self.hSpace
                 if height > maxHeight:
                     maxHeight = height
@@ -270,15 +256,14 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         painter.restore()
         self.painter = None
         self.option = None
-        self.state = None
                     
-    def _rowDimensions(self,items,availableWidth = None):
+    def _rowDimensions(self, items, availableWidth=None):
         """Helper function for sizeHint: Compute the size of *items* when they are laid out in a row and get
         a maximum of *availableWidth* horizontal space space."""      
         width = 0
         maxHeight = 0
         for item in items:
-            w,h = item.sizeHint(self,availableWidth)
+            w, h = item.sizeHint(self, availableWidth)
             width += w + self.hSpace
             if h > maxHeight:
                 maxHeight = h
@@ -288,10 +273,10 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
                     break
         
         if width > 0:
-            width -= self.hSpace # above loop adds one space too much
-        return width,maxHeight
+            width -= self.hSpace  # above loop adds one space too much
+        return width, maxHeight
     
-    def getFontMetrics(self,style=STD_STYLE):
+    def getFontMetrics(self, style=STD_STYLE):
         """Return a QFontMetrics-object for a font with the given style."""
         if style is None:
             style = STD_STYLE
@@ -300,7 +285,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         self.font.setItalic(style.italic)
         return QtGui.QFontMetrics(self.font)
                 
-    def _configurePainter(self,style):
+    def _configurePainter(self, style):
         """Configure the current painter to draw in the given style. This may only be used in the paint
         methods of DelegateItems."""
         if style is None:
@@ -320,18 +305,18 @@ class DelegateItem:
     to adding widgets to a layout). Then the delegate will draw those items or compute the sizeHint using the
     items' paint and sizeHint methods.
     """
-    def sizeHint(self,delegate,availableWidth=None):
+    def sizeHint(self, delegate, availableWidth=None):
         """Compute the sizeHint of this item. *delegate* may be used to access variables like delegate.option
         or methods like delegate.getFontMetrics. When *availableWidth* is not None, the item should try to
         not use more horizontal space (if that is not possible it still may use more).
         """ 
         raise NotImplementedError()
     
-    def paint(self,delegate,rect,align=LEFT):
+    def paint(self, delegate, rect, align=Qt.AlignLeft):
         """Draw this item. *delegate* must be used to access variables like delegate.painter, delegate.option
         and methods like delegate._configurePainter. *rect* is the QRect into which the item should be
-        painted (this differs from option.rect). *align* is one of the module constants ''LEFT'' or ''RIGHT''
-        and determines the alignment of the item in the available space.
+        painted (this differs from option.rect). *align* is one of Qt.AlignLeft or Qt.AlignRight and determines the
+        alignment of the item in the available space.
         """
         raise NotImplementedError()
     
@@ -339,42 +324,44 @@ class DelegateItem:
 class TextItem(DelegateItem):
     """A TextItem displays a single text. Optionally you can set the DelegateStyle of the text and a
     minimum height of the text line."""
-    def __init__(self,text,style=None,minHeight=0):
+    def __init__(self, text, style=None, minHeight=0):
         self.text = text
         self.style = style
         self.minHeight = minHeight
         
-    def sizeHint(self,delegate,availableWidth=-1):
-        rect = QtCore.QRect(0,0,availableWidth,1)
-        bRect = delegate.getFontMetrics(self.style).boundingRect(rect,Qt.TextSingleLine,self.text)
-        return bRect.width(),max(bRect.height(),self.minHeight)
+    def sizeHint(self, delegate, availableWidth=-1):
+        rect = QtCore.QRect(0, 0, availableWidth, 1)
+        bRect = delegate.getFontMetrics(self.style).boundingRect(rect, Qt.TextSingleLine, self.text)
+        return bRect.width(), max(bRect.height(), self.minHeight)
 
-    def paint(self,delegate,rect,align=LEFT):
+    def paint(self, delegate, rect, align=Qt.AlignLeft):
         delegate._configurePainter(self.style)
         flags = Qt.TextSingleLine
-        if align == RIGHT:
+        if align == Qt.AlignRight:
             flags |= Qt.AlignRight
-        else: flags |= Qt.AlignLeft
+        else:
+            flags |= Qt.AlignLeft
         # Enable elided text
-        #text = delegate.painter.fontMetrics().elidedText(self.text,Qt.ElideRight,rect.width())
-        bRect = delegate.painter.drawText(rect,flags,self.text)
-        return bRect.width(),max(bRect.height(),self.minHeight)
+        # text = delegate.painter.fontMetrics().elidedText(self.text,Qt.ElideRight,rect.width())
+        bRect = delegate.painter.drawText(rect, flags, self.text)
+        return bRect.width(), max(bRect.height(), self.minHeight)
     
     
 class ImageItem(DelegateItem):
     """A ImageItem displays a single pixmap."""
-    def __init__(self,pixmap):
+    def __init__(self, pixmap):
         self.pixmap = pixmap
 
-    def sizeHint(self,delegate,availableWidth=None):
-        return self.pixmap.width(),self.pixmap.height()
+    def sizeHint(self, delegate, availableWidth=None):
+        return self.pixmap.width(), self.pixmap.height()
         
-    def paint(self,delegate,rect,align=LEFT):
-        if align == RIGHT:
+    def paint(self, delegate, rect, align=Qt.AlignLeft):
+        if align == Qt.AlignRight:
             imageLeft = rect.x() + rect.width() - self.pixmap.width()
-        else: imageLeft = rect.x()
-        delegate.painter.drawPixmap(imageLeft,rect.y(),self.pixmap.width(),self.pixmap.height(),self.pixmap)
-        return self.pixmap.width(),self.pixmap.height()
+        else:
+            imageLeft = rect.x()
+        delegate.painter.drawPixmap(imageLeft, rect.y(), self.pixmap.width(), self.pixmap.height(), self.pixmap)
+        return self.pixmap.width(), self.pixmap.height()
 
 
 class ColorBarItem(DelegateItem):
@@ -382,24 +369,27 @@ class ColorBarItem(DelegateItem):
     may be None (the item will stretch over the available height). *background* may be everything that can
     be submitted to QPainter.fillRect, e.g. QColor, QBrush.
     """
-    def __init__(self,background,width,height=None):
+    def __init__(self, background, width, height=None):
         self.background = background
         self.width = width
         self.height = height
         
-    def sizeHint(self,delegate,availableWidth=None):
-        return self.width,self.height if self.height is not None else 1
+    def sizeHint(self, delegate, availableWidth=None):
+        return self.width, self.height if self.height is not None else 1
     
-    def paint(self,delegate,rect,align=LEFT):
-        if align == RIGHT:
+    def paint(self, delegate, rect, align=Qt.AlignLeft):
+        if align == Qt.AlignRight:
             left = rect.x() + rect.width() - self.width
-        else: left = rect.x()
+        else:
+            left = rect.x()
         if self.height is None:
             height = rect.height()
-        else: height = self.height
-        delegate.painter.fillRect(QtCore.QRect(left,rect.y(),self.width,height),
+        else:
+            height = self.height
+        delegate.painter.fillRect(QtCore.QRect(left, rect.y(), self.width, height),
                                   self.background)
-        return self.width,height
+        return self.width, height
+
 
 class PlayTriangleItem(DelegateItem):
     """An item that displays a small triangle, indicating the currenty playing element in
@@ -416,13 +406,14 @@ class PlayTriangleItem(DelegateItem):
         self.pp = QtGui.QPainterPath()
         self.pp.addPolygon(poly)
     
-    def sizeHint(self, delegate, availableWidth = None):
+    def sizeHint(self, delegate, availableWidth=None):
         return self.width, self.width
     
-    def paint(self, delegate, rect, align = LEFT):
+    def paint(self, delegate, rect, align=Qt.AlignLeft):
         delegate.painter.fillPath(self.pp.translated(rect.x(), rect.y()), self.color)
         delegate.painter.drawPath(self.pp.translated(rect.x(), rect.y()))
-        return self.width,self.width
+        return self.width, self.width
+
 
 class IconBarItem(DelegateItem):
     """An IconBarItem displays a list of icons in a grid. The size of the grid is specified by the parameters
@@ -489,13 +480,13 @@ class IconBarItem(DelegateItem):
         height = rows * self.iconSize + (rows-1) * self.vSpace
         return width,height
 
-    def paint(self,delegate,rect,align=LEFT):
+    def paint(self,delegate,rect,align=Qt.AlignLeft):
         if len(self.icons) == 0:
             return 0,0
         
         rows,columns = self._computeRowsAndColumns(rect.width())
         
-        if align == RIGHT:
+        if align == Qt.AlignRight:
             right = rect.right() + 1 # Confer documentation of rect.right 
         else: left = rect.x()
         
@@ -504,7 +495,7 @@ class IconBarItem(DelegateItem):
             if i >= columns:
                 top += self.iconSize + self.vSpace
                 i = 0
-            if align == RIGHT:
+            if align == Qt.AlignRight:
                 rect = QtCore.QRect(right - (i+1)*self.iconSize - i*self.hSpace,top,
                                     self.iconSize,self.iconSize)
             else: rect = QtCore.QRect(left+i*(self.iconSize+self.hSpace),top,self.iconSize,self.iconSize)
@@ -557,7 +548,7 @@ class MultiTextItem(DelegateItem):
         fm = delegate.getFontMetrics(self.style)
         return self._layout(delegate,fm,availableWidth,0,paint=False) # availableHeight is not needed
     
-    def paint(self,delegate,rect,align=LEFT):
+    def paint(self,delegate,rect,align=Qt.AlignLeft):
         delegate.painter.save()
         fm = delegate._configurePainter(self.style)
         delegate.painter.translate(rect.x(),rect.y())
