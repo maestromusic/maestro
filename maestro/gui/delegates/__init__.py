@@ -16,17 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import math, copy
+import math
 
-from PyQt5 import QtCore,QtGui
+from PyQt5 import QtCore, QtGui
 from PyQt5.QtCore import Qt
 
-from .abstractdelegate import *
-from ... import config, database as db, utils
-from ...core import tags, levels, elements
-from ...core.nodes import RootNode, Wrapper, TextNode
-from . import profiles
+from maestro.gui.delegates.abstractdelegate import *
+from maestro import utils
+from maestro.core import tags, levels
+from maestro.core.nodes import RootNode, Wrapper, TextNode
+from maestro.gui.delegates import profiles
 
+translate = QtCore.QCoreApplication.translate
 
 class StandardDelegate(AbstractDelegate):
     """While still abstract, this class implements almost all of the features used by the usual delegates in
@@ -88,7 +89,7 @@ class StandardDelegate(AbstractDelegate):
         if urlWarningItem is not None:
             self.addCenter(urlWarningItem)
         if self.profile.options['showType'] and element.isContainer():
-            pixmap = element.type.pixmap()
+            pixmap = element.type.pixmap(size=16)
             if pixmap is not None:
                 self.addCenter(ImageItem(pixmap))
         self.addCenter(titleItem)
@@ -109,13 +110,13 @@ class StandardDelegate(AbstractDelegate):
             maxFlagsInTitleRow = flagIconsItem.maxColumnsIn(availableWidth - titleLength - self.hSpace)
             if maxFlagsInTitleRow >= len(flagIcons):
                 # Yeah, all flags fit into the title row
-                self.addCenter(flagIconsItem,align=RIGHT)
+                self.addCenter(flagIconsItem,align=Qt.AlignRight)
                 # Now we even try to fit the fitInTitleRowText
                 if fitInTitleRowText is not None:
                     remainingWidth = availableWidth - titleLength \
                                      - flagIconsItem.sizeHint(self)[0] - 2* self.hSpace
                     if self.getFontMetrics().width(fitInTitleRowText) <= remainingWidth:
-                        self.addCenter(TextItem(fitInTitleRowText),align=RIGHT)
+                        self.addCenter(TextItem(fitInTitleRowText),align=Qt.AlignRight)
                         fittedTextInTitleRow = True
                 self.newRow()
             else:
@@ -129,21 +130,21 @@ class StandardDelegate(AbstractDelegate):
                 leftTexts,rightTexts = self.prepareColumns(wrapper)
 
                 # First we compute a lower bound of the rows used by the tags
-                rowsForSure = max(len(leftTexts),len(rightTexts))
+                rowsForSure = max(len(leftTexts), len(rightTexts))
                 
                 if rowsForSure == 0:
                     # No tags
                     if 2*maxFlagsInTitleRow >= len(flagIcons):
                         flagIconsItem.rows = 2
                         self.addRight(flagIconsItem)
-                    else: self.addCenter(flagIconsItem,align=RIGHT)
+                    else: self.addCenter(flagIconsItem,align=Qt.AlignRight)
                 else:
                     # Do not use too many columns
                     maxFlagsInTitleRow = min(2,maxFlagsInTitleRow)
                     if maxFlagsInTitleRow == 0:
                         # Put all flags on the right side of the tags
                         flagIconsItem.columns = 1 if len(flagIcons) <= rowsForSure else 2
-                        self.addCenter(flagIconsItem,align=RIGHT)
+                        self.addCenter(flagIconsItem,align=Qt.AlignRight)
                     elif maxFlagsInTitleRow == 2:
                         # Also use the title row
                         flagIconsItem.columns = 1 if len(flagIcons) <= rowsForSure+1 else 2
@@ -158,7 +159,7 @@ class StandardDelegate(AbstractDelegate):
                             self.addRight(flagIconsItem)
                         else:
                             flagIconsItem.columns = 2
-                            self.addCenter(flagIconsItem,align=RIGHT)
+                            self.addCenter(flagIconsItem,align=Qt.AlignRight)
         else: 
             # This means len(flagIcons) == 0
             # Try to fit fitInTitleRowText
@@ -166,7 +167,7 @@ class StandardDelegate(AbstractDelegate):
                 titleLength = titleItem.sizeHint(self)[0]
                 if (self.getFontMetrics().width(fitInTitleRowText)
                             <= availableWidth - titleLength - self.hSpace):
-                    self.addCenter(TextItem(fitInTitleRowText),align=RIGHT)
+                    self.addCenter(TextItem(fitInTitleRowText),align=Qt.AlignRight)
                     fittedTextInTitleRow = True
             self.newRow()
         
