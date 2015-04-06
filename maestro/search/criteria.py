@@ -710,6 +710,8 @@ class DateCriterion(AbstractTagCriterion):
             self.value = str(interval.start)
         else: self.value = None
         self.tagList = tagList
+        self.binary = True
+        self.singleWord = False
         self.matchingTags = None
         
     def isUsingTag(self, tag):
