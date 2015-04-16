@@ -166,8 +166,9 @@ class RealFile(urls.BackendFile):
         try:
             self._taglibFile = taglib.File(self.url.path, applyID3v2Hack=True)
         except OSError:
-            logging.warning(__name__, 'TagLib failed to open "{}". Tags will be stored in database only'
-                                      .format(self.url.path))
+            if self.url.extension in config.options.main.audio_extensions:
+                logging.warning(__name__, 'TagLib failed to open "{}". Tags will be stored in database only'
+                                          .format(self.url.path))
             return
         self.length = self._taglibFile.length
         autoProcessingDone = False
