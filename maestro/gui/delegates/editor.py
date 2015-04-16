@@ -20,7 +20,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
 from . import profiles, StandardDelegate
-from ...core import tags
+from ...core import tags, levels
 
 translate = QtCore.QCoreApplication.translate
 
@@ -44,6 +44,23 @@ class EditorDelegate(StandardDelegate):
         if wrapper is not None:
             return LineEdit(wrapper.element, parent)
         else: return None
+        
+    def setModelData(self, editor, model, index):
+        element = editor.element
+        newTitle = editor.text()
+        diff = None
+        if tags.TITLE not in element.tags:
+            if newTitle != '':
+                diff = tags.TagDifference(additions=[(tags.TITLE, newTitle)])
+        else:
+            oldTitle = element.tags[tags.TITLE][0]
+            if newTitle == '':
+                diff = tags.TagDifference(removals=[(tags.TITLE, oldTitle)])
+            elif newTitle != oldTitle:
+                diff = tags.TagDifference(replacements=[(tags.TITLE, oldTitle, newTitle)])
+                
+        if diff is not None:
+            levels.editor.changeTags({element: diff})
 
 
 class LineEdit(QtWidgets.QLineEdit):
