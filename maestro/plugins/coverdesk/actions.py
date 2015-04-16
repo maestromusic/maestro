@@ -52,7 +52,7 @@ class ChangeStackTitleAction(QtWidgets.QAction):
     """Let the user change the title of the given stack."""
     def __init__(self, stack, parent):
         super().__init__(translate('ChangeStackTitleAction', 'Change title...'), parent)
-        self.item = item
+        self.item = stack
         self.triggered.connect(self._triggered)
         
     def _triggered(self):

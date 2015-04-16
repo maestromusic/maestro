@@ -18,7 +18,7 @@
 
 import collections
 
-from PyQt5 import QtCore,QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
@@ -171,8 +171,8 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         """Prepare *urls* to be dropped under *parent*; returns a list of Elements."""
         files = utils.files.collect(urls)
         numFiles = sum(len(v) for v in files.values())
-        progress = QtGui.QProgressDialog(self.tr("Importing {0} files...").format(numFiles),
-                                         self.tr("Cancel"), 0, numFiles)
+        progress = QtWidgets.QProgressDialog(self.tr("Importing {0} files...").format(numFiles),
+                                             self.tr("Cancel"), 0, numFiles)
         progress.setMinimumDuration(1000)
         progress.setWindowModality(Qt.WindowModal)
         filesByFolder = collections.OrderedDict()
