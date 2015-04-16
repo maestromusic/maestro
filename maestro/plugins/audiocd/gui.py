@@ -16,12 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
+import itertools
 import os.path
 from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialogButtonBox
 
-from maestro import config
+from maestro import config, utils
 from maestro.core import levels, tags, domains, urls
 from maestro.core.elements import ContainerType
 from maestro.gui import actions, dialogs, delegates, mainwindow, tagwidgets, treeview

@@ -51,10 +51,10 @@ class AudioFileIdentifier:
             return 'nomusic'
         try:
             data = subprocess.check_output(['fpcalc', path], stderr=subprocess.DEVNULL)
-        except OSError: # fpcalc not found, not executable etc.
+        except OSError:  # fpcalc not found, not executable etc.
             global _logOSError
             if _logOSError:
-                _logOSError = False # This error will always occur  - don't print it again.
+                _logOSError = False  # This error will always occur  - don't print it again.
             logging.warning(__name__, 'Error computing AcoustID fingerprint: fpcalc unavailable?')
             return self.fallbackHash(path)
         except subprocess.CalledProcessError:
