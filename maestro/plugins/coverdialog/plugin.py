@@ -487,7 +487,7 @@ class CoverDialog(QtWidgets.QDialog):
             
     def _handleOpenFromFile(self):
         """Handle the "Open from File..." button."""
-        fileName = QtGui.QFileDialog.getOpenFileName(
+        fileName = QtWidgets.QFileDialog.getOpenFileName(
                                 self,
                                 self.tr("Open cover file"),
                                 os.path.expanduser("~"),
