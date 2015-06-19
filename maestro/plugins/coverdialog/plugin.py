@@ -481,7 +481,7 @@ class CoverDialog(QtWidgets.QDialog):
         """This is called when the user selects a cover in the list of available covers."""
         selectedItems = self.coverList.selectedItems()
         if len(selectedItems) == 0:
-            return # This happens due to self.coverList.clear in _fillAvailableCovers
+            return  # This happens due to self.coverList.clear in _fillAvailableCovers
         cover = selectedItems[0].data(Qt.UserRole)
         self.model.setCover(cover)
             
@@ -492,13 +492,12 @@ class CoverDialog(QtWidgets.QDialog):
                                 self.tr("Open cover file"),
                                 os.path.expanduser("~"),
                                 self.tr("Image files (*.png *.jpg *.jpeg *.bmp);;All files (*)"))
-        if fileName == "": # user canceled the dialog
+        if fileName == "":  # user canceled the dialog
             return
-        
-        pixmap = QtGui.QPixmap(fileName)
+        pixmap = QtGui.QPixmap(fileName[0])  # method returns (filename, filter) tuple
         if pixmap.isNull():
             QtWidgets.QMessageBox.warning(self,self.tr("Failed to open the file"),
-                                      self.tr("The file could not be opened."))
+                                          self.tr("The file could not be opened."))
         else:
             cover = Cover(pixmap=pixmap)
             self.model.setCover(cover)

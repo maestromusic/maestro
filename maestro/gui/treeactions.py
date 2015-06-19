@@ -313,7 +313,7 @@ class DeleteAction(actions.TreeAction):
         self.level().stack.endMacro()
         if self.allowDisk and len(files) > 0:
             from maestro.gui.dialogs import DeleteDialog
-            dialog = DeleteDialog(files,self.parent())
+            dialog = DeleteDialog(files, self.parent())
             if dialog.exec_() == QtWidgets.QDialog.Accepted:
                 self.level().deleteElements(files, fromDisk=True)
 
