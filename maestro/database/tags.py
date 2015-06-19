@@ -22,6 +22,7 @@ from maestro.core import tags as tagsModule
 _idToValue = {}
 _valueToId = {}
 
+
 def cacheValues():
     """Cache all id<->value relations, except for text-tags (which are mostly not displayed)."""
     for tag in tagsModule.tagList:
@@ -78,7 +79,6 @@ def value(tagSpec, valueId):
     return value
 
 
-
 def id(tagSpec, value, insert=False):
     """Return the id of the given value in the tag-table of tag *tagSpec*. If the value does not exist,
     raise an EmptyResultException, unless the optional parameter *insert* is set to True. In that case
@@ -93,18 +93,15 @@ def id(tagSpec, value, insert=False):
             return id
 
     # Look up id
-    if tag.type in (tagsModule.TYPE_VARCHAR, tagsModule.TYPE_TEXT):
-        if type == 'mysql':
-            whereClause = "value COLLATE utf8_bin = ?"
-        else: whereClause = "value = ?"
-        args = [tag.sqlFormat(value)]
+    if tag.type in (tagsModule.TYPE_VARCHAR, tagsModule.TYPE_TEXT) and type == 'mysql':
+        whereClause = "value COLLATE utf8_bin = ?"
     else:
         whereClause = "value = ?"
-        args = [tag.sqlFormat(value)]
+    args = [tag.sqlFormat(value)]
         
     ids = list(getIdsAndValues(tag, whereClause, *args))
     if len(ids) > 0:
-        id = ids[0]
+        id = ids[0][0]
     elif insert:
         if tag.type == tagsModule.TYPE_VARCHAR:
             columns = 'tag_id, value, search_value'
@@ -116,7 +113,8 @@ def id(tagSpec, value, insert=False):
                           .format(tag.type.table, columns, ','.join(['?']*len(args))),
                           *args)
         id = result.insertId()
-    else: raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
+    else:
+        raise KeyError("No value id for tag '{}' and value '{}'".format(tag, value))
     
     # Store id in cache
     if tag.type != tagsModule.TYPE_TEXT:
