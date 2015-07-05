@@ -127,7 +127,6 @@ def init(**kwargs):
     
     if type == 'sqlite':
         path = kwargs.get('path', config.options.database.sqlite_path).strip()
-        print("PATH", path, kwargs.get('path'))
         # Replace 'config:' prefix in path
         if path.startswith('config:'):
             path = os.path.join(config.CONFDIR, path[len('config:'):])

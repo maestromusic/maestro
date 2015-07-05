@@ -237,14 +237,12 @@ class ValueIdsCheck(Check):
                       
     _name = translate("DBAnalyzerChecks", "Value IDs")
 
-    def _query(self, type, data, delete):
+    def _query(self, type, data):
         """Build a query selecting invalid tag references in the tag-table of type *type* (or only their
-        number if *data* is true)."""
-        if not delete:
-            if not data:
-                beginning = "SELECT COUNT(*)"
-            else: beginning = "SELECT element_id, {0}tags.tag_id, value_id".format(db.prefix)
-        else: beginning = "DELETE {0}tags".format(db.prefix)
+        number if *data* is false)."""
+        if not data:
+            beginning = "SELECT COUNT(*)"
+        else: beginning = "SELECT element_id, {0}tags.tag_id, value_id".format(db.prefix)
         return beginning + """
             FROM {0}tags LEFT JOIN {0}values_{1} ON {0}tags.tag_id = {0}values_{1}.tag_id
                                                  AND {0}tags.value_id = {0}values_{1}.id
@@ -253,17 +251,19 @@ class ValueIdsCheck(Check):
             
     def check(self, data):
         if not data:
-            return sum(db.query(self._query(type.name, False, False)).getSingle() for type in tags.TYPES)
+            return sum(db.query(self._query(type.name, False)).getSingle() for type in tags.TYPES)
         else:
             result = []
             for type in tags.TYPES:
                 result.extend((row[0], getTitle(row[0]), row[1], row[2])
-                                    for row in db.query(self._query(type.name, True, False)))
+                                    for row in db.query(self._query(type.name, True)))
             return result
             
     def _fix(self):
         for type in tags.TYPES:
-            db.query(self._query(type.name, False, True))
+            data = list(db.query(self._query(type.name, True)))
+            if len(data) > 0:
+                db.multiQuery("DELETE FROM {p}tags WHERE element_id=? AND tag_id=? AND value_id=?", data)
 
 
 class DoubleTagsCheck(Check):
