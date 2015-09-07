@@ -18,35 +18,39 @@
 
 from PyQt5 import QtCore
 
-from ...core import tags, covers
-from ...core.nodes import Wrapper
-from . import profiles, StandardDelegate, TextItem, STD_STYLE, ITALIC_STYLE, BOLD_STYLE
+from maestro.core import tags, covers
+from maestro.gui.delegates import profiles, StandardDelegate, TextItem, STD_STYLE, ITALIC_STYLE,\
+    BOLD_STYLE
 
 translate = QtCore.QCoreApplication.translate
+
+
+def init():
+    BrowserDelegate.profileType = profiles.createProfileType(
+        name='browser',
+        title=translate("Delegates","Browser"),
+        leftData=['t:composer', 't:artist', 't:performer'],
+        rightData=['t:date', 't:conductor'],
+        overwrite={"fitInTitleRowData": profiles.DataPiece(tags.get("date"))
+                                        if tags.isInDb("date") else None},
+        addOptions=[
+            profiles.DelegateOption("showSortValues",
+                translate("Delegates", "Display sort values instead of real values"),"bool",False)
+        ]
+    )
 
 
 class BrowserDelegate(StandardDelegate):
     """Delegate used in the Browser. Does some effort to put flag icons at the optimal place using free space
     in the title row and trying not to increase the overall number of rows.
     """
-
-    profileType = profiles.createProfileType(
-            name       = 'browser',
-            title      = translate("Delegates","Browser"),
-            leftData   = ['t:composer','t:artist','t:performer'],
-            rightData  = ['t:date','t:conductor'],
-            overwrite  = {"fitInTitleRowData": profiles.DataPiece(tags.get("date"))
-                                         if tags.isInDb("date") else None},
-            addOptions = [profiles.DelegateOption("showSortValues",
-                         translate("Delegates","Display sort values instead of real values"),"bool",False)]
-    )
     
-    def __init__(self,view,profile):
-        super().__init__(view,profile)
+    def __init__(self, view, profile):
+        super().__init__(view, profile)
         # Don't worry, addCacheSize won't add sizes twice
         covers.addCacheSize(self.profile.options['coverSize'])
     
-    def layout(self,index,availableWidth):
+    def layout(self, index, availableWidth):
         node = index.model().data(index)
         from maestro.widgets import browser
         
@@ -56,17 +60,16 @@ class BrowserDelegate(StandardDelegate):
                 self.addCenter(TextItem(value, style=BOLD_STYLE if matching else STD_STYLE))
                 self.newRow()
         elif isinstance(node, browser.nodes.VariousNode):
-            self.addCenter(TextItem(self.tr("Unknown/Various"),ITALIC_STYLE))
+            self.addCenter(TextItem(self.tr("Unknown/Various"), ITALIC_STYLE))
         elif isinstance(node, browser.nodes.HiddenValuesNode):
-            self.addCenter(TextItem(self.tr("Hidden"),ITALIC_STYLE))
+            self.addCenter(TextItem(self.tr("Hidden"), ITALIC_STYLE))
         elif isinstance(node, browser.nodes.LoadingNode):
-            self.addCenter(TextItem(self.tr("Loading..."),ITALIC_STYLE))
+            self.addCenter(TextItem(self.tr("Loading..."), ITALIC_STYLE))
         else:
-            super().layout(index,availableWidth)
+            super().layout(index, availableWidth)
     
-    def _handleProfileChanged(self,profile):
+    def _handleProfileChanged(self, profile):
         """React to the configuration dispatcher."""
         super()._handleProfileChanged(profile)
         if profile == self.profile:
             covers.addCacheSize(profile.options['coverSize'])
-            

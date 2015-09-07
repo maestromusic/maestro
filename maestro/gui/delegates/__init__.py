@@ -29,6 +29,16 @@ from maestro.gui.delegates import profiles
 
 translate = QtCore.QCoreApplication.translate
 
+
+def init():
+    from maestro.gui.delegates import abstractdelegate, profiles
+    abstractdelegate.init()
+    profiles.init()
+    from maestro.gui.delegates import browser, editor
+    browser.init()
+    editor.init()
+
+
 class StandardDelegate(AbstractDelegate):
     """While still abstract, this class implements almost all of the features used by the usual delegates in
     Maestro. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default
@@ -340,6 +350,6 @@ class StandardDelegate(AbstractDelegate):
             return TextItem(element.url.scheme, DelegateStyle(bold=True, color=Qt.red))
             
             
-def _join(sep,strings):
+def _join(sep, strings):
     """Join *strings* using *sep* but removing empty strings."""
     return sep.join(s for s in strings if len(s) > 0)

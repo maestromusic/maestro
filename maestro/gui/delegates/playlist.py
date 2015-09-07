@@ -24,11 +24,9 @@ from ...core import covers
 
 translate = QtCore.QCoreApplication.translate
 
+def init():
 
-class PlaylistDelegate(StandardDelegate):
-    """Delegate for the playlist."""
-    
-    profileType = profiles.createProfileType(
+    PlaylistDelegate.profileType = profiles.createProfileType(
             name      = 'playlist',
             title     = translate("Delegates","Playlist"),
             leftData  = ['t:composer','t:artist','t:performer'],
@@ -37,6 +35,9 @@ class PlaylistDelegate(StandardDelegate):
                          "showMajorAncestors": True
                         }
     )
+
+class PlaylistDelegate(StandardDelegate):
+    """Delegate for the playlist."""
     
     def __init__(self,view,profile):
         super().__init__(view,profile)
@@ -53,4 +54,3 @@ class PlaylistDelegate(StandardDelegate):
         super()._handleProfileChanged(profile)
         if profile == self.profile:
             covers.addCacheSize(profile.options['coverSize'])
-    

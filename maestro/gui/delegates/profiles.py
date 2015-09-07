@@ -38,17 +38,42 @@ class DelegateProfileCategory(profiles.TypedProfileCategory):
 
 
 def init():
-    global category
+    global category, defaultOptions, defaultProfileType
     category = DelegateProfileCategory(
-           name = "delegates",
-           title = translate("Delegates","Item display"),
-           storageOption = config.getOption(config.storage, 'gui.delegates'),
-           description = translate("Delegates",
-                    "Configure how elements are rendered in treeviews like browser, editor and playlist."),
-           iconName='preferences-delegates',
+        name="delegates",
+        title=translate("Delegates","Item display"),
+        storageOption=config.getOption(config.storage, 'gui.delegates'),
+        description=translate(
+            "Delegates",
+            "Configure how elements are rendered in treeviews like browser, editor and playlist."),
+        iconName='preferences-delegates',
     )
-
     profiles.manager.addCategory(category)
+    # List of available options for delegates. This list in particular defines the default values.
+    defaultOptions = [DelegateOption(*data) for data in [
+        ("fontSize", translate("Delegates", "Fontsize"), "int", 8),
+        ("showMajorAncestors", translate("Delegates", "Mention major parent containers which are not in the tree."), "bool", False),
+        ("showAllAncestors", translate("Delegates", "Mention all parent containers which are not in the tree."), "bool", False),
+        ("showType", translate("Delegates", "Display element type"), "bool", False),
+        ("showPositions", translate("Delegates", "Display position numbers"), "bool", True),
+        ("showPaths", translate("Delegates", "Display paths"), "bool", False),
+        ("showFlagIcons", translate("Delegates", "Display flag icons"), "bool", True),
+        ("removeParentFlags", translate("Delegates", "Remove flags which appear in ancestor elements"), "bool", True),
+        ("fitInTitleRowData", translate("Delegates", "This datapiece will be displayed next to the title if it fits"), "datapiece", None),
+        ("appendRemainingTags", translate("Delegates", "Append all tags that are not listed above"), "bool", False),
+        #("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
+        #("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
+        #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
+        ("coverSize", translate("Delegates", "Size of covers"), "int", 40)
+    ]]
+
+    # This type is useful to create profiles which are not configurable
+    defaultProfileType = ProfileType('default',
+                                     translate("Delegates","Standard"),
+                                     collections.OrderedDict([(option.name,option)
+                                                              for option in defaultOptions]),
+                                     [],
+                                     [])
 
 
 class ProfileType(profiles.ProfileType):
@@ -362,29 +387,3 @@ class DelegateOption:
                 except ValueError:
                     logging.warning(__name__, "Invalid datapiece in delegate configuration in storage file.")
                     return None
-
-# List of available options for delegates. This list in particular defines the default values.
-defaultOptions = [DelegateOption(*data) for data in [
-        ("fontSize", translate("Delegates", "Fontsize"), "int", 8),
-        ("showMajorAncestors", translate("Delegates", "Mention major parent containers which are not in the tree."), "bool", False),
-        ("showAllAncestors", translate("Delegates", "Mention all parent containers which are not in the tree."), "bool", False),
-        ("showType", translate("Delegates", "Display element type"), "bool", False),
-        ("showPositions", translate("Delegates", "Display position numbers"), "bool", True),
-        ("showPaths", translate("Delegates", "Display paths"), "bool", False),
-        ("showFlagIcons", translate("Delegates", "Display flag icons"), "bool", True),
-        ("removeParentFlags", translate("Delegates", "Remove flags which appear in ancestor elements"), "bool", True),
-        ("fitInTitleRowData", translate("Delegates", "This datapiece will be displayed next to the title if it fits"), "datapiece", None),
-        ("appendRemainingTags", translate("Delegates", "Append all tags that are not listed above"), "bool", False),
-        #("hideParentFlags",translate("Delegates","Hide flags that appear in parent elements"),"bool",True),
-        #("maxRowsTag",translate("Delegates","Maximal number of rows per tag"),"int",4),
-        #("maxRowsElement",translate("Delegates","Maximal number of rows per element"),"int",50),
-        ("coverSize", translate("Delegates", "Size of covers"), "int", 40)
-    ]]
-
-# This type is useful to create profiles which are not configurable
-defaultProfileType = ProfileType('default',
-                                 translate("Delegates","Standard"),
-                                 collections.OrderedDict([(option.name,option)
-                                                          for option in defaultOptions]),
-                                 [],
-                                 [])

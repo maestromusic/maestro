@@ -34,18 +34,22 @@ class DelegateStyle:
     three attributes *relFontSize*, *bold* and *italic*. *relFontSize* is a factor which is multiplied with
     the delegate option ''fontSize''.
     """
-    def __init__(self, relFontSize=1, bold=False, italic=False,
-                 color=QtWidgets.qApp.palette().color(QtGui.QPalette.WindowText)):
+    def __init__(self, relFontSize=1, bold=False, italic=False, color=None):
         self.bold = bold
         self.italic = italic
         self.relFontSize = relFontSize
+        if color is None:
+            color = QtWidgets.qApp.palette().color(QtGui.QPalette.WindowText)
         self.color = color
             
 
-# Some standard styles used in the delegates
-STD_STYLE = DelegateStyle(1, False, False)
-ITALIC_STYLE = DelegateStyle(1, False, True)
-BOLD_STYLE = DelegateStyle(1, True, False)
+STD_STYLE = ITALIC_STYLE = BOLD_STYLE = False
+def init():
+    # Some standard styles used in the delegates
+    global STD_STYLE, ITALIC_STYLE, BOLD_STYLE
+    STD_STYLE = DelegateStyle(1, False, False)
+    ITALIC_STYLE = DelegateStyle(1, False, True)
+    BOLD_STYLE = DelegateStyle(1, True, False)
             
             
 class AbstractDelegate(QtWidgets.QStyledItemDelegate):
@@ -441,7 +445,6 @@ class IconBarItem(DelegateItem):
         self.icons = icons
         self.rows = rows
         self.columns = columns
-        
     
     def _computeRowsAndColumns(self,availableWidth):
         """Compute the grid to use given the number of icons and the attributes ''self.rows'' and

@@ -24,11 +24,8 @@ from ...core import tags, levels
 
 translate = QtCore.QCoreApplication.translate
 
-
-class EditorDelegate(StandardDelegate):
-    """Delegate for the editor."""
-
-    profileType = profiles.createProfileType(
+def init():
+    EditorDelegate.profileType = profiles.createProfileType(
             name      = 'editor',
             title     = translate("Delegates","Editor"),
             leftData  = ['t:album','t:composer','t:artist','t:performer'],
@@ -38,6 +35,10 @@ class EditorDelegate(StandardDelegate):
                          'appendRemainingTags': True,
                          'showAllAncestors': True}
     )
+
+
+class EditorDelegate(StandardDelegate):
+    """Delegate for the editor."""
     
     def createEditor(self, parent, option, index):
         wrapper = index.model().data(index)

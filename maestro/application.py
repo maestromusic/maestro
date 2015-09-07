@@ -271,8 +271,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     if type == 'test' or exitPoint == 'noplugins':
         return app
 
-    import maestro.gui.delegates.profiles
-    maestro.gui.delegates.profiles.init()
+    import maestro.gui.delegates
+    maestro.gui.delegates.init()
 
     # Load Plugins
     if type == 'gui':
