@@ -15,5 +15,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from maestro.widgets.editor import model
-from maestro.widgets.editor.editor import EditorTreeView, EditorWidget
+
+from PyQt5 import QtCore
+from maestro.widgets.editor.editor import EditorTreeView
+translate = QtCore.QCoreApplication.translate
+
+
+def init():
+    from maestro import utils
+    from maestro.widgets import WidgetClass
+    from maestro.gui import treeactions
+    from maestro.widgets.editor.editor import EditorTreeView, EditorWidget
+    for identifier in 'editTags', 'remove', 'merge', 'flatten', 'clearTree', 'commit':
+        EditorTreeView.addActionDefinition(identifier)
+    treeactions.SetElementTypeAction.addSubmenu(EditorTreeView.actionConf.root)
+    treeactions.ChangePositionAction.addSubmenu(EditorTreeView.actionConf.root)
+    WidgetClass(
+        id='editor', theClass=EditorWidget, name=translate('Editor', 'editor'),
+        icon=utils.images.icon('accessories-text-editor'),
+        preferredDockArea='right'
+    ).register()

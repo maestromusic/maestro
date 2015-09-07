@@ -18,15 +18,15 @@
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
-translate = QtCore.QCoreApplication.translate
 
-from maestro import utils, widgets
+from maestro import widgets
 from maestro.core import levels, tags
 from maestro.widgets.editor import albumguesser
 from maestro.widgets.editor.model import EditorModel
-from maestro.gui import treeview, treeactions, tagwidgets, dialogs, delegates
+from maestro.gui import treeview, tagwidgets, dialogs, delegates
 from maestro.gui.delegates import editor as editordelegate
 from maestro.gui.preferences import profiles as profilesgui
+translate = QtCore.QCoreApplication.translate
 
 
 class EditorTreeView(treeview.DraggingTreeView):
@@ -52,12 +52,6 @@ class EditorTreeView(treeview.DraggingTreeView):
                                                           self.model().index(end, 0, parent)),
                                      QtCore.QItemSelectionModel.ClearAndSelect)
         self.setFocus(Qt.MouseFocusReason)
-
-
-for identifier in 'editTags', 'remove', 'merge', 'flatten', 'clearTree', 'commit':
-    EditorTreeView.addActionDefinition(identifier)
-treeactions.SetElementTypeAction.addSubmenu(EditorTreeView.actionConf.root)
-treeactions.ChangePositionAction.addSubmenu(EditorTreeView.actionConf.root)
 
 
 class EditorWidget(widgets.Widget):
@@ -250,12 +244,3 @@ class ExternalTagsWidget(QtWidgets.QScrollArea):
                     index = self.editor.model().getIndex(wrapper)
                     itemSelection.select(index,index)
             self.editor.selectionModel().select(itemSelection,QtCore.QItemSelectionModel.ClearAndSelect)
-
-
-widgets.addClass(
-    id='editor',
-    name=translate("Editor", "editor"),
-    icon=utils.images.icon('accessories-text-editor'),
-    theClass=EditorWidget,
-    preferredDockArea = 'right'
-)

@@ -16,4 +16,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from maestro.widgets.tageditor.tageditor import TagEditorWidget, TagEditorDialog
+
+from PyQt5 import QtCore
+translate = QtCore.QCoreApplication.translate
+
+
+def init():
+    from maestro import utils
+    from maestro.widgets import WidgetClass
+    from maestro.widgets.tageditor.tageditor import TagEditorWidget, TagEditorDialog
+
+    WidgetClass(
+        id='tageditor', theClass=TagEditorWidget, name=translate('Tageditor', 'Tag Editor'),
+        icon=utils.images.icon('tageditor'),
+        unique=True,
+        areas='dock', preferredDockArea='right'
+    ).register()

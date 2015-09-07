@@ -38,11 +38,13 @@ SMALL_COVER_SIZE = 40
 
 
 def enable():
-    from maestro.widgets.editor import editor
-    from maestro.widgets import browser
-    CoverAction.register('editCovers', context='plugins', description=translate('CoverAction', 'Edit covers'))
-    editor.EditorTreeView.addActionDefinition('editCovers')
-    browser.BrowserTreeView.addActionDefinition('editCovers')
+    from maestro.widgets.editor import EditorTreeView
+    from maestro.widgets.browser import BrowserTreeView
+    CoverAction.register(
+        'editCovers', context='plugins', description=translate('CoverAction', 'Edit covers')
+    )
+    EditorTreeView.addActionDefinition('editCovers')
+    BrowserTreeView.addActionDefinition('editCovers')
 
 
 def disable():

@@ -19,9 +19,9 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from .. import utils, logging
-from ..core import flags
-from ..search import criteria
+from maestro import logging
+from maestro.core import flags
+from maestro.search import criteria
 
 
 class SearchBox(QtWidgets.QLineEdit):

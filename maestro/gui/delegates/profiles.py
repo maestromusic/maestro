@@ -18,12 +18,13 @@
 
 import copy, collections
 
-from PyQt5 import QtCore,QtGui
+from PyQt5 import QtCore, QtGui
 from PyQt5.QtCore import Qt
-translate = QtCore.QCoreApplication.translate
+from maestro import config, profiles, logging
+from maestro.core import tags
 
-from ... import config, profiles, logging
-from ...core import tags
+translate = QtCore.QCoreApplication.translate
+category = None
 
 
 class DelegateProfileCategory(profiles.TypedProfileCategory):
@@ -34,17 +35,20 @@ class DelegateProfileCategory(profiles.TypedProfileCategory):
             if profile is not None and restrictToType is None and profile.type == restrictToType:
                 return profile
         return restrictToType.default()
-    
-category = DelegateProfileCategory(
-       name = "delegates",
-       title = translate("Delegates","Item display"),
-       storageOption = config.getOption(config.storage, 'gui.delegates'),
-       description = translate("Delegates",
-                "Configure how elements are rendered in treeviews like browser, editor and playlist."),
-       iconName='preferences-delegates',
-)
-                                   
-profiles.manager.addCategory(category)
+
+
+def init():
+    global category
+    category = DelegateProfileCategory(
+           name = "delegates",
+           title = translate("Delegates","Item display"),
+           storageOption = config.getOption(config.storage, 'gui.delegates'),
+           description = translate("Delegates",
+                    "Configure how elements are rendered in treeviews like browser, editor and playlist."),
+           iconName='preferences-delegates',
+    )
+
+    profiles.manager.addCategory(category)
 
 
 class ProfileType(profiles.ProfileType):
@@ -359,9 +363,8 @@ class DelegateOption:
                     logging.warning(__name__, "Invalid datapiece in delegate configuration in storage file.")
                     return None
 
- 
 # List of available options for delegates. This list in particular defines the default values.
-defaultOptions = [DelegateOption(*data) for data in [                                            
+defaultOptions = [DelegateOption(*data) for data in [
         ("fontSize", translate("Delegates", "Fontsize"), "int", 8),
         ("showMajorAncestors", translate("Delegates", "Mention major parent containers which are not in the tree."), "bool", False),
         ("showAllAncestors", translate("Delegates", "Mention all parent containers which are not in the tree."), "bool", False),

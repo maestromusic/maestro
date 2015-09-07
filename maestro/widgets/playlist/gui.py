@@ -19,17 +19,15 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import player, utils, widgets
+from maestro import player, widgets
 from maestro.core import levels, nodes
 from maestro.models import rootedtreemodel
-from maestro.gui import actions, dialogs, treeview, delegates, treeactions
+from maestro.gui import actions, dialogs, treeview, delegates
 from maestro.gui.delegates import playlist as playlistdelegate
 from maestro.gui.preferences import profiles as profilesgui
+from maestro.widgets import WidgetClass
 
 translate = QtCore.QCoreApplication.translate
-
-# the default playlist used for user commands that do not specify a particular playlist
-defaultPlaylist = None
 
 
 def appendToDefaultPlaylist(wrappers, replace=False):
@@ -37,9 +35,10 @@ def appendToDefaultPlaylist(wrappers, replace=False):
     If *replace* is true, clear the playlist. If the playlist is currently stopped, start it with the new
     wrappers.
     """
-    if defaultPlaylist is None:
+    currentPlaylist = WidgetClass.currentWidget('playlist')
+    if currentPlaylist is None:
         return
-    model = defaultPlaylist.model()
+    model = currentPlaylist.treeview.model()
     if model.backend.connectionState != player.ConnectionState.Connected:
         return
     if replace:
@@ -77,12 +76,6 @@ class ClearPlaylistAction(actions.TreeAction):
 
     def doAction(self):
         self.parent().model().clear()
-
-
-RemoveFromPlaylistAction.register('removeFromPL', context='playback',
-                                  shortcut=translate('RemoveFromPlaylistAction', 'Del'))
-ClearPlaylistAction.register('clearPL', context='playback',
-                             shortcut=translate('ClearPlaylistAction', 'Shift+Del'))
 
 
 class PlaylistTreeView(treeview.DraggingTreeView):
@@ -124,8 +117,6 @@ class PlaylistTreeView(treeview.DraggingTreeView):
                 self.removeAction(action)
         self.backend = backend
         if backend is not None:
-            global defaultPlaylist
-            defaultPlaylist = self
             model = backend.playlist
             self.setRootIsDecorated(True)
             for action in backend.treeActions():
@@ -144,10 +135,6 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         
     def removeSelected(self):
         self.model().removeMany(self.selectedRanges())
-
-
-for definition in 'editTags', 'removeFromPL', 'clearPL':
-    PlaylistTreeView.addActionDefinition(definition)
 
 
 class PlaylistWidget(widgets.Widget):
@@ -217,14 +204,6 @@ class PlaylistWidget(widgets.Widget):
     
     def createOptionDialog(self, button=None):
         return OptionDialog(button, self)
-        
-        
-widgets.addClass(
-    id = "playlist",
-    name = translate("Playlist", "Playlist"),
-    icon = utils.images.icon('view-media-playlist'),
-    theClass = PlaylistWidget
-)
 
 
 class OptionDialog(dialogs.FancyPopup):

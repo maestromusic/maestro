@@ -444,10 +444,10 @@ class MainWindow(QtWidgets.QMainWindow):
                         action.setEnabled(False)
                 menu.addAction(action)
 
-        _updateMenu([wClass for wClass in widgets.widgetClasses if 'central' in wClass.areas],
+        _updateMenu([wClass for wClass in widgets.widgetClasses() if 'central' in wClass.areas],
                     self.menus['centralwidgets'],
                     self.addCentralWidget)
-        _updateMenu([wClass for wClass in widgets.widgetClasses
+        _updateMenu([wClass for wClass in widgets.widgetClasses()
                                     if wClass.allowedDockAreas() != Qt.NoDockWidgetArea],
                     self.menus['dockwidgets'],
                     self.addDockWidget)
@@ -577,7 +577,8 @@ class CentralTabBar(QtWidgets.QTabBar):
         return super().dragEnterEvent(event)
 
 
-fullscreenAction = actions.ActionDefinition('view', 'fullScreen',
-                                            translate('MainWindow', 'Toggle full-screen mode'),
-                                            shortcut=translate('QShortcut', 'F11'))
-actions.manager.registerAction(fullscreenAction)
+def init():
+    fullscreenAction = actions.ActionDefinition('view', 'fullScreen',
+                                                translate('MainWindow', 'Toggle full-screen mode'),
+                                                shortcut=translate('QShortcut', 'F11'))
+    actions.manager.registerAction(fullscreenAction)

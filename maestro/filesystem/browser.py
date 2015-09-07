@@ -274,13 +274,3 @@ class FileSystemSelection(selection.Selection):
     
     def hasElements(self):
         return len(self._files) > 0
-        
-        
-# register this widget in the main application
-widgets.addClass(
-    id='filesystembrowser',
-    theClass=FilesystemBrowser,
-    name=translate('FilesystemBrowser', 'File System Browser'),
-    icon=utils.images.icon('filesystembrowser'),
-    areas='dock', preferredDockArea='right'
-)

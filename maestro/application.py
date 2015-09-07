@@ -270,7 +270,10 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     if type == 'test' or exitPoint == 'noplugins':
         return app
-    
+
+    import maestro.gui.delegates.profiles
+    maestro.gui.delegates.profiles.init()
+
     # Load Plugins
     if type == 'gui':
         splash.showMessage(translate('Splash', 'Loading plugins'))
@@ -284,17 +287,21 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
         return app
 
     from . import filesystem
-    filesystem.init()
+    filesystem.enable()
 
     # Create GUI
     splash.showMessage(translate('Splash', 'Loading GUI classes'))
     from maestro.gui import mainwindow
     # First import all modules that want to register WidgetClass-instances
-
-    from maestro.widgets import browser, playback, playlist, editor, details, tageditor
-    from maestro.filesystem import browser as fsbrowser
-
+    import maestro.filesystem
+    from maestro.gui import treeactions
+    import maestro.widgets.playlist.gui
+    import maestro.widgets.editor.editor
     global mainWindow
+    mainwindow.init()
+    treeactions.init()
+    maestro.widgets.init()
+    maestro.filesystem.init()
     splash.showMessage(translate('Splash', 'Creating main window'))
     mainWindow = mainwindow.MainWindow()
     plugins.mainWindowInit()
@@ -308,7 +315,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     
     # Close operations
     logger.debug('main application quit')
-    filesystem.shutdown()
+    filesystem.disable()
     mainWindow.close()
     plugins.shutdown()
     covers.shutdown()

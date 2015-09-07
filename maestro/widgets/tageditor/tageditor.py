@@ -466,17 +466,6 @@ class TagEditorWidget(widgets.Widget):
         self.includeContentsButton.setChecked(value)
 
 
-widgetClass = widgets.addClass(
-    id = "tageditor",
-    name = translate("Tageditor", "Tageditor"),
-    icon = utils.images.icon('tageditor'),
-    theClass = TagEditorWidget,
-    unique = True,
-    areas = 'dock',
-    preferredDockArea = 'right'
-)
-
-
 class RecordDialog(QtWidgets.QDialog):
     """Dialog to edit a single record. Parameters are:
     

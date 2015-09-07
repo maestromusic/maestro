@@ -31,7 +31,7 @@ from maestro.core.nodes import RootNode, Wrapper
  
 class PlaylistModel(wrappertreemodel.WrapperTreeModel):
     """Model for Playlists of a player backend."""
-    _dontGlueAway = None # See glue and move
+    _dontGlueAway = None  # See glue and move
     
     def __init__(self, backend=None, level=None, stack=None):
         """Initialize with an empty playlist."""
@@ -43,7 +43,8 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         if stack is None:
             from maestro import stack
             self.stack = stack.stack
-        else: self.stack = stack
+        else:
+            self.stack = stack
         # self.current and all of its parents. The delegate draws an arrow in front of these nodes
         self.currentlyPlayingNodes = []
         self._updateNecessary = False # see _scheduleUpdateCurrentlyPlayingNodes

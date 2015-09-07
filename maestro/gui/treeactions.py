@@ -29,6 +29,36 @@ from maestro.gui import actions, dialogs
 translate = QtCore.QCoreApplication.translate
 
 
+def init():
+    EditTagsAction.register('editTags', shortcut=translate('QShortcut', 'Ctrl+T'))
+    RemoveFromParentAction.register('remove', shortcut=QtGui.QKeySequence(QtGui.QKeySequence.Delete))
+    MergeAction.register('merge', description=translate('MergeAction',
+                                                        'Merge elements into a new container'),
+                         shortcut=translate('QShortcut', 'Ctrl+M'))
+    FlattenAction.register('flatten', shortcut=translate('QShortcut', 'Ctrl+F'))
+    ChangePositionAction.register('changePos*',
+                                  description=translate('ChangePositionAction', 'Change position'),
+                                  shortcut=translate('QShortcut', 'Ctrl+P'), mode='*')
+    ChangePositionAction.register('changePos+',
+                                  description=translate('ChangePositionAction', 'Increase position by 1'),
+                                  shortcut=translate('QShortcut', '+'), mode='+',)
+    ChangePositionAction.register('changePos-',
+                                  description=translate('ChangePositionAction', 'Decrease position by 1'),
+                                  shortcut=translate('QShortcut', '-'), mode='-',)
+    typeDesc = translate('SetElementTypeAction', 'Set type to "{}"')
+    for type in elements.ContainerType:
+        SetElementTypeAction.register('setType' + type.name, description=typeDesc.format(type.title()),
+                                      type=type)
+    ClearTreeAction.register('clearTree', context='misc',
+                             description=translate('ClearTreeAction', 'Clear (empty) all contents'),
+                             shortcut=translate('QShortcut', 'Shift+Del'))
+    CommitTreeAction.register('commit', context='misc',
+                              description=translate('CommitTreeAction', 'Store all changes made in this view'),
+                            shortcut=translate('QShortcut', 'Shift+Return'))
+    DeleteAction.register('delete', shortcut=translate('QShortcut', 'Ctrl+Del'))
+    ChangeFileUrlsAction.register('changeURLs')
+
+
 class EditTagsAction(actions.TreeAction):
     """Action to edit tags; exists both in a recursive and non-recursive variant, depending on the argument
     to the constructor."""
@@ -46,8 +76,6 @@ class EditTagsAction(actions.TreeAction):
         dialog = tageditor.TagEditorDialog(parent=self.parent())
         dialog.useElementsFromSelection(self.parent().selection)
         dialog.exec_()
-
-EditTagsAction.register('editTags', shortcut=translate('QShortcut', 'Ctrl+T'))
 
 
 class RemoveFromParentAction(actions.TreeAction):
@@ -87,8 +115,6 @@ class RemoveFromParentAction(actions.TreeAction):
             raise NotImplementedError()
         stack.endMacro()
 
-RemoveFromParentAction.register('remove', shortcut=QtGui.QKeySequence(QtGui.QKeySequence.Delete))
-
 
 class MergeAction(actions.TreeAction):
     """Action to merge selected elements into a new container."""
@@ -104,9 +130,6 @@ class MergeAction(actions.TreeAction):
         nodes = sorted(selection.wrappers(), key=lambda wrap: wrap.parent.contents.index(wrap))
         dialog = MergeDialog(self.parent().model(), nodes, self.parent())
         dialog.exec_()
-
-MergeAction.register('merge', description=translate('MergeAction', 'Merge elements into a new container'),
-                     shortcut=translate('QShortcut', 'Ctrl+M'))
 
 
 class FlattenAction(actions.TreeAction):
@@ -136,8 +159,6 @@ class FlattenAction(actions.TreeAction):
                 self.level().removeElements([element])
             self.level().insertContentsAuto(parent, index, children)
         stack.endMacro()
-
-FlattenAction.register('flatten', shortcut=translate('QShortcut', 'Ctrl+F'))
 
 
 class ChangePositionAction(actions.TreeAction):
@@ -175,16 +196,6 @@ class ChangePositionAction(actions.TreeAction):
         for mode in '+', '-', '*':
             subTree.addActionDefinition('changePos' + mode)
 
-ChangePositionAction.register('changePos*',
-                              description=translate('ChangePositionAction', 'Change position'),
-                              shortcut=translate('QShortcut', 'Ctrl+P'), mode='*')
-ChangePositionAction.register('changePos+',
-                              description=translate('ChangePositionAction', 'Increase position by 1'),
-                              shortcut=translate('QShortcut', '+'), mode='+',)
-ChangePositionAction.register('changePos-',
-                              description=translate('ChangePositionAction', 'Decrease position by 1'),
-                              shortcut=translate('QShortcut', '-'), mode='-',)
-
 
 class SetElementTypeAction(actions.TreeAction):
     """Action to set the element type of one or more elements."""
@@ -213,12 +224,6 @@ class SetElementTypeAction(actions.TreeAction):
             subTree.addActionDefinition('setType' + type.name)
 
 
-typeDesc = translate('SetElementTypeAction', 'Set type to "{}"')
-for type in elements.ContainerType:
-    SetElementTypeAction.register('setType' + type.name, description=typeDesc.format(type.title()),
-                                  type=type)
-
-
 class ClearTreeAction(actions.TreeAction):
     """This action clears a tree model."""
 
@@ -232,10 +237,6 @@ class ClearTreeAction(actions.TreeAction):
 
     def doAction(self):
         self.parent().model().clear()
-
-ClearTreeAction.register('clearTree', context='misc',
-                         description=translate('ClearTreeAction', 'Clear (empty) all contents'),
-                         shortcut=translate('QShortcut', 'Shift+Del'))
 
 
 class CommitTreeAction(actions.TreeAction):
@@ -261,10 +262,6 @@ class CommitTreeAction(actions.TreeAction):
         else:
             dialogs.warning(self.tr('No commit possible'),
                             self.tr("Can't commit while editor contains external tags."))
-
-CommitTreeAction.register('commit', context='misc',
-                          description=translate('CommitTreeAction', 'Store all changes made in this view'),
-                          shortcut=translate('QShortcut', 'Shift+Enter'))
 
 
 class DeleteAction(actions.TreeAction):
@@ -316,8 +313,6 @@ class DeleteAction(actions.TreeAction):
             dialog = DeleteDialog(files, self.parent())
             if dialog.exec_() == QtWidgets.QDialog.Accepted:
                 self.level().deleteElements(files, fromDisk=True)
-
-DeleteAction.register('delete', shortcut=translate('QShortcut', 'Ctrl+Del'))
 
 
 class ChangeFileUrlsAction(actions.TreeAction):
@@ -427,5 +422,3 @@ class ChangeFileUrlsAction(actions.TreeAction):
                                         .format(str(oldUrl), str(newUrl))))
                     return
             self.level().renameFiles(changes)
-
-ChangeFileUrlsAction.register('changeURLs')

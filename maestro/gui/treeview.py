@@ -214,4 +214,3 @@ class DraggingTreeView(TreeView):
         self.model().dndSource = None
         self.model().dndTarget = None
         self.updateSelection()
-        

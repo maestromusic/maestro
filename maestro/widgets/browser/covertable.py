@@ -83,8 +83,6 @@ class CoverTable(coverbrowser.AbstractCoverWidget):
     def state(self):
         return {'size': self.getCoverSize()}
 
-coverbrowser.addDisplayClass('table', CoverTable)
-
     
 class CoverTableScene(QtWidgets.QGraphicsScene):
     """QGraphicsScene that contains one CoverItem for each cover and arranges them in a grid."""

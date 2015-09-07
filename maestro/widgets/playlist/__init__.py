@@ -15,5 +15,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from maestro.widgets.playlist import model
-from maestro.widgets.playlist.gui import PlaylistWidget, PlaylistTreeView
+
+from PyQt5 import QtCore
+translate = QtCore.QCoreApplication.translate
+
+
+def init():
+    from maestro.widgets.playlist import gui as pgui
+    from maestro.widgets import WidgetClass
+    from maestro import utils
+    WidgetClass(
+        id='playlist', theClass=pgui.PlaylistWidget, name=translate('Playlist', 'Playlist'),
+        icon=utils.images.icon('view-media-playlist'),
+
+    ).register()
+    pgui.RemoveFromPlaylistAction.register(
+        'removeFromPL', context='playback',
+        shortcut=translate('RemoveFromPlaylistAction', 'Del')
+    )
+    pgui.ClearPlaylistAction.register(
+        'clearPL', context='playback',
+        shortcut=translate('ClearPlaylistAction', 'Shift+Del')
+    )
+    for definition in 'editTags', 'removeFromPL', 'clearPL':
+        pgui.PlaylistTreeView.addActionDefinition(definition)

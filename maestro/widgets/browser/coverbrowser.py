@@ -323,14 +323,6 @@ class CoverBrowser(widgets.Widget):
         key = self.displayChooser.itemData(i)
         if key != self._display:
             self.setDisplayKey(key)
-        
-
-widgets.addClass(
-    id = "coverbrowser",
-    name = translate("CoverBrowser", "Cover Browser"),
-    icon = utils.images.icon('widgets/coverbrowser.png'),
-    theClass = CoverBrowser
-)
 
 
 class AbstractCoverWidget(QtWidgets.QWidget):
@@ -379,4 +371,3 @@ class BrowserDialog(browserdialog.AbstractBrowserDialog):
         if widget is not None:
             optionLayout.addWidget(widget)
         optionLayout.addStretch(1)
-        
