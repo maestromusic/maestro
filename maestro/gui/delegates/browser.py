@@ -19,8 +19,7 @@
 from PyQt5 import QtCore
 
 from maestro.core import tags, covers
-from maestro.gui.delegates import profiles, StandardDelegate, TextItem, STD_STYLE, ITALIC_STYLE,\
-    BOLD_STYLE
+from maestro.gui.delegates import profiles, StandardDelegate, TextItem, DelegateStyle
 
 translate = QtCore.QCoreApplication.translate
 
@@ -28,11 +27,11 @@ translate = QtCore.QCoreApplication.translate
 def init():
     BrowserDelegate.profileType = profiles.createProfileType(
         name='browser',
-        title=translate("Delegates","Browser"),
+        title=translate('Delegates', 'Browser'),
         leftData=['t:composer', 't:artist', 't:performer'],
         rightData=['t:date', 't:conductor'],
-        overwrite={"fitInTitleRowData": profiles.DataPiece(tags.get("date"))
-                                        if tags.isInDb("date") else None},
+        overwrite={'fitInTitleRowData': profiles.DataPiece(tags.get('date'))
+                                            if tags.isInDb('date') else None},
         addOptions=[
             profiles.DelegateOption("showSortValues",
                 translate("Delegates", "Display sort values instead of real values"),"bool",False)
@@ -57,14 +56,15 @@ class BrowserDelegate(StandardDelegate):
         if isinstance(node, browser.nodes.TagNode):
             valueList = node.sortValues if self.profile.options['showSortValues'] else node.values
             for value, matching in valueList:
-                self.addCenter(TextItem(value, style=BOLD_STYLE if matching else STD_STYLE))
+                self.addCenter(TextItem(value, style=DelegateStyle.boldStyle() if matching
+                                        else DelegateStyle.standardStyle()))
                 self.newRow()
         elif isinstance(node, browser.nodes.VariousNode):
-            self.addCenter(TextItem(self.tr("Unknown/Various"), ITALIC_STYLE))
+            self.addCenter(TextItem(self.tr("Unknown/Various"), DelegateStyle.italicStyle()))
         elif isinstance(node, browser.nodes.HiddenValuesNode):
-            self.addCenter(TextItem(self.tr("Hidden"), ITALIC_STYLE))
+            self.addCenter(TextItem(self.tr("Hidden"), DelegateStyle.italicStyle()))
         elif isinstance(node, browser.nodes.LoadingNode):
-            self.addCenter(TextItem(self.tr("Loading..."), ITALIC_STYLE))
+            self.addCenter(TextItem(self.tr("Loading..."), DelegateStyle.italicStyle()))
         else:
             super().layout(index, availableWidth)
     

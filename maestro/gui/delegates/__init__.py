@@ -32,7 +32,6 @@ translate = QtCore.QCoreApplication.translate
 
 def init():
     from maestro.gui.delegates import abstractdelegate, profiles
-    abstractdelegate.init()
     profiles.init()
     from maestro.gui.delegates import browser, editor, playlist
     browser.init()
@@ -75,7 +74,7 @@ class StandardDelegate(AbstractDelegate):
                     pos = ancestor.contents.positionOf(element.id)
                     text = translate("Delegates","#{} in {}").format(pos,ancestor.getTitle())
                 else: text = translate("Delegates","In {}").format(ancestor.getTitle())
-                self.addCenter(TextItem(text,ITALIC_STYLE))
+                self.addCenter(TextItem(text, DelegateStyle.italicStyle()))
                 self.newRow()
             
         # Cover
@@ -92,7 +91,8 @@ class StandardDelegate(AbstractDelegate):
         urlWarningItem = self.getUrlWarningItem(wrapper)
         titleItem = TextItem(wrapper.getTitle(prependPosition=self.profile.options['showPositions'],
                                            usePath=False),
-                             STD_STYLE if isinstance(wrapper.parent, Wrapper) else BOLD_STYLE,
+                             DelegateStyle.standardStyle() if isinstance(wrapper.parent, Wrapper)
+                                else DelegateStyle.boldStyle(),
                              minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
         
         if not element.isInDb():
@@ -200,8 +200,9 @@ class StandardDelegate(AbstractDelegate):
         two items for an old and a new path.""" 
         if self.profile.options['showPaths'] and element.isFile():
             self.newRow()
-            self.addCenter(TextItem(element.url.path if hasattr(element.url, 'path') else str(element.url),
-                           ITALIC_STYLE))
+            self.addCenter(TextItem(element.url.path if hasattr(element.url, 'path')
+                                    else str(element.url),
+                           DelegateStyle.italicStyle()))
         
     def appendAncestors(self, element, ancestors, ancestorIds, filter, onlyMajor):
         """Recursively add all ancestors of *element* to the list *ancestors* and their ids to the list
