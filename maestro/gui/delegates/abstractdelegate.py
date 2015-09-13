@@ -43,7 +43,9 @@ class DelegateStyle:
         self.color = color
             
 
-STD_STYLE = ITALIC_STYLE = BOLD_STYLE = False
+STD_STYLE = ITALIC_STYLE = BOLD_STYLE = None
+
+
 def init():
     # Some standard styles used in the delegates
     global STD_STYLE, ITALIC_STYLE, BOLD_STYLE
@@ -280,7 +282,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
             width -= self.hSpace  # above loop adds one space too much
         return width, maxHeight
     
-    def getFontMetrics(self, style=STD_STYLE):
+    def getFontMetrics(self, style=None):
         """Return a QFontMetrics-object for a font with the given style."""
         if style is None:
             style = STD_STYLE

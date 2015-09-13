@@ -34,9 +34,10 @@ def init():
     from maestro.gui.delegates import abstractdelegate, profiles
     abstractdelegate.init()
     profiles.init()
-    from maestro.gui.delegates import browser, editor
+    from maestro.gui.delegates import browser, editor, playlist
     browser.init()
     editor.init()
+    playlist.init()
 
 
 class StandardDelegate(AbstractDelegate):

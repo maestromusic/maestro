@@ -17,7 +17,7 @@
 #
 
 from PyQt5 import QtCore
-from maestro.widgets.editor.editor import EditorTreeView
+from maestro.widgets.editor.gui import EditorTreeView
 translate = QtCore.QCoreApplication.translate
 
 
@@ -25,7 +25,7 @@ def init():
     from maestro import utils
     from maestro.widgets import WidgetClass
     from maestro.gui import treeactions
-    from maestro.widgets.editor.editor import EditorTreeView, EditorWidget
+    from maestro.widgets.editor.gui import EditorTreeView, EditorWidget
     for identifier in 'editTags', 'remove', 'merge', 'flatten', 'clearTree', 'commit':
         EditorTreeView.addActionDefinition(identifier)
     treeactions.SetElementTypeAction.addSubmenu(EditorTreeView.actionConf.root)

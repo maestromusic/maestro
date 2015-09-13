@@ -27,7 +27,8 @@ def init():
     package are used.
     """
     from maestro.widgets import browser, details, editor, playlist, tageditor, playback
-    for module in tageditor, browser, details, editor, playlist, playback:
+    for module in tageditor, browser, details, editor, playback, playlist:
+        # caution: order of init()-calls is important
         module.init()
 
 

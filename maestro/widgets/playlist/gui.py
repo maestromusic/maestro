@@ -148,17 +148,19 @@ class PlaylistWidget(widgets.Widget):
         if state is None:
             if len(player.profileCategory.profiles()) > 0:
                 backend = player.profileCategory.profiles()[0]
-            else: backend=None
+            else:
+                backend = None
             delegateProfile = profileType.default()
         else:
             backend = player.profileCategory.getFromStorage(state['backend'])
-            delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'), profileType)
+            delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),
+                                                                         profileType)
         
         self.treeview = PlaylistTreeView(delegateProfile)
          
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         layout.addWidget(self.treeview)
         self.errorLabel = QtWidgets.QLabel()

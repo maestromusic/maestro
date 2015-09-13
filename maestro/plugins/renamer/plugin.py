@@ -52,8 +52,7 @@ def enable():
     profiles.manager.addCategory(profileCategory)
     
     from .gui import RenameFilesAction
-    from maestro.widgets.editor import editor
-    from maestro.widgets import browser
+    from maestro.widgets import editor, browser
     RenameFilesAction.register('renamer', context='plugins',
                                shortcut=translate('RenameFilesAction', 'Ctrl+R'))
     editor.EditorTreeView.addActionDefinition('renamer')

@@ -296,7 +296,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     import maestro.filesystem
     from maestro.gui import treeactions
     import maestro.widgets.playlist.gui
-    import maestro.widgets.editor.editor
+    import maestro.widgets.editor.gui
     global mainWindow
     mainwindow.init()
     treeactions.init()
