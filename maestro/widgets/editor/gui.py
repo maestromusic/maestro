@@ -26,6 +26,7 @@ from maestro.widgets.editor.model import EditorModel
 from maestro.gui import treeview, tagwidgets, dialogs, delegates
 from maestro.gui.delegates import editor as editordelegate
 from maestro.gui.preferences import profiles as profilesgui
+
 translate = QtCore.QCoreApplication.translate
 
 

@@ -33,9 +33,8 @@ translate = QtCore.QCoreApplication.translate
 def init():
     from maestro.gui.delegates import abstractdelegate, profiles
     profiles.init()
-    from maestro.gui.delegates import browser, editor, playlist
+    from maestro.gui.delegates import browser, playlist
     browser.init()
-    editor.init()
     playlist.init()
 
 
@@ -44,7 +43,7 @@ class StandardDelegate(AbstractDelegate):
     Maestro. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default
     values for these options."""
     
-    def layout(self,index,availableWidth):
+    def layout(self, index, availableWidth):
         node = index.model().data(index)
         if isinstance(node, TextNode):
             if node.wordWrap:

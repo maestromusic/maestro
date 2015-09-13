@@ -26,7 +26,8 @@ from maestro import application, database as db, stack, utils
 from maestro.core import levels, tags, urls
 from maestro.models.leveltreemodel import LevelTreeModel
 from maestro.gui import actions, delegates, treeview
-from maestro.gui.delegates import abstractdelegate, editor as editordelegate
+from maestro.gui.delegates import abstractdelegate
+from maestro.widgets.editor import delegate as editordelegate
 
 translate = QtCore.QCoreApplication.translate
 

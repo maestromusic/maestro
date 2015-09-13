@@ -151,7 +151,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         if profile == self.profile and self.view is not None:
             self.view.scheduleDelayedItemsLayout()
                     
-    def layout(self, index, width):
+    def layout(self, index, availableWidth):
         """Layout the node with the given index. This method is called by paint and sizeHint and must be
         implemented in subclasses."""
         raise NotImplementedError()

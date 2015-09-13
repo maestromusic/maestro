@@ -26,6 +26,7 @@ def init():
     from maestro.widgets import WidgetClass
     from maestro.gui import treeactions
     from maestro.widgets.editor.gui import EditorTreeView, EditorWidget
+    from maestro.widgets.editor.delegate import EditorDelegate
     for identifier in 'editTags', 'remove', 'merge', 'flatten', 'clearTree', 'commit':
         EditorTreeView.addActionDefinition(identifier)
     treeactions.SetElementTypeAction.addSubmenu(EditorTreeView.actionConf.root)
@@ -35,3 +36,11 @@ def init():
         icon=utils.images.icon('accessories-text-editor'),
         preferredDockArea='right'
     ).register()
+    from maestro.gui.delegates import profiles
+    EditorDelegate.profileType = profiles.createProfileType(
+        name='editor', title=translate('Delegates', 'Editor'),
+        leftData=['t:album', 't:composer', 't:artist', 't:performer'],
+        rightData=['t:date', 't:genre', 't:conductor'],
+        overwrite=dict(showPaths=True, showType=True,
+                       appendRemainingTags=True, showAllAncestors=True)
+    )
