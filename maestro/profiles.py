@@ -16,10 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-"""This module provides a system to manage configuration profiles in Maestro. Profiles are organized in
-categories (e.g. delegates, playback). Profiles of one category may have different types (e.g. MPD
-playback, Phonon playback). Profiles and types are managed by their category. Categories are
-managed by the ProfileManager.""" 
+"""This module provides a system to manage configuration profiles in Maestro. Profiles are organized
+in categories (e.g. delegates, playback). Profiles of one category may have different types (e.g.
+MPD playback, Phonon playback). Profiles and types are managed by their category. Categories are
+managed by the ProfileManager."""
 
 from PyQt5 import QtCore
 
@@ -29,13 +29,14 @@ from maestro import config, utils
 class Profile(QtCore.QObject):
     """A profile stores the configuration of some object. Profiles are stored persistently in the
     storage file.
-    
-    A profile has a name and optionally a type. The constructor variable *state* contains the data
-    read from the storage file. Because profiles are generally created by the user, there is no
-    distinction between name and title (as for profile types and profile categories).
+
+    Args:
+        name (str): Name of the profile (usually user-defined)
+        type: ProfileType this profile belongs to, or ``None`` for no ProfileType.
+        state: State as returned by :func:`save`.
     """
     
-    builtIn = False # built-in profiles cannot be renamed or deleted
+    builtIn = False  # built-in profiles cannot be renamed or deleted
     
     def __init__(self, name, type=None, state=None):
         super().__init__()
@@ -44,49 +45,60 @@ class Profile(QtCore.QObject):
         self.type = type
     
     def save(self):
-        """Return a dict, list, tuple or a simple data type that can be used to store this profile in the
-        storage file. The result of this method will be passed as state to the constructor the next time the
-        application starts.
+        """Return a dict, list, tuple or a simple data type that can be used to store this profile
+        in the storage file. The result of this method will be passed as state to the constructor
+        the next time the application starts.
+
+        Default implementation returns ``None``.
         """
         return None
 
     @classmethod
     def configurationWidget(cls, profile, parent):
-        """Return a widget that can be used to configure a profile. Should be a subclass
-        of gui.preferences.profiles.ProfileConfigurationWidget."""
-        raise NotImplementedError()
+        """Return a widget that can be used to configure a profile.
+
+        Args:
+            profile (Profile): Profile used for current configuration in the widget
+            parent (QWidget): Parent window.
+
+        Returns:
+            gui.preferences.profiles.ProfileConfigurationWidget: The widget, or ``None`` if there's
+            nothing to configure (the default)."""
+        return None
     
     def copy(self):
         """Return a copy of this profile."""
         return type(self)(self.name, self.type, self.save())
     
     def __str__(self):
-        return "{}(name={})".format(type(self).__name__, self.name)
+        return '{}(name={})'.format(type(self).__name__, self.name)
 
 
 class ProfileType:
-    """Optionally profiles may have a type. This is useful to
-    
-        - use different subclasses of Profile for profiles (e.g. MPDPlayback, PhononPlayback),
-        - restrict some widget to profiles of a certain type (e.g. the Playlist accepts only DelegateProfiles
-          of type 'playlist')
-    
-    *name* is the internal name of the profile. *title* is displayed to the user. *profileClass* is the
-    (sub)class of Profile that will be used for profiles of this type.
+    """Optionally, profiles may have a type. This is useful to
+
+    - use different subclasses of Profile for profiles (e.g. MPDPlayback, PhononPlayback),
+    - restrict some widget to profiles of a certain type (e.g. the Playlist accepts only
+      DelegateProfiles of type 'playlist')
+
+    Args:
+        name (str): Internal name of the profile type
+        title (str): UI string describing this type.
+        profileClass: Profile subclass that will be used for profiles of this type.
     """ 
     
     def __init__(self, name, title, profileClass=Profile, defaultProfileName=None):
         self.name = name
         self.title = title
         self.profileClass = profileClass
-        if defaultProfileName is not None:
-            self.defaultProfileName = defaultProfileName
-        else: self.defaultProfileName = title
+        if defaultProfileName is None:
+            defaultProfileName = title
+        self.defaultProfileName = defaultProfileName
         
-    def load(self,category):
-        """This is called after the type has been added to its ProfileCategory and its profiles have been
-        loaded. Subclass implementations could use this method to create a default profile if none was
-        contained in the storage file.
+    def load(self, category):
+        """Called after the type has been added to its ProfileCategory and its profiles have been
+        loaded. Subclass implementations could use this method to create a default profile if none
+        was contained in the storage file.
         """
         pass
 

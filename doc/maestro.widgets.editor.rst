@@ -15,7 +15,7 @@ maestro.widgets.editor.albumguesser module
 maestro.widgets.editor.editor module
 ------------------------------------
 
-.. automodule:: maestro.widgets.editor.editor
+.. automodule:: maestro.widgets.editor.gui
     :members:
     :undoc-members:
     :show-inheritance:

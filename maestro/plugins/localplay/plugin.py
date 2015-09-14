@@ -196,9 +196,5 @@ class LocalPlayerBackend(player.PlayerBackend):
             result['volume'] = self.volume()
         return result
 
-    @classmethod
-    def configurationWidget(cls, profile, parent):
-        return None
-
     def __str__(self):
         return 'LocalPlayerBackend({})'.format(self.name)

@@ -381,16 +381,14 @@ class VolumeButton(QtWidgets.QToolButton):
     # Inspired by the VolumePopupButton from Amarok 2.7.1
     volumeChanged = QtCore.pyqtSignal(int)
     
-    mutedIcon = utils.images.icon("audio_volume_muted.png")
-    lowIcon = utils.images.icon("audio_volume_low.png")
-    mediumIcon = utils.images.icon("audio_volume_medium.png")
-    highIcon = utils.images.icon("audio_volume_high.png")
-    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setIconSize(QtCore.QSize(24, 24))
         self.setContentsMargins(0,0,0,0)
-        
+        self.mutedIcon = utils.images.icon('audio_volume_muted.png')
+        self.lowIcon = utils.images.icon('audio_volume_low.png')
+        self.mediumIcon = utils.images.icon('audio_volume_medium.png')
+        self.highIcon = utils.images.icon('audio_volume_high.png')
         self.popup = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(self.popup)
         layout.setContentsMargins(1,1,1,1)
@@ -443,16 +441,15 @@ class VolumeButton(QtWidgets.QToolButton):
             if volume != -1:
                 self.volumeChanged.emit(volume)
 
-    @staticmethod
-    def volumeIcon(volume):
+    def volumeIcon(self, volume):
         """Maps the given volume to the appropriate icon."""
         if volume == 0:
-            return VolumeButton.mutedIcon
+            return self.mutedIcon
         elif volume <= 33:
-            return VolumeButton.lowIcon
+            return self.lowIcon
         elif volume <= 66:
-            return VolumeButton.mediumIcon
-        return VolumeButton.highIcon
+            return self.mediumIcon
+        return self.highIcon
             
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
