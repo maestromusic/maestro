@@ -261,7 +261,6 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     # Load and initialize remaining modules
     from maestro.core import levels
     levels.init()
-    from . import profiles
     from maestro.core import covers
     covers.init()
 
@@ -273,6 +272,10 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
 
     import maestro.gui.delegates
     maestro.gui.delegates.init()
+    import maestro.player
+    maestro.player.init()
+    import maestro.gui.preferences
+    maestro.gui.preferences.init()
 
     # Load Plugins
     if type == 'gui':
@@ -319,7 +322,8 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     mainWindow.close()
     plugins.shutdown()
     covers.shutdown()
-    profiles.manager.save()
+    import maestro.profiles
+    maestro.profiles.ProfileManager.save()
     database.tags.deleteSuperfluousValues()
     database.shutdown()
     config.shutdown()

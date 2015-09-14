@@ -343,36 +343,51 @@ class ProfileManager(QtCore.QObject):
     """The single instance of this class manages profile categories."""
     categoryAdded = QtCore.pyqtSignal(ProfileCategory)
     categoryRemoved = QtCore.pyqtSignal(ProfileCategory)
-    
+
+    __instance = None
+
     def __init__(self):
         super().__init__()
-        self.categories = []
-        
-    def getCategory(self, name):
+        self._categories = []
+
+    @staticmethod
+    def instance():
+        if ProfileManager.__instance is None:
+            ProfileManager.__instance = ProfileManager()
+        return ProfileManager.__instance
+
+    @staticmethod
+    def category(name):
         """Return the profile category with the given name."""
-        for category in self.categories:
+        for category in ProfileManager.instance()._categories:
             if category.name == name:
                 return category
         raise ValueError("There is no profile category with name '{}'.".format(name))
-    
-    def addCategory(self, category):
+
+    @staticmethod
+    def categories():
+        return ProfileManager.instance()._categories
+
+    @staticmethod
+    def addCategory(category):
         """Add a profile category. Load all of its profiles whose type has been added to the category yet
         (or which do not have a type) from the storage file."""
-        if category not in self.categories:
-            self.categories.append(category)
-            self.categoryAdded.emit(category)
+        manager = ProfileManager.instance()
+        if category not in manager._categories:
+            manager._categories.append(category)
+            manager.categoryAdded.emit(category)
             category.loadProfiles()
-            
-    def removeCategory(self, category):
+
+    @staticmethod
+    def removeCategory(category):
         """Remove the given category without deleting its profiles from the storage file."""
         category.save()
-        self.categories.remove(category)
-        self.categoryRemoved.emit(category)
-        
-    def save(self):
-        """Save all categories to their respective options in the storage file."""
-        for category in self.categories:
-            category.save()
-            
+        manager = ProfileManager.instance()
+        manager._categories.remove(category)
+        manager.categoryRemoved.emit(category)
 
-manager = ProfileManager()
+    @staticmethod
+    def save():
+        """Save all categories to their respective options in the storage file."""
+        for category in ProfileManager.instance().categories():
+            category.save()

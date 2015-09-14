@@ -23,33 +23,26 @@ from PyQt5 import QtCore
 
 translate = QtCore.QCoreApplication.translate
 
-from ...core import tags
-from ... import config, profiles
+from maestro.core import tags
+from maestro import config, profiles
 
     
 def defaultStorage():
-    return {"renamer": {'profiles': [],
-                        'current_profile': None
-                        }
-            }
+    return dict(renamer=dict(profiles=[], current_profile=None))
+
 
 def defaultConfig():
-    return {"renamer": {
-            "positionDigits": (int,2,"Minimum number of digits to use for positions (filled with zeros).")
-        }}
-
-
-profileCategory = None
+    return dict(renamer=dict(
+        positionDigits=(int, 2, 'Minimum number of (zero-padded) digits to use for positions.')
+    ))
 
 
 def enable():
-    global profileCategory
-    profileCategory = profiles.ProfileCategory("renamer",
-                                               translate("Renamer","Renamer"),
-                                               config.getOption(config.storage, 'renamer.profiles'),
-                                               profileClass=GrammarRenamer,
-                                               iconName='edit-rename')
-    profiles.manager.addCategory(profileCategory)
+    profiles.ProfileManager.addCategory(profiles.ProfileCategory(
+        name='renamer', title=translate('Renamer', 'Renamer'),
+        storageOption=config.getOption(config.storage, 'renamer.profiles'),
+        profileClass=GrammarRenamer, iconName='edit-rename')
+    )
     
     from .gui import RenameFilesAction
     from maestro.widgets import editor, browser
@@ -62,9 +55,7 @@ def enable():
 def disable():
     from maestro.gui import actions
     actions.manager.unregisterAction('renamer')
-    global profileCategory
-    profiles.manager.removeCategory(profileCategory)
-    profileCategory = None
+    profiles.ProfileManager.removeCategory('renamer')
 
 
 class FormatSyntaxError(SyntaxError):

@@ -44,3 +44,5 @@ def init():
         overwrite=dict(showPaths=True, showType=True,
                        appendRemainingTags=True, showAllAncestors=True)
     )
+    from maestro.widgets.editor import albumguesser
+    albumguesser.init()

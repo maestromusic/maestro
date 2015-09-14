@@ -17,11 +17,10 @@
 #
 
 import enum
-
 from PyQt5 import QtCore
-translate = QtCore.QCoreApplication.translate
-
 from maestro import config, profiles
+
+translate = QtCore.QCoreApplication.translate
 
 
 class PlayState(enum.Enum):
@@ -36,15 +35,14 @@ class ConnectionState(enum.Enum):
     Connected = 2
 
 
-profileCategory = profiles.TypedProfileCategory(
-    name = 'playback',
-    title = translate('PlayerBackend','Playback'),
-    storageOption = config.getOption(config.storage, 'player.profiles'),
-    description = translate("PlayerBackend",
-                    "Maestro can control more than one audio backend. To easily switch between them, "
-                    "their configuration is stored in profiles."),
-    iconName='preferences-sound')
-profiles.manager.addCategory(profileCategory)
+def init():
+    profiles.ProfileManager.addCategory(profiles.TypedProfileCategory(
+        name='playback', title=translate('PlayerBackend', 'Playback'),
+        storageOption=config.getOption(config.storage, 'player.profiles'),
+        description=translate('PlayerBackend',
+                              'Configure backends for audio playback (e.g. local playback)'),
+        iconName='preferences-sound')
+    )
 
 
 class BackendError(Exception):

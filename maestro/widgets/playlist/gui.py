@@ -19,7 +19,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import player, widgets
+from maestro import player, widgets, profiles
 from maestro.core import levels, nodes
 from maestro.models import rootedtreemodel
 from maestro.gui import actions, dialogs, treeview, delegates
@@ -145,14 +145,15 @@ class PlaylistWidget(widgets.Widget):
         super().__init__(**args)
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
+        playerProfileCategory = profiles.ProfileManager.category('playback')
         if state is None:
-            if len(player.profileCategory.profiles()) > 0:
-                backend = player.profileCategory.profiles()[0]
+            if len(playerProfileCategory.profiles()) > 0:
+                backend = playerProfileCategory.profiles()[0]
             else:
                 backend = None
             delegateProfile = profileType.default()
         else:
-            backend = player.profileCategory.getFromStorage(state['backend'])
+            backend = playerProfileCategory.getFromStorage(state['backend'])
             delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),
                                                                          profileType)
         
@@ -213,7 +214,9 @@ class OptionDialog(dialogs.FancyPopup):
     def __init__(self, parent, playlist):
         super().__init__(parent)
         layout = QtWidgets.QFormLayout(self)
-        backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playlist.backend)
+        backendChooser = profilesgui.ProfileComboBox(
+            profiles.ProfileManager.category('playback'),
+            default=playlist.backend)
         backendChooser.profileChosen.connect(playlist.setBackend)
         layout.addRow(self.tr("Backend:"), backendChooser)
         profileChooser = profilesgui.ProfileComboBox(

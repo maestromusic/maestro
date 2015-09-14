@@ -434,14 +434,14 @@ class CategoryMenu(QtWidgets.QLabel):
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.linkActivated.connect(dialog.showPanel)
         self.setIndent(10)
-        profiles.manager.categoryAdded.connect(self._updateText)
-        profiles.manager.categoryRemoved.connect(self._updateText)
+        profiles.ProfileManager.instance().categoryAdded.connect(self._updateText)
+        profiles.ProfileManager.instance().categoryRemoved.connect(self._updateText)
         self._updateText()
 
     def _updateText(self):
         """Reset the HTML text of this label."""
         parts = [self.tr("Choose a profile category:"), "<ul>"]
-        for category in profiles.manager.categories:
+        for category in profiles.ProfileManager.categories():
             parts.append('<li style="margin-bottom: 10px"><a href="profiles/{}">{}</a></li>'
                          .format(category.name, category.title))
         parts.append("</ul>")

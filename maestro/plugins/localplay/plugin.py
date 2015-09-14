@@ -31,17 +31,18 @@ def enable():
     profileType = profiles.ProfileType('localplay',
                                        translate('LocalPlayBackend','Local Playback'),
                                        LocalPlayerBackend)
-    player.profileCategory.addType(profileType)
+    playerProfileCategory = profiles.ProfileManager.category('playback')
+    playerProfileCategory.addType(profileType)
     # addType loads stored profiles of this type from storage
     # If no profile was loaded, create a default one.
-    if len(player.profileCategory.profiles(profileType)) == 0:
+    if len(playerProfileCategory.profiles(profileType)) == 0:
         name = translate("LocalPlayBackend", 'Local playback')
-        if player.profileCategory.get(name) is None:
-            player.profileCategory.addProfile(name, profileType)
+        if playerProfileCategory.get(name) is None:
+            playerProfileCategory.addProfile(name, profileType)
 
 
 def disable():
-    player.profileCategory.removeType('localplay')
+    profiles.ProfileManager.category('playback').removeType('localplay')
     
     
 def defaultStorage():

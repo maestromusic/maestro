@@ -40,7 +40,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
 from maestro import application, config, logging, utils, stack, VERSION, widgets
-from maestro.gui import actions, selection, dialogs
+from maestro.gui import actions, selection
 
 
 translate = QtCore.QCoreApplication.translate

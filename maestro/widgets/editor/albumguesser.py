@@ -29,6 +29,26 @@ from maestro.gui.tagwidgets import TagTypeButton
 
 translate = QtCore.QCoreApplication.translate
 
+
+def init():
+    profileCategory = profiles.TypedProfileCategory(
+        name='albumguesser', title=translate('Albumguesser', 'Album Guesser'),
+        description=translate('Albumguesser', 'Configure automated generation of containers for '
+                                              'typical albums, works, and collections.'),
+        storageOption=config.getOption(config.storage, 'editor.albumguesser_profiles'),
+        iconName='container',
+    )
+
+    profileCategory.addType(profiles.ProfileType(
+        name='standard',
+        title=translate('Albumguesser', 'Tag-Based Guesser'),
+        profileClass=StandardGuesser)
+    )
+    profiles.ProfileManager.addCategory(profileCategory)
+    if len(profileCategory.profiles()) == 0:
+        profileCategory.addProfile(translate('Albumguesser', 'Default'),
+                                   type=profileCategory.getType('standard'))
+
                 
 class StandardGuesser(profiles.Profile):
     """The default album guesser. Albums are recognized by files having a certain set of tags in common,
@@ -36,32 +56,19 @@ class StandardGuesser(profiles.Profile):
     Optionally, the title of the guessed album is matched against a regular expression in order to
     detect meta-containers."""
     
-    defaultMetaRegex = r" ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?"
+    defaultMetaRegex = r' ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?'
 
     def __init__(self, name, type, state):
-        """Initialize a guesser profile with the given *name*.
-        
-        *albumGroupers* is the list of grouper tags;
-        the elements may be anything accepted by tags.get. The first grouper tag determines the title
-        of the album container.
-        If *directoryMode* is True, an additional condition for albums is that all files are in the
-        same directory.
-        *metaRegex* is a regular expression that finds meta-container indicators; if it is None, this
-        will be skipped."""
         super().__init__(name, type, state)
-        
         if state is None:
             state = {}
         if 'groupTags' in state:
             self.groupTags = [tags.get(t) for t in state['groupTags']]
         else:
-            self.groupTags = [tags.get("album")]
+            self.groupTags = [tags.get('album')]
         self.albumTag = self.groupTags[0] if len(self.groupTags) > 0 else None
-        self.directoryMode = 'directoryMode' in state and state['directoryMode']
-        if 'metaRegex' in state:
-            self.metaRegex = state['metaRegex']
-        else:
-            self.metaRegex = self.defaultMetaRegex
+        self.directoryMode = state.get('directoryMode', False)
+        self.metaRegex = state.get('metaRegex', self.defaultMetaRegex)
         try:
             self.compilationFlag = flags.get(state['compilationFlag'])
         except (KeyError, ValueError):
@@ -142,7 +149,7 @@ class StandardGuesser(profiles.Profile):
                 children = {}
                 for element in elementsWithPos:
                     if position(element) in children:
-                        from ..gui.dialogs import warning
+                        from maestro.gui.dialogs import warning
                         warning(self.tr("Error guessing albums"),
                                 self.tr("position {} appears twice in {}").format(position(element), key))
                         self.level.removeElements([element])
@@ -179,7 +186,7 @@ class StandardGuesser(profiles.Profile):
                 if (key, discname_reduced) not in byKey:
                     byKey[(key, discname_reduced)] = {}
                 if discnumber in byKey[(key,discname_reduced)]:
-                    from ..gui.dialogs import warning
+                    from maestro.gui.dialogs import warning
                     warning(self.tr("Error guessing meta-containers"),
                             self.tr("disc-number {} appears twice in meta-container {}").format(discnumber, key))
                 else:
@@ -206,32 +213,16 @@ class StandardGuesser(profiles.Profile):
         return GuessProfileConfigWidget(profile, parent)
 
 
-profileCategory = profiles.TypedProfileCategory(
-    name='albumguesser',
-    title=translate('Albumguesser','Album guesser'),
-    description=translate("Albumguesser", "Configure how the editor tries to guess album structure "
-                            "when files are dropped into it."),
-    storageOption=config.getOption(config.storage, 'editor.albumguesser_profiles'),
-    iconName='container',
-)
-
-profileCategory.addType(profiles.ProfileType('standard',
-                                             translate('Albumguesser', 'standard guesser'),
-                                             StandardGuesser))
-profiles.manager.addCategory(profileCategory)
-if len(profileCategory.profiles()) == 0:
-    profileCategory.addProfile(translate("Albumguesser", "Default"),
-                               profileCategory.getType('standard'))
-
-
 class GuessProfileConfigWidget(QtWidgets.QWidget):
     """A widget to configure the profiles used for guessing album structures."""
     
     def __init__(self, profile, parent):
         super().__init__(parent)
         mainLayout = QtWidgets.QVBoxLayout(self)
-        descriptionLabel = QtWidgets.QLabel(self.tr('Album guessing is done by means of a list of tags; all files '
-                                        'whose tags coincide for this list will then be considered an album.'))
+        descriptionLabel = QtWidgets.QLabel(self.tr(
+            'Containers are auto-generated based on a list of tags: all files whose values for '
+            'these tags coincide will put in one container.')
+        )
         descriptionLabel.setWordWrap(True)
         mainLayout.addWidget(descriptionLabel)
         toolBar = QtWidgets.QToolBar()

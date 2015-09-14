@@ -27,6 +27,27 @@ from ... import utils, logging, config
 panels = utils.OrderedDict()
 
 
+def init():
+    addPanel('profiles', translate('Preferences', 'Profiles'),
+             description=translate('Preferences',
+                                   'Manage configuration options that are organized in profiles.'),
+             callable=('gui.preferences.profiles', 'CategoryMenu'),
+             iconName='preferences-profiles')
+
+    # Bugfix: do not call this profiles, otherwise the submodule is unreachable
+    from maestro import profiles as profilesModule
+    profilesModule.ProfileManager.instance().categoryAdded.connect(_addProfileCategory)
+    profilesModule.ProfileManager.instance().categoryRemoved.connect(_removeProfileCategory)
+    for category in profilesModule.ProfileManager.categories():
+        _addProfileCategory(category)
+
+    addPanel('plugins', translate('Preferences', 'Plugins'),
+             ('gui.preferences.plugins', 'PluginPanel'),
+             iconName='preferences-plugin',
+             description=translate('Preferences', 'Enable or disable plugins.<br />'
+                                   '<b>Warning:</b> Changes are immediate!'))
+
+
 def show(startPanel=None):
     """Open the preferences dialog. To start with a specific panel provide its path as *startPanel*."""
     from .. import mainwindow
@@ -402,21 +423,4 @@ def _addProfileCategory(category):
 def _removeProfileCategory(category):
     removePanel("profiles/" + category.name)
 
-addPanel("profiles", translate("Preferences", "Profiles"),
-         description=translate("Preferences",
-                    "To manage groups of configuration Maestro uses profiles of various categories."),
-         callable=('gui.preferences.profiles', 'CategoryMenu'),
-         iconName='preferences-profiles',)
 
-# Bugfix: do not call this profiles, otherwise the submodule is unreachable
-from maestro import profiles as profilesModule
-profilesModule.manager.categoryAdded.connect(_addProfileCategory)
-profilesModule.manager.categoryRemoved.connect(_removeProfileCategory)
-for category in profilesModule.manager.categories:
-    _addProfileCategory(category)
-
-
-addPanel('plugins', translate("Preferences", "Plugins"), ('gui.preferences.plugins', 'PluginPanel'),
-         iconName='preferences-plugin',
-         description=translate("Preferences", "Enable or disable plugins.<br />"
-                                 "<b>Warning:</b> Changes will be performed immediately!"))

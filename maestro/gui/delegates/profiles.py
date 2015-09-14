@@ -48,7 +48,7 @@ def init():
             "Configure how elements are rendered in treeviews like browser, editor and playlist."),
         iconName='preferences-delegates',
     )
-    profiles.manager.addCategory(category)
+    profiles.ProfileManager.addCategory(category)
     # List of available options for delegates. This list in particular defines the default values.
     defaultOptions = [DelegateOption(*data) for data in [
         ("fontSize", translate("Delegates", "Fontsize"), "int", 8),

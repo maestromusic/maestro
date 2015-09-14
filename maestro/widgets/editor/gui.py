@@ -21,10 +21,9 @@ from PyQt5.QtCore import Qt
 
 from maestro import widgets
 from maestro.core import levels, tags
-from maestro.widgets.editor import albumguesser
+from maestro.widgets.editor import albumguesser, delegate
 from maestro.widgets.editor.model import EditorModel
 from maestro.gui import treeview, tagwidgets, dialogs, delegates
-from maestro.gui.delegates import editor as editordelegate
 from maestro.gui.preferences import profiles as profilesgui
 
 translate = QtCore.QCoreApplication.translate
@@ -36,7 +35,7 @@ class EditorTreeView(treeview.DraggingTreeView):
     def __init__(self, delegateProfile):
         super().__init__(levels.editor)
         self.setModel(EditorModel())
-        self.setItemDelegate(editordelegate.EditorDelegate(self, delegateProfile))
+        self.setItemDelegate(delegate.EditorDelegate(self, delegateProfile))
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
         self.model().rowsDropped.connect(self._selectDroppedRows, Qt.QueuedConnection)
@@ -74,7 +73,7 @@ class EditorWidget(widgets.Widget):
         guessProfile = albumguesser.profileCategory.getFromStorage(state.get('guessProfile'))
         delegateProfile = delegates.profiles.category.getFromStorage(
             state.get('delegate'),
-            editordelegate.EditorDelegate.profileType)
+            delegate.EditorDelegate.profileType)
         
         buttonLayout = QtWidgets.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
@@ -109,17 +108,18 @@ class EditorWidget(widgets.Widget):
         
     def saveState(self):
         guessProfile = self.editor.model().guessProfile
-        return {'expand': self.editor.autoExpand,
-                'guessingEnabled': self.editor.model().guessingEnabled,
-                'guessProfile': guessProfile.name if guessProfile is not None else None, 
-                'delegate': self.editor.itemDelegate().profile.name # a delegate's profile is never None
-                }
+        return dict(expand=self.editor.autoExpand,
+                    guessingEnabled=self.editor.model().guessingEnabled,
+                    guessProfile=guessProfile.name if guessProfile else None,
+                    delegate=self.editor.itemDelegate().profile.name
+                    )
     
     def canClose(self):
         if self.editor.model().containsUncommitedData():
             return dialogs.question(self.tr("Unsaved changes"),
                                     self.tr("The editor contains uncommited changes. Really close?"))
-        else: return True
+        else:
+            return True
 
 
 class OptionDialog(dialogs.FancyPopup):
@@ -149,7 +149,7 @@ class OptionDialog(dialogs.FancyPopup):
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
-        delegateType = editordelegate.EditorDelegate.profileType
+        delegateType = delegate.EditorDelegate.profileType
         delegateChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
                                                      restrictToType=delegateType,
                                                      default=self.editor.itemDelegate().profile)
