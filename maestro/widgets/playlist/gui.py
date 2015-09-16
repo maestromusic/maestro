@@ -154,8 +154,10 @@ class PlaylistWidget(widgets.Widget):
             delegateProfile = profileType.default()
         else:
             backend = playerProfileCategory.getFromStorage(state['backend'])
-            delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'),
-                                                                         profileType)
+            delegateProfile = profiles.category('delegates').getFromStorage(
+                state.get('delegate'),
+                profileType
+            )
         
         self.treeview = PlaylistTreeView(delegateProfile)
          
@@ -219,7 +221,7 @@ class OptionDialog(dialogs.FancyPopup):
         backendChooser.profileChosen.connect(playlist.setBackend)
         layout.addRow(self.tr("Backend:"), backendChooser)
         profileChooser = profilesgui.ProfileComboBox(
-            delegates.profiles.category,
+            profiles.category('delegates'),
             restrictToType=playlistdelegate.PlaylistDelegate.profileType,
             default=playlist.treeview.itemDelegate().profile
         )

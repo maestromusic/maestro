@@ -21,8 +21,6 @@ import math, itertools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro.gui.delegates import profiles
-
 translate = QtCore.QCoreApplication.translate
 
 __all__ = ['AbstractDelegate', 'MultiTextItem', 'TextItem', 'ImageItem', 'ColorBarItem',
@@ -106,8 +104,8 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         self.font = QtGui.QFont()
         assert profile is not None
         self.profile = profile
-        profiles.category.profileRemoved.connect(self._handleProfileRemoved)
-        profiles.category.profileChanged.connect(self._handleProfileChanged)
+        profile.category.profileRemoved.connect(self._handleProfileRemoved)
+        profile.category.profileChanged.connect(self._handleProfileChanged)
     
     def setProfile(self, profile):
         """Set the profile and redraw the whole view."""

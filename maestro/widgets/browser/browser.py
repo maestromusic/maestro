@@ -26,7 +26,7 @@ translate = QtCore.QCoreApplication.translate
 from maestro import application, database as db, logging, utils, search, widgets
 from maestro.core import flags, levels, domains
 from maestro.core.elements import Element
-from maestro.gui import mainwindow, treeview, delegates, dockwidget, search as searchgui
+from maestro.gui import mainwindow, treeview, dockwidget, search as searchgui
 from maestro.gui.delegates import browser as browserdelegate
 from maestro.widgets.browser import model, nodes as bnodes
 
@@ -143,9 +143,11 @@ class Browser(widgets.Widget):
                 except search.criteria.ParseException:
                     logging.exception(__name__, "Could not parse the browser's filter criterion.")
             if 'delegate' in state:
-                self.delegateProfile = delegates.profiles.category.getFromStorage(
-                                                            state.get('delegate'),
-                                                            browserdelegate.BrowserDelegate.profileType)
+                from maestro import profiles
+                self.delegateProfile = profiles.category('delegates').getFromStorage(
+                    state.get('delegate'),
+                    profiles.category('delegates').getType('browser')
+                )
             
         application.dispatcher.connect(self._handleChangeEvent)
         levels.real.connect(self._handleChangeEvent)
