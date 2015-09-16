@@ -133,10 +133,10 @@ class Dialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
         self.stackedLayout = QtWidgets.QStackedLayout(self)
         layout.addLayout(self.stackedLayout, 1)
-        self.profileActionWidget = profilesgui.ProfileActionWidget(profileCategory)
+        self.profileActionWidget = profilesgui.ProfileActionWidget(profiles.category('wtf'))
         self.configWidget = self.profileActionWidget.configWidget
         self.stackedLayout.addWidget(self.profileActionWidget)
-        self.stackedLayout.setContentsMargins(0,0,0,0)
+        self.stackedLayout.setContentsMargins(0, 0, 0, 0)
         fileTreePage = QtWidgets.QWidget()
         fileTreeLayout = QtWidgets.QVBoxLayout(fileTreePage)
         self.statLabel = QtWidgets.QLabel()

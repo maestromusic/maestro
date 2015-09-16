@@ -54,7 +54,8 @@ class CriterionNode(Node):
             self.loadContents()
         return self.contents
     
-    def getAllNodes(self):
+    def getAllNodes(self, skipSelf=False):
+        assert skipSelf
         if self.contents is None:
             return
         else: 
@@ -162,10 +163,12 @@ class TagNode(CriterionNode):
         return "<ValueNode {} {}>".format(self.values, self.tagIds)
     
     def getKey(self):
-        return "tag:"+str(self.tagIds)
+        return 'tag:' + str(self.tagIds)
 
     def toolTipText(self):
-        return str(self.values) + '\n' + str(self.tagIds)
+        from maestro.core import tags
+        return '{} ({})'.format(' or '.join(self.getValues()),
+                                '/'.join(tags.get(id).title for (id,_) in self.tagIds))
 
 
 class VariousNode(CriterionNode):
@@ -186,7 +189,7 @@ class VariousNode(CriterionNode):
         return "<VariousNode>"
         
     def toolTipText(self):
-        return None
+        return translate('VariousNode', 'Elements that do not appear above')
 
 
 class HiddenValuesNode(Node):
@@ -199,7 +202,7 @@ class HiddenValuesNode(Node):
         return "<HiddenValues>"
         
     def toolTipText(self):
-        return None
+        return translate('HiddenValuesNode', 'Values that have been marked as hidden')
                
 
 class BrowserWrapper(Wrapper):
