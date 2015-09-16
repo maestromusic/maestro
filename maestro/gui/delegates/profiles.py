@@ -18,8 +18,7 @@
 
 import copy, collections
 
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtCore import Qt
+from PyQt5 import QtCore
 from maestro import config, profiles, logging
 from maestro.core import tags
 
@@ -28,12 +27,13 @@ translate = QtCore.QCoreApplication.translate
 
 class DelegateProfileCategory(profiles.TypedProfileCategory):
     """The delegates' profile category prefers the default delegates of each type."""
-    def getFromStorage(self, name, restrictToType=None):
-        if name is not None:
-            profile = self.get(name)
-            if profile is not None and restrictToType is None and profile.type == restrictToType:
-                return profile
-        return restrictToType.default()
+    pass
+    # def getFromStorage(self, name, restrictToType=None):
+    #     if name is not None:
+    #         profile = self.get(name)
+    #         if profile is not None and (restrictToType is None or profile.type == restrictToType):
+    #             return profile
+    #     return restrictToType.default()
 
 
 def init():

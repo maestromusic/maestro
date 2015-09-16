@@ -16,14 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
 from maestro import player, widgets, profiles
 from maestro.core import levels, nodes
 from maestro.models import rootedtreemodel
-from maestro.gui import actions, dialogs, treeview, delegates
-from maestro.gui.delegates import playlist as playlistdelegate
+from maestro.gui import actions, dialogs, treeview
+from maestro.widgets.playlist.delegate import PlaylistDelegate
 from maestro.gui.preferences import profiles as profilesgui
 from maestro.widgets import WidgetClass
 
@@ -86,7 +86,7 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         super().__init__(levels.real)
         self.backend = None
         self.doubleClicked.connect(self._handleDoubleClick)
-        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,delegateProfile))
+        self.setItemDelegate(PlaylistDelegate(self, delegateProfile))
         self.emptyModel = rootedtreemodel.RootedTreeModel()
         self.emptyModel.root.setContents([nodes.TextNode(
                                         self.tr("Please configure and choose a backend to play music."),
@@ -144,7 +144,7 @@ class PlaylistWidget(widgets.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         # Read state
-        profileType = playlistdelegate.PlaylistDelegate.profileType
+        profileType = PlaylistDelegate.profileType
         playerProfileCategory = profiles.category('playback')
         if state is None:
             if len(playerProfileCategory.profiles()) > 0:
@@ -221,8 +221,7 @@ class OptionDialog(dialogs.FancyPopup):
         backendChooser.profileChosen.connect(playlist.setBackend)
         layout.addRow(self.tr("Backend:"), backendChooser)
         profileChooser = profilesgui.ProfileComboBox(
-            profiles.category('delegates'),
-            restrictToType=playlistdelegate.PlaylistDelegate.profileType,
+            'delegates', 'playlist',
             default=playlist.treeview.itemDelegate().profile
         )
         profileChooser.profileChosen.connect(playlist.treeview.itemDelegate().setProfile)

@@ -27,8 +27,7 @@ from maestro import application, database as db, logging, utils, search, widgets
 from maestro.core import flags, levels, domains
 from maestro.core.elements import Element
 from maestro.gui import mainwindow, treeview, dockwidget, search as searchgui
-from maestro.gui.delegates import browser as browserdelegate
-from maestro.widgets.browser import model, nodes as bnodes
+from maestro.widgets.browser import delegate, model, nodes as bnodes
 
 
 class Browser(widgets.Widget):
@@ -110,7 +109,7 @@ class Browser(widgets.Widget):
         
         # Restore state
         layersForViews = [self.defaultLayers()]
-        self.delegateProfile = browserdelegate.BrowserDelegate.profileType.default()
+        self.delegateProfile = delegate.BrowserDelegate.profileType.default()
         self.sortTags = {}
         if state is not None and isinstance(state, dict):
             if 'domain' in state:
@@ -145,7 +144,7 @@ class Browser(widgets.Widget):
             if 'delegate' in state:
                 from maestro import profiles
                 self.delegateProfile = profiles.category('delegates').getFromStorage(
-                    state.get('delegate'),
+                    state['delegate'],
                     profiles.category('delegates').getType('browser')
                 )
             
@@ -360,7 +359,7 @@ class BrowserTreeView(treeview.TreeView):
         # Queued connection is necessary so that the model has really finished loading, when the view reacts.
         self.model().nodeLoaded.connect(self._handleNodeLoaded, Qt.QueuedConnection)
         
-        self.setItemDelegate(browserdelegate.BrowserDelegate(self, delegateProfile))
+        self.setItemDelegate(delegate.BrowserDelegate(self, delegateProfile))
         
         # The expander will decide which nodes to load/expand after the view is reset. Because each loading
         # might perform a search, Expanders work asynchronously.

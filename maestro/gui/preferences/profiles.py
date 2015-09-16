@@ -467,7 +467,11 @@ class ProfileComboBox(QtWidgets.QComboBox):
                  includeConfigure=True, showTypes=False, selectFirstProfile=True):
         super().__init__()
         self._profile = None
+        if isinstance(category, str):
+            category = profiles.category(category)
         self.category = category
+        if isinstance(restrictToType, str):
+            restrictToType = category.getType(restrictToType)
         self.restrictToType = restrictToType
         self.includeConfigure = includeConfigure
         self.showTypes = showTypes

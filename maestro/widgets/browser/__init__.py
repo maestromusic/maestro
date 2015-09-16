@@ -24,10 +24,12 @@ def init():
     from maestro import utils
     from maestro.gui import treeactions
     from maestro.widgets import WidgetClass
+    from maestro.widgets.browser import delegate
     from maestro.widgets.browser.browser import Browser, BrowserTreeView
     from maestro.widgets.browser.coverbrowser import CoverBrowser
     from maestro.widgets.browser.covertable import CoverTable
     translate = QtCore.QCoreApplication.translate
+    delegate.init()
     WidgetClass(
         id='browser', theClass=Browser, name=translate('Browser', 'Browser'),
         areas='dock', preferredDockArea='left'

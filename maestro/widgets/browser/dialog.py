@@ -23,8 +23,7 @@ from PyQt5.QtCore import Qt
 
 from maestro import utils
 from maestro.core import tags
-from maestro.gui import dialogs, delegates, search as searchgui, widgets as guiwidgets
-from maestro.gui.delegates import browser as browserdelegate
+from maestro.gui import dialogs, search as searchgui, widgets as guiwidgets
 from maestro.gui.preferences import profiles as profilesgui
 from maestro.widgets.browser import model
 
@@ -97,9 +96,7 @@ class BrowserDialog(AbstractBrowserDialog):
         lineLayout = QtWidgets.QHBoxLayout()
         optionLayout.addLayout(lineLayout)
         lineLayout.addWidget(QtWidgets.QLabel(self.tr("Item Display:")))
-        profileType = browserdelegate.BrowserDelegate.profileType
-        profileChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
-                                                     restrictToType=profileType,
+        profileChooser = profilesgui.ProfileComboBox('delegates', 'browser',
                                                      default=self.browser.delegateProfile)
         profileChooser.profileChosen.connect(self._handleProfileChosen)
         lineLayout.addWidget(profileChooser)

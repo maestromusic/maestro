@@ -21,9 +21,10 @@ translate = QtCore.QCoreApplication.translate
 
 
 def init():
-    from maestro.widgets.playlist import gui as pgui
+    from maestro.widgets.playlist import gui as pgui, delegate
     from maestro.widgets import WidgetClass
     from maestro import utils
+    delegate.init()
     WidgetClass(
         id='playlist', theClass=pgui.PlaylistWidget, name=translate('Playlist', 'Playlist'),
         icon=utils.images.icon('view-media-playlist'),

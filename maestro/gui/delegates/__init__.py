@@ -31,11 +31,8 @@ translate = QtCore.QCoreApplication.translate
 
 
 def init():
-    from maestro.gui.delegates import abstractdelegate, profiles
+    from maestro.gui.delegates import profiles
     profiles.init()
-    from maestro.gui.delegates import browser, playlist
-    browser.init()
-    playlist.init()
 
 
 class StandardDelegate(AbstractDelegate):

@@ -153,11 +153,8 @@ class OptionDialog(dialogs.FancyPopup):
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
         delegateType = delegate.EditorDelegate.profileType
-        delegateChooser = profilesgui.ProfileComboBox(
-            profiles.category('delegates'),
-            restrictToType=delegateType,
-            default=self.editor.itemDelegate().profile
-        )
+        delegateChooser = profilesgui.ProfileComboBox('delegates', 'editor',
+                                                      self.editor.itemDelegate().profile)
         delegateChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
         layout.addRow(self.tr("Item display"),delegateChooser)
         

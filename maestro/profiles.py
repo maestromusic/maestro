@@ -263,7 +263,8 @@ class TypedProfileCategory(ProfileCategory):
         ProfileType."""
         if type is None:
             return self._profiles
-        else: return [p for p in self._profiles if p.type == type]
+        else:
+            return [p for p in self._profiles if p.type == type]
         
     def getType(self, name):
         """Return the type of the given name or None if such a type does not exist."""
@@ -357,7 +358,7 @@ class TypedProfileCategory(ProfileCategory):
         # Return the profile given by name if it exists and its type fits
         if name is not None:
             profile = self.get(name)
-            if profile is not None and (restrictToType is None or profile.type == restrictToType):
+            if profile is not None and (restrictToType is None or profile.type is restrictToType):
                 return profile
         # Return the first profile whose type fits
         for profile in self._profiles:

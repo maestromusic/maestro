@@ -46,8 +46,7 @@ class RenameFilesAction(actions.TreeAction):
 class PathDelegate(delegates.StandardDelegate):
     """Delegate for the rename preview; shows old and new path color-coded.
     """
-    def __init__(self, view): 
-        # Because it should not be configurable, this profile is not contained in the profile category
+    def __init__(self, view):
         self.profile = delegates.profiles.DelegateProfile('renamer')
         super().__init__(view, self.profile)
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)

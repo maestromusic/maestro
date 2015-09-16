@@ -25,7 +25,8 @@ from PyQt5.QtCore import Qt
 from maestro import player, utils, widgets, profiles
 from maestro.core import levels
 from maestro.gui import actions, dialogs
-from maestro.gui.delegates import delegatewidget, playlist as playlistdelegate
+from maestro.gui.delegates import delegatewidget
+from maestro.widgets.playlist import delegate as playlistdelegate
 from maestro.gui.preferences import profiles as profilesgui
 
 translate = QtCore.QCoreApplication.translate
