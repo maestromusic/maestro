@@ -59,14 +59,17 @@ class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend
     providing audio playback and playlist management.
     """
+
+    categoryName = 'playback'
+
     stateChanged = QtCore.pyqtSignal(PlayState)
     volumeChanged = QtCore.pyqtSignal(int)
     currentChanged = QtCore.pyqtSignal(object)
     elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(ConnectionState)
     
-    def __init__(self, name, category, type, state):
-        super().__init__(name, category, type, state)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         self.connectionState = ConnectionState.Disconnected
         self.playlist = None
         self.numFrontends = 0

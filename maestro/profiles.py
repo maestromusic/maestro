@@ -35,16 +35,16 @@ class Profile(QtCore.QObject):
         type: ProfileType this profile belongs to, or ``None`` for no ProfileType.
         state: State as returned by :func:`save`.
     """
-    
+
+    categoryName = None  # override in subclasses!
     builtIn = False  # built-in profiles cannot be renamed or deleted
     
-    def __init__(self, name, category, type=None, state=None):
+    def __init__(self, name, type=None, state=None):
         super().__init__()
         self.name = name
         assert type is None or isinstance(type, ProfileType)
-        assert isinstance(category, ProfileCategory)
         self.type = type
-        self.category = category
+        self.category = category(self.categoryName)
     
     def save(self):
         """Return a dict, list, tuple or a simple data type that can be used to store this profile
@@ -77,7 +77,7 @@ class Profile(QtCore.QObject):
     
     def copy(self):
         """Return a copy of this profile."""
-        return type(self)(self.name, self.category, self.type, self.save())
+        return type(self)(self.name, self.type, self.save())
     
     def __str__(self):
         return '{}(name={})'.format(type(self).__name__, self.name)
@@ -95,11 +95,11 @@ class ProfileType:
         name (str): Internal name of the profile type
         title (str): UI string describing this type.
         profileClass: Profile subclass that will be used for profiles of this type.
-    """ 
+    """
     
-    def __init__(self, category, name, title, profileClass=Profile, defaultProfileName=None):
+    def __init__(self, name, title, profileClass=Profile, defaultProfileName=None):
         self.name = name
-        self.category = category
+        self.category = category(profileClass.categoryName)
         self.title = title
         self.profileClass = profileClass
         if defaultProfileName is None:
@@ -160,7 +160,8 @@ class ProfileCategory(QtCore.QObject):
         
         if defaultProfileName is not None:
             self.defaultProfileName = defaultProfileName
-        else: self.defaultProfileName = title
+        else:
+            self.defaultProfileName = title
         
         self.description = description
     
@@ -184,7 +185,7 @@ class ProfileCategory(QtCore.QObject):
             type: ignored (compatibility with TypedProfileCategory)
         """
         if isinstance(profile, str):
-            profile = self.profileClass(profile, self, type, state)
+            profile = self.profileClass(profile, type, state)
         self._profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile
@@ -235,7 +236,7 @@ class ProfileCategory(QtCore.QObject):
             i += 1
         return name
     
-    def getFromStorage(self,name):
+    def getFromStorage(self, name):
         """Return the profile of the given name if it exists or any other profile else. Use this method
         to load profiles from states saved in the storage file."""
         if name is not None:
@@ -309,7 +310,7 @@ class TypedProfileCategory(ProfileCategory):
         """
         if isinstance(profile, str):
             profileClass = type.profileClass if type.profileClass is not None else self.profileClass
-            profile = profileClass(profile, self, type, state)
+            profile = profileClass(profile, type, state)
         self._profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile

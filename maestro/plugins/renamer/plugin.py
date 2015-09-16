@@ -62,8 +62,10 @@ class FormatSyntaxError(SyntaxError):
 
 class GrammarRenamer(profiles.Profile):
 
-    def __init__(self, name, category, type=None, state=None):
-        super().__init__(name, category, type)
+    categoryName = 'renamer'
+
+    def __init__(self, name, type=None, state=None):
+        super().__init__(name, type)
         self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
         self.read(state)
 

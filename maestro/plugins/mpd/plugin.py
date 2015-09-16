@@ -47,9 +47,8 @@ translate = QtCore.QCoreApplication.translate
 
 def enable():
     profiles.category('playback').addType(profiles.ProfileType(
-        category=profiles.category('playback'),
         name='mpd', title=translate('MPDPlayerBackend', 'MPD'),
-        profileClass=MPDPlayerBackend
+        profileClass=MPDPlayerBackend,
     ))
     urls.fileBackends.append(MPDFile)
 
@@ -85,14 +84,14 @@ class MPDPlayerBackend(player.PlayerBackend):
     a playlist modification.
     """
     
-    def __init__(self, name, category, type, state):
+    def __init__(self, name, type, state):
         """Create the backend object named *name* with the configuration given in *state*.
         
         The backend connects to MPD as soon as at least one frontend is registered, and terminates
         the connection when the last frontend is unregistered. On initalization, no connection is
         made.
         """
-        super().__init__(name, category, type, state)
+        super().__init__(name, type, state)
         self.stack = stack.createSubstack()
         self.playlist = model.PlaylistModel(self, stack=self.stack)
 

@@ -38,13 +38,11 @@ def init():
         storageOption=config.getOption(config.storage, 'editor.albumguesser_profiles'),
         iconName='container',
     )
-
+    profiles.addCategory(profileCategory)
     profileCategory.addType(profiles.ProfileType(
-        category=profileCategory,
         name='standard', title=translate('Albumguesser', 'Tag-Based Guesser'),
         profileClass=StandardGuesser)
     )
-    profiles.addCategory(profileCategory)
     if len(profileCategory.profiles()) == 0:
         profileCategory.addProfile(translate('Albumguesser', 'Default'),
                                    type=profileCategory.getType('standard'))
@@ -55,11 +53,12 @@ class StandardGuesser(profiles.Profile):
     and optionally being in the same directory.
     Optionally, the title of the guessed album is matched against a regular expression in order to
     detect meta-containers."""
-    
+
+    categoryName = 'albumguesser'
     defaultMetaRegex = r' ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?'
 
-    def __init__(self, name, category, type, state):
-        super().__init__(name, category, type, state)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         if state is None:
             state = {}
         if 'groupTags' in state:

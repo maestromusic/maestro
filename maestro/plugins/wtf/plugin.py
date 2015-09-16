@@ -74,8 +74,11 @@ def defaultStorage():
 
 
 class Profile(profiles.Profile):
-    def __init__(self, name, category, type=None, state=None):
-        super().__init__(name, category, type, state)
+
+    categoryName = 'wtf'
+
+    def __init__(self, name, type=None, state=None):
+        super().__init__(name, type, state)
         self.domain = None
         self.criterion = None
         self.path = ''

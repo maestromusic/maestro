@@ -68,7 +68,6 @@ def init():
 
     # This type is useful to create profiles which are not configurable
     defaultProfileType = ProfileType(
-        category=category,
         name='default', title=translate('Delegates', 'Standard'),
         options=collections.OrderedDict([(option.name, option) for option in defaultOptions]),
         leftData=[], rightData=[])
@@ -86,9 +85,10 @@ class ProfileType(profiles.ProfileType):
     The constructor takes the name and title of the type, an (ordered) dict mapping option names to
     DelegateOptions (these include the options' default values for the default delegate) and two lists of
     DataPieces that are displayed by default in the left and right column of the default delegate profile.
-    """  
-    def __init__(self, category, name, title, options, leftData, rightData):
-        super().__init__(category, name, title, profileClass=DelegateProfile)
+    """
+
+    def __init__(self, name, title, options, leftData, rightData):
+        super().__init__(name, title, profileClass=DelegateProfile)
         self.options = options
         self.leftData = leftData
         self.rightData = rightData
@@ -156,8 +156,7 @@ def createProfileType(name, title, *, options=None, leftData=None, rightData=Non
     leftData = [DataPiece.fromString(string) for string in leftData]
     rightData = [DataPiece.fromString(string) for string in rightData]
     
-    profileType = ProfileType(profiles.category('delegates'), name, title,
-                              options, leftData, rightData)
+    profileType = ProfileType(name, title, options, leftData, rightData)
     # this will in particular load the profiles of this type from storage
     profiles.category('delegates').addType(profileType)
     return profileType
@@ -165,10 +164,13 @@ def createProfileType(name, title, *, options=None, leftData=None, rightData=Non
     
 class DelegateProfile(profiles.Profile):
     """Profile to configure a delegate. See profiles.Profile."""
-    def __init__(self, name, category, type=None, state=None):
+
+    categoryName = 'delegates'
+
+    def __init__(self, name, type=None, state=None):
         if type is None:
             type = defaultProfileType
-        super().__init__(name, category, type, state)
+        super().__init__(name, type, state)
         
         self.options = {option.name: option.default for option in type.options.values()}
         self.leftData = type.leftData[:]

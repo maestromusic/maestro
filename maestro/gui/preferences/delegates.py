@@ -21,9 +21,9 @@ import functools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from .. import dialogs, delegates
-from ... import application, utils
-from ...core import tags
+from maestro.gui import delegates
+from maestro import application, utils, profiles
+from maestro.core import tags
 
         
 class DelegateOptionsPanel(QtWidgets.QWidget):
@@ -64,7 +64,7 @@ class DelegateOptionsPanel(QtWidgets.QWidget):
         grid.setColumnStretch(1,1)
         
         layout.addStretch(1)
-        delegates.profiles.category.profileChanged.connect(self._handleProfileChanged)
+        profiles.category('delegates').profileChanged.connect(self._handleProfileChanged)
         
     def _handleValueChanged(self,option,editor):
         """Handle a value change in the editor for the given *option*."""
@@ -84,18 +84,18 @@ class DataPiecesModel(QtCore.QAbstractListModel):
         super().__init__()
         self.profile = profile
         self.left = left
-        delegates.profiles.category.profileChanged.connect(self._handleProfileChanged)
+        profiles.category('delegates').profileChanged.connect(self._handleProfileChanged)
     
     def setProfile(self,profile):
         """Set the profile whose datapieces are managed by this model."""
         self.profile = profile
         self.reset()
     
-    def rowCount(self,parent):
+    def rowCount(self, parent):
         if not parent.isValid():
             return len(self.profile.getDataPieces(self.left))
         
-    def data(self,index,role):
+    def data(self, index, role):
         dataPiece = self.profile.getDataPieces(self.left)[index.row()]
         if role == Qt.DisplayRole:
             return dataPiece.title

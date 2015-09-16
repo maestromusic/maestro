@@ -30,7 +30,6 @@ translate = QtCore.QCoreApplication.translate
 def enable():
     playerProfileCategory = profiles.category('playback')
     profileType = profiles.ProfileType(
-        category=playerProfileCategory,
         name='localplay',
         title=translate('LocalPlayBackend', 'Local Playback'),
         profileClass=LocalPlayerBackend
@@ -58,8 +57,8 @@ def defaultStorage():
 class LocalPlayerBackend(player.PlayerBackend):
     """Player backend implementation using a QtMultimedia.QMediaPlayer for local playback.
     """
-    def __init__(self, name, category, type, state):
-        super().__init__(name, category, type, state)
+    def __init__(self, name, type, state):
+        super().__init__(name, type, state)
         self.playlist = model.PlaylistModel(self)
         self.qtPlayer = None
         if state is None:

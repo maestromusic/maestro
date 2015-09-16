@@ -48,7 +48,7 @@ class PathDelegate(delegates.StandardDelegate):
     """
     def __init__(self, view): 
         # Because it should not be configurable, this profile is not contained in the profile category
-        self.profile = delegates.profiles.DelegateProfile('renamer', profiles.category('delegates'))
+        self.profile = delegates.profiles.DelegateProfile('renamer')
         super().__init__(view, self.profile)
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
