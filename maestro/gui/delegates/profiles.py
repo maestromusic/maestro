@@ -24,12 +24,11 @@ from maestro import config, profiles, logging
 from maestro.core import tags
 
 translate = QtCore.QCoreApplication.translate
-category = None
 
 
 class DelegateProfileCategory(profiles.TypedProfileCategory):
     """The delegates' profile category prefers the default delegates of each type."""
-    def getFromStorage(self,name,restrictToType):
+    def getFromStorage(self, name, restrictToType=None):
         if name is not None:
             profile = self.get(name)
             if profile is not None and restrictToType is None and profile.type == restrictToType:
@@ -38,17 +37,17 @@ class DelegateProfileCategory(profiles.TypedProfileCategory):
 
 
 def init():
-    global category, defaultOptions, defaultProfileType
+    global defaultOptions, defaultProfileType
     category = DelegateProfileCategory(
         name="delegates",
-        title=translate("Delegates","Item display"),
+        title=translate("Delegates", "Item display"),
         storageOption=config.getOption(config.storage, 'gui.delegates'),
         description=translate(
             "Delegates",
             "Configure how elements are rendered in treeviews like browser, editor and playlist."),
         iconName='preferences-delegates',
     )
-    profiles.ProfileManager.addCategory(category)
+    profiles.addCategory(category)
     # List of available options for delegates. This list in particular defines the default values.
     defaultOptions = [DelegateOption(*data) for data in [
         ("fontSize", translate("Delegates", "Fontsize"), "int", 8),
@@ -68,12 +67,11 @@ def init():
     ]]
 
     # This type is useful to create profiles which are not configurable
-    defaultProfileType = ProfileType('default',
-                                     translate("Delegates","Standard"),
-                                     collections.OrderedDict([(option.name,option)
-                                                              for option in defaultOptions]),
-                                     [],
-                                     [])
+    defaultProfileType = ProfileType(
+        category=category,
+        name='default', title=translate('Delegates', 'Standard'),
+        options=collections.OrderedDict([(option.name, option) for option in defaultOptions]),
+        leftData=[], rightData=[])
 
 
 class ProfileType(profiles.ProfileType):
@@ -89,8 +87,8 @@ class ProfileType(profiles.ProfileType):
     DelegateOptions (these include the options' default values for the default delegate) and two lists of
     DataPieces that are displayed by default in the left and right column of the default delegate profile.
     """  
-    def __init__(self,name,title,options,leftData,rightData):
-        super().__init__(name,title,profileClass=DelegateProfile)
+    def __init__(self, category, name, title, options, leftData, rightData):
+        super().__init__(category, name, title, profileClass=DelegateProfile)
         self.options = options
         self.leftData = leftData
         self.rightData = rightData
@@ -100,7 +98,7 @@ class ProfileType(profiles.ProfileType):
         from self.options, self.leftData, self.rightData because the user is allowed to change the default
         delegate.
         """
-        return category.get(self.title)
+        return self.category.get(self.title)
         
     def defaultState(self):
         """Return a state object that - if passed to the constructor of Profile - will create a profile
@@ -117,17 +115,18 @@ class ProfileType(profiles.ProfileType):
             'type': self.name
         }
     
-    def load(self,category):
-        profile = category.get(self.title)
+    def load(self):
+        profile = self.category.get(self.title)
         if profile is None:
-            profile = category.addProfile(self.title,self)
+            profile = self.category.addProfile(self.title, self)
         elif profile.type is not self:
-            category.deleteProfile(profile)
-            profile = category.addProfile(self.title,self)
+            self.category.deleteProfile(profile)
+            profile = self.category.addProfile(self.title, self)
         profile.builtIn = True
         
 
-def createProfileType(name,title,*,options=None,leftData=None,rightData=None,overwrite={},addOptions=[]):
+def createProfileType(name, title, *, options=None, leftData=None, rightData=None,
+                      overwrite={}, addOptions=[]):
     """Create a profile type and an associated default profile and add them to the delegate profile category.
     This should be called once inside the class definition of each treeview-subclass that needs its own
     type of delegate profiles.
@@ -146,9 +145,9 @@ def createProfileType(name,title,*,options=None,leftData=None,rightData=None,ove
     
     """
     if options is None:
-        options = defaultOptions # defined below
+        options = defaultOptions  # defined below
     
-    options = collections.OrderedDict([(option.name,copy.copy(option)) for option in options])
+    options = collections.OrderedDict([(option.name, copy.copy(option)) for option in options])
     for optionName, value in overwrite.items():
         options[optionName].default = value
     for option in addOptions:
@@ -157,17 +156,19 @@ def createProfileType(name,title,*,options=None,leftData=None,rightData=None,ove
     leftData = [DataPiece.fromString(string) for string in leftData]
     rightData = [DataPiece.fromString(string) for string in rightData]
     
-    type = ProfileType(name,title,options,leftData,rightData)
-    category.addType(type) # this will in particular load the profiles of this type from storage
-    return type
+    profileType = ProfileType(profiles.category('delegates'), name, title,
+                              options, leftData, rightData)
+    # this will in particular load the profiles of this type from storage
+    profiles.category('delegates').addType(profileType)
+    return profileType
     
     
 class DelegateProfile(profiles.Profile):
     """Profile to configure a delegate. See profiles.Profile."""
-    def __init__(self,name,type=None,state=None):
+    def __init__(self, name, category, type=None, state=None):
         if type is None:
             type = defaultProfileType
-        super().__init__(name,type,state)
+        super().__init__(name, category, type, state)
         
         self.options = {option.name: option.default for option in type.options.values()}
         self.leftData = type.leftData[:]
@@ -229,38 +230,38 @@ class DelegateProfile(profiles.Profile):
         theList = self.leftData if left else self.rightData
         theList[pos:pos] = dataPieces
         if emitEvent:
-            category.profileChanged.emit(self)
+            self.emitChange()
     
     def removeDataPieces(self,left,index,count):
         """Remove *count* datapieces beginning with index *index* from the left or right column (depending on
         *left*."""
         theList = self.leftData if left else self.rightData
         del theList[index:index+count]
-        category.profileChanged.emit(self)
+        self.emitChange()
         
     def setDataPieces(self,left,dataPieces):
         """Set the datapieces of the left or right column depending on the parameter *left*."""
         if left:
             if self.leftData != dataPieces:
                 self.leftData = dataPieces
-                category.profileChanged.emit(self)
+                self.emitChange()
         else:
             if self.rightData != dataPieces:
                 self.rightData = dataPieces
-                category.profileChanged.emit(self)
+                self.emitChange()
     
     def setOption(self,option,value):
         """Set the value of the given option."""
         assert option.name in self.options
         if value != self.options[option.name]:
             self.options[option.name] = value
-            category.profileChanged.emit(self)
+            self.emitChange()
       
     def resetToDefaults(self):
         """Reset all datapieces and options to the default values for this configuration's type. This does
         not work, if the profile does not have a type."""
         self._updateFromState(self.type.defaultState())
-        category.profileChanged.emit(self)
+        self.emitChange()
 
     @classmethod
     def configurationWidget(cls, profile, parent):

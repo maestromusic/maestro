@@ -44,7 +44,7 @@ OPTIONS_ALL = [OPTION_DELETE, OPTION_INCLUDE_WORK_TITLES]
 
 def enable():
     global _action
-    profiles.ProfileManager.addCategory(profiles.ProfileCategory(
+    profiles.addCategory(profiles.ProfileCategory(
         name='wtf', title=translate('wtf', 'Export'), iconName='actions-export',
         storageOption=config.getOption(config.storage, 'wtf.profiles'),
         profileClass=Profile
@@ -66,7 +66,7 @@ def mainWindowInit():
 
 def disable():
     application.mainWindow.menus['extras'].removeAction(_action)
-    profiles.ProfileManager.removeCategory('wtf')
+    profiles.removeCategory('wtf')
 
 
 def defaultStorage():
@@ -74,8 +74,8 @@ def defaultStorage():
 
 
 class Profile(profiles.Profile):
-    def __init__(self, name, type=None, state=None):
-        super().__init__(name, type, state)
+    def __init__(self, name, category, type=None, state=None):
+        super().__init__(name, category, type, state)
         self.domain = None
         self.criterion = None
         self.path = ''

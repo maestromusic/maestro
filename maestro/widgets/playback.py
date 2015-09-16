@@ -22,8 +22,7 @@ import functools
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import Qt
 
-from maestro import player, utils, widgets
-from maestro.profiles import ProfileManager
+from maestro import player, utils, widgets, profiles
 from maestro.core import levels
 from maestro.gui import actions, dialogs
 from maestro.gui.delegates import delegatewidget, playlist as playlistdelegate
@@ -86,7 +85,7 @@ class PlayControlAction(actions.GlobalAction):
 
         currentWidget = widgets.current('playback')
         currentBackend = None if currentWidget is None else currentWidget.backend
-        backends = [b for b in ProfileManager.category('playback').profiles()
+        backends = [b for b in profiles.category('playback').profiles()
                     if b.connectionState is player.ConnectionState.Connected]
         if self.command is PlayCommand.PlayPause:
 
@@ -173,7 +172,7 @@ class PlaybackWidget(widgets.Widget):
         
     def initialize(self, state=None):
         super().initialize(state)
-        playerProfileCategory = ProfileManager.category('playback')
+        playerProfileCategory = profiles.category('playback')
         if state:
             backend = playerProfileCategory.get(state)  # may be None
         elif len(playerProfileCategory.profiles()) > 0:
@@ -343,9 +342,8 @@ class OptionDialog(dialogs.FancyPopup):
         hLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(hLayout)
         hLayout.addWidget(QtWidgets.QLabel(self.tr("Backend:")))
-        backendChooser = profilesgui.ProfileComboBox(
-            ProfileManager.category('playback'),
-            default=playback.backend)
+        backendChooser = profilesgui.ProfileComboBox(profiles.category('playback'),
+                                                     default=playback.backend)
         backendChooser.profileChosen.connect(playback.setBackend)
         hLayout.addWidget(backendChooser)
         hLayout.addStretch()

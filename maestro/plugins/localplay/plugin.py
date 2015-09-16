@@ -28,21 +28,24 @@ translate = QtCore.QCoreApplication.translate
 
 # noinspection PyTypeChecker,PyArgumentList
 def enable():
-    profileType = profiles.ProfileType('localplay',
-                                       translate('LocalPlayBackend','Local Playback'),
-                                       LocalPlayerBackend)
-    playerProfileCategory = profiles.ProfileManager.category('playback')
+    playerProfileCategory = profiles.category('playback')
+    profileType = profiles.ProfileType(
+        category=playerProfileCategory,
+        name='localplay',
+        title=translate('LocalPlayBackend', 'Local Playback'),
+        profileClass=LocalPlayerBackend
+    )
     playerProfileCategory.addType(profileType)
     # addType loads stored profiles of this type from storage
     # If no profile was loaded, create a default one.
     if len(playerProfileCategory.profiles(profileType)) == 0:
-        name = translate("LocalPlayBackend", 'Local playback')
+        name = translate('LocalPlayBackend', 'Local playback')
         if playerProfileCategory.get(name) is None:
             playerProfileCategory.addProfile(name, profileType)
 
 
 def disable():
-    profiles.ProfileManager.category('playback').removeType('localplay')
+    profiles.category('playback').removeType('localplay')
     
     
 def defaultStorage():
@@ -55,8 +58,8 @@ def defaultStorage():
 class LocalPlayerBackend(player.PlayerBackend):
     """Player backend implementation using a QtMultimedia.QMediaPlayer for local playback.
     """
-    def __init__(self, name, type, state):
-        super().__init__(name, type, state)
+    def __init__(self, name, category, type, state):
+        super().__init__(name, category, type, state)
         self.playlist = model.PlaylistModel(self)
         self.qtPlayer = None
         if state is None:

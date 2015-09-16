@@ -38,7 +38,7 @@ def init():
     from maestro import profiles as profilesModule
     profilesModule.ProfileManager.instance().categoryAdded.connect(_addProfileCategory)
     profilesModule.ProfileManager.instance().categoryRemoved.connect(_removeProfileCategory)
-    for category in profilesModule.ProfileManager.categories():
+    for category in profilesModule.categories():
         _addProfileCategory(category)
 
     addPanel('plugins', translate('Preferences', 'Plugins'),

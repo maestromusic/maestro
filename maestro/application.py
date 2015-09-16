@@ -323,7 +323,7 @@ def run(cmdConfig=[], type='gui', exitPoint=None):
     plugins.shutdown()
     covers.shutdown()
     import maestro.profiles
-    maestro.profiles.ProfileManager.save()
+    maestro.profiles.save()
     database.tags.deleteSuperfluousValues()
     database.shutdown()
     config.shutdown()

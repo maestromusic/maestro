@@ -40,11 +40,11 @@ def init():
     )
 
     profileCategory.addType(profiles.ProfileType(
-        name='standard',
-        title=translate('Albumguesser', 'Tag-Based Guesser'),
+        category=profileCategory,
+        name='standard', title=translate('Albumguesser', 'Tag-Based Guesser'),
         profileClass=StandardGuesser)
     )
-    profiles.ProfileManager.addCategory(profileCategory)
+    profiles.addCategory(profileCategory)
     if len(profileCategory.profiles()) == 0:
         profileCategory.addProfile(translate('Albumguesser', 'Default'),
                                    type=profileCategory.getType('standard'))
@@ -58,8 +58,8 @@ class StandardGuesser(profiles.Profile):
     
     defaultMetaRegex = r' ?[([]?(?:cd|disc|part|teil|disk|vol)[^a-zA-Z]\.? ?([iI0-9]+)[)\]]?'
 
-    def __init__(self, name, type, state):
-        super().__init__(name, type, state)
+    def __init__(self, name, category, type, state):
+        super().__init__(name, category, type, state)
         if state is None:
             state = {}
         if 'groupTags' in state:

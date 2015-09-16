@@ -145,7 +145,7 @@ class PlaylistWidget(widgets.Widget):
         super().__init__(**args)
         # Read state
         profileType = playlistdelegate.PlaylistDelegate.profileType
-        playerProfileCategory = profiles.ProfileManager.category('playback')
+        playerProfileCategory = profiles.category('playback')
         if state is None:
             if len(playerProfileCategory.profiles()) > 0:
                 backend = playerProfileCategory.profiles()[0]
@@ -214,14 +214,14 @@ class OptionDialog(dialogs.FancyPopup):
     def __init__(self, parent, playlist):
         super().__init__(parent)
         layout = QtWidgets.QFormLayout(self)
-        backendChooser = profilesgui.ProfileComboBox(
-            profiles.ProfileManager.category('playback'),
-            default=playlist.backend)
+        backendChooser = profilesgui.ProfileComboBox(profiles.category('playback'),
+                                                     default=playlist.backend)
         backendChooser.profileChosen.connect(playlist.setBackend)
         layout.addRow(self.tr("Backend:"), backendChooser)
         profileChooser = profilesgui.ProfileComboBox(
-                                         delegates.profiles.category,
-                                         restrictToType=playlistdelegate.PlaylistDelegate.profileType,
-                                         default=playlist.treeview.itemDelegate().profile)
+            delegates.profiles.category,
+            restrictToType=playlistdelegate.PlaylistDelegate.profileType,
+            default=playlist.treeview.itemDelegate().profile
+        )
         profileChooser.profileChosen.connect(playlist.treeview.itemDelegate().setProfile)
         layout.addRow(self.tr("Item view:"), profileChooser)

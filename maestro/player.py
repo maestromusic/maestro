@@ -36,7 +36,7 @@ class ConnectionState(enum.Enum):
 
 
 def init():
-    profiles.ProfileManager.addCategory(profiles.TypedProfileCategory(
+    profiles.addCategory(profiles.TypedProfileCategory(
         name='playback', title=translate('PlayerBackend', 'Playback'),
         storageOption=config.getOption(config.storage, 'player.profiles'),
         description=translate('PlayerBackend',
@@ -65,8 +65,8 @@ class PlayerBackend(profiles.Profile):
     elapsedChanged = QtCore.pyqtSignal(float)
     connectionStateChanged = QtCore.pyqtSignal(ConnectionState)
     
-    def __init__(self, name, type, state):
-        super().__init__(name, type, state)
+    def __init__(self, name, category, type, state):
+        super().__init__(name, category, type, state)
         self.connectionState = ConnectionState.Disconnected
         self.playlist = None
         self.numFrontends = 0

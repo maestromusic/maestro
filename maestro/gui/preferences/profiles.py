@@ -441,7 +441,7 @@ class CategoryMenu(QtWidgets.QLabel):
     def _updateText(self):
         """Reset the HTML text of this label."""
         parts = [self.tr("Choose a profile category:"), "<ul>"]
-        for category in profiles.ProfileManager.categories():
+        for category in profiles.categories():
             parts.append('<li style="margin-bottom: 10px"><a href="profiles/{}">{}</a></li>'
                          .format(category.name, category.title))
         parts.append("</ul>")
@@ -597,8 +597,10 @@ class ProfileActionWidget(QtWidgets.QWidget):
     the temporary profile as a normal persistent profile or to load (copies of) normal profiles.
     """
 
-    def __init__(self, category: profiles.ProfileCategory):
+    def __init__(self, category):
         super().__init__()
+        if isinstance(category, str):
+            category = profiles.category(category)
         self.category = category
         self.category.profileAdded.connect(self._makeMenu)
         self.category.profileRemoved.connect(self._makeMenu)

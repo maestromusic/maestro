@@ -38,7 +38,7 @@ def defaultConfig():
 
 
 def enable():
-    profiles.ProfileManager.addCategory(profiles.ProfileCategory(
+    profiles.addCategory(profiles.ProfileCategory(
         name='renamer', title=translate('Renamer', 'Renamer'),
         storageOption=config.getOption(config.storage, 'renamer.profiles'),
         profileClass=GrammarRenamer, iconName='edit-rename')
@@ -55,7 +55,7 @@ def enable():
 def disable():
     from maestro.gui import actions
     actions.manager.unregisterAction('renamer')
-    profiles.ProfileManager.removeCategory('renamer')
+    profiles.removeCategory('renamer')
 
 
 class FormatSyntaxError(SyntaxError):
@@ -64,8 +64,8 @@ class FormatSyntaxError(SyntaxError):
 
 class GrammarRenamer(profiles.Profile):
 
-    def __init__(self, name, type=None, state=None):
-        super().__init__(name, type)
+    def __init__(self, name, category, type=None, state=None):
+        super().__init__(name, category, type)
         self.positionFormat = "{:0>" + str(config.options.renamer.positionDigits) + "}"
         self.read(state)
 

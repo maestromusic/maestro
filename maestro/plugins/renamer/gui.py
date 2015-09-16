@@ -22,7 +22,7 @@ translate = QtCore.QCoreApplication.translate
 from maestro import logging
 from maestro.gui import actions, treeview, delegates
 from maestro.gui.delegates import abstractdelegate
-from maestro.gui.preferences import profiles
+from maestro.gui.preferences import profiles as profileprefs
 from maestro.models import leveltreemodel
 from maestro.core import levels
 from . import plugin
@@ -90,7 +90,7 @@ class RenameDialog(QtWidgets.QDialog):
         self.setWindowTitle(self.tr("Rename {} containers").format(len(elements)))
         mainLayout = QtWidgets.QVBoxLayout()
 
-        self.profileActionWidget = profiles.ProfileActionWidget(plugin.profileCategory)
+        self.profileActionWidget = profileprefs.ProfileActionWidget('renamer')
         mainLayout.addWidget(self.profileActionWidget, 1)
         self.statusLabel = QtWidgets.QLabel()
         self.statusLabel.setVisible(False)
@@ -158,7 +158,7 @@ class RenameDialog(QtWidgets.QDialog):
         self.accept()
 
 
-class GrammarConfigurationWidget(profiles.ProfileConfigurationWidget):
+class GrammarConfigurationWidget(profileprefs.ProfileConfigurationWidget):
     """This widget is used in two places to configure grammar profiles:
     
         - as configuration widget of the profiles (and thus used in the standard ProfileDialog),
