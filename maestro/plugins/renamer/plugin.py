@@ -18,13 +18,11 @@
 
 import pyparsing
 from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums
-
 from PyQt5 import QtCore
-
-translate = QtCore.QCoreApplication.translate
-
 from maestro.core import tags
 from maestro import config, profiles
+
+translate = QtCore.QCoreApplication.translate
 
     
 def defaultStorage():
@@ -191,13 +189,12 @@ class GrammarRenamer(profiles.Profile):
         if not isinstance(other, GrammarRenamer):
             return True
         return self.formatString != other.formatString or \
-               self.replaceChars != other.replaceChars or \
-               self.replaceBy != other.replaceBy or \
-               self.removeChars != other.removeChars
+            self.replaceChars != other.replaceChars or \
+            self.replaceBy != other.replaceBy or \
+            self.removeChars != other.removeChars
 
     def __eq__(self, other):
         return not self.__neq__(other)
     
     def __hash__(self):
         return id(self)
-        

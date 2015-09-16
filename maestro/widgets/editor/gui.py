@@ -19,7 +19,7 @@
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import widgets
+from maestro import widgets, profiles
 from maestro.core import levels, tags
 from maestro.widgets.editor import albumguesser, delegate
 from maestro.widgets.editor.model import EditorModel
@@ -70,10 +70,11 @@ class EditorWidget(widgets.Widget):
             state = {}
         expand = 'expand' not in state or state['expand'] # by default expand
         guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled']
-        guessProfile = albumguesser.profileCategory.getFromStorage(state.get('guessProfile'))
-        delegateProfile = delegates.profiles.category.getFromStorage(
+        guessProfile = profiles.category('albumguesser').getFromStorage(state.get('guessProfile'))
+        delegateProfile = profiles.category('delegates').getFromStorage(
             state.get('delegate'),
-            delegate.EditorDelegate.profileType)
+            profiles.category('delegates').getType('editor')
+        )
         
         buttonLayout = QtWidgets.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
@@ -141,8 +142,10 @@ class OptionDialog(dialogs.FancyPopup):
         albumGuessCheckBox.toggled.connect(self._handleAlbumGuessCheckBox)
         albumGuessLayout.addWidget(albumGuessCheckBox)
         
-        self.albumGuessComboBox = profilesgui.ProfileComboBox(albumguesser.profileCategory,
-                                                              default=self.editor.model().guessProfile)
+        self.albumGuessComboBox = profilesgui.ProfileComboBox(
+            profiles.category('albumguesser'),
+            default=self.editor.model().guessProfile
+        )
         self.albumGuessComboBox.setToolTip(self.tr("Select album guessing profile"))
         self._handleAlbumGuessCheckBox(albumGuessCheckBox.isChecked()) # initialize enabled/disabled
         self.albumGuessComboBox.profileChosen.connect(self._handleAlbumGuessComboBox)
@@ -150,9 +153,11 @@ class OptionDialog(dialogs.FancyPopup):
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
         delegateType = delegate.EditorDelegate.profileType
-        delegateChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
-                                                     restrictToType=delegateType,
-                                                     default=self.editor.itemDelegate().profile)
+        delegateChooser = profilesgui.ProfileComboBox(
+            profiles.category('delegates'),
+            restrictToType=delegateType,
+            default=self.editor.itemDelegate().profile
+        )
         delegateChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
         layout.addRow(self.tr("Item display"),delegateChooser)
         

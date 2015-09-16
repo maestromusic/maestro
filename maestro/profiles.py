@@ -77,7 +77,7 @@ class Profile(QtCore.QObject):
     
     def copy(self):
         """Return a copy of this profile."""
-        return type(self)(self.name, self.type, self.save())
+        return type(self)(self.name, self.category, self.type, self.save())
     
     def __str__(self):
         return '{}(name={})'.format(type(self).__name__, self.name)

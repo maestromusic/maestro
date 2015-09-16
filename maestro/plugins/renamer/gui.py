@@ -19,7 +19,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from maestro import logging
+from maestro import logging, profiles
 from maestro.gui import actions, treeview, delegates
 from maestro.gui.delegates import abstractdelegate
 from maestro.gui.preferences import profiles as profileprefs
@@ -48,7 +48,7 @@ class PathDelegate(delegates.StandardDelegate):
     """
     def __init__(self, view): 
         # Because it should not be configurable, this profile is not contained in the profile category
-        self.profile = delegates.profiles.DelegateProfile("renamer")
+        self.profile = delegates.profiles.DelegateProfile('renamer', profiles.category('delegates'))
         super().__init__(view, self.profile)
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
