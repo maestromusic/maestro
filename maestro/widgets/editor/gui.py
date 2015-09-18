@@ -21,9 +21,9 @@ from PyQt5.QtCore import Qt
 
 from maestro import widgets, profiles
 from maestro.core import levels, tags
-from maestro.widgets.editor import albumguesser, delegate
+from maestro.widgets.editor import delegate
 from maestro.widgets.editor.model import EditorModel
-from maestro.gui import treeview, tagwidgets, dialogs, delegates
+from maestro.gui import treeview, tagwidgets, dialogs
 from maestro.gui.preferences import profiles as profilesgui
 
 translate = QtCore.QCoreApplication.translate
@@ -43,13 +43,13 @@ class EditorTreeView(treeview.DraggingTreeView):
        
     def _expandInsertedRows(self, parent, start, end):
         if self.autoExpand:
-            for row in range(start, end+1):
+            for row in range(start, end + 1):
                 child = self.model().index(row, 0, parent)
                 self.expand(child)
             
     def _selectDroppedRows(self, parent, start, end):
         self.selectionModel().select(QtCore.QItemSelection(self.model().index(start, 0, parent),
-                                                          self.model().index(end, 0, parent)),
+                                                           self.model().index(end, 0, parent)),
                                      QtCore.QItemSelectionModel.ClearAndSelect)
         self.setFocus(Qt.MouseFocusReason)
 
@@ -158,14 +158,14 @@ class OptionDialog(dialogs.FancyPopup):
         delegateChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
         layout.addRow(self.tr("Item display"),delegateChooser)
         
-    def _handleAutoExpandBox(self,state):
+    def _handleAutoExpandBox(self, state):
         """Handle toggling the auto expand checkbox."""
         self.editor.autoExpand = state == Qt.Checked
         
-    def _handleAlbumGuessCheckBox(self,checked):
+    def _handleAlbumGuessCheckBox(self, checked):
         """Handle toggling of the guess checkbox."""
         self.editor.model().guessingEnabled = checked
-        if len(albumguesser.profileCategory.profiles()) > 0:
+        if len(profiles.profiles('albumguesser')) > 0:
             self.albumGuessComboBox.setEnabled(checked)
         else: self.albumGuessComboBox.setEnabled(True) # the box contains only 'Configure...'
         
@@ -227,7 +227,7 @@ class ExternalTagsWidget(QtWidgets.QScrollArea):
         self.label.setText('<br>'.join(lines))
         self.setHidden(len(lines) == 0)
         
-    def _handleLink(self,link):
+    def _handleLink(self, link):
         """Handle a link in the text."""
         action, index = link.split(':',1)
         index = int(index)

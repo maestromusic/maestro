@@ -26,6 +26,37 @@ from PyQt5 import QtCore
 from maestro import config, utils
 
 
+# ======== convenience module-level functions for common tasks
+def profiles(categoryName):
+    """Returns all profiles of the category named `categoryName`."""
+    return category(categoryName).profiles()
+
+
+def category(categoryName):
+    """Return the :class:`ProfileCategory` named `categoryName`."""
+    return ProfileManager.instance().category(categoryName)
+
+
+def categories():
+    """Returns an iterator over all registered profile categories."""
+    return ProfileManager.instance().categories()
+
+
+def addCategory(cat):
+    """Adds (registers) a new profile category."""
+    return ProfileManager.instance().addCategory(cat)
+
+
+def removeCategory(cat):
+    """Remove (unregister) a profile category."""
+    return ProfileManager.instance().removeCategory(cat)
+
+
+def save():
+    """Store all profiles to the storage file."""
+    return ProfileManager.instance().save()
+
+
 class Profile(QtCore.QObject):
     """A profile stores the configuration of some object. Profiles are stored persistently in the
     storage file.
@@ -365,26 +396,6 @@ class TypedProfileCategory(ProfileCategory):
             if restrictToType is None or profile.type == profile.type:
                 return profile
         return None
-    
-
-def category(name):
-    return ProfileManager.instance().category(name)
-
-
-def categories():
-    return ProfileManager.instance().categories()
-
-
-def addCategory(cat):
-    return ProfileManager.instance().addCategory(cat)
-
-
-def removeCategory(cat):
-    return ProfileManager.instance().removeCategory(cat)
-
-
-def save():
-    return ProfileManager.instance().save()
 
 
 class ProfileManager(QtCore.QObject):
