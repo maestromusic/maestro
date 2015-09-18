@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+"""Basic definitions for audio playback control. Provides the (abstract) class
+:class:`PlayerBackend` which audio backends need to implement.
+"""
 
 import enum
 from PyQt5 import QtCore
@@ -50,9 +53,16 @@ class BackendError(Exception):
 
 
 class InsertError(BackendError):
-    def __init__(self, msg, successfulURLs=[]):
+    """Error raised when the insertion of songs into the current playlist fails, e.g. beacause of
+    unsupported format.
+
+    Args:
+        msg (int): Message describing the error
+        successfulURLs (list): List of those URLs that were successfully inserted
+    """
+    def __init__(self, msg, successfulURLs=None):
         super().__init__(msg)
-        self.successfulURLs = successfulURLs
+        self.successfulURLs = successfulURLs or []
 
 
 class PlayerBackend(profiles.Profile):
