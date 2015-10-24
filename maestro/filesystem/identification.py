@@ -74,7 +74,7 @@ class AudioFileIdentifier:
             logging.warning(__name__,
                 'Error opening {}'.format(self.requestURL.format(self.apikey, duration, fingerprint)))
             return self.fallbackHash(path)
-        ans = req.readall().decode("utf-8")
+        ans = req.read().decode('utf-8')
         req.close()
         ans = json.loads(ans)
         if ans['status'] != 'ok':
