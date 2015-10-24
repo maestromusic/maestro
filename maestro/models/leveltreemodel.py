@@ -18,13 +18,19 @@
 
 import collections
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore
 from PyQt5.QtCore import Qt
+
+from maestro import config, logging, utils, stack
+from maestro.core import elements, levels, nodes
+from maestro.models import rootedtreemodel
+
 translate = QtCore.QCoreApplication.translate
 
-from .. import config, logging, utils, stack
-from ..core import elements, levels, nodes
-from ..models import rootedtreemodel
+
+class CancelledByUser(RuntimeError):
+    """Use when some operation was cancelled by user interaction."""
+    pass
 
 
 class LevelTreeModel(rootedtreemodel.RootedTreeModel):
@@ -83,14 +89,19 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         
         # Get elements to insert
         if mimeData.hasFormat(config.options.gui.mime):
-            ids = [ node.element.id for node in mimeData.wrappers() ]
+            ids = [node.element.id for node in mimeData.wrappers()]
             elements = self.level.collect(ids)
         else:  # text/uri-list
-            elements = self.prepareURLs(mimeData.urls(), parent)
+            try:
+                elements = self.prepareURLs(mimeData.urls(), parent)
+            except CancelledByUser:
+                stack.abortMacro()
+                return False
+
 
         if len(elements) > 0:
             self.insertElements(parent, row, elements)
-            self.rowsDropped.emit(self.getIndex(parent), row, row+len(elements)-1)
+            self.rowsDropped.emit(self.getIndex(parent), row, row + len(elements) - 1)
             
         stack.endMacro()
         return len(elements) != 0
@@ -171,6 +182,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
         """Prepare *urls* to be dropped under *parent*; returns a list of Elements."""
         files = utils.files.collect(urls)
         numFiles = sum(len(v) for v in files.values())
+        from PyQt5 import QtWidgets
         progress = QtWidgets.QProgressDialog(self.tr("Importing {0} files...").format(numFiles),
                                              self.tr("Cancel"), 0, numFiles)
         progress.setMinimumDuration(1000)
@@ -184,8 +196,7 @@ class LevelTreeModel(rootedtreemodel.RootedTreeModel):
                 filesByFolder[folder] = []
                 for file in filesInOneFolder:
                     if progress.wasCanceled():
-                        self.level.stack.abortMacro()
-                        return []
+                        raise CancelledByUser()
                     progress.setValue(progress.value() + 1)
                     element = self.loadFile(file)
                     filesByFolder[folder].append(element)
