@@ -117,6 +117,7 @@
         <file alias="weather_sun.png">flags/silk/weather_sun.png</file>
         <file alias="world.png">flags/silk/world.png</file>
         <file alias="cross.png">flags/silk/cross.png</file>
+        <file alias="oscar.png">flags/oscar.png</file>
     </qresource>
     <qresource prefix="/maestro/icons/preferences">
         <file alias="delegates.svgz">icons/preferences/delegates.svgz</file>

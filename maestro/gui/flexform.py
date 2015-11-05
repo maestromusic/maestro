@@ -727,8 +727,8 @@ class ImageChooser(QtWidgets.QDialog):
                 
     def _handleAdd(self):
         """Handle clicks on the add button: Open a file dialog."""
-        fileName = QtGui.QFileDialog.getOpenFileName(self,self.tr("Choose an image"),
-                                                     filter = self.tr("Images (*.png *.xpm *.jpg)"))
+        fileName = QtWidgets.QFileDialog.getOpenFileName(self,self.tr("Choose an image"),
+                                                         filter = self.tr("Images (*.png *.xpm *.jpg)"))
         if fileName:
             pixmap = QtGui.QPixmap(fileName)
             item = QtWidgets.QListWidgetItem(QtGui.QIcon(pixmap), '')

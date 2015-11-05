@@ -380,7 +380,7 @@ class AddFlagPopup(dialogs.FancyPopup):
     def _handleAddButton(self):
         """Create a new flagtype (querying the user for the flagtype's name) and directly add it to all
         elements that are currently edited."""
-        from .preferences import flagmanager
+        from maestro.gui.preferences import flagmanager
         flag = flagmanager.createNewFlagType(self.parent())
         if flag is not None:
             self.model.addFlag(flag)
@@ -388,7 +388,7 @@ class AddFlagPopup(dialogs.FancyPopup):
 
     def _handleManagerButton(self):
         """Open the flagmanager."""
-        from . import preferences
+        from maestro.gui import preferences
         preferences.show('main/flagmanager')
         self.close()
 
