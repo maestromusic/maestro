@@ -22,11 +22,12 @@ import os.path
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import application, database as db, stack, utils
+from maestro import application, database as db, stack, utils, profiles
 from maestro.core import levels, tags, urls
 from maestro.models.leveltreemodel import LevelTreeModel
 from maestro.gui import actions, delegates, treeview
-from maestro.gui.delegates import abstractdelegate, editor as editordelegate
+from maestro.gui.delegates import abstractdelegate
+from maestro.widgets.editor import delegate as editordelegate
 
 translate = QtCore.QCoreApplication.translate
 
@@ -206,8 +207,9 @@ class ModifiedTagsDialog(QtWidgets.QDialog):
         leftLayout.addWidget(QtWidgets.QLabel(self.tr('<b>In Maestro\'s database:</b>')))
         rightLayout.addWidget(QtWidgets.QLabel(self.tr('<b>In the file:</b>')))
         
-        delegateProfile = delegates.profiles.category.getFromStorage(
-                                None, editordelegate.EditorDelegate.profileType)
+        delegateProfile = profiles.category('delegates').getFromStorage(
+            None, profiles.category('delegates').getType('editor')
+        )
         delegateProfile.options['showPaths'] = False
         dbElem = levels.real.collect(file.id)
         

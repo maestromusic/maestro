@@ -19,7 +19,7 @@
 """Improved QUndoStack."""
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from . import logging, utils
+from maestro import logging, utils
 
 # The main application stack.
 # Note that it is possible to access all methods and attributes of stack directly via the module.

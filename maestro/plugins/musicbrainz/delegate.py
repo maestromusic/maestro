@@ -25,6 +25,7 @@ from ...gui.delegates.profiles import DelegateProfile
 from .elements import MBNode, Medium, Recording
 from .xmlapi import AliasEntity
 
+
 class MusicBrainzDelegate(StandardDelegate):
 
     def __init__(self, view):
@@ -52,7 +53,9 @@ class MusicBrainzDelegate(StandardDelegate):
             italic = self.ignoreItalic
             normal = self.ignoreNormal
         else:
-            bold, italic, normal = BOLD_STYLE, ITALIC_STYLE, STD_STYLE
+            bold = DelegateStyle.boldStyle()
+            italic = DelegateStyle.italicStyle()
+            normal = DelegateStyle.standardStyle()
         # Title and type
         titleItem = TextItem(node.title(), bold)
         self.addCenter(titleItem)

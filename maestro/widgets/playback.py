@@ -22,16 +22,38 @@ import functools
 from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import Qt
 
-from maestro import player, utils, widgets
+from maestro import player, utils, widgets, profiles
 from maestro.core import levels
 from maestro.gui import actions, dialogs
-from maestro.gui.delegates import delegatewidget, playlist as playlistdelegate
+from maestro.gui.delegates import delegatewidget
+from maestro.widgets.playlist import delegate as playlistdelegate
 from maestro.gui.preferences import profiles as profilesgui
 
 translate = QtCore.QCoreApplication.translate
-renderer = QtSvg.QSvgRenderer(":maestro/playback.svg")
 ICON_SIZE = 16
-       
+
+
+def init():
+    from maestro.widgets import WidgetClass
+    WidgetClass(
+        id='playback', theClass=PlaybackWidget, name=translate('Playback', 'playback'),
+        icon=utils.images.icon('media-playback-start'),
+        areas='dock', preferredDockArea='left'
+    ).register()
+
+    for command in PlayCommand:
+        PlayControlAction.register(
+            context='playback', identifier=command.value, label=command.label(),
+            shortcut=Qt.Key_Space if command is PlayCommand.PlayPause else None
+        )
+
+    global renderer, playIcon, pauseIcon
+    renderer = QtSvg.QSvgRenderer(':maestro/playback.svg')
+    playIcon = QtGui.QIcon(utils.images.renderSvg(
+        renderer, "media_playback_start", ICON_SIZE, ICON_SIZE))
+    pauseIcon = QtGui.QIcon(utils.images.renderSvg(
+        renderer, "media_playback_pause", ICON_SIZE, ICON_SIZE))
+
 
 class PlayCommand(enum.Enum):
     PlayPause = 'playPause'
@@ -64,7 +86,7 @@ class PlayControlAction(actions.GlobalAction):
 
         currentWidget = widgets.current('playback')
         currentBackend = None if currentWidget is None else currentWidget.backend
-        backends = [b for b in player.profileCategory.profiles()
+        backends = [b for b in profiles.category('playback').profiles()
                     if b.connectionState is player.ConnectionState.Connected]
         if self.command is PlayCommand.PlayPause:
 
@@ -88,10 +110,6 @@ class PlayControlAction(actions.GlobalAction):
                 currentBackend.skipForward()
             elif self.command is PlayCommand.SkipBackward:
                 currentBackend.skipBackward()
-
-for command in PlayCommand:
-    PlayControlAction.register(context='playback', identifier=command.value, label=command.label(),
-                               shortcut=Qt.Key_Space if command is PlayCommand.PlayPause else None)
 
 
 class PlaybackWidget(widgets.Widget):
@@ -155,10 +173,11 @@ class PlaybackWidget(widgets.Widget):
         
     def initialize(self, state=None):
         super().initialize(state)
+        playerProfileCategory = profiles.category('playback')
         if state:
-            backend = player.profileCategory.get(state)  # may be None
-        elif len(player.profileCategory.profiles()) > 0:
-            backend = player.profileCategory.profiles()[0]
+            backend = playerProfileCategory.get(state)  # may be None
+        elif len(playerProfileCategory.profiles()) > 0:
+            backend = playerProfileCategory.profiles()[0]
         else:
             backend = None
         self.setBackend(backend)
@@ -315,16 +334,6 @@ class PlaybackWidget(widgets.Widget):
     def saveState(self):
         return self.backend.name if self.backend is not None else None
 
-    
-widgets.addClass(
-    id='playback',
-    name=translate('Playback', 'playback'),
-    icon=utils.images.icon('media-playback-start'),
-    theClass=PlaybackWidget,
-    areas='dock',
-    preferredDockArea='left'
-)
-
 
 class OptionDialog(dialogs.FancyPopup):
     """Dialog for the option button in the playlist's (dock widget) title bar.""" 
@@ -334,7 +343,8 @@ class OptionDialog(dialogs.FancyPopup):
         hLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(hLayout)
         hLayout.addWidget(QtWidgets.QLabel(self.tr("Backend:")))
-        backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playback.backend)
+        backendChooser = profilesgui.ProfileComboBox(profiles.category('playback'),
+                                                     default=playback.backend)
         backendChooser.profileChosen.connect(playback.setBackend)
         hLayout.addWidget(backendChooser)
         hLayout.addStretch()
@@ -345,14 +355,12 @@ class PlayPauseButton(QtWidgets.QToolButton):
     """Special button with two states. Depending on the state different signals (play and pause)
     are emitted when the button is clicked and the button shows different icons."""
 
-    playIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_start", ICON_SIZE, ICON_SIZE))
-    pauseIcon = QtGui.QIcon(utils.images.renderSvg(renderer, "media_playback_pause", ICON_SIZE, ICON_SIZE))
     stateChanged = QtCore.pyqtSignal(player.PlayState)
     
     def __init__(self, parent=None):
         """Initialize this button with the given parent. The button will be in pause-state."""
         super().__init__(parent)
-        self.setIcon(self.playIcon)
+        self.setIcon(playIcon)
         self.playing = False
         self.clicked.connect(lambda: self.stateChanged.emit(player.PlayState.Pause if self.playing
                                                             else player.PlayState.Play))
@@ -361,7 +369,7 @@ class PlayPauseButton(QtWidgets.QToolButton):
         """Set the state of this button to play if *playing* is true or pause otherwise."""
         if playing != self.playing:
             self.playing = playing
-            self.setIcon(self.pauseIcon if playing else self.playIcon)
+            self.setIcon(pauseIcon if playing else playIcon)
         
     
 class VolumeButton(QtWidgets.QToolButton):
@@ -372,16 +380,14 @@ class VolumeButton(QtWidgets.QToolButton):
     # Inspired by the VolumePopupButton from Amarok 2.7.1
     volumeChanged = QtCore.pyqtSignal(int)
     
-    mutedIcon = utils.images.icon("audio_volume_muted.png")
-    lowIcon = utils.images.icon("audio_volume_low.png")
-    mediumIcon = utils.images.icon("audio_volume_medium.png")
-    highIcon = utils.images.icon("audio_volume_high.png")
-    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setIconSize(QtCore.QSize(24, 24))
         self.setContentsMargins(0,0,0,0)
-        
+        self.mutedIcon = utils.images.icon('audio_volume_muted.png')
+        self.lowIcon = utils.images.icon('audio_volume_low.png')
+        self.mediumIcon = utils.images.icon('audio_volume_medium.png')
+        self.highIcon = utils.images.icon('audio_volume_high.png')
         self.popup = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(self.popup)
         layout.setContentsMargins(1,1,1,1)
@@ -434,16 +440,15 @@ class VolumeButton(QtWidgets.QToolButton):
             if volume != -1:
                 self.volumeChanged.emit(volume)
 
-    @staticmethod
-    def volumeIcon(volume):
+    def volumeIcon(self, volume):
         """Maps the given volume to the appropriate icon."""
         if volume == 0:
-            return VolumeButton.mutedIcon
+            return self.mutedIcon
         elif volume <= 33:
-            return VolumeButton.lowIcon
+            return self.lowIcon
         elif volume <= 66:
-            return VolumeButton.mediumIcon
-        return VolumeButton.highIcon
+            return self.mediumIcon
+        return self.highIcon
             
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:

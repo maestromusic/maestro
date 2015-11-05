@@ -19,31 +19,19 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from . import profiles, StandardDelegate
-from ...core import tags, levels
+from maestro.gui.delegates import profiles, StandardDelegate
+from maestro.core import tags, levels
 
 translate = QtCore.QCoreApplication.translate
 
 
 class EditorDelegate(StandardDelegate):
     """Delegate for the editor."""
-
-    profileType = profiles.createProfileType(
-            name      = 'editor',
-            title     = translate("Delegates","Editor"),
-            leftData  = ['t:album','t:composer','t:artist','t:performer'],
-            rightData = ['t:date','t:genre','t:conductor'],
-            overwrite = {'showPaths': True,
-                         'showType': True,
-                         'appendRemainingTags': True,
-                         'showAllAncestors': True}
-    )
     
     def createEditor(self, parent, option, index):
         wrapper = index.model().data(index)
         if wrapper is not None:
-            return LineEdit(wrapper.element, parent)
-        else: return None
+            return EditorLineEdit(wrapper.element, parent)
         
     def setModelData(self, editor, model, index):
         element = editor.element
@@ -63,7 +51,7 @@ class EditorDelegate(StandardDelegate):
             levels.editor.changeTags({element: diff})
 
 
-class LineEdit(QtWidgets.QLineEdit):
+class EditorLineEdit(QtWidgets.QLineEdit):
     def __init__(self, element, parent):
         title = element.tags[tags.TITLE][0] if tags.TITLE in element.tags else ''
         super().__init__(title, parent)

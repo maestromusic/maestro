@@ -28,20 +28,23 @@ translate = QtCore.QCoreApplication.translate
 
 # noinspection PyTypeChecker,PyArgumentList
 def enable():
-    profileType = profiles.ProfileType('localplay',
-                                       translate('LocalPlayBackend','Local Playback'),
-                                       LocalPlayerBackend)
-    player.profileCategory.addType(profileType)
+    playerProfileCategory = profiles.category('playback')
+    profileType = profiles.ProfileType(
+        name='localplay',
+        title=translate('LocalPlayBackend', 'Local Playback'),
+        profileClass=LocalPlayerBackend
+    )
+    playerProfileCategory.addType(profileType)
     # addType loads stored profiles of this type from storage
     # If no profile was loaded, create a default one.
-    if len(player.profileCategory.profiles(profileType)) == 0:
-        name = translate("LocalPlayBackend", 'Local playback')
-        if player.profileCategory.get(name) is None:
-            player.profileCategory.addProfile(name, profileType)
+    if len(playerProfileCategory.profiles(profileType)) == 0:
+        name = translate('LocalPlayBackend', 'Local playback')
+        if playerProfileCategory.get(name) is None:
+            playerProfileCategory.addProfile(name, profileType)
 
 
 def disable():
-    player.profileCategory.removeType('localplay')
+    profiles.category('playback').removeType('localplay')
     
     
 def defaultStorage():
@@ -194,10 +197,6 @@ class LocalPlayerBackend(player.PlayerBackend):
         if self.volume() != 100:
             result['volume'] = self.volume()
         return result
-
-    @classmethod
-    def configurationWidget(cls, profile, parent):
-        return None
 
     def __str__(self):
         return 'LocalPlayerBackend({})'.format(self.name)

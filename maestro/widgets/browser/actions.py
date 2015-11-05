@@ -19,11 +19,47 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-translate = QtCore.QCoreApplication.translate
-
 from maestro import database as db, stack
 from maestro.core import tags
 from maestro.gui import actions
+translate = QtCore.QCoreApplication.translate
+
+
+def init():
+    TagValueAction.register('tagValue', context='browser')
+    ExpandOrCollapseAllAction.register(
+        'expandAll', context='browser', expand=True,
+        description=translate('ExpandOrCollapseAllAction', 'Expand all nodes'),
+        shortcut=translate('QShortcut', 'Ctrl++')
+    )
+    ExpandOrCollapseAllAction.register(
+        'collapseAll', context='browser', expand=False,
+        description=translate('ExpandOrCollapseAllAction', 'Collapse all nodes'),
+        shortcut=translate('QShortcut', 'Ctrl+-')
+    )
+    AddToPlaylistAction.register(
+        'appendToPL', context='playback',
+        description=translate('AddToPlaylistAction', 'Append selection to playlist'),
+        shortcut=QtGui.QKeySequence(Qt.Key_Enter | Qt.SHIFT), replace=False
+    )
+    AddToPlaylistAction.register(
+        'replacePL', context='playback',
+        description=translate('AddToPlaylistAction', 'Playback selected elements'),
+        shortcut=QtGui.QKeySequence(Qt.Key_P), replace=True
+    )
+    GlobalSearchAction.register('navigation', shortcut=QtGui.QKeySequence.Find)
+    CompleteContainerAction.register(
+        'completeContainer', context='browser',
+        description=translate('CompleteContainerAction', 'Load complete container')
+    )
+    HideTagValuesAction.register(
+        'hideTagValues', context='browser',
+        description=translate('HideTagValuesAction',
+                              'Hide tag values that appear only below this container')
+    )
+
+
+
 
 
 class TagValueAction(actions.TreeAction):
@@ -58,8 +94,6 @@ class TagValueAction(actions.TreeAction):
             tagName, valueId = self.tagIds[0]
         TagValuePropertiesWidget.showDialog(tags.get(tagName), valueId)
 
-TagValueAction.register('tagValue', context='browser')
-
 
 class ExpandOrCollapseAllAction(actions.TreeAction):
     """Expand or collapse (depending on second parameter) all selected nodes that have contents."""
@@ -82,13 +116,6 @@ class ExpandOrCollapseAllAction(actions.TreeAction):
             if node.hasContents():
                 method(view.model().getIndex(node))
 
-ExpandOrCollapseAllAction.register('expandAll', context='browser', expand=True,
-                                   description=translate('ExpandOrCollapseAllAction', 'Expand all nodes'),
-                                   shortcut=translate('QShortcut', 'Ctrl++'))
-ExpandOrCollapseAllAction.register('collapseAll', context='browser', expand=False,
-                                   description=translate('ExpandOrCollapseAllAction', 'Collapse all nodes'),
-                                   shortcut=translate('QShortcut', 'Ctrl+-'))
-
 
 class AddToPlaylistAction(actions.TreeAction):
     """Action to play back elements selected in a browser."""
@@ -109,13 +136,6 @@ class AddToPlaylistAction(actions.TreeAction):
 
         gui.appendToDefaultPlaylist(wrappers, replace=self.replace)
 
-AddToPlaylistAction.register('appendToPL', context='playback',
-                             description=translate('AddToPlaylistAction', 'Append selection to playlist'),
-                             shortcut=QtGui.QKeySequence(Qt.Key_Enter | Qt.SHIFT), replace=False)
-AddToPlaylistAction.register('replacePL', context='playback',
-                             description=translate('AddToPlaylistAction', 'Playback selected elements'),
-                             shortcut=QtGui.QKeySequence(Qt.Key_P), replace=True)
-
 
 class GlobalSearchAction(actions.GlobalAction):
     """Global action that jumps to the most current browser's search box."""
@@ -128,8 +148,6 @@ class GlobalSearchAction(actions.GlobalAction):
         if browser is not None:
             browser.containingWidget().raise_()
             browser.searchBox.setFocus()
-
-GlobalSearchAction.register('navigation', shortcut=QtGui.QKeySequence.Find)
 
 
 class CompleteContainerAction(actions.TreeAction):
@@ -155,9 +173,6 @@ class CompleteContainerAction(actions.TreeAction):
                 model.beginInsertRows(model.getIndex(wrapper), 0, len(wrapper.element.contents)-1)
                 wrapper.loadContents(recursive=True)
                 model.endInsertRows()
-
-CompleteContainerAction.register('completeContainer', context='browser',
-                                 description=translate('CompleteContainerAction', 'Load complete container'))
 
 
 class HideTagValuesAction(actions.TreeAction):
@@ -215,10 +230,6 @@ class HideTagValuesAction(actions.TreeAction):
             
             dialog = HideTagValuesDialog(treeView, valuesToHide)
             dialog.exec_()
-                
-HideTagValuesAction.register('hideTagValues', context='browser',
-                 description=translate('HideTagValuesAction',
-                                       'Hide tag values which appear only below this container'))
 
 
 class HideTagValuesDialog(QtWidgets.QDialog):

@@ -21,7 +21,21 @@ from PyQt5.QtCore import Qt
 
 from maestro import application, logging
 
-widgetClasses = [] # registered WidgetClass-instances
+
+def init():
+    """Initialize the widget package. This method has to be called before any of the widgets of this
+    package are used.
+    """
+    from maestro.widgets import browser, details, editor, playlist, tageditor, playback
+    for module in tageditor, browser, details, editor, playback, playlist:
+        # caution: order of init()-calls is important
+        module.init()
+
+
+def widgetClasses():
+    import warnings
+    warnings.warn(DeprecationWarning('use WidgetClass.classes()'))
+    return WidgetClass.widgetClasses()
 
 
 def current(widgetClassId):
@@ -34,32 +48,24 @@ def addClass(widgetClass=None, **kwargs):
     Arguments must be either a single WidgetClass-instance or keyword-arguments which will be passed to the
     constructor of WidgetClass. This method returns the class.
     """
-    if widgetClass is None:
-        widgetClass = WidgetClass(**kwargs)
-    if widgetClass in widgetClasses:
-        logging.warning(__name__, "Attempt to add widget class twice: {}".format(widgetClass))
-    else: widgetClasses.append(widgetClass)
-    if application.mainWindow is not None:
-        application.mainWindow._widgetClassAdded(widgetClass)
-    return widgetClass
+    import warnings
+    warnings.warn(DeprecationWarning('use WidgetClass.addWidgetClass()'))
+    return WidgetClass.addWidgetClass(widgetClass, **kwargs)
 
 
 def removeClass(id):
     """Remove a registered WidgetClass instance with the given id from the list of registered widget
     classes."""
-    widgetClass = getWidgetClass(id)
-    if widgetClass is None:
-        logging.warning(__name__, "Attempt to remove nonexistent widget class: {}".format(id))
-    else: widgetClasses.remove(widgetClass)
-    if application.mainWindow is not None:
-        application.mainWindow._widgetClassRemoved(widgetClass)
+    import warnings
+    warnings.warn(DeprecationWarning('use WidgetClass.removeWidgetClass()'))
+    WidgetClass.removeWidgetClass(id)
 
 
 def getClass(id):
     """Get the registered WidgetClass with the given id (or None)."""
-    for c in widgetClasses:
-        if c.id == id:
-            return c
+    import warnings
+    warnings.warn(DeprecationWarning('use WidgetClass.getWidgetClass()'))
+    return WidgetClass.getWidgetClass(id)
 
 
 class WidgetClass:
@@ -85,7 +91,47 @@ class WidgetClass:
             'left': Qt.LeftDockWidgetArea,
             'right': Qt.RightDockWidgetArea,
         }
-    
+
+    __registeredClasses = []
+
+    @staticmethod
+    def widgetClasses():
+        """Returns a list of all currently registered WidgetClass instances."""
+        return WidgetClass.__registeredClasses[:]
+
+    @staticmethod
+    def addWidgetClass(widgetClass=None, **kwargs):
+        if widgetClass is None:
+            widgetClass = WidgetClass(**kwargs)
+        if widgetClass in WidgetClass.widgetClasses():
+            logging.warning(__name__, "Attempt to add widget class twice: {}".format(widgetClass))
+        else:
+            WidgetClass.__registeredClasses.append(widgetClass)
+        if application.mainWindow is not None:
+            application.mainWindow._widgetClassAdded(widgetClass)
+        return widgetClass
+
+    @staticmethod
+    def removeWidgetClass(widgetClassId):
+        widgetClass = WidgetClass.getWidgetClass(widgetClassId)
+        if widgetClass is None:
+            logging.warning(__name__, "Attempt to remove nonexistent widget class: {}".format(widgetClassId))
+        else:
+            WidgetClass.__registeredClasses.remove(widgetClass)
+        if application.mainWindow is not None:
+            application.mainWindow._widgetClassRemoved(widgetClass)
+
+    @staticmethod
+    def getWidgetClass(widgetClassId):
+        for c in WidgetClass.widgetClasses():
+            if c.id == widgetClassId:
+                return c
+
+    @staticmethod
+    def currentWidget(widgetClassId):
+        """Return the "current" widget of a certain widget class."""
+        return application.mainWindow.currentWidgets.get(widgetClassId)
+
     def __init__(self, id, name, theClass, areas=None, preferredDockArea=None, unique=False, icon=None):
         self.id = id
         self.name = name
@@ -106,7 +152,10 @@ class WidgetClass:
             self.preferredDockArea = self.areas[0]
         self.unique = unique
         self.icon = icon
-        
+
+    def register(self):
+        return WidgetClass.addWidgetClass(self)
+
     def allowedDockAreas(self):
         """Return the allowed dock areas as Qt::DockWidgetAreas flags."""
         result = Qt.NoDockWidgetArea
@@ -252,3 +301,4 @@ class Widget(QtWidgets.QWidget):
             tabWidget.setTabIcon(tabWidget.indexOf(self), icon)
         else:
             self.containingWidget().setWindowIcon(icon)
+

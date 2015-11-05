@@ -90,8 +90,8 @@ class FancyPopup(QtWidgets.QFrame):
         
         # Fancy design code
         self.setAutoFillBackground(True)
-        self.setFrameStyle(QtWidgets.QFrame.Box | QtWidgets.QFrame.Plain);
-        self.setLineWidth(1);
+        self.setFrameStyle(QtWidgets.QFrame.Box | QtWidgets.QFrame.Plain)
+        self.setLineWidth(1)
         p = self.palette()
         p.setColor(QtGui.QPalette.Window, p.window().color().lighter(105))
         # Unbelievably this is used for the border...
@@ -115,9 +115,9 @@ class FancyPopup(QtWidgets.QFrame):
         # Therefore we correct offscreen positions after the dialog is shown as well as before (to try to
         # avoid flickering).
         pos = self.pos()
-        if pos.x()+self.width() > QtWidgets.QApplication.desktop().width():
+        if pos.x() + self.width() > QtWidgets.QApplication.desktop().width():
             pos.setX(QtWidgets.QApplication.desktop().width() - self.width())
-        if pos.y()+self.height() > QtWidgets.QApplication.desktop().height():
+        if pos.y() + self.height() > QtWidgets.QApplication.desktop().height():
             pos.setY(QtWidgets.QApplication.desktop().height() - self.height())
         self.move(pos)
         
@@ -177,7 +177,7 @@ class FancyTabbedPopup(FancyPopup):
         
         from . import dockwidget
         closeButton = dockwidget.DockWidgetTitleButton(
-                                        QtWidgets.qApp.style().standardIcon(QtWidgets.QStyle.SP_TitleBarCloseButton))
+                        QtWidgets.qApp.style().standardIcon(QtWidgets.QStyle.SP_TitleBarCloseButton))
         closeButton.clicked.connect(self.close)
         self.tabWidget.setCornerWidget(closeButton)
         
@@ -348,7 +348,8 @@ class MergeDialog(QtWidgets.QDialog):
                 for value in element.tags[tags.TITLE]:
                     if removePrefixes and value.startswith(prefix):
                         newValue = value[len(prefix):]
-                    else: newValue = value
+                    else:
+                        newValue = value
                     if removeNumbers:
                         number = utils.strings.numberFromPrefix(newValue)[1]
                         if len(number) > 0:
@@ -379,11 +380,11 @@ class MergeDialog(QtWidgets.QDialog):
                                                and elem.type != newType})
             
         contents = elements.ContentList.fromPairs(enumerate(self.elements, start=1))
-        container = self.level.createContainer(domain = domain,
-                                               tags = containerTags,
-                                               flags = containerFlags,
-                                               contents = contents,
-                                               type = containerType)
+        container = self.level.createContainer(domain=domain,
+                                               tags=containerTags,
+                                               flags=containerFlags,
+                                               contents=contents,
+                                               type=containerType)
                     
         if isinstance(self.parentNode, nodes.Wrapper):
             parent = self.parentNode.element
@@ -406,17 +407,16 @@ class MergeDialog(QtWidgets.QDialog):
                 # Insert first, otherwise EditorTreeModel might remove elements from the level.
                 self.model.insertElements(self.parentNode, insertIndex, [container])
                 self.model.removeElements(self.parentNode, rows)
-            #else: Nothing to do: Merge has been performed in the level and the model does not allow a merge
+            # else: Nothing to do: Merge has been performed in the level and the model does not allow a merge
                 
         self.level.stack.endMacro()
         
         if containerType != self.DefaultType:
             config.storage.gui.merge_dialog_container_type = containerType
-        else: config.storage.gui.merge_dialog_container_type = None
+        else:
+            config.storage.gui.merge_dialog_container_type = None
             
         self.accept()
-
-
 
 
 class DeleteDialog(QtWidgets.QDialog):
@@ -427,11 +427,10 @@ class DeleteDialog(QtWidgets.QDialog):
         self.setWindowTitle(self.tr("Delete files?"))
         self.resize(400, 300)
         layout = QtWidgets.QVBoxLayout(self)
-        label = QtWidgets.QLabel(
-                             self.tr("You have deleted the following %n file(s) from Maestro. "
-                                     "Do you want them deleted completely?<br />\n"
-                                     "<b>This cannot be reversed!</b>",
-                                     '', len(files)))
+        label = QtWidgets.QLabel(self.tr('You have deleted the following %n file(s) from Maestro. '
+                                         'Do you want them deleted completely?<br />\n'
+                                         '<b>This cannot be reversed!</b>',
+                                         '', len(files)))
         label.setTextFormat(Qt.RichText)
         label.setWordWrap(True)
         layout.addWidget(label)
@@ -439,8 +438,8 @@ class DeleteDialog(QtWidgets.QDialog):
         listWidget.addItems([str(file.url) for file in files])
         layout.addWidget(listWidget)
         buttonBox = QtWidgets.QDialogButtonBox()
-        buttonBox.addButton(self.tr("Irreversibly delete files"), buttonBox.YesRole)
-        no = buttonBox.addButton(self.tr("No, keep files"), buttonBox.NoRole)
+        buttonBox.addButton(self.tr('Irreversibly delete files'), buttonBox.YesRole)
+        no = buttonBox.addButton(self.tr('No, keep files'), buttonBox.NoRole)
         no.setDefault(True)
         buttonBox.rejected.connect(self.reject)
         buttonBox.accepted.connect(self.accept)

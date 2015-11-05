@@ -16,20 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro import player, utils, widgets
+from maestro import player, widgets, profiles
 from maestro.core import levels, nodes
 from maestro.models import rootedtreemodel
-from maestro.gui import actions, dialogs, treeview, delegates, treeactions
-from maestro.gui.delegates import playlist as playlistdelegate
+from maestro.gui import actions, dialogs, treeview
+from maestro.widgets.playlist.delegate import PlaylistDelegate
 from maestro.gui.preferences import profiles as profilesgui
+from maestro.widgets import WidgetClass
 
 translate = QtCore.QCoreApplication.translate
-
-# the default playlist used for user commands that do not specify a particular playlist
-defaultPlaylist = None
 
 
 def appendToDefaultPlaylist(wrappers, replace=False):
@@ -37,9 +35,10 @@ def appendToDefaultPlaylist(wrappers, replace=False):
     If *replace* is true, clear the playlist. If the playlist is currently stopped, start it with the new
     wrappers.
     """
-    if defaultPlaylist is None:
+    currentPlaylist = WidgetClass.currentWidget('playlist')
+    if currentPlaylist is None:
         return
-    model = defaultPlaylist.model()
+    model = currentPlaylist.treeview.model()
     if model.backend.connectionState != player.ConnectionState.Connected:
         return
     if replace:
@@ -79,12 +78,6 @@ class ClearPlaylistAction(actions.TreeAction):
         self.parent().model().clear()
 
 
-RemoveFromPlaylistAction.register('removeFromPL', context='playback',
-                                  shortcut=translate('RemoveFromPlaylistAction', 'Del'))
-ClearPlaylistAction.register('clearPL', context='playback',
-                             shortcut=translate('ClearPlaylistAction', 'Shift+Del'))
-
-
 class PlaylistTreeView(treeview.DraggingTreeView):
     """This is the main widget of a playlist: The tree view showing the current element tree."""
     level = None
@@ -93,7 +86,7 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         super().__init__(levels.real)
         self.backend = None
         self.doubleClicked.connect(self._handleDoubleClick)
-        self.setItemDelegate(playlistdelegate.PlaylistDelegate(self,delegateProfile))
+        self.setItemDelegate(PlaylistDelegate(self, delegateProfile))
         self.emptyModel = rootedtreemodel.RootedTreeModel()
         self.emptyModel.root.setContents([nodes.TextNode(
                                         self.tr("Please configure and choose a backend to play music."),
@@ -124,8 +117,6 @@ class PlaylistTreeView(treeview.DraggingTreeView):
                 self.removeAction(action)
         self.backend = backend
         if backend is not None:
-            global defaultPlaylist
-            defaultPlaylist = self
             model = backend.playlist
             self.setRootIsDecorated(True)
             for action in backend.treeActions():
@@ -146,10 +137,6 @@ class PlaylistTreeView(treeview.DraggingTreeView):
         self.model().removeMany(self.selectedRanges())
 
 
-for definition in 'editTags', 'removeFromPL', 'clearPL':
-    PlaylistTreeView.addActionDefinition(definition)
-
-
 class PlaylistWidget(widgets.Widget):
 
     hasOptionDialog = True
@@ -157,21 +144,26 @@ class PlaylistWidget(widgets.Widget):
     def __init__(self, state=None, **args):
         super().__init__(**args)
         # Read state
-        profileType = playlistdelegate.PlaylistDelegate.profileType
+        profileType = PlaylistDelegate.profileType
+        playerProfileCategory = profiles.category('playback')
         if state is None:
-            if len(player.profileCategory.profiles()) > 0:
-                backend = player.profileCategory.profiles()[0]
-            else: backend=None
+            if len(playerProfileCategory.profiles()) > 0:
+                backend = playerProfileCategory.profiles()[0]
+            else:
+                backend = None
             delegateProfile = profileType.default()
         else:
-            backend = player.profileCategory.getFromStorage(state['backend'])
-            delegateProfile = delegates.profiles.category.getFromStorage(state.get('delegate'), profileType)
+            backend = playerProfileCategory.getFromStorage(state['backend'])
+            delegateProfile = profiles.category('delegates').getFromStorage(
+                state.get('delegate'),
+                profileType
+            )
         
         self.treeview = PlaylistTreeView(delegateProfile)
          
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(0)
-        layout.setContentsMargins(0,0,0,0)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         layout.addWidget(self.treeview)
         self.errorLabel = QtWidgets.QLabel()
@@ -217,14 +209,6 @@ class PlaylistWidget(widgets.Widget):
     
     def createOptionDialog(self, button=None):
         return OptionDialog(button, self)
-        
-        
-widgets.addClass(
-    id = "playlist",
-    name = translate("Playlist", "Playlist"),
-    icon = utils.images.icon('view-media-playlist'),
-    theClass = PlaylistWidget
-)
 
 
 class OptionDialog(dialogs.FancyPopup):
@@ -232,12 +216,13 @@ class OptionDialog(dialogs.FancyPopup):
     def __init__(self, parent, playlist):
         super().__init__(parent)
         layout = QtWidgets.QFormLayout(self)
-        backendChooser = profilesgui.ProfileComboBox(player.profileCategory, default=playlist.backend)
+        backendChooser = profilesgui.ProfileComboBox(profiles.category('playback'),
+                                                     default=playlist.backend)
         backendChooser.profileChosen.connect(playlist.setBackend)
         layout.addRow(self.tr("Backend:"), backendChooser)
         profileChooser = profilesgui.ProfileComboBox(
-                                         delegates.profiles.category,
-                                         restrictToType=playlistdelegate.PlaylistDelegate.profileType,
-                                         default=playlist.treeview.itemDelegate().profile)
+            'delegates', 'playlist',
+            default=playlist.treeview.itemDelegate().profile
+        )
         profileChooser.profileChosen.connect(playlist.treeview.itemDelegate().setProfile)
         layout.addRow(self.tr("Item view:"), profileChooser)

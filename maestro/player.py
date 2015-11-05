@@ -15,13 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+"""Basic definitions for audio playback control. Provides the (abstract) class
+:class:`PlayerBackend` which audio backends need to implement.
+"""
 
 import enum
-
 from PyQt5 import QtCore
-translate = QtCore.QCoreApplication.translate
-
 from maestro import config, profiles
+
+translate = QtCore.QCoreApplication.translate
 
 
 class PlayState(enum.Enum):
@@ -36,15 +38,14 @@ class ConnectionState(enum.Enum):
     Connected = 2
 
 
-profileCategory = profiles.TypedProfileCategory(
-    name = 'playback',
-    title = translate('PlayerBackend','Playback'),
-    storageOption = config.getOption(config.storage, 'player.profiles'),
-    description = translate("PlayerBackend",
-                    "Maestro can control more than one audio backend. To easily switch between them, "
-                    "their configuration is stored in profiles."),
-    iconName='preferences-sound')
-profiles.manager.addCategory(profileCategory)
+def init():
+    profiles.addCategory(profiles.TypedProfileCategory(
+        name='playback', title=translate('PlayerBackend', 'Playback'),
+        storageOption=config.getOption(config.storage, 'player.profiles'),
+        description=translate('PlayerBackend',
+                              'Configure backends for audio playback (e.g. local playback)'),
+        iconName='preferences-sound')
+    )
 
 
 class BackendError(Exception):
@@ -52,15 +53,25 @@ class BackendError(Exception):
 
 
 class InsertError(BackendError):
-    def __init__(self, msg, successfulURLs=[]):
+    """Error raised when the insertion of songs into the current playlist fails, e.g. beacause of
+    unsupported format.
+
+    Args:
+        msg (int): Message describing the error
+        successfulURLs (list): List of those URLs that were successfully inserted
+    """
+    def __init__(self, msg, successfulURLs=None):
         super().__init__(msg)
-        self.successfulURLs = successfulURLs
+        self.successfulURLs = successfulURLs or []
 
 
 class PlayerBackend(profiles.Profile):
     """This is the base class for modules that implement connection to a backend
     providing audio playback and playlist management.
     """
+
+    categoryName = 'playback'
+
     stateChanged = QtCore.pyqtSignal(PlayState)
     volumeChanged = QtCore.pyqtSignal(int)
     currentChanged = QtCore.pyqtSignal(object)

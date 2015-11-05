@@ -29,12 +29,18 @@ from maestro.gui.delegates import profiles
 
 translate = QtCore.QCoreApplication.translate
 
+
+def init():
+    from maestro.gui.delegates import profiles
+    profiles.init()
+
+
 class StandardDelegate(AbstractDelegate):
     """While still abstract, this class implements almost all of the features used by the usual delegates in
     Maestro. In fact, subclasses like BrowserDelegate and EditorDelegate mainly provide different default
     values for these options."""
     
-    def layout(self,index,availableWidth):
+    def layout(self, index, availableWidth):
         node = index.model().data(index)
         if isinstance(node, TextNode):
             if node.wordWrap:
@@ -64,7 +70,7 @@ class StandardDelegate(AbstractDelegate):
                     pos = ancestor.contents.positionOf(element.id)
                     text = translate("Delegates","#{} in {}").format(pos,ancestor.getTitle())
                 else: text = translate("Delegates","In {}").format(ancestor.getTitle())
-                self.addCenter(TextItem(text,ITALIC_STYLE))
+                self.addCenter(TextItem(text, DelegateStyle.italicStyle()))
                 self.newRow()
             
         # Cover
@@ -81,7 +87,8 @@ class StandardDelegate(AbstractDelegate):
         urlWarningItem = self.getUrlWarningItem(wrapper)
         titleItem = TextItem(wrapper.getTitle(prependPosition=self.profile.options['showPositions'],
                                            usePath=False),
-                             STD_STYLE if isinstance(wrapper.parent, Wrapper) else BOLD_STYLE,
+                             DelegateStyle.standardStyle() if isinstance(wrapper.parent, Wrapper)
+                                else DelegateStyle.boldStyle(),
                              minHeight=IconBarItem.iconSize if len(flagIcons) > 0 else 0)
         
         if not element.isInDb():
@@ -189,8 +196,9 @@ class StandardDelegate(AbstractDelegate):
         two items for an old and a new path.""" 
         if self.profile.options['showPaths'] and element.isFile():
             self.newRow()
-            self.addCenter(TextItem(element.url.path if hasattr(element.url, 'path') else str(element.url),
-                           ITALIC_STYLE))
+            self.addCenter(TextItem(element.url.path if hasattr(element.url, 'path')
+                                    else str(element.url),
+                           DelegateStyle.italicStyle()))
         
     def appendAncestors(self, element, ancestors, ancestorIds, filter, onlyMajor):
         """Recursively add all ancestors of *element* to the list *ancestors* and their ids to the list
@@ -340,6 +348,6 @@ class StandardDelegate(AbstractDelegate):
             return TextItem(element.url.scheme, DelegateStyle(bold=True, color=Qt.red))
             
             
-def _join(sep,strings):
+def _join(sep, strings):
     """Join *strings* using *sep* but removing empty strings."""
     return sep.join(s for s in strings if len(s) > 0)

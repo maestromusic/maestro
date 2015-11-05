@@ -35,8 +35,6 @@ from . import filetree
 _action = None  # the action that is inserted into the Extras menu
 _widget = None  # the dialog widget must be stored in a variable or it will vanish immediately
 
-profileCategory = None
-
 STRUCTURE_KEEP, STRUCTURE_FLAT = range(2)
 
 OPTION_DELETE = 'delete'
@@ -45,14 +43,12 @@ OPTIONS_ALL = [OPTION_DELETE, OPTION_INCLUDE_WORK_TITLES]
 
 
 def enable():
-    global _action, profileCategory
-    profileCategory = profiles.ProfileCategory(
-                            name='wtf',
-                            title=translate("wtf", "Export"),
-                            storageOption=config.getOption(config.storage, 'wtf.profiles'),
-                            profileClass=Profile,
-                            iconName='actions-export')
-    profiles.manager.addCategory(profileCategory)
+    global _action
+    profiles.addCategory(profiles.ProfileCategory(
+        name='wtf', title=translate('wtf', 'Export'), iconName='actions-export',
+        storageOption=config.getOption(config.storage, 'wtf.profiles'),
+        profileClass=Profile
+    ))
     
     _action = QtWidgets.QAction(application.mainWindow)
     _action.setText(QtWidgets.QApplication.translate("wtf", "Export..."))
@@ -70,7 +66,7 @@ def mainWindowInit():
 
 def disable():
     application.mainWindow.menus['extras'].removeAction(_action)
-    profiles.manager.removeCategory(profileCategory)
+    profiles.removeCategory('wtf')
 
 
 def defaultStorage():
@@ -78,6 +74,9 @@ def defaultStorage():
 
 
 class Profile(profiles.Profile):
+
+    categoryName = 'wtf'
+
     def __init__(self, name, type=None, state=None):
         super().__init__(name, type, state)
         self.domain = None
@@ -134,10 +133,10 @@ class Dialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
         self.stackedLayout = QtWidgets.QStackedLayout(self)
         layout.addLayout(self.stackedLayout, 1)
-        self.profileActionWidget = profilesgui.ProfileActionWidget(profileCategory)
+        self.profileActionWidget = profilesgui.ProfileActionWidget(profiles.category('wtf'))
         self.configWidget = self.profileActionWidget.configWidget
         self.stackedLayout.addWidget(self.profileActionWidget)
-        self.stackedLayout.setContentsMargins(0,0,0,0)
+        self.stackedLayout.setContentsMargins(0, 0, 0, 0)
         fileTreePage = QtWidgets.QWidget()
         fileTreeLayout = QtWidgets.QVBoxLayout(fileTreePage)
         self.statLabel = QtWidgets.QLabel()

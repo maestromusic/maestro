@@ -16,41 +16,41 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt5 import QtCore, QtGui
 
-from . import abstractdelegate, StandardDelegate, profiles
-from ...core import covers
+from maestro.gui.delegates import abstractdelegate, StandardDelegate, profiles
+from maestro.core import covers
 
 translate = QtCore.QCoreApplication.translate
+
+
+def init():
+    PlaylistDelegate.profileType = profiles.createProfileType(
+        name='playlist',
+        title=translate('Delegates', 'Playlist'),
+        leftData=['t:composer', 't:artist', 't:performer'],
+        rightData=['t:date', 't:genre', 't:conductor'],
+        overwrite=dict(fitInTitleRowData=profiles.DataPiece('filecount+length'),
+                       showMajorAncestors=True)
+    )
 
 
 class PlaylistDelegate(StandardDelegate):
     """Delegate for the playlist."""
     
-    profileType = profiles.createProfileType(
-            name      = 'playlist',
-            title     = translate("Delegates","Playlist"),
-            leftData  = ['t:composer','t:artist','t:performer'],
-            rightData = ['t:date','t:genre','t:conductor'],
-            overwrite = {"fitInTitleRowData": profiles.DataPiece("filecount+length"),
-                         "showMajorAncestors": True
-                        }
-    )
-    
-    def __init__(self,view,profile):
-        super().__init__(view,profile)
+    def __init__(self, view, profile):
+        super().__init__(view, profile)
         # Don't worry, addCacheSize won't add sizes twice
         covers.addCacheSize(self.profile.options['coverSize'])
     
-    def getPreTitleItem(self,wrapper):
+    def getPreTitleItem(self, wrapper):
         if self.model is not None and wrapper in self.model.currentlyPlayingNodes:
-            return abstractdelegate.PlayTriangleItem(QtGui.QColor(20,200,20),9)
-        else: return None
+            return abstractdelegate.PlayTriangleItem(QtGui.QColor(20, 200, 20), 9)
+        else:
+            return None
     
-    def _handleProfileChanged(self,profile):
+    def _handleProfileChanged(self, profile):
         """React to the configuration dispatcher."""
         super()._handleProfileChanged(profile)
         if profile == self.profile:
             covers.addCacheSize(profile.options['coverSize'])
-    

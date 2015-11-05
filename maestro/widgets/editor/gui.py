@@ -18,15 +18,15 @@
 
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
-translate = QtCore.QCoreApplication.translate
 
-from maestro import utils, widgets
+from maestro import widgets, profiles
 from maestro.core import levels, tags
-from maestro.widgets.editor import albumguesser
+from maestro.widgets.editor import delegate
 from maestro.widgets.editor.model import EditorModel
-from maestro.gui import treeview, treeactions, tagwidgets, dialogs, delegates
-from maestro.gui.delegates import editor as editordelegate
+from maestro.gui import treeview, tagwidgets, dialogs
 from maestro.gui.preferences import profiles as profilesgui
+
+translate = QtCore.QCoreApplication.translate
 
 
 class EditorTreeView(treeview.DraggingTreeView):
@@ -35,7 +35,7 @@ class EditorTreeView(treeview.DraggingTreeView):
     def __init__(self, delegateProfile):
         super().__init__(levels.editor)
         self.setModel(EditorModel())
-        self.setItemDelegate(editordelegate.EditorDelegate(self, delegateProfile))
+        self.setItemDelegate(delegate.EditorDelegate(self, delegateProfile))
         self.autoExpand = True
         self.model().rowsInserted.connect(self._expandInsertedRows)
         self.model().rowsDropped.connect(self._selectDroppedRows, Qt.QueuedConnection)
@@ -43,21 +43,15 @@ class EditorTreeView(treeview.DraggingTreeView):
        
     def _expandInsertedRows(self, parent, start, end):
         if self.autoExpand:
-            for row in range(start, end+1):
+            for row in range(start, end + 1):
                 child = self.model().index(row, 0, parent)
                 self.expand(child)
             
     def _selectDroppedRows(self, parent, start, end):
         self.selectionModel().select(QtCore.QItemSelection(self.model().index(start, 0, parent),
-                                                          self.model().index(end, 0, parent)),
+                                                           self.model().index(end, 0, parent)),
                                      QtCore.QItemSelectionModel.ClearAndSelect)
         self.setFocus(Qt.MouseFocusReason)
-
-
-for identifier in 'editTags', 'remove', 'merge', 'flatten', 'clearTree', 'commit':
-    EditorTreeView.addActionDefinition(identifier)
-treeactions.SetElementTypeAction.addSubmenu(EditorTreeView.actionConf.root)
-treeactions.ChangePositionAction.addSubmenu(EditorTreeView.actionConf.root)
 
 
 class EditorWidget(widgets.Widget):
@@ -76,10 +70,11 @@ class EditorWidget(widgets.Widget):
             state = {}
         expand = 'expand' not in state or state['expand'] # by default expand
         guessingEnabled = 'guessingEnabled' not in state or state['guessingEnabled']
-        guessProfile = albumguesser.profileCategory.getFromStorage(state.get('guessProfile'))
-        delegateProfile = delegates.profiles.category.getFromStorage(
+        guessProfile = profiles.category('albumguesser').getFromStorage(state.get('guessProfile'))
+        delegateProfile = profiles.category('delegates').getFromStorage(
             state.get('delegate'),
-            editordelegate.EditorDelegate.profileType)
+            profiles.category('delegates').getType('editor')
+        )
         
         buttonLayout = QtWidgets.QHBoxLayout()
         # buttonLayout is filled below, when the editor exists 
@@ -114,17 +109,18 @@ class EditorWidget(widgets.Widget):
         
     def saveState(self):
         guessProfile = self.editor.model().guessProfile
-        return {'expand': self.editor.autoExpand,
-                'guessingEnabled': self.editor.model().guessingEnabled,
-                'guessProfile': guessProfile.name if guessProfile is not None else None, 
-                'delegate': self.editor.itemDelegate().profile.name # a delegate's profile is never None
-                }
+        return dict(expand=self.editor.autoExpand,
+                    guessingEnabled=self.editor.model().guessingEnabled,
+                    guessProfile=guessProfile.name if guessProfile else None,
+                    delegate=self.editor.itemDelegate().profile.name
+                    )
     
     def canClose(self):
         if self.editor.model().containsUncommitedData():
             return dialogs.question(self.tr("Unsaved changes"),
                                     self.tr("The editor contains uncommited changes. Really close?"))
-        else: return True
+        else:
+            return True
 
 
 class OptionDialog(dialogs.FancyPopup):
@@ -146,29 +142,30 @@ class OptionDialog(dialogs.FancyPopup):
         albumGuessCheckBox.toggled.connect(self._handleAlbumGuessCheckBox)
         albumGuessLayout.addWidget(albumGuessCheckBox)
         
-        self.albumGuessComboBox = profilesgui.ProfileComboBox(albumguesser.profileCategory,
-                                                              default=self.editor.model().guessProfile)
+        self.albumGuessComboBox = profilesgui.ProfileComboBox(
+            profiles.category('albumguesser'),
+            default=self.editor.model().guessProfile
+        )
         self.albumGuessComboBox.setToolTip(self.tr("Select album guessing profile"))
         self._handleAlbumGuessCheckBox(albumGuessCheckBox.isChecked()) # initialize enabled/disabled
         self.albumGuessComboBox.profileChosen.connect(self._handleAlbumGuessComboBox)
         albumGuessLayout.addWidget(self.albumGuessComboBox,1)
         layout.addRow(self.tr("Guess albums"),albumGuessLayout)
         
-        delegateType = editordelegate.EditorDelegate.profileType
-        delegateChooser = profilesgui.ProfileComboBox(delegates.profiles.category,
-                                                     restrictToType=delegateType,
-                                                     default=self.editor.itemDelegate().profile)
+        delegateType = delegate.EditorDelegate.profileType
+        delegateChooser = profilesgui.ProfileComboBox('delegates', 'editor',
+                                                      self.editor.itemDelegate().profile)
         delegateChooser.profileChosen.connect(self.editor.itemDelegate().setProfile)
         layout.addRow(self.tr("Item display"),delegateChooser)
         
-    def _handleAutoExpandBox(self,state):
+    def _handleAutoExpandBox(self, state):
         """Handle toggling the auto expand checkbox."""
         self.editor.autoExpand = state == Qt.Checked
         
-    def _handleAlbumGuessCheckBox(self,checked):
+    def _handleAlbumGuessCheckBox(self, checked):
         """Handle toggling of the guess checkbox."""
         self.editor.model().guessingEnabled = checked
-        if len(albumguesser.profileCategory.profiles()) > 0:
+        if len(profiles.profiles('albumguesser')) > 0:
             self.albumGuessComboBox.setEnabled(checked)
         else: self.albumGuessComboBox.setEnabled(True) # the box contains only 'Configure...'
         
@@ -230,7 +227,7 @@ class ExternalTagsWidget(QtWidgets.QScrollArea):
         self.label.setText('<br>'.join(lines))
         self.setHidden(len(lines) == 0)
         
-    def _handleLink(self,link):
+    def _handleLink(self, link):
         """Handle a link in the text."""
         action, index = link.split(':',1)
         index = int(index)
@@ -250,12 +247,3 @@ class ExternalTagsWidget(QtWidgets.QScrollArea):
                     index = self.editor.model().getIndex(wrapper)
                     itemSelection.select(index,index)
             self.editor.selectionModel().select(itemSelection,QtCore.QItemSelectionModel.ClearAndSelect)
-
-
-widgets.addClass(
-    id='editor',
-    name=translate("Editor", "editor"),
-    icon=utils.images.icon('accessories-text-editor'),
-    theClass=EditorWidget,
-    preferredDockArea = 'right'
-)

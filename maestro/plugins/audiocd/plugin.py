@@ -23,7 +23,7 @@ except ImportError:
 from PyQt5 import QtCore, QtWidgets
 
 from maestro import application, database as db
-from maestro.widgets.editor import editor
+from maestro.widgets import editor
 from maestro.core import urls, tags
 
 
@@ -31,11 +31,11 @@ translate = QtCore.QCoreApplication.translate
 
 
 def defaultConfig():
-    return {"audiocd": {
-            "rippath":  (str, "/tmp", "Default path in which ripped tracks are put."),
-            "earlyrip": (bool, True, "Start ripping before the MusicBrainz dialog is opened."),
-            'eject':    (bool, True, 'Eject CD after ripping is completed or aborted'),
-        }}
+    return dict(audiocd=dict(
+        rippath=(str, '/tmp', 'Default path in which ripped tracks are put.'),
+        earlyrip=(bool, True, 'Start ripping before the MusicBrainz dialog is opened.'),
+        eject=(bool, True, 'Eject CD after ripping is completed or aborted')
+    ))
 
 
 def enable():

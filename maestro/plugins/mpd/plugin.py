@@ -46,13 +46,15 @@ translate = QtCore.QCoreApplication.translate
 
 
 def enable():
-    player.profileCategory.addType(profiles.ProfileType(
-                                   'mpd', translate('MPDPlayerBackend', 'MPD'), MPDPlayerBackend))
+    profiles.category('playback').addType(profiles.ProfileType(
+        name='mpd', title=translate('MPDPlayerBackend', 'MPD'),
+        profileClass=MPDPlayerBackend,
+    ))
     urls.fileBackends.append(MPDFile)
 
 
 def disable():
-    player.profileCategory.removeType('mpd')
+    profiles.category('playback').removeType('mpd')
     urls.fileBackends.remove(MPDFile)
 
 
@@ -61,7 +63,7 @@ class MPDFile(urls.BackendFile):
     scheme = 'mpd'
 
     def readTags(self):
-        mpdProfile = player.profileCategory.get(self.url.netloc)
+        mpdProfile = profiles.category('playback').get(self.url.netloc)
         self.tags, self.length = mpdProfile.getInfo(self.url.path[1:])
 
 
@@ -142,18 +144,18 @@ class MPDPlayerBackend(player.PlayerBackend):
         if self.connectionState == player.ConnectionState.Connected:
             self.disconnectClient()
         self.connectBackend()
-        player.profileCategory.profileChanged.emit(self)
+        self.emitChange()
         
     def setPath(self, path):
         """Change the path where Maestro believes the MPD music folder to be."""
         if path != self.path:
             self.path = path
-            player.profileCategory.profileChanged.emit(self)
+            self.emitChange()
             # Changing the path probably means that mpd:// urls become file:// urls
             if self.playlist.root.hasContents():
                 self.playlist.resetFromUrls(self.makeUrls(self.mpdPlaylist),
                                             updateBackend='never') 
-                self.stack.reset() # avoid trouble
+                self.stack.reset()  # avoid trouble
     
     def connectBackend(self):
         """Connect to MPD.
@@ -654,7 +656,7 @@ class MPDConfigWidget(QtWidgets.QWidget):
         path = self.pathEdit.text()
         self.profile.setConnectionParameters(host, port, password)
         self.profile.setPath(path)
-        player.profileCategory.save()
+        self.category.save()
         self.saveButton.setEnabled(False)
     
     def _handlePasswordVisibleBox(self,checked):

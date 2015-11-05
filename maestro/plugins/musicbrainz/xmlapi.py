@@ -29,7 +29,7 @@ from maestro.utils import FlexiDate
 
 from . import plugin as mbplugin
 
-wsURL = "http://musicbrainz.org/ws/2"  # the base URL for MusicBrainz' web service
+wsURL = 'http://musicbrainz.org/ws/2'  # the base URL for MusicBrainz' web service
 
 queryCallback = None
 
@@ -48,7 +48,7 @@ def query(resource, mbid, includes=[]):
     if queryCallback:
         queryCallback(url)
     if len(includes) > 0:
-        url += "?inc={}".format("+".join(includes))
+        url += '?inc={}'.format('+'.join(includes))
     logging.debug(__name__, 'querying {}'.format(url))
     ans = db.query("SELECT xml FROM {}musicbrainzqueries WHERE url=?".format(db.prefix), url)
     try:
@@ -56,9 +56,10 @@ def query(resource, mbid, includes=[]):
     except db.EmptyResultException:
         try:
             request = urllib.request.Request(url)
-            request.add_header('User-Agent', 'Maestro/0.4.0 (https://github.com/maestromusic/maestro)')
+            request.add_header('User-Agent',
+                               'Maestro/0.4.0 (https://github.com/maestromusic/maestro)')
             with urllib.request.urlopen(request) as response:
-                data = response.readall()
+                data = response.read()
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 raise e

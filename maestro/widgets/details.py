@@ -18,13 +18,22 @@
 
 import os
 from xml.sax import saxutils
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
-translate = QtCore.QCoreApplication.translate
 
 from maestro import widgets, logging, utils
 from maestro.core import levels, tags
 from maestro.gui import selection
+translate = QtCore.QCoreApplication.translate
+
+
+def init():
+    from maestro.widgets import WidgetClass
+    WidgetClass(
+        id='details', theClass=DetailsView, name=translate('DetailsView', 'Details'),
+        icon=utils.images.icon('help-about'),
+        preferredDockArea='right'
+    ).register()
 
 
 class DetailsView(widgets.Widget):
@@ -250,15 +259,6 @@ class DetailsView(widgets.Widget):
         text.append('<tr><td>Level</td><td>{}</td></tr>'.format(el.level))
         text.append('</table>')
         self.label.setText(''.join(text))
-
-
-widgets.addClass(
-    id = "details",
-    name = translate("DetailsView", "Details"),
-    theClass = DetailsView,
-    icon = utils.images.icon('help-about'),
-    preferredDockArea = 'right'
-)
 
 
 class CoverDialog(QtWidgets.QDialog):

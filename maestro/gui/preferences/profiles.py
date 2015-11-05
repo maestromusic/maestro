@@ -434,14 +434,14 @@ class CategoryMenu(QtWidgets.QLabel):
         self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.linkActivated.connect(dialog.showPanel)
         self.setIndent(10)
-        profiles.manager.categoryAdded.connect(self._updateText)
-        profiles.manager.categoryRemoved.connect(self._updateText)
+        profiles.ProfileManager.instance().categoryAdded.connect(self._updateText)
+        profiles.ProfileManager.instance().categoryRemoved.connect(self._updateText)
         self._updateText()
 
     def _updateText(self):
         """Reset the HTML text of this label."""
         parts = [self.tr("Choose a profile category:"), "<ul>"]
-        for category in profiles.manager.categories:
+        for category in profiles.categories():
             parts.append('<li style="margin-bottom: 10px"><a href="profiles/{}">{}</a></li>'
                          .format(category.name, category.title))
         parts.append("</ul>")
@@ -467,7 +467,11 @@ class ProfileComboBox(QtWidgets.QComboBox):
                  includeConfigure=True, showTypes=False, selectFirstProfile=True):
         super().__init__()
         self._profile = None
+        if isinstance(category, str):
+            category = profiles.category(category)
         self.category = category
+        if isinstance(restrictToType, str):
+            restrictToType = category.getType(restrictToType)
         self.restrictToType = restrictToType
         self.includeConfigure = includeConfigure
         self.showTypes = showTypes
@@ -597,8 +601,10 @@ class ProfileActionWidget(QtWidgets.QWidget):
     the temporary profile as a normal persistent profile or to load (copies of) normal profiles.
     """
 
-    def __init__(self, category: profiles.ProfileCategory):
+    def __init__(self, category):
         super().__init__()
+        if isinstance(category, str):
+            category = profiles.category(category)
         self.category = category
         self.category.profileAdded.connect(self._makeMenu)
         self.category.profileRemoved.connect(self._makeMenu)

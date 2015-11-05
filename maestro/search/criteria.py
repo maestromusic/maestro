@@ -462,17 +462,19 @@ class AbstractTagCriterion(Criterion):
     self.value and self.interval, leading to both a date-search and a text-search.
     """
     
-    # Name of the temporary search table
-    # The table is created in the search thread and temporary, so that it does not conflict with other threads.
-    HELP_TABLE = db.prefix + "tmp_help" 
+    @classmethod
+    def helpTableName(cls):
+        """Name of the temporary search table that is created in the search thread temporarily."""
+        return db.prefix + 'tmp_help'
+
     
     def process(self, fromTable, domain):
         # Prepare help table
         #===================
-        if not db.engine.dialect.has_table(db.engine.connect(), self.HELP_TABLE):
+        if not db.engine.dialect.has_table(db.engine.connect(), self.helpTableName()):
             from sqlalchemy import MetaData, Integer, Table, Column, Index
             metadata = MetaData(db.engine)
-            helpTable = Table(self.HELP_TABLE, metadata,
+            helpTable = Table(self.helpTableName(), metadata,
                 Column('value_id', Integer, nullable=False), 
                 Column('tag_id', Integer, nullable=False),     
                 Index('value_id', 'tag_id'),
@@ -482,8 +484,8 @@ class AbstractTagCriterion(Criterion):
         else:
             if db.type == 'mysql':
                 # truncate may be much faster than delete http://dev.mysql.com/doc/refman/5.6/en/delete.html
-                db.query("TRUNCATE {}".format(self.HELP_TABLE))
-            else: db.query("DELETE FROM {}".format(self.HELP_TABLE))
+                db.query("TRUNCATE {}".format(self.helpTableName()))
+            else: db.query("DELETE FROM {}".format(self.helpTableName()))
         
         # Select matching values and put them into help table
         #====================================================
@@ -552,7 +554,7 @@ class AbstractTagCriterion(Criterion):
                         FROM {table}
                         WHERE {where}
                     """, *args,
-                    help=self.HELP_TABLE, table=valueType.table,
+                    help=self.helpTableName(), table=valueType.table,
                     where=' AND '.join(whereClauses) if len(whereClauses) > 0 else '1')
             #print("1: "+str(time.perf_counter()-perf))
             if pragmaNecessary:
@@ -562,9 +564,9 @@ class AbstractTagCriterion(Criterion):
                 
         # Store values that match
         #=================================================
-        if db.query("SELECT COUNT(*) FROM {help}", help=self.HELP_TABLE).getSingle() <= MAX_MATCHING_TAGS:
+        if db.query("SELECT COUNT(*) FROM {help}", help=self.helpTableName()).getSingle() <= MAX_MATCHING_TAGS:
             self.matchingTags = set(tuple(r) for r in db.query("SELECT tag_id, value_id FROM {help}",
-                                                               help=self.HELP_TABLE))
+                                                               help=self.helpTableName()))
         yield
         
         # Select elements which have these values (or not)
@@ -578,7 +580,7 @@ class AbstractTagCriterion(Criterion):
                     JOIN {p}tags AS t ON el.id = t.element_id
                     JOIN {help} AS h USING(tag_id, value_id)
                     WHERE {where}
-                """, table=fromTable, help=self.HELP_TABLE, where=domainWhereClause).getSingleColumn())
+                """, table=fromTable, help=self.helpTableName(), where=domainWhereClause).getSingleColumn())
         else: 
             self.result = set(db.query("""
                 SELECT el.id
@@ -588,7 +590,7 @@ class AbstractTagCriterion(Criterion):
                 WHERE {where}
                 GROUP BY el.id
                 HAVING COUNT(h.value_id) = 0
-                """, table=fromTable, help=self.HELP_TABLE, where=domainWhereClause).getSingleColumn())
+                """, table=fromTable, help=self.helpTableName(), where=domainWhereClause).getSingleColumn())
         #print("2: "+str(time.perf_counter()-perf))
     
     def _escapeParameter(self, parameter):

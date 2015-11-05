@@ -16,77 +16,131 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-"""This module provides a system to manage configuration profiles in Maestro. Profiles are organized in
-categories (e.g. delegates, playback). Profiles of one category may have different types (e.g. MPD
-playback, Phonon playback). Profiles and types are managed by their category. Categories are
-managed by the ProfileManager.""" 
+"""This module provides a system to manage configuration profiles in Maestro. Profiles are organized
+in categories (e.g. delegates, playback). Profiles of one category may have different types (e.g.
+MPD playback, Phonon playback). Profiles and types are managed by their category. Categories are
+managed by the ProfileManager."""
 
 from PyQt5 import QtCore
 
 from maestro import config, utils
 
 
+# ======== convenience module-level functions for common tasks
+def profiles(categoryName):
+    """Returns all profiles of the category named `categoryName`."""
+    return category(categoryName).profiles()
+
+
+def category(categoryName):
+    """Return the :class:`ProfileCategory` named `categoryName`."""
+    return ProfileManager.instance().category(categoryName)
+
+
+def categories():
+    """Returns an iterator over all registered profile categories."""
+    return ProfileManager.instance().categories()
+
+
+def addCategory(cat):
+    """Adds (registers) a new profile category."""
+    return ProfileManager.instance().addCategory(cat)
+
+
+def removeCategory(cat):
+    """Remove (unregister) a profile category."""
+    return ProfileManager.instance().removeCategory(cat)
+
+
+def save():
+    """Store all profiles to the storage file."""
+    return ProfileManager.instance().save()
+
+
 class Profile(QtCore.QObject):
     """A profile stores the configuration of some object. Profiles are stored persistently in the
     storage file.
-    
-    A profile has a name and optionally a type. The constructor variable *state* contains the data
-    read from the storage file. Because profiles are generally created by the user, there is no
-    distinction between name and title (as for profile types and profile categories).
+
+    Args:
+        name (str): Name of the profile (usually user-defined)
+        type: ProfileType this profile belongs to, or ``None`` for no ProfileType.
+        state: State as returned by :func:`save`.
     """
-    
-    builtIn = False # built-in profiles cannot be renamed or deleted
+
+    categoryName = None  # override in subclasses!
+    builtIn = False  # built-in profiles cannot be renamed or deleted
     
     def __init__(self, name, type=None, state=None):
         super().__init__()
         self.name = name
         assert type is None or isinstance(type, ProfileType)
         self.type = type
+        self.category = category(self.categoryName)
     
     def save(self):
-        """Return a dict, list, tuple or a simple data type that can be used to store this profile in the
-        storage file. The result of this method will be passed as state to the constructor the next time the
-        application starts.
+        """Return a dict, list, tuple or a simple data type that can be used to store this profile
+        in the storage file. The result of this method will be passed as state to the constructor
+        the next time the application starts.
+
+        Default implementation returns ``None``.
         """
         return None
 
+    def emitChange(self):
+        """Subclasses should call this when the current profile has been changed.
+
+        This method will notify the profile managing system about the change.
+        """
+        self.category.profileChanged.emit(self)
+
     @classmethod
     def configurationWidget(cls, profile, parent):
-        """Return a widget that can be used to configure a profile. Should be a subclass
-        of gui.preferences.profiles.ProfileConfigurationWidget."""
-        raise NotImplementedError()
+        """Return a widget that can be used to configure a profile.
+
+        Args:
+            profile (Profile): Profile used for current configuration in the widget
+            parent (QWidget): Parent window.
+
+        Returns:
+            gui.preferences.profiles.ProfileConfigurationWidget: The widget, or ``None`` if there's
+            nothing to configure (the default)."""
+        return None
     
     def copy(self):
         """Return a copy of this profile."""
         return type(self)(self.name, self.type, self.save())
     
     def __str__(self):
-        return "{}(name={})".format(type(self).__name__, self.name)
+        return '{}(name={})'.format(type(self).__name__, self.name)
 
 
 class ProfileType:
-    """Optionally profiles may have a type. This is useful to
-    
-        - use different subclasses of Profile for profiles (e.g. MPDPlayback, PhononPlayback),
-        - restrict some widget to profiles of a certain type (e.g. the Playlist accepts only DelegateProfiles
-          of type 'playlist')
-    
-    *name* is the internal name of the profile. *title* is displayed to the user. *profileClass* is the
-    (sub)class of Profile that will be used for profiles of this type.
-    """ 
+    """Optionally, profiles may have a type. This is useful to
+
+    - use different subclasses of Profile for profiles (e.g. MPDPlayback, PhononPlayback),
+    - restrict some widget to profiles of a certain type (e.g. the Playlist accepts only
+      DelegateProfiles of type 'playlist')
+
+    Args:
+        category (TypedProfileCategory): The category this type belongs to.
+        name (str): Internal name of the profile type
+        title (str): UI string describing this type.
+        profileClass: Profile subclass that will be used for profiles of this type.
+    """
     
     def __init__(self, name, title, profileClass=Profile, defaultProfileName=None):
         self.name = name
+        self.category = category(profileClass.categoryName)
         self.title = title
         self.profileClass = profileClass
-        if defaultProfileName is not None:
-            self.defaultProfileName = defaultProfileName
-        else: self.defaultProfileName = title
+        if defaultProfileName is None:
+            defaultProfileName = title
+        self.defaultProfileName = defaultProfileName
         
-    def load(self,category):
-        """This is called after the type has been added to its ProfileCategory and its profiles have been
-        loaded. Subclass implementations could use this method to create a default profile if none was
-        contained in the storage file.
+    def load(self):
+        """Called after the type has been added to its ProfileCategory and its profiles have been
+        loaded. Subclass implementations could use this method to create a default profile if none
+        was contained in the storage file.
         """
         pass
 
@@ -137,7 +191,8 @@ class ProfileCategory(QtCore.QObject):
         
         if defaultProfileName is not None:
             self.defaultProfileName = defaultProfileName
-        else: self.defaultProfileName = title
+        else:
+            self.defaultProfileName = title
         
         self.description = description
     
@@ -152,16 +207,16 @@ class ProfileCategory(QtCore.QObject):
         """Return a list of all profiles of this category."""
         return self._profiles
     
-    def addProfile(self, nameOrProfile, type=None, state=None):
-        """Add a profile to the category. You can specify the profile either directly or pass a name
-        and, optionally, a type and state. In the latter case the arguments will be passed to the constructor
-        of the correct subclass of Profile.
-        
-        The argument *type* is ignored and only available to be compatible with TypedCategory.
+    def addProfile(self, profile, type=None, state=None):
+        """Add a profile to the category.
+
+        Args:
+            profile (Profile or str): Profile to add or its name
+            state: The state (only if profile is given as string)
+            type: ignored (compatibility with TypedProfileCategory)
         """
-        if isinstance(nameOrProfile, str):
-            profile = self.profileClass(nameOrProfile, type, state)
-        else: profile = nameOrProfile
+        if isinstance(profile, str):
+            profile = self.profileClass(profile, type, state)
         self._profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile
@@ -174,7 +229,7 @@ class ProfileCategory(QtCore.QObject):
         profile.read(newProfile.save())
         self.profileChanged.emit(profile)
     
-    def deleteProfile(self,profile):
+    def deleteProfile(self, profile):
         """Delete a profile so that it disappears from the storage file at application end."""
         assert not profile.builtIn
         self._profiles.remove(profile)
@@ -191,9 +246,9 @@ class ProfileCategory(QtCore.QObject):
         """Load all profiles of known types from the storage file. If *restrictToType* is not None,
         only load profiles of this profile type."""
         for data in self.storageOption.getValue():
-            if len(data) != 2: # broken storage option; should not happen
+            if len(data) != 2:  # broken storage option; should not happen
                 continue
-            name,state = data
+            name, state = data
             self.addProfile(name, None, state)
             
     def save(self):
@@ -212,7 +267,7 @@ class ProfileCategory(QtCore.QObject):
             i += 1
         return name
     
-    def getFromStorage(self,name):
+    def getFromStorage(self, name):
         """Return the profile of the given name if it exists or any other profile else. Use this method
         to load profiles from states saved in the storage file."""
         if name is not None:
@@ -239,7 +294,8 @@ class TypedProfileCategory(ProfileCategory):
         ProfileType."""
         if type is None:
             return self._profiles
-        else: return [p for p in self._profiles if p.type == type]
+        else:
+            return [p for p in self._profiles if p.type == type]
         
     def getType(self, name):
         """Return the type of the given name or None if such a type does not exist."""
@@ -248,42 +304,45 @@ class TypedProfileCategory(ProfileCategory):
                 return type
         return None
         
-    def addType(self, type):
+    def addType(self, profileType):
         """Add a type to the category. Load all profiles of this type from the storage file and add them
         to the category."""
-        if type not in self.types:
-            if self.getType(type.name) != None:
-                raise ValueError("There is already a profile type of name '{}'.".format(type.name))
-            self.types.append(type)
-            self.typeAdded.emit(type)
-            self.loadProfiles(restrictToType=type)
+        if profileType not in self.types:
+            if self.getType(profileType.name) is not None:
+                raise ValueError("There is already a profile type of name '{}'.".format(profileType.name))
+            assert profileType.category is self
+            self.types.append(profileType)
+            self.typeAdded.emit(profileType)
+            self.loadProfiles(restrictToType=profileType)
             
-    def removeType(self, type):
+    def removeType(self, profileType):
         """Remove a type and all profiles of this type from the storage file. *type* may either be the type
         or its name."""
-        if isinstance(type, str):
-            type = self.getType(type)
-            if type is None:
-                raise ValueError("There is no profile type of name '{}'.".format(type))
+        if isinstance(profileType, str):
+            profileType = self.getType(profileType)
+            if profileType is None:
+                raise ValueError("There is no profile type of name '{}'.".format(profileType))
         for profile in self._profiles:
-            if profile.type == type:
+            if profile.type == profileType:
                 profile.builtIn = False # delete built-in profiles, too
                 self.deleteProfile(profile)
-        self.types.remove(type)
-        self.typeRemoved.emit(type)
+        self.types.remove(profileType)
+        self.typeRemoved.emit(profileType)
     
-    def addProfile(self, nameOrProfile, type=None, state=None):
-        """Add a profile to the category. You can specify the profile either directly or pass a name
-        and, optionally, a type and state. In the latter case the arguments will be passed to the constructor
-        of the correct subclass of Profile.
-        
-        The argument *type* is ignored and only available to be compatible with TypedCategory.
+    def addProfile(self, profile, type=None, state=None):
+        """Add a profile to the category.
+
+        Args:
+            profile (Profile or str): Profile object to add or its name
+            type: Profile type (optional)
+            state: Profile state (optional)
+
+
+        If *type* and *state* are given, a new profile object is created.
         """
-        if isinstance(nameOrProfile, str):
-            assert type is not None
+        if isinstance(profile, str):
             profileClass = type.profileClass if type.profileClass is not None else self.profileClass
-            profile = profileClass(nameOrProfile, type, state)
-        else: profile = nameOrProfile
+            profile = profileClass(profile, type, state)
         self._profiles.append(profile)
         self.profileAdded.emit(profile)
         return profile
@@ -302,7 +361,7 @@ class TypedProfileCategory(ProfileCategory):
             elif typeName == restrictToType.name:
                 self.addProfile(name, restrictToType, state)
         if restrictToType is not None:
-            restrictToType.load(self)
+            restrictToType.load()
             
     def save(self):
         """Save the profiles of this category to the storage options specified in the constructor."""
@@ -330,49 +389,57 @@ class TypedProfileCategory(ProfileCategory):
         # Return the profile given by name if it exists and its type fits
         if name is not None:
             profile = self.get(name)
-            if profile is not None and (restrictToType is None or profile.type == restrictToType):
+            if profile is not None and (restrictToType is None or profile.type is restrictToType):
                 return profile
         # Return the first profile whose type fits
         for profile in self._profiles:
             if restrictToType is None or profile.type == profile.type:
                 return profile
         return None
-    
+
 
 class ProfileManager(QtCore.QObject):
     """The single instance of this class manages profile categories."""
     categoryAdded = QtCore.pyqtSignal(ProfileCategory)
     categoryRemoved = QtCore.pyqtSignal(ProfileCategory)
-    
+
+    __instance = None
+
     def __init__(self):
         super().__init__()
-        self.categories = []
-        
-    def getCategory(self, name):
+        self._categories = []
+
+    @staticmethod
+    def instance():
+        if ProfileManager.__instance is None:
+            ProfileManager.__instance = ProfileManager()
+        return ProfileManager.__instance
+
+    def category(self, name):
         """Return the profile category with the given name."""
-        for category in self.categories:
-            if category.name == name:
-                return category
+        for cat in self._categories:
+            if cat.name == name:
+                return cat
         raise ValueError("There is no profile category with name '{}'.".format(name))
-    
-    def addCategory(self, category):
+
+    def categories(self):
+        return self._categories
+
+    def addCategory(self, cat):
         """Add a profile category. Load all of its profiles whose type has been added to the category yet
         (or which do not have a type) from the storage file."""
-        if category not in self.categories:
-            self.categories.append(category)
-            self.categoryAdded.emit(category)
-            category.loadProfiles()
-            
-    def removeCategory(self, category):
+        if cat not in self._categories:
+            self._categories.append(cat)
+            self.categoryAdded.emit(cat)
+            cat.loadProfiles()
+
+    def removeCategory(self, cat):
         """Remove the given category without deleting its profiles from the storage file."""
-        category.save()
-        self.categories.remove(category)
-        self.categoryRemoved.emit(category)
-        
+        cat.save()
+        self._categories.remove(cat)
+        self.categoryRemoved.emit(cat)
+
     def save(self):
         """Save all categories to their respective options in the storage file."""
-        for category in self.categories:
-            category.save()
-            
-
-manager = ProfileManager()
+        for cat in self._categories:
+            cat.save()

@@ -93,11 +93,13 @@ class ActionManager(QtCore.QObject):
         return None
 
     def setShortcut(self, identifier, shortcut: QtGui.QKeySequence):
-        """Set a shortcut for the action named *identifier*."""
+        """Set a shortcut for the action named `identifier`."""
         action = self.actions[identifier]
         action.shortcut = shortcut
         if action.shortcut == action.defaultShortcut:
-            del config.storage.gui.shortcuts[identifier]
+            # remove from storage, if it's there (we only store non-defaults)
+            if identifier in config.storage.gui.shortcuts:
+                del config.storage.gui.shortcuts[identifier]
         else:
             config.storage.gui.shortcuts[identifier] = shortcut.toString()
         self.shortcutChanged.emit(identifier, shortcut)

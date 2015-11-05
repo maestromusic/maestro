@@ -27,6 +27,18 @@ allSources = []
 
 
 def init():
+    from maestro.widgets import WidgetClass
+    from maestro import utils
+    from maestro.filesystem.browser import FilesystemBrowser
+    WidgetClass(
+        id='filesystembrowser', theClass=FilesystemBrowser,
+        name=translate('FilesystemBrowser', 'File System Browser'),
+        icon=utils.images.icon('filesystembrowser'),
+        areas='dock', preferredDockArea='right'
+    ).register()
+
+
+def enable():
     """Initialize filesystem module. Creates :class:`Source` instances for all configured sources.
     """
     global allSources
@@ -41,7 +53,7 @@ def init():
     parseAutoReplace()
 
 
-def shutdown():
+def disable():
     """Terminates this module, storing the state of all sources."""
     global allSources
     config.storage.filesystem.sources = [s.save() for s in allSources]

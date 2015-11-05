@@ -26,9 +26,8 @@ translate = QtCore.QCoreApplication.translate
 from maestro import application, database as db, logging, utils, search, widgets
 from maestro.core import flags, levels, domains
 from maestro.core.elements import Element
-from maestro.gui import treeactions, mainwindow, treeview, delegates, dockwidget, search as searchgui
-from maestro.gui.delegates import browser as browserdelegate
-from maestro.widgets.browser import model, nodes as bnodes
+from maestro.gui import mainwindow, treeview, dockwidget, search as searchgui
+from maestro.widgets.browser import delegate, model, nodes as bnodes
 
 
 class Browser(widgets.Widget):
@@ -110,7 +109,7 @@ class Browser(widgets.Widget):
         
         # Restore state
         layersForViews = [self.defaultLayers()]
-        self.delegateProfile = browserdelegate.BrowserDelegate.profileType.default()
+        self.delegateProfile = delegate.BrowserDelegate.profileType.default()
         self.sortTags = {}
         if state is not None and isinstance(state, dict):
             if 'domain' in state:
@@ -143,9 +142,11 @@ class Browser(widgets.Widget):
                 except search.criteria.ParseException:
                     logging.exception(__name__, "Could not parse the browser's filter criterion.")
             if 'delegate' in state:
-                self.delegateProfile = delegates.profiles.category.getFromStorage(
-                                                            state.get('delegate'),
-                                                            browserdelegate.BrowserDelegate.profileType)
+                from maestro import profiles
+                self.delegateProfile = profiles.category('delegates').getFromStorage(
+                    state['delegate'],
+                    profiles.category('delegates').getType('browser')
+                )
             
         application.dispatcher.connect(self._handleChangeEvent)
         levels.real.connect(self._handleChangeEvent)
@@ -338,16 +339,6 @@ class Browser(widgets.Widget):
         super().closeEvent(event)
 
 
-widgets.addClass(
-    id = "browser",
-    name = translate("Browser", "Browser"),
-    icon = utils.images.icon('browser'),
-    theClass = Browser,
-    areas = 'dock',
-    preferredDockArea = 'left'
-)
-
-
 class BrowserTreeView(treeview.TreeView):
     """TreeView for the Browser. A browser may contain more than one view each using its own model. *parent*
     must be the browser-widget of this view. The *layers*-parameter determines how elements are grouped in
@@ -368,7 +359,7 @@ class BrowserTreeView(treeview.TreeView):
         # Queued connection is necessary so that the model has really finished loading, when the view reacts.
         self.model().nodeLoaded.connect(self._handleNodeLoaded, Qt.QueuedConnection)
         
-        self.setItemDelegate(browserdelegate.BrowserDelegate(self, delegateProfile))
+        self.setItemDelegate(delegate.BrowserDelegate(self, delegateProfile))
         
         # The expander will decide which nodes to load/expand after the view is reset. Because each loading
         # might perform a search, Expanders work asynchronously.
@@ -398,13 +389,6 @@ class BrowserTreeView(treeview.TreeView):
             from maestro.widgets.playlist import gui
 
             gui.appendToDefaultPlaylist(wrappers, replace=event.modifiers() & Qt.ControlModifier)
-
-
-for identifier in ('hideTagValues', 'tagValue', 'editTags', 'changeURLs', 'delete', 'merge', 'completeContainer',
-                   'collapseAll', 'expandAll', 'appendToPL', 'replacePL'):
-    BrowserTreeView.addActionDefinition(identifier)
-treeactions.SetElementTypeAction.addSubmenu(BrowserTreeView.actionConf.root)
-treeactions.ChangePositionAction.addSubmenu(BrowserTreeView.actionConf.root)
 
 
 class RestoreExpander:

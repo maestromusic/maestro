@@ -111,36 +111,36 @@ class Node:
         return -1
     
     def getAllNodes(self, skipSelf=False):
-        """Generator which will return all nodes contained in this node or in children of it, including the
-        node itself if *skipSelf* is not set True.
+        """Generator which will return all nodes contained in this node or in children of it,
+        including the node itself unless *skipSelf* is ``True``.
         
-        The send-method of the returned generator may be used to decide whether the generator should descend
-        to the contents of the last node:
-        
-            generator = model.getAllNodes()
-            descend = None # send must be invoked with None first
-            try:
-                while True:
-                    node = generator.send(descend)
-                    descend = ... # decide whether the generator should yield the contents of node
-                                  # If descend is set to False, the generator will skip the contents and
-                                  # continue with the next sibling of node
-            except StopIteration: pass
+        The send-method of the returned generator may be used to decide whether the generator should
+        descend to the contents of the last node:
+
+        >>> generator = model.getAllNodes()
+        >>> descend = None # send must be invoked with None first
+        >>> try:
+        >>>     while True:
+        >>>         node = generator.send(descend)
+        >>>         descend = ... # decide whether the generator should yield the contents of node
+        >>>                       # If descend is set to False, the generator will skip the contents and
+        >>>                       # continue with the next sibling of node
+        >>> except StopIteration: pass
         
         See http://docs.python.org/3/reference/expressions.html#generator.send
         """
         if not skipSelf:
             descend = yield self
-            if descend is False: # Remember that yield usually returns None 
+            if descend is False:  # Remember that yield usually returns None
                 return
         for node in self.getContents():
             generator = node.getAllNodes()
             try:
-                descend = None # send must be called with None first
+                descend = None  # send must be called with None first
                 while True:
                     descend = yield generator.send(descend)
             except StopIteration:
-                pass # continue to next node
+                pass  # continue to next node
  
     def getAllFiles(self, reverse=False):
         """Generator which will return all files contained in this node or in children of it

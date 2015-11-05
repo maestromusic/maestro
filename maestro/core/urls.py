@@ -66,6 +66,10 @@ class URL:
     def directory(self):
         return os.path.dirname(self.path)
 
+    @property
+    def basename(self):
+        return os.path.basename(self.path)
+
     def copy(self, **kwargs):
         """Create a copy of this URL. Optional kwargs allow to change specific parts, i.e.:
             >>> copiedUrl = url.copy(scheme="foo", netloc="bar")

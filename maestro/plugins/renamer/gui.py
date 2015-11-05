@@ -19,10 +19,10 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 translate = QtCore.QCoreApplication.translate
 
-from maestro import logging
+from maestro import logging, profiles
 from maestro.gui import actions, treeview, delegates
 from maestro.gui.delegates import abstractdelegate
-from maestro.gui.preferences import profiles
+from maestro.gui.preferences import profiles as profileprefs
 from maestro.models import leveltreemodel
 from maestro.core import levels
 from . import plugin
@@ -46,9 +46,8 @@ class RenameFilesAction(actions.TreeAction):
 class PathDelegate(delegates.StandardDelegate):
     """Delegate for the rename preview; shows old and new path color-coded.
     """
-    def __init__(self, view): 
-        # Because it should not be configurable, this profile is not contained in the profile category
-        self.profile = delegates.profiles.DelegateProfile("renamer")
+    def __init__(self, view):
+        self.profile = delegates.profiles.DelegateProfile('renamer')
         super().__init__(view, self.profile)
         self.newPathStyleNew = abstractdelegate.DelegateStyle(1, False, True, Qt.darkGreen)
         self.newPathStyleOld = abstractdelegate.DelegateStyle(1, False, True, Qt.red)
@@ -90,7 +89,7 @@ class RenameDialog(QtWidgets.QDialog):
         self.setWindowTitle(self.tr("Rename {} containers").format(len(elements)))
         mainLayout = QtWidgets.QVBoxLayout()
 
-        self.profileActionWidget = profiles.ProfileActionWidget(plugin.profileCategory)
+        self.profileActionWidget = profileprefs.ProfileActionWidget('renamer')
         mainLayout.addWidget(self.profileActionWidget, 1)
         self.statusLabel = QtWidgets.QLabel()
         self.statusLabel.setVisible(False)
@@ -158,7 +157,7 @@ class RenameDialog(QtWidgets.QDialog):
         self.accept()
 
 
-class GrammarConfigurationWidget(profiles.ProfileConfigurationWidget):
+class GrammarConfigurationWidget(profileprefs.ProfileConfigurationWidget):
     """This widget is used in two places to configure grammar profiles:
     
         - as configuration widget of the profiles (and thus used in the standard ProfileDialog),

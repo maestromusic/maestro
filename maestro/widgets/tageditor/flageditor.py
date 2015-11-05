@@ -188,10 +188,7 @@ class FlagWidget(QtWidgets.QWidget):
         - model: the model containing the record
         - record: the record displayed by this FlagWidget
         - parent: the parent component
-        
-    \ """
-    # Used to render the removeButton
-    clearPixmap = utils.images.icon('edit-clear-locationbar-rtl').pixmap(16, 16)
+    """
 
     # Whether the removeButton is visible
     _showRemoveButton = False
@@ -207,6 +204,7 @@ class FlagWidget(QtWidgets.QWidget):
         self.model = model
         self.record = record
         self.setRecord(record)
+        self._clearPixmap = None
 
     def getText(self):
         """Return the text displayed by this widget."""
@@ -254,6 +252,12 @@ class FlagWidget(QtWidgets.QWidget):
         height = fm.height() + 2 * vSpace + 2 * borderWidth
         return fm, borderWidth, textWidth, iconSize, smallHSpace, bigHSpace, vSpace, width, height
 
+    def clearPixmap(self):
+        """Used to render the removeButton."""
+        if self._clearPixmap is None:
+            self._clearPixmap = utils.images.icon('edit-clear-locationbar-rtl').pixmap(16, 16)
+        return self._clearPixmap
+
     def paintEvent(self, event):
         fm, borderWidth, textWidth, iconSize, smallHSpace, bigHSpace, vSpace, width, height = self._sizes()
         painter = QtGui.QPainter(self)
@@ -277,7 +281,7 @@ class FlagWidget(QtWidgets.QWidget):
 
         if self._showRemoveButton:
             painter.drawPixmap(width - borderWidth - smallHSpace - iconSize,
-                               (height - iconSize) // 2, self.clearPixmap)
+                               (height - iconSize) // 2, self.clearPixmap())
 
     def sizeHint(self):
         fm, borderWidth, textWidth, iconSize, smallHSpace, bigHSpace, vSpace, width, height = self._sizes()

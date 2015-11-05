@@ -18,42 +18,32 @@
 
 import pyparsing
 from pyparsing import Forward, Literal, OneOrMore, Optional, Word, alphas, alphanums, nums
-
 from PyQt5 import QtCore
+from maestro.core import tags
+from maestro import config, profiles
 
 translate = QtCore.QCoreApplication.translate
 
-from ...core import tags
-from ... import config, profiles
-
     
 def defaultStorage():
-    return {"renamer": {'profiles': [],
-                        'current_profile': None
-                        }
-            }
+    return dict(renamer=dict(profiles=[], current_profile=None))
+
 
 def defaultConfig():
-    return {"renamer": {
-            "positionDigits": (int,2,"Minimum number of digits to use for positions (filled with zeros).")
-        }}
-
-
-profileCategory = None
+    return dict(renamer=dict(
+        positionDigits=(int, 2, 'Minimum number of (zero-padded) digits to use for positions.')
+    ))
 
 
 def enable():
-    global profileCategory
-    profileCategory = profiles.ProfileCategory("renamer",
-                                               translate("Renamer","Renamer"),
-                                               config.getOption(config.storage, 'renamer.profiles'),
-                                               profileClass=GrammarRenamer,
-                                               iconName='edit-rename')
-    profiles.manager.addCategory(profileCategory)
+    profiles.addCategory(profiles.ProfileCategory(
+        name='renamer', title=translate('Renamer', 'Renamer'),
+        storageOption=config.getOption(config.storage, 'renamer.profiles'),
+        profileClass=GrammarRenamer, iconName='edit-rename')
+    )
     
     from .gui import RenameFilesAction
-    from maestro.widgets.editor import editor
-    from maestro.widgets import browser
+    from maestro.widgets import editor, browser
     RenameFilesAction.register('renamer', context='plugins',
                                shortcut=translate('RenameFilesAction', 'Ctrl+R'))
     editor.EditorTreeView.addActionDefinition('renamer')
@@ -63,9 +53,7 @@ def enable():
 def disable():
     from maestro.gui import actions
     actions.manager.unregisterAction('renamer')
-    global profileCategory
-    profiles.manager.removeCategory(profileCategory)
-    profileCategory = None
+    profiles.removeCategory('renamer')
 
 
 class FormatSyntaxError(SyntaxError):
@@ -73,6 +61,8 @@ class FormatSyntaxError(SyntaxError):
 
 
 class GrammarRenamer(profiles.Profile):
+
+    categoryName = 'renamer'
 
     def __init__(self, name, type=None, state=None):
         super().__init__(name, type)
@@ -201,13 +191,12 @@ class GrammarRenamer(profiles.Profile):
         if not isinstance(other, GrammarRenamer):
             return True
         return self.formatString != other.formatString or \
-               self.replaceChars != other.replaceChars or \
-               self.replaceBy != other.replaceBy or \
-               self.removeChars != other.removeChars
+            self.replaceChars != other.replaceChars or \
+            self.replaceBy != other.replaceBy or \
+            self.removeChars != other.removeChars
 
     def __eq__(self, other):
         return not self.__neq__(other)
     
     def __hash__(self):
         return id(self)
-        

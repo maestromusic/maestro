@@ -156,7 +156,7 @@ class FilesystemBrowserTreeView(QtWidgets.QTreeView):
     
     def setSource(self, source):
         oldSource = self.fsModel.source
-        if source != oldSource:
+        if source is not oldSource:
             if source:
                 self.model().setSourceModel(self.fsModel)
                 self.fsModel.setSource(source)
@@ -167,7 +167,7 @@ class FilesystemBrowserTreeView(QtWidgets.QTreeView):
                 self.setEnabled(False)
             
     def _handleDispatcher(self, event):
-        if isinstance(event, filesystem.SourceChangeEvent) and event.source == self.model().source:
+        if isinstance(event, filesystem.SourceChangeEvent) and event.source is self.fsModel.source:
             if event.action == application.ChangeType.deleted:
                 self.setSource(None)
             else:
@@ -274,13 +274,3 @@ class FileSystemSelection(selection.Selection):
     
     def hasElements(self):
         return len(self._files) > 0
-        
-        
-# register this widget in the main application
-widgets.addClass(
-    id='filesystembrowser',
-    theClass=FilesystemBrowser,
-    name=translate('FilesystemBrowser', 'File System Browser'),
-    icon=utils.images.icon('filesystembrowser'),
-    areas='dock', preferredDockArea='right'
-)

@@ -88,7 +88,10 @@ class Element:
             result += " - ".join(self.tags[tagsModule.TITLE])
         elif usePath and self.isFile():
             result += str(self.url)
-        else: result += translate("Element", "<No title>")
+        else:
+            result += translate('Element', '<No title>')
+            if self.isFile():
+                result += ' ({})'.format(self.url.basename)
 
         return result
     

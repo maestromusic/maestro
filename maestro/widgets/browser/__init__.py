@@ -16,7 +16,37 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from maestro.widgets.browser import actions, model, nodes 
-from maestro.widgets.browser.browser import Browser, BrowserTreeView
-from maestro.widgets.browser.coverbrowser import CoverBrowser
-from maestro.widgets.browser import covertable # register default display class for CoverBrowser
+from PyQt5 import QtCore
+from maestro.widgets.browser.browser import BrowserTreeView
+
+
+def init():
+    from maestro import utils
+    from maestro.gui import treeactions
+    from maestro.widgets import WidgetClass
+    from maestro.widgets.browser import delegate
+    from maestro.widgets.browser.browser import Browser, BrowserTreeView
+    from maestro.widgets.browser.coverbrowser import CoverBrowser
+    from maestro.widgets.browser.covertable import CoverTable
+    translate = QtCore.QCoreApplication.translate
+    delegate.init()
+    WidgetClass(
+        id='browser', theClass=Browser, name=translate('Browser', 'Browser'),
+        areas='dock', preferredDockArea='left'
+    ).register()
+
+    WidgetClass(
+        id='coverbrowser', theClass=CoverBrowser, name=translate('CoverBrowser', 'Cover Browser'),
+        icon=utils.images.icon('widgets/coverbrowser.png')
+    ).register()
+
+    coverbrowser.addDisplayClass('table', CoverTable)
+
+    import maestro.widgets.browser.actions
+    maestro.widgets.browser.actions.init()
+
+    for identifier in ('hideTagValues', 'tagValue', 'editTags', 'changeURLs', 'delete', 'merge',
+                       'completeContainer', 'collapseAll', 'expandAll', 'appendToPL', 'replacePL'):
+        BrowserTreeView.addActionDefinition(identifier)
+    treeactions.SetElementTypeAction.addSubmenu(BrowserTreeView.actionConf.root)
+    treeactions.ChangePositionAction.addSubmenu(BrowserTreeView.actionConf.root)

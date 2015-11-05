@@ -21,12 +21,10 @@ import math, itertools
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
-from maestro.gui.delegates import profiles
-
 translate = QtCore.QCoreApplication.translate
 
-__all__ = ['AbstractDelegate', 'MultiTextItem', 'TextItem', 'ImageItem', 'ColorBarItem', 'IconBarItem',
-           'DelegateStyle', 'STD_STYLE', 'ITALIC_STYLE', 'BOLD_STYLE']
+__all__ = ['AbstractDelegate', 'MultiTextItem', 'TextItem', 'ImageItem', 'ColorBarItem',
+           'IconBarItem', 'DelegateStyle']
 
 
 class DelegateStyle:
@@ -34,19 +32,32 @@ class DelegateStyle:
     three attributes *relFontSize*, *bold* and *italic*. *relFontSize* is a factor which is multiplied with
     the delegate option ''fontSize''.
     """
-    def __init__(self, relFontSize=1, bold=False, italic=False,
-                 color=QtWidgets.qApp.palette().color(QtGui.QPalette.WindowText)):
+    def __init__(self, relFontSize=1, bold=False, italic=False, color=None):
         self.bold = bold
         self.italic = italic
         self.relFontSize = relFontSize
+        if color is None:
+            color = QtWidgets.qApp.palette().color(QtGui.QPalette.WindowText)
         self.color = color
-            
 
-# Some standard styles used in the delegates
-STD_STYLE = DelegateStyle(1, False, False)
-ITALIC_STYLE = DelegateStyle(1, False, True)
-BOLD_STYLE = DelegateStyle(1, True, False)
-            
+    @classmethod
+    def standardStyle(cls):
+        if not hasattr(cls, '_stdStyle'):
+            cls._stdStyle = cls()
+        return cls._stdStyle
+
+    @classmethod
+    def italicStyle(cls):
+        if not hasattr(cls, '_italicStyle'):
+            cls._italicStyle = cls(italic=True)
+        return cls._italicStyle
+
+    @classmethod
+    def boldStyle(cls):
+        if not hasattr(cls, '_boldStyle'):
+            cls._boldStyle = cls(bold=True)
+        return cls._boldStyle
+
             
 class AbstractDelegate(QtWidgets.QStyledItemDelegate):
     """Abstract base class for delegates. This class implements sizeHint and paint by calling ''layout'',
@@ -93,8 +104,8 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         self.font = QtGui.QFont()
         assert profile is not None
         self.profile = profile
-        profiles.category.profileRemoved.connect(self._handleProfileRemoved)
-        profiles.category.profileChanged.connect(self._handleProfileChanged)
+        profile.category.profileRemoved.connect(self._handleProfileRemoved)
+        profile.category.profileChanged.connect(self._handleProfileChanged)
     
     def setProfile(self, profile):
         """Set the profile and redraw the whole view."""
@@ -138,7 +149,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         if profile == self.profile and self.view is not None:
             self.view.scheduleDelayedItemsLayout()
                     
-    def layout(self, index, width):
+    def layout(self, index, availableWidth):
         """Layout the node with the given index. This method is called by paint and sizeHint and must be
         implemented in subclasses."""
         raise NotImplementedError()
@@ -276,10 +287,10 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
             width -= self.hSpace  # above loop adds one space too much
         return width, maxHeight
     
-    def getFontMetrics(self, style=STD_STYLE):
+    def getFontMetrics(self, style=None):
         """Return a QFontMetrics-object for a font with the given style."""
         if style is None:
-            style = STD_STYLE
+            style = DelegateStyle.standardStyle()
         self.font.setPointSize(style.relFontSize * self.profile.options["fontSize"])
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
@@ -289,7 +300,7 @@ class AbstractDelegate(QtWidgets.QStyledItemDelegate):
         """Configure the current painter to draw in the given style. This may only be used in the paint
         methods of DelegateItems."""
         if style is None:
-            style = STD_STYLE
+            style = DelegateStyle.standardStyle()
         self.font.setPointSize(style.relFontSize * self.profile.options["fontSize"])
         self.font.setBold(style.bold)
         self.font.setItalic(style.italic)
@@ -441,7 +452,6 @@ class IconBarItem(DelegateItem):
         self.icons = icons
         self.rows = rows
         self.columns = columns
-        
     
     def _computeRowsAndColumns(self,availableWidth):
         """Compute the grid to use given the number of icons and the attributes ''self.rows'' and
@@ -539,7 +549,9 @@ class MultiTextItem(DelegateItem):
     Warning: MultiTextItems will take all available horizontal space. Thus you can usually use it only in
     the center region of an AbstractDelegate and must add it last to its row.
     """
-    def __init__(self,leftTexts,rightTexts,style=STD_STYLE):
+    def __init__(self,leftTexts,rightTexts,style=None):
+        if style is None:
+            style = DelegateStyle.standardStyle()
         self.leftTexts = leftTexts
         self.rightTexts = rightTexts
         self.style = style
