@@ -622,7 +622,7 @@ class MPDConfigWidget(QtWidgets.QWidget):
         self.portEdit.textChanged.connect(self._handleChange)
         self.passwordEdit.textChanged.connect(self._handleChange)
         self.pathEdit.textChanged.connect(self._handleChange)
-    
+
     def setProfile(self, profile):
         """Change the profile whose data is displayed."""
         self.profile = profile
@@ -631,11 +631,11 @@ class MPDConfigWidget(QtWidgets.QWidget):
         self.passwordEdit.setText(profile.password)
         self.passwordVisibleBox.setChecked(len(profile.password) == 0)
         self.pathEdit.setText(profile.path)
-    
+
     def _handleChange(self):
         """(De)activate save button when configuration is modified."""
         self.saveButton.setEnabled(self.isModified())
-        
+
     def isModified(self):
         """Return whether the configuration in the GUI differs from the stored configuration."""
         host = self.hostEdit.text()
@@ -645,9 +645,13 @@ class MPDConfigWidget(QtWidgets.QWidget):
             return True # Not an int
         password = self.passwordEdit.text()
         path = self.pathEdit.text()
-        return [host, port, password, path] != \
-                [self.profile.host, self.profile.port, self.profile.password, self.profile.path]
-        
+        return (
+            host != self.profile.host or
+            port != self.profile.port or
+            password != self.profile.password or
+            path != self.profile.path
+        )
+
     def save(self):
         """Really change the profile."""
         host = self.hostEdit.text()
@@ -656,13 +660,13 @@ class MPDConfigWidget(QtWidgets.QWidget):
         path = self.pathEdit.text()
         self.profile.setConnectionParameters(host, port, password)
         self.profile.setPath(path)
-        self.category.save()
+        profiles.category('playback').save()
         self.saveButton.setEnabled(False)
-    
-    def _handlePasswordVisibleBox(self,checked):
+
+    def _handlePasswordVisibleBox(self, checked):
         """Change whether the password is visible in self.passwordEdit."""
         self.passwordEdit.setEchoMode(QtWidgets.QLineEdit.Normal if checked else QtWidgets.QLineEdit.Password)
-        
+
     def okToClose(self):
         """In case of unsaved configuration data, ask the user what to do."""
         if self.isModified():
@@ -674,6 +678,6 @@ class MPDConfigWidget(QtWidgets.QWidget):
                 return False
             elif button == QtWidgets.QMessageBox.Yes:
                 self.save()
-            else: self.setProfile(self.profile) # reset
+            else:
+                self.setProfile(self.profile) # reset
         return True
-    
