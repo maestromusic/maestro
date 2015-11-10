@@ -196,7 +196,7 @@ class ModifiedTagsDialog(QtWidgets.QDialog):
         self.setModal(True)
 
         self.setWindowTitle(self.tr('Detected Modified Tags on Disk'))
-        layout = QtWidgets.QGridLayout()
+        layout = QtWidgets.QVBoxLayout()
         layout.addWidget(QtWidgets.QLabel(self.tr('Maestro has detected that the tags of <center><i>{}</i>'
             '</center> do not match Maestro\'s database. Please choose which version to keep:')
             .format(self.file.url.path)))
