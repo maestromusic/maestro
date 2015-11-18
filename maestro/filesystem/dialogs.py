@@ -59,46 +59,33 @@ class SetPathAction(actions.TreeAction):
     
     Used by the LostFilesDialog to correct URLs of files moved outside of Maestro.
     """
-    
-    def __init__(self, parent, dialog, text=None, shortcut=None):
-        super().__init__(parent, shortcut)
-        if text is None:
-            self.setText(self.tr('choose path'))
-        else:
-            self.setText(text)
-        self.setPaths = []
-        self.dialog = dialog
+
+    label = translate('SetPathAction', 'Choose path')
     
     def initialize(self, selection):
         self.setEnabled(selection.singleWrapper() and \
                         selection.hasFiles() and \
-                        not os.path.exists(next(selection.fileWrappers()).element.url.absPath))
+                        not os.path.exists(next(selection.fileWrappers()).element.url.path))
     
     def doAction(self):
         elem = next(self.parent().selection.fileWrappers()).element
-        path = QtWidgets.QFileDialog.getOpenFileName(application.mainWindow,
-                                                 self.tr("Select new file location"),
-                                                 os.path.dirname(elem.url.path))
-        if path != "":
+        path = QtWidgets.QFileDialog.getOpenFileName(
+            application.mainWindow,
+            self.tr('Select new location of the missing file'),
+            os.path.dirname(elem.url.path))[0]
+        if path != '':
             newUrl = urls.URL.fileURL(path)
-            from . import getNewfileHash
-            db.query("UPDATE {p}files SET url=?,hash=? WHERE element_id=?",
+            from maestro.filesystem import getNewfileHash
+            db.query('UPDATE {p}files SET url=?,hash=? WHERE element_id=?',
                      str(newUrl), getNewfileHash(newUrl), elem.id)
-            self.setPaths.append( (elem.url, newUrl) )
-            self.dialog.problemURLs.remove(elem.url)
             elem.url = newUrl
             levels.real.emitEvent(dataIds=(elem.id,))
             
 
 class RemoveMissingFilesAction(actions.TreeAction):
     """Action to remove elements from the database which are missing on the filesystem."""
-    
-    def __init__(self, parent):
-        """Initialize the action."""
-        super().__init__(parent)
-        self.setShortcut(self.tr("Del"))
-        self.setText(self.tr("Remove"))
-        self.removedURLs = []
+
+    label = translate('RemoveMissingFilesAction', 'Remove')
             
     def initialize(self, selection):
         self.setEnabled(selection.hasElements())
@@ -108,12 +95,18 @@ class RemoveMissingFilesAction(actions.TreeAction):
         selection = self.parent().selection
         belowRoot = [wrap.parent.index(wrap) for wrap in selection.wrappers()
                      if wrap.parent is self.parent().model().root]
-        self.removedURLs.extend(wrapper.element.url for wrapper in selection.fileWrappers())
         elements = selection.elements()
         if len(belowRoot) > 0:
             for row in sorted(belowRoot, reverse=True):
                 model._removeContents(QtCore.QModelIndex(), row, row)
         levels.real.deleteElements(elements)
+
+
+class MissingFilesTreeView(treeview.TreeView):
+
+    def __init__(self, model):
+        super().__init__(level=levels.real, affectGlobalSelection=False)
+        self.setModel(model)
 
 
 class MissingFilesDialog(QtWidgets.QDialog):
@@ -139,8 +132,7 @@ class MissingFilesDialog(QtWidgets.QDialog):
         label.setWordWrap(True)
         layout.addWidget(label)
         
-        files = [ levels.real.collect(id) for id in ids ]
-        self.problemURLs = set([file.url for file in files])
+        files = [levels.real.collect(id) for id in ids]
         containers = []
         for pid in set(itertools.chain(*(file.parents for file in files))):
             containers.append(levels.real.collect(pid))
@@ -150,20 +142,14 @@ class MissingFilesDialog(QtWidgets.QDialog):
                     files.remove(file)
         self.model = LevelTreeModel(levels.real, containers + files)
         
-        self.view = treeview.TreeView(levels.real, affectGlobalSelection=False)        
-        self.view.setModel(self.model)
+        self.view = MissingFilesTreeView(self.model)
         self.view.setItemDelegate(LostFilesDelegate(self.view))
         self.view.expandAll()
-        
-        self.setPathAction = SetPathAction(self.view, self)
-        self.deleteAction = RemoveMissingFilesAction(self.view)
-        self.view.addAction(self.setPathAction)
-        self.view.addAction(self.deleteAction)
         layout.addWidget(self.view)
         
         toolbar = QtWidgets.QToolBar()
-        toolbar.addAction(self.setPathAction)
-        toolbar.addAction(self.deleteAction)
+        toolbar.addAction(self.view.treeActions['filesystem-setPath'])
+        toolbar.addAction(self.view.treeActions['filesystem-removeMissing'])
         buttonLayout = QtWidgets.QHBoxLayout()
         buttonLayout.addStretch()
         buttonLayout.addWidget(toolbar)
@@ -174,10 +160,10 @@ class MissingFilesDialog(QtWidgets.QDialog):
         self.setLayout(layout)
         self.updateCloseButton()
         levels.real.connect(self.updateCloseButton)
-        self.resize(800,400)
+        self.resize(800, 400)
     
     def updateCloseButton(self):
-        numProblem = sum(f.element.url in self.problemURLs for f in self.model.root.getAllFiles())
+        numProblem = len([f for f in self.model.root.getAllFiles() if not os.path.exists(f.element.url.path)])
         if numProblem == 0:
             self.accept()
         self.closeButton.setText(self.tr("Close (%n files still missing)", None, numProblem))
@@ -197,9 +183,11 @@ class ModifiedTagsDialog(QtWidgets.QDialog):
 
         self.setWindowTitle(self.tr('Detected Modified Tags on Disk'))
         layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(QtWidgets.QLabel(self.tr('Maestro has detected that the tags of <center><i>{}</i>'
+        layout.addWidget(QtWidgets.QLabel(self.tr(
+            'Maestro has detected that the tags of <center><i>{}</i>'
             '</center> do not match Maestro\'s database. Please choose which version to keep:')
-            .format(self.file.url.path)))
+            .format(self.file.url.path)
+        ))
         viewLayout = QtWidgets.QHBoxLayout()
         leftLayout = QtWidgets.QVBoxLayout()
         rightLayout = QtWidgets.QVBoxLayout()

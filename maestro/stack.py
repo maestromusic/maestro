@@ -169,11 +169,15 @@ class UndoStack(QtCore.QObject):
             raise UndoStackError("Cannot abort macro, because no macro is being built.")
         if self._inUndoRedo:
             raise UndoStackError("Cannot end a macro during undo/redo.")
-        
-        for macro in reversed(self._activeMacros):
-            macro.abort()
-        self._activeMacros = []
-        self._eventQueue = []
+
+        innerMacro = self._activeMacros.pop()
+        innerMacro.abort()
+
+        # TODO: the following older code did abort *all* macros -> not what we want!?
+        # for macro in reversed(self._activeMacros):
+        #     macro.abort()
+        # self._activeMacros = []
+        # self._eventQueue = []
         # No need to change the stack because active macros have not been added to the stack.
         
     def clear(self):

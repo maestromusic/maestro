@@ -443,13 +443,10 @@ class Source(QtCore.QObject):
                     self.moveFile(file, newURL)
             if len(self.missingDB) > 0:
                 # --> some files are lost. Show a dialog and let the user fix this
-                from . import dialogs
+                from maestro.filesystem import dialogs
                 dialog = dialogs.MissingFilesDialog([file.id for file in self.missingDB])
                 dialog.exec_()
                 stack.clear()
-                for oldURL, newURL in dialog.setPathAction.setPaths:
-                    self.moveFile(self.files[oldURL.path], newURL)
-                self.removeFiles([self.files[url.path] for url in dialog.deleteAction.removedURLs])
         self.scanState = ScanState.notScanning
         self.scanTimer.stop()
         logging.debug(__name__, 'scan of source {} finished'.format(self.name))

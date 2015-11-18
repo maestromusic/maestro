@@ -90,7 +90,6 @@ class ActionManager(QtCore.QObject):
         """
         if identifier in self.actions:
             return self.actions[identifier].shortcut
-        return None
 
     def setShortcut(self, identifier, shortcut: QtGui.QKeySequence):
         """Set a shortcut for the action named `identifier`."""
