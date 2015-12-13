@@ -84,10 +84,7 @@ class CriterionNode(Node):
         """
         if self.contents is None:
             # Only the root node stores an reference to the model
-            parent = self.parent
-            while parent.parent is not None:
-                parent = parent.parent
-            model = parent.model
+            model = self.getRoot().model
             if not block:
                 self.setContents([LoadingNode()])
                 model._startLoading(self)

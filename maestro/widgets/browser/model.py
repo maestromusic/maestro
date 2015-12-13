@@ -202,7 +202,7 @@ class BrowserModel(rootedtreemodel.RootedTreeModel):
             # Usually nodes are only loaded when the _loaded-signal arrives. But usually when block=True
             # is used, the caller expects nodes to be loaded after this method.
             # So: Don't wait for the signal. 
-            self._loaded(task)  # Do not wait for the signal to arrive because the caller often expe
+            self._loaded(task)
     
     def _loaded(self, task):
         """This is called (in the main thread) when a task has been processed. It will insert the loaded
