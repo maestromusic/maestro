@@ -11,7 +11,7 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
@@ -29,10 +29,10 @@ class DockWidget(QtWidgets.QDockWidget):
     """QDockWidget subclass that uses our custom DockWidgetTitleBar and respects the 'Hide title bars'
     option. DockWidgets are created automatically by MainWindow when a widgets.Widget is added to a
     dock area.
-    
+
     *widget* is the widgets.Widget-instance for the dock. *title* and *icon* are used for the
-    dockwidget's title bar. 
-    """    
+    dockwidget's title bar.
+    """
     def __init__(self, widget, title='', icon=None):
         super().__init__()
         self.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable)
@@ -44,16 +44,16 @@ class DockWidget(QtWidgets.QDockWidget):
         self.tbWidget.setWidget(widget)
         self._handleHideTitleBarAction(mainwindow.mainWindow.hideTitleBarsAction.isChecked())
         mainwindow.mainWindow.hideTitleBarsAction.toggled.connect(self._handleHideTitleBarAction)
-        
+
     def close(self):
         return self.widget().close() and super().close() # make sure self.widget().close is called
-        
+
     def setWindowTitle(self, title):
         """Set the title displayed in the title bar of this dock widget."""
         super().setWindowTitle(title)
         if self.tbWidget is not None:
             self.tbWidget.titleLabel.setText(title)
-        
+
     def setWindowIcon(self, icon):
         """Set the icon displayed in the title bar of this dock widget. If *icon* is None, the icon will be
         hidden."""
@@ -65,7 +65,7 @@ class DockWidget(QtWidgets.QDockWidget):
         else:
             self.tbWidget.iconLabel.setPixmap(QtGui.QPixmap())
             self.tbWidget.iconLabel.hide()
-            
+
     def _handleHideTitleBarAction(self, checked):
         """Set whether the title bar is visible."""
         if checked:
@@ -74,7 +74,7 @@ class DockWidget(QtWidgets.QDockWidget):
         else:
             self.setTitleBarWidget(self.tbWidget)
             self.tbWidget.show()
-    
+
     def setFrozen(self, frozen):
         """Freeze/unfreeze dockwidget. Frozen dockwidgets cannot be resized, moved or closed."""
         if frozen:
@@ -91,11 +91,11 @@ class DockWidgetTitleBar(QtWidgets.QFrame):
     has been removed, but an 'options' button may be added."""
     def __init__(self, parent):
         super().__init__(parent)
-        
+
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(2, 0, 0, 0)
         layout.setSpacing(0)
-        
+
         self.iconLabel = QtWidgets.QLabel()
         layout.addWidget(self.iconLabel)
         layout.addSpacing(3)
@@ -104,19 +104,19 @@ class DockWidgetTitleBar(QtWidgets.QFrame):
         layout.addWidget(self.titleLabel)
         layout.addStretch()
         layout.addSpacing(8)
-        
+
         self.optionButton = DockWidgetTitleButton('options')
         self.optionButton.setEnabled(False)
         layout.addWidget(self.optionButton)
         self.closeButton = DockWidgetTitleButton('close')
         self.closeButton.clicked.connect(self._handleCloseButton)
         layout.addWidget(self.closeButton)
-    
+
     def _handleCloseButton(self):
         mainwindow.mainWindow.closeWidget(self.parent().widget())
-        
+
     def setWidget(self, widget):
-        """Give the title bar a reference to its dock's inner widget.""" 
+        """Give the title bar a reference to its dock's inner widget."""
         if widget.hasOptionDialog:
             self.optionButton.clicked.connect(functools.partial(widget.toggleOptionDialog,
                                                                 self.optionButton))
@@ -127,12 +127,12 @@ class DockWidgetTitleButton(QtWidgets.QAbstractButton):
     """Python implementation of QDockWidgetTitleButton from the Qt source (gui/widgets/qdockwidget.cpp).
     Unfortunately that class is not part of the public API and hence this Python port is necessary to create
     custom buttons. Constructor and paintEvent have been slightly modified, the rest is the same.
-    
+
     *icon* may be either a QIcon or one of the following special strings, which stand for style-dependent
     icons:
         - 'close': The close button used in dockwidgets' title bars.
         - 'options': The option button used in dockwidgets' title bars.
-    """ 
+    """
     def __init__(self, icon):
         super().__init__()
         self.setFocusPolicy(Qt.NoFocus)
@@ -148,7 +148,7 @@ class DockWidgetTitleButton(QtWidgets.QAbstractButton):
             else:
                 raise ValueError("*icon* must be either a QIcon or one of ['close', 'options'].")
         self.setIcon(icon)
-        
+
     def minimumSizeHint(self):
         return self.sizeHint()
 
@@ -176,7 +176,7 @@ class DockWidgetTitleButton(QtWidgets.QAbstractButton):
         opt = QtWidgets.QStyleOptionToolButton()
         opt.initFrom(self)
         opt.state |= QtWidgets.QStyle.State_AutoRaise;
-        
+
         if self.style().styleHint(QtWidgets.QStyle.SH_DockWidget_ButtonsHaveFrame, None, self):
             if self.isEnabled() and self.underMouse() and not self.isChecked() and not self.isDown():
                 opt.state |= QtWidgets.QStyle.State_Raised
@@ -184,7 +184,7 @@ class DockWidgetTitleButton(QtWidgets.QAbstractButton):
                 opt.state |= QtWidgets.QStyle.State_On
             if self.isDown():
                 opt.state |= QtWidgets.QStyle.State_Sunken
-            
+
             # QGtkStyle disables the frame (unless hovering). It does so by checking whether this widget
             # inherits QDockWidgetTitleButton, which is not part of the API.
             # Thus we have to anticipate this check here.
@@ -193,12 +193,20 @@ class DockWidgetTitleButton(QtWidgets.QAbstractButton):
                     # This should be done in drawPrimitive, but for some reason it does not work.
                     opt.rect.adjust(2,2,-2,-2)
                 self.style().drawPrimitive(QtWidgets.QStyle.PE_PanelButtonTool, opt, painter, self)
-        
+
         opt.icon = self.icon()
         opt.subControls = QtWidgets.QStyle.SC_None
         opt.activeSubControls = QtWidgets.QStyle.SC_None
-        opt.features = getattr(QtWidgets.QStyleOptionToolButton, 'None') # QStyleOptionToolButton::None
+        opt.features = _getNoneAttribute(QtWidgets.QStyleOptionToolButton) # QStyleOptionToolButton::None
         opt.arrowType = Qt.NoArrow
         size = self.style().pixelMetric(QtWidgets.QStyle.PM_SmallIconSize, None, self)
         opt.iconSize = QtCore.QSize(size, size)
         self.style().drawComplexControl(QtWidgets.QStyle.CC_ToolButton, opt, painter, self)
+
+
+def _getNoneAttribute(obj):
+    # The name of this attribute seems to have been changed in some PyQt version.
+    if hasattr(obj, 'None_'):
+        return obj.None_
+    else:
+        return getattr(obj, 'None')
