@@ -32,7 +32,7 @@ translate = QtCore.QCoreApplication.translate
 
 def appendToDefaultPlaylist(wrappers, replace=False):
     """Append the given wrappers to the default playlist. Just do nothing if there is no default playlist.
-    If *replace* is true, clear the playlist. If the playlist is currently stopped, start it with the new
+    If `replace` is true, clear the playlist. If the playlist is currently stopped, start it with the new
     wrappers.
     """
     currentPlaylist = WidgetClass.currentWidget('playlist')

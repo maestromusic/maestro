@@ -106,7 +106,7 @@ class MBTagStorage(dict):
                     tag = mapping[key]
             else:
                 tag = tags.get(key)
-            ret[tag] = [str(v) for v in values]  # converts AliasEntities to strings
+            ret[tag] = [tag.convertValue(str(v)) for v in values]  # converts AliasEntities to strings
         return ret
 
 

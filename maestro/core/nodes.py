@@ -78,6 +78,13 @@ class Node:
         while parent is not None and not (excludeRootNode and isinstance(parent, RootNode)): 
             yield parent
             parent = parent.parent
+
+    def getRoot(self):
+        """Return the root node in the tree `self` is part of, i.e., the most remote parent."""
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node
             
     def isAncestorOf(self, node):
         """Return whether this is an ancestor of *node*. A node is considered an ancestor of itself."""

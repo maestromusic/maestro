@@ -39,7 +39,11 @@ class URL:
 
     @classmethod
     def fileURL(cls, path):
-        """Convenience method: create an URL with scheme 'file', empty netloc and given *path*."""
+        """Convenience method: create an URL with scheme 'file', and empty netloc.
+
+         Args:
+             path: path of the file.
+        """
         assert path[0] == '/'
         return cls('file://{}'.format(path))
 

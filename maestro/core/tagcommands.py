@@ -100,12 +100,12 @@ def renameTagValue(tag, oldValue, newValue):
             elemToList[elementId].append(valueId) 
     onlyOld = [ id for id, vals in elemToList.items() if len(vals) == 1 and vals[0] == oldId ]
     both = [ id for id, vals in elemToList.items() if len(vals) == 2 ]
-    bar = QtGui.QProgressDialog(translate("renameTagValue", "Renaming {} to {} ...")
-                                .format(oldValue, newValue),
-                                None,
-                                0,
-                                len(onlyOld) + len(both),
-                                application.mainWindow)
+    bar = QtWidgets.QProgressDialog(translate("renameTagValue", "Renaming {} to {} ...")
+                                    .format(oldValue, newValue),
+                                    None,
+                                    0,
+                                    len(onlyOld) + len(both),
+                                    application.mainWindow)
     bar.setMinimumDuration(1000)
     bar.setWindowModality(Qt.WindowModal)
     stack.beginMacro(translate("renameTagValue", "rename {} value").format(tag),

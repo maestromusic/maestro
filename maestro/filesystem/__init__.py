@@ -36,6 +36,12 @@ def init():
         icon=utils.images.icon('filesystembrowser'),
         areas='dock', preferredDockArea='right'
     ).register()
+    from maestro.filesystem import dialogs
+    dialogs.RemoveMissingFilesAction.register('filesystem-removeMissing',
+                                              shortcut=translate('QShortcut', 'Del'))
+    dialogs.SetPathAction.register('filesystem-setPath')
+    dialogs.MissingFilesTreeView.addActionDefinition('filesystem-removeMissing')
+    dialogs.MissingFilesTreeView.addActionDefinition('filesystem-setPath')
 
 
 def enable():

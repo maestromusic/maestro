@@ -292,7 +292,7 @@ class PlaylistModel(wrappertreemodel.WrapperTreeModel):
         command = PlaylistInsertCommand(self, parent, position, wrappers, updateBackend)
         self.stack.push(command)
         if hasattr(command, 'error'):
-            from ..gui import dialogs
+            from maestro.gui import dialogs
             QtWidgets.qApp.setOverrideCursor(Qt.ArrowCursor)
             dialogs.warning(self.tr('Playlist error'), str(command.error))
             QtWidgets.qApp.restoreOverrideCursor()
