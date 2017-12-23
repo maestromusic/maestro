@@ -60,13 +60,14 @@ class AudioFileIdentifier:
         except subprocess.CalledProcessError:
             # fpcalc returned non-zero exit status
             logging.warning(__name__,
-                            'Error computing AcoustID fingerprint: fpcalc returned non-zero exit status')
+                            f'Error computing AcoustID fingerprint of {path}: fpcalc returned non-zero exit status')
             return self.fallbackHash(path)
         data = data.decode(sys.getfilesystemencoding())
-        if len(data) == 0:
-            logging.warning(__name__, 'Error computing AcoustID fingerprint: fpcalc output is empty')
+        try:
+            duration, fingerprint = (line.split("=", 1)[1] for line in data.splitlines() )
+        except Exception as e:
+            logging.warning(__name__, f'Error computing AcoustID fingerprint of {path}: {e}')
             return self.fallbackHash(path)
-        duration, fingerprint = (line.split("=", 1)[1] for line in data.splitlines()[1:] )
         import urllib.request, urllib.error, json
         try:
             req = urllib.request.urlopen(self.requestURL.format(self.apikey, duration, fingerprint))
