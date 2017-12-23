@@ -77,19 +77,19 @@ class MainWindow(QtWidgets.QMainWindow):
         """:type: dict[str, widgets.Widget]"""
 
         # Resize and move the widget to the size and position it had when the program was closed
-        if config.binary.gui.mainwindow_maximized:
-            self.showMaximized()
-        else:
-            if config.binary.gui.mainwindow_geometry is not None:
-                success = self.restoreGeometry(config.binary.gui.mainwindow_geometry)
-            else: success = False
-            if not success:  # Default geometry
-                screen = QtWidgets.QDesktopWidget().availableGeometry()
-                self.resize(min(1000, screen.width()), min(800, screen.height()))
-                # Center the window
-                screen = QtWidgets.QDesktopWidget().screenGeometry()
-                size = self.geometry()
-                self.move((screen.width() - size.width()) / 2, (screen.height() - size.height()) / 2)
+        # if config.binary.gui.mainwindow_maximized:
+        #     self.showMaximized()
+        # else:
+        if config.binary.gui.mainwindow_geometry is not None:
+            success = self.restoreGeometry(config.binary.gui.mainwindow_geometry)
+        else: success = False
+        if not success:  # Default geometry
+            screen = QtWidgets.QDesktopWidget().availableGeometry()
+            self.resize(min(1000, screen.width()), min(800, screen.height()))
+            # Center the window
+            screen = QtWidgets.QDesktopWidget().screenGeometry()
+            size = self.geometry()
+            self.move((screen.width() - size.width()) / 2, (screen.height() - size.height()) / 2)
 
         self.setCentralWidget(CentralTabWidget())
         self.initMenus()
@@ -123,7 +123,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.savePerspective()
         for widget in self.getWidgets():
             self.closeWidget(widget, ask=False)
-        config.binary.gui.mainwindow_maximized = self.isMaximized()
         config.binary.gui.mainwindow_geometry = bytearray(self.saveGeometry())
                    
     # Dock Widget handling

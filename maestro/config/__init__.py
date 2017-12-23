@@ -235,7 +235,6 @@ storageOptions = collections.OrderedDict((
 binaryOptions = {
 'gui': {
     'mainwindow_geometry': None,
-    'mainwindow_maximized': False,
     'mainwindow_state': None,
     'preferences_geometry': None,
 }
